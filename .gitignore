@@ -8,7 +8,6 @@ cmake-build-*/
 
 # IDE
 .idea/
-.kiro/
 *.swp
 *.swo
 *~
