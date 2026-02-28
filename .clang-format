@@ -1,0 +1,67 @@
+# Nexus Code Formatting Configuration
+# Based on LLVM style with Nexus-specific adjustments
+
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# Line length
+ColumnLimit: 80
+
+# Braces
+BreakBeforeBraces: Linux
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: Never
+  AfterStruct: false
+  AfterEnum: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments: true
+
+# Spacing
+SpaceAfterCStyleCast: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Pointers and references
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+# Functions
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterReturnType: None
+
+# Comments
+ReflowComments: true
+SpacesBeforeTrailingComments: 2
+
+# Includes
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<xgl/'
+    Priority: 1
+  - Regex: '^<'
+    Priority: 2
+  - Regex: '.*'
+    Priority: 3
+
+# Other
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1

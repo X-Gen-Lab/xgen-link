@@ -1,0 +1,121 @@
+# Build directories
+build/
+build-*/
+build_*/
+_build/
+out/
+cmake-build-*/
+
+# IDE
+.idea/
+.kiro/
+*.swp
+*.swo
+*~
+
+# VS Code (keep settings, ignore user-specific)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Compiled files
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.d
+*.su
+
+# Libraries
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+
+# Debug files
+*.dSYM/
+
+# Documentation build
+docs/build/
+docs/api/
+*.log
+
+# Test coverage
+coverage/
+coverage_html/
+coverage_report/
+Testing/
+.hypothesis/
+.pytest_cache/
+*.gcno
+*.gcda
+*.gcov
+lcov.info
+*.profdata
+*.profraw
+
+# Test results
+test_results.xml
+*.xml.bak
+
+# Package managers
+node_modules/
+__pycache__/
+*.pyc
+.env
+venv/
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*~
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Doxygen
+docs/api/html/
+docs/api/xml/
+docs/api/latex/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+compile_commands.json
+
+# Visual Studio
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vs/
+x64/
+Debug/
+Release/
+*.suo
+*.user
+
+# Kconfig
+.config
+.config.old
+defconfig
+

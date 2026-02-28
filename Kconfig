@@ -1,0 +1,284 @@
+# x_gen_link Protocol Configuration
+# Compile-time configuration options
+# Author: Nexus Team
+
+menu "x_gen_link Protocol Configuration"
+
+config XGL_ENABLE
+    bool "Enable x_gen_link Protocol"
+    default y
+    help
+      Enable the x_gen_link communication protocol stack.
+
+config XGL_MAX_INSTANCES
+    int "Maximum protocol instances"
+    default 4
+    range 1 16
+    depends on XGL_ENABLE
+    help
+      Maximum number of protocol instances that can be created.
+      Each instance maintains its own state, memory pools, and routing table.
+
+config XGL_DEFAULT_TX_POOL_SIZE
+    int "Default TX memory pool size (bytes)"
+    default 4096
+    range 1024 65536
+    depends on XGL_ENABLE
+    help
+      Default size of the transmission memory pool.
+      This pool is used for allocating outgoing packets.
+
+config XGL_DEFAULT_RX_BUFFER_SIZE
+    int "Default RX buffer size (bytes)"
+    default 512
+    range 128 4096
+    depends on XGL_ENABLE
+    help
+      Default size of the reception buffer.
+      Must be large enough to hold the maximum frame size.
+
+config XGL_MAX_FRAME_SIZE
+    int "Maximum frame size (bytes)"
+    default 256
+    range 64 1024
+    depends on XGL_ENABLE
+    help
+      Maximum size of a single frame including header and CRC.
+
+config XGL_THREAD_SAFE
+    bool "Enable thread safety"
+    default n
+    depends on XGL_ENABLE
+    help
+      Enable mutex protection for multi-threaded environments.
+      Adds overhead but allows safe concurrent access.
+
+config XGL_ENABLE_FRAGMENTATION
+    bool "Enable packet fragmentation"
+    default y
+    depends on XGL_ENABLE
+    help
+      Enable support for fragmenting large packets.
+      Required for sending data larger than max frame size.
+
+config XGL_ENABLE_COMPRESSION
+    bool "Enable data compression"
+    default n
+    depends on XGL_ENABLE
+    help
+      Enable optional data compression (RLE/LZ77/ZLIB).
+      Reduces bandwidth usage for compressible data.
+
+choice
+    prompt "Compression algorithm"
+    default XGL_COMPRESSION_RLE
+    depends on XGL_ENABLE_COMPRESSION
+
+config XGL_COMPRESSION_RLE
+    bool "Run-Length Encoding (RLE)"
+    help
+      Simple and fast compression for repetitive data.
+
+config XGL_COMPRESSION_LZ77
+    bool "LZ77 compression"
+    help
+      Better compression ratio, higher CPU usage.
+
+config XGL_COMPRESSION_ZLIB
+    bool "ZLIB compression"
+    help
+      Best compression ratio, highest CPU usage.
+
+endchoice
+
+config XGL_ENABLE_ENCRYPTION
+    bool "Enable data encryption"
+    default n
+    depends on XGL_ENABLE
+    help
+      Enable optional data encryption for secure communication.
+
+choice
+    prompt "Encryption algorithm"
+    default XGL_ENCRYPTION_AES128
+    depends on XGL_ENABLE_ENCRYPTION
+
+config XGL_ENCRYPTION_AES128
+    bool "AES-128"
+    help
+      Standard AES encryption with 128-bit keys.
+
+config XGL_ENCRYPTION_CHACHA20
+    bool "ChaCha20"
+    help
+      Modern stream cipher, faster on embedded systems.
+
+endchoice
+
+config XGL_DEFAULT_ACK_TIMEOUT_MS
+    int "Default ACK timeout (milliseconds)"
+    default 100
+    range 10 5000
+    depends on XGL_ENABLE
+    help
+      Default timeout for waiting for acknowledgments.
+      Will be adjusted dynamically based on RTT measurements.
+
+config XGL_DEFAULT_MAX_RETRY
+    int "Default maximum retry count"
+    default 3
+    range 0 10
+    depends on XGL_ENABLE
+    help
+      Maximum number of retransmission attempts before giving up.
+
+config XGL_DEFAULT_WINDOW_SIZE
+    int "Default sliding window size"
+    default 4
+    range 1 16
+    depends on XGL_ENABLE
+    help
+      Size of the sliding window for flow control.
+      Larger windows allow higher throughput but use more memory.
+
+config XGL_ENABLE_LOGGING
+    bool "Enable logging"
+    default n
+    depends on XGL_ENABLE
+    help
+      Enable logging for debugging and diagnostics.
+
+choice
+    prompt "Default log level"
+    default XGL_LOG_LEVEL_INFO
+    depends on XGL_ENABLE_LOGGING
+
+config XGL_LOG_LEVEL_ERROR
+    bool "Error"
+    help
+      Log only errors.
+
+config XGL_LOG_LEVEL_WARNING
+    bool "Warning"
+    help
+      Log warnings and errors.
+
+config XGL_LOG_LEVEL_INFO
+    bool "Info"
+    help
+      Log informational messages, warnings, and errors.
+
+config XGL_LOG_LEVEL_DEBUG
+    bool "Debug"
+    help
+      Log debug messages and above.
+
+config XGL_LOG_LEVEL_VERBOSE
+    bool "Verbose"
+    help
+      Log everything including verbose details.
+
+endchoice
+
+config XGL_ENABLE_STATISTICS
+    bool "Enable statistics collection"
+    default y
+    depends on XGL_ENABLE
+    help
+      Enable collection of protocol statistics.
+      Minimal overhead, useful for monitoring.
+
+config XGL_ENABLE_QOS
+    bool "Enable Quality of Service (QoS)"
+    default n
+    depends on XGL_ENABLE
+    help
+      Enable priority-based packet transmission.
+
+config XGL_QOS_PRIORITY_LEVELS
+    int "Number of QoS priority levels"
+    default 4
+    range 2 8
+    depends on XGL_ENABLE_QOS
+    help
+      Number of priority levels for QoS.
+
+config XGL_MEMORY_POOL_ALIGNMENT
+    int "Memory pool alignment (bytes)"
+    default 4
+    range 1 16
+    depends on XGL_ENABLE
+    help
+      Alignment requirement for memory pool allocations.
+      Should match platform requirements (4 for ARM Cortex-M).
+
+config XGL_ENABLE_ASSERTIONS
+    bool "Enable runtime assertions"
+    default y
+    depends on XGL_ENABLE
+    help
+      Enable runtime assertions for parameter validation.
+      Disable for production to reduce code size.
+
+endmenu
+
+menu "Platform Configuration"
+
+config XGL_PLATFORM_POSIX
+    bool "POSIX platform"
+    default n
+    help
+      Enable POSIX platform support (Linux, macOS).
+
+config XGL_PLATFORM_FREERTOS
+    bool "FreeRTOS platform"
+    default n
+    help
+      Enable FreeRTOS platform support.
+
+config XGL_PLATFORM_WINDOWS
+    bool "Windows platform"
+    default n
+    help
+      Enable Windows platform support.
+
+config XGL_PLATFORM_BAREMETAL
+    bool "Bare-metal platform"
+    default n
+    help
+      Enable bare-metal platform support (no OS).
+
+endmenu
+
+menu "Resource Constraints"
+
+config XGL_TINY_FOOTPRINT
+    bool "Tiny footprint mode"
+    default n
+    depends on XGL_ENABLE
+    help
+      Optimize for minimal code size and RAM usage.
+      Disables optional features.
+
+config XGL_SMALL_FOOTPRINT
+    bool "Small footprint mode"
+    default n
+    depends on XGL_ENABLE
+    help
+      Optimize for small code size with essential features.
+
+config XGL_MEDIUM_FOOTPRINT
+    bool "Medium footprint mode"
+    default y
+    depends on XGL_ENABLE
+    help
+      Balanced configuration for typical embedded systems.
+
+config XGL_LARGE_FOOTPRINT
+    bool "Large footprint mode"
+    default n
+    depends on XGL_ENABLE
+    help
+      Full-featured configuration for systems with ample resources.
+
+endmenu
