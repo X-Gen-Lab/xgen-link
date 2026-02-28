@@ -1,0 +1,139 @@
+/**
+ * \file            xgl_network.h
+ * \brief           Network layer packet handling and routing
+ * \author          Nexus Team
+ */
+
+#ifndef XGL_NETWORK_H
+#define XGL_NETWORK_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "xgl_types.h"
+#include "xgl_error.h"
+#include "xgl_route.h"
+#include "xgl_packet_pool.h"
+
+/*---------------------------------------------------------------------------*/
+/* Network Layer Configuration                                               */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Protocol version
+ */
+#define XGL_PROTOCOL_VERSION        1
+
+/**
+ * \brief           Broadcast address
+ */
+#define XGL_BROADCAST_ID            0xFF
+
+/*---------------------------------------------------------------------------*/
+/* Network Layer Context                                                     */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Network layer context structure
+ */
+typedef struct {
+    uint8_t local_id;               /**< Local node ID */
+    xgl_route_table_t* route_table; /**< Route table */
+    xgl_rx_callback_t rx_callback;  /**< Receive callback */
+    xgl_error_callback_t error_callback; /**< Error callback */
+    void* callback_user_data;       /**< User data for callbacks */
+    xgl_statistics_t* stats;        /**< Statistics structure */
+} xgl_network_ctx_t;
+
+/*---------------------------------------------------------------------------*/
+/* Network Layer API                                                         */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Initialize network layer context
+ * \param[in,out]   ctx: Network layer context
+ * \param[in]       local_id: Local node ID
+ * \param[in]       route_table: Route table
+ * \param[in]       rx_callback: Receive callback
+ * \param[in]       error_callback: Error callback
+ * \param[in]       callback_user_data: User data for callbacks
+ * \param[in]       stats: Statistics structure
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
+                             uint8_t local_id,
+                             xgl_route_table_t* route_table,
+                             xgl_rx_callback_t rx_callback,
+                             xgl_error_callback_t error_callback,
+                             void* callback_user_data,
+                             xgl_statistics_t* stats);
+
+/**
+ * \brief           Send packet through network layer
+ * \param[in]       ctx: Network layer context
+ * \param[in]       packet: Packet to send
+ * \param[in]       assign_seq: Assign sequence number flag
+ * \return          XGL_OK on success, error code otherwise
+ * \note            This function performs routing and forwards packet to data link layer
+ */
+xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
+                             xgl_packet_t* packet,
+                             bool assign_seq);
+
+/**
+ * \brief           Receive and process packet from data link layer
+ * \param[in]       ctx: Network layer context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in]       frame_buf: Frame buffer
+ * \param[in]       frame_len: Frame length
+ * \return          XGL_OK on success, error code otherwise
+ * \note            This function validates address and forwards to transport layer or application
+ */
+xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
+                                xgl_handle_t handle,
+                                uint8_t* frame_buf,
+                                size_t frame_len);
+
+/**
+ * \brief           Validate packet addressing
+ * \param[in]       ctx: Network layer context
+ * \param[in]       target_id: Target node ID
+ * \param[in]       source_id: Source node ID
+ * \return          true if addressing is valid, false otherwise
+ */
+bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
+                                  uint8_t target_id,
+                                  uint8_t source_id);
+
+/**
+ * \brief           Check if packet is addressed to local node
+ * \param[in]       ctx: Network layer context
+ * \param[in]       target_id: Target node ID
+ * \return          true if packet is for local node, false otherwise
+ */
+static inline bool xgl_network_is_local(const xgl_network_ctx_t* ctx,
+                                       uint8_t target_id) {
+    return (target_id == ctx->local_id) || (target_id == XGL_BROADCAST_ID);
+}
+
+/**
+ * \brief           Invoke error callback
+ * \param[in]       ctx: Network layer context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in]       error: Error code
+ * \param[in]       message: Error message
+ */
+void xgl_network_report_error(xgl_network_ctx_t* ctx,
+                              xgl_handle_t handle,
+                              xgl_error_t error,
+                              const char* message);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* XGL_NETWORK_H */
