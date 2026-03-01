@@ -105,7 +105,8 @@ TEST_F(XglSendTest, SendWithNullHandle) {
         .data = (const uint8_t*)"test",
         .data_len = 4,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send(nullptr, &tx_data);
@@ -132,7 +133,8 @@ TEST_F(XglSendTest, SendWithNullDataPointer) {
         .data = nullptr,
         .data_len = 4,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send(handle, &tx_data);
@@ -150,7 +152,8 @@ TEST_F(XglSendTest, SendWithZeroDataLength) {
         .data = (const uint8_t*)"test",
         .data_len = 0,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send(handle, &tx_data);
@@ -168,7 +171,8 @@ TEST_F(XglSendTest, SendWithInvalidPriority) {
         .data = (const uint8_t*)"test",
         .data_len = 4,
         .reliable = false,
-        .priority = 8  /* Invalid: must be 0-7 */
+        .priority = 8,  /* Invalid: must be 0-7 */
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send(handle, &tx_data);
@@ -191,7 +195,8 @@ TEST_F(XglSendTest, BasicSendSuccess) {
         .data = test_data,
         .data_len = sizeof(test_data) - 1,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     /* Expect PHY TX to be called */
@@ -215,7 +220,8 @@ TEST_F(XglSendTest, SendToNonExistentRoute) {
         .data = test_data,
         .data_len = sizeof(test_data) - 1,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send(handle, &tx_data);
@@ -240,7 +246,8 @@ TEST_F(XglSendTest, ZeroCopySendWithNullHandle) {
         .target_id = 2,
         .data_type = 1,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send_zerocopy(nullptr, &tx_data);
@@ -270,7 +277,8 @@ TEST_F(XglSendTest, ZeroCopySendWithInvalidDataOffset) {
         .target_id = 2,
         .data_type = 1,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send_zerocopy(handle, &tx_data);
@@ -291,7 +299,8 @@ TEST_F(XglSendTest, ZeroCopySendWithBufferTooSmall) {
         .target_id = 2,
         .data_type = 1,
         .reliable = false,
-        .priority = 0
+        .priority = 0,
+        .timeout_ms = 0
     };
     
     xgl_error_t err = xgl_send_zerocopy(handle, &tx_data);

@@ -16,18 +16,19 @@ TEST(XglFrameTest, BuildBasicFrame) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0x01, 0x02, 0x03, 0x04};
     
-    xgl_error_t result = xgl_frame_build(
-        &frame,
-        0x10,  /* source_id */
-        0x20,  /* target_id */
-        0x05,  /* data_type */
-        0x42,  /* seq_num */
-        0x00,  /* ack_num */
-        payload,
-        sizeof(payload),
-        true,  /* reliable */
-        3      /* priority */
-    );
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 3
+    };
+    
+    xgl_error_t result = xgl_frame_build(&frame, &params);
     
     EXPECT_EQ(result, XGL_OK);
     EXPECT_EQ(frame.header.sof, XGL_SOF);
@@ -52,25 +53,42 @@ TEST(XglFrameTest, BuildBasicFrame) {
 TEST(XglFrameTest, BuildFrameNullPointer) {
     const uint8_t payload[] = {0x01, 0x02};
     
-    xgl_error_t result = xgl_frame_build(
-        nullptr,
-        0x10, 0x20, 0x05, 0x42, 0x00,
-        payload, sizeof(payload),
-        false, 0
-    );
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0
+    };
     
+    xgl_error_t result = xgl_frame_build(nullptr, &params);
+    EXPECT_EQ(result, XGL_ERR_NULL_POINTER);
+    
+    xgl_frame_t frame;
+    result = xgl_frame_build(&frame, nullptr);
     EXPECT_EQ(result, XGL_ERR_NULL_POINTER);
 }
 
 TEST(XglFrameTest, BuildFrameEmptyPayload) {
     xgl_frame_t frame;
     
-    xgl_error_t result = xgl_frame_build(
-        &frame,
-        0x10, 0x20, 0x05, 0x42, 0x00,
-        nullptr, 0,
-        false, 0
-    );
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = nullptr,
+        .payload_len = 0,
+        .reliable = false,
+        .priority = 0
+    };
+    
+    xgl_error_t result = xgl_frame_build(&frame, &params);
     
     EXPECT_EQ(result, XGL_OK);
     EXPECT_EQ(frame.payload, nullptr);
@@ -89,8 +107,18 @@ TEST(XglFrameTest, SerializeFrame) {
     size_t bytes_written;
     
     /* Build frame */
-    xgl_frame_build(&frame, 0x10, 0x20, 0x05, 0x42, 0x00,
-                    payload, sizeof(payload), true, 3);
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 3
+    };
+    xgl_frame_build(&frame, &params);
     
     /* Serialize */
     xgl_error_t result = xgl_frame_serialize(buffer, sizeof(buffer),
@@ -119,8 +147,18 @@ TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
     uint8_t buffer[10];  /* Too small */
     size_t bytes_written;
     
-    xgl_frame_build(&frame, 0x10, 0x20, 0x05, 0x42, 0x00,
-                    payload, sizeof(payload), false, 0);
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0
+    };
+    xgl_frame_build(&frame, &params);
     
     xgl_error_t result = xgl_frame_serialize(buffer, sizeof(buffer),
                                              &frame, &bytes_written);
@@ -273,8 +311,18 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
     const uint8_t payload[] = {0x01, 0x02};
     
     /* Build frame (CRC8 is calculated automatically) */
-    xgl_frame_build(&frame, 0x10, 0x20, 0x05, 0x42, 0x00,
-                    payload, sizeof(payload), false, 0);
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0
+    };
+    xgl_frame_build(&frame, &params);
     
     /* Validate CRC8 */
     bool valid = xgl_frame_validate_header_crc(&frame.header);
@@ -286,8 +334,18 @@ TEST(XglFrameTest, InvalidHeaderCRC) {
     const uint8_t payload[] = {0x01, 0x02};
     
     /* Build frame */
-    xgl_frame_build(&frame, 0x10, 0x20, 0x05, 0x42, 0x00,
-                    payload, sizeof(payload), false, 0);
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0
+    };
+    xgl_frame_build(&frame, &params);
     
     /* Corrupt CRC8 */
     frame.header.crc8 ^= 0xFF;

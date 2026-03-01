@@ -54,7 +54,7 @@ TEST_F(XglInstanceTest, CreateWithNullConfig) {
  * \brief           Test instance creation with invalid TX pool size
  */
 TEST_F(XglInstanceTest, CreateWithInvalidTxPoolSize) {
-    config.tx_pool_size = 0;
+    config.memory.tx_pool_size = 0;
     
     xgl_handle_t handle = xgl_create(&config);
     
@@ -65,7 +65,7 @@ TEST_F(XglInstanceTest, CreateWithInvalidTxPoolSize) {
  * \brief           Test instance creation with invalid RX buffer size
  */
 TEST_F(XglInstanceTest, CreateWithInvalidRxBufferSize) {
-    config.rx_buffer_size = 0;
+    config.memory.rx_buffer_size = 0;
     
     xgl_handle_t handle = xgl_create(&config);
     
@@ -76,7 +76,7 @@ TEST_F(XglInstanceTest, CreateWithInvalidRxBufferSize) {
  * \brief           Test instance creation with invalid ACK timeout
  */
 TEST_F(XglInstanceTest, CreateWithInvalidAckTimeout) {
-    config.ack_timeout_ms = 0;
+    config.protocol.ack_timeout_ms = 0;
     
     xgl_handle_t handle = xgl_create(&config);
     
@@ -87,7 +87,7 @@ TEST_F(XglInstanceTest, CreateWithInvalidAckTimeout) {
  * \brief           Test instance creation with invalid max frame size
  */
 TEST_F(XglInstanceTest, CreateWithInvalidMaxFrameSize) {
-    config.max_frame_size = 0;
+    config.protocol.max_frame_size = 0;
     
     xgl_handle_t handle = xgl_create(&config);
     
@@ -98,7 +98,7 @@ TEST_F(XglInstanceTest, CreateWithInvalidMaxFrameSize) {
  * \brief           Test instance creation with frame size too small
  */
 TEST_F(XglInstanceTest, CreateWithFrameSizeTooSmall) {
-    config.max_frame_size = 10;  /* Less than header + CRC */
+    config.protocol.max_frame_size = 10;  /* Less than header + CRC */
     
     xgl_handle_t handle = xgl_create(&config);
     

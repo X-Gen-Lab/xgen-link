@@ -33,16 +33,19 @@ protected:
         
         /* Build frame structure */
         xgl_frame_t xgl_frame;
-        xgl_error_t err = xgl_frame_build(&xgl_frame,
-                                          0x01,  /* source_id */
-                                          0x02,  /* target_id */
-                                          0x03,  /* data_type */
-                                          0x10,  /* seq_num */
-                                          0x20,  /* ack_num */
-                                          payload.data(),
-                                          payload.size(),
-                                          true,  /* reliable */
-                                          5);    /* priority */
+        xgl_frame_params_t params = {
+            .source_id = 0x01,
+            .target_id = 0x02,
+            .data_type = 0x03,
+            .seq_num = 0x10,
+            .ack_num = 0x20,
+            .payload = payload.data(),
+            .payload_len = payload.size(),
+            .reliable = true,
+            .priority = 5
+        };
+        
+        xgl_error_t err = xgl_frame_build(&xgl_frame, &params);
         EXPECT_EQ(err, XGL_OK);
         
         /* Serialize to buffer */

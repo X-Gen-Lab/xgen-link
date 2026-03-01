@@ -101,17 +101,17 @@ TEST_F(XglStatsTest, InitialStatsAreZero) {
     ASSERT_EQ(err, XGL_OK);
     
     /* Verify all counters are zero */
-    EXPECT_EQ(stats.tx_packets, 0);
-    EXPECT_EQ(stats.tx_bytes, 0);
-    EXPECT_EQ(stats.tx_errors, 0);
+    EXPECT_EQ(stats.datalink.tx_packets, 0);
+    EXPECT_EQ(stats.datalink.tx_bytes, 0);
+    EXPECT_EQ(stats.datalink.tx_errors, 0);
     EXPECT_EQ(stats.tx_retries, 0);
     
-    EXPECT_EQ(stats.rx_packets, 0);
-    EXPECT_EQ(stats.rx_bytes, 0);
-    EXPECT_EQ(stats.rx_errors, 0);
+    EXPECT_EQ(stats.datalink.rx_packets, 0);
+    EXPECT_EQ(stats.datalink.rx_bytes, 0);
+    EXPECT_EQ(stats.datalink.rx_errors, 0);
     EXPECT_EQ(stats.rx_crc8_errors, 0);
     EXPECT_EQ(stats.rx_crc16_errors, 0);
-    EXPECT_EQ(stats.rx_dropped, 0);
+    EXPECT_EQ(stats.datalink.rx_dropped, 0);
     
     EXPECT_EQ(stats.avg_rtt_ms, 0);
     EXPECT_EQ(stats.max_rtt_ms, 0);
@@ -176,17 +176,17 @@ TEST_F(XglStatsTest, StatsRemainZeroAfterReset) {
     ASSERT_EQ(err, XGL_OK);
     
     /* Verify all counters are zero after reset */
-    EXPECT_EQ(stats.tx_packets, 0);
-    EXPECT_EQ(stats.tx_bytes, 0);
-    EXPECT_EQ(stats.tx_errors, 0);
+    EXPECT_EQ(stats.datalink.tx_packets, 0);
+    EXPECT_EQ(stats.datalink.tx_bytes, 0);
+    EXPECT_EQ(stats.datalink.tx_errors, 0);
     EXPECT_EQ(stats.tx_retries, 0);
     
-    EXPECT_EQ(stats.rx_packets, 0);
-    EXPECT_EQ(stats.rx_bytes, 0);
-    EXPECT_EQ(stats.rx_errors, 0);
+    EXPECT_EQ(stats.datalink.rx_packets, 0);
+    EXPECT_EQ(stats.datalink.rx_bytes, 0);
+    EXPECT_EQ(stats.datalink.rx_errors, 0);
     EXPECT_EQ(stats.rx_crc8_errors, 0);
     EXPECT_EQ(stats.rx_crc16_errors, 0);
-    EXPECT_EQ(stats.rx_dropped, 0);
+    EXPECT_EQ(stats.datalink.rx_dropped, 0);
     
     EXPECT_EQ(stats.avg_rtt_ms, 0);
     EXPECT_EQ(stats.max_rtt_ms, 0);
@@ -226,8 +226,8 @@ TEST_F(XglStatsTest, StatsIsolationBetweenInstances) {
     ASSERT_EQ(err, XGL_OK);
     
     /* Both should have zero statistics */
-    EXPECT_EQ(stats1.tx_packets, 0);
-    EXPECT_EQ(stats2.tx_packets, 0);
+    EXPECT_EQ(stats1.datalink.tx_packets, 0);
+    EXPECT_EQ(stats2.datalink.tx_packets, 0);
     
     /* Reset first instance */
     err = xgl_stats_reset(handle);
@@ -241,8 +241,8 @@ TEST_F(XglStatsTest, StatsIsolationBetweenInstances) {
     ASSERT_EQ(err, XGL_OK);
     
     /* Both should still have zero statistics */
-    EXPECT_EQ(stats1.tx_packets, 0);
-    EXPECT_EQ(stats2.tx_packets, 0);
+    EXPECT_EQ(stats1.datalink.tx_packets, 0);
+    EXPECT_EQ(stats2.datalink.tx_packets, 0);
     
     xgl_destroy(handle2);
 }
@@ -263,11 +263,11 @@ TEST_F(XglStatsTest, GetStatsMultipleTimes) {
     EXPECT_EQ(err3, XGL_OK);
     
     /* All should be identical */
-    EXPECT_EQ(stats1.tx_packets, stats2.tx_packets);
-    EXPECT_EQ(stats2.tx_packets, stats3.tx_packets);
+    EXPECT_EQ(stats1.datalink.tx_packets, stats2.datalink.tx_packets);
+    EXPECT_EQ(stats2.datalink.tx_packets, stats3.datalink.tx_packets);
     
-    EXPECT_EQ(stats1.rx_packets, stats2.rx_packets);
-    EXPECT_EQ(stats2.rx_packets, stats3.rx_packets);
+    EXPECT_EQ(stats1.datalink.rx_packets, stats2.datalink.rx_packets);
+    EXPECT_EQ(stats2.datalink.rx_packets, stats3.datalink.rx_packets);
 }
 
 /**
@@ -283,7 +283,7 @@ TEST_F(XglStatsTest, ResetAndGetSequence) {
     /* Get */
     err = xgl_stats_get(handle, &stats);
     ASSERT_EQ(err, XGL_OK);
-    EXPECT_EQ(stats.tx_packets, 0);
+    EXPECT_EQ(stats.datalink.tx_packets, 0);
     
     /* Reset again */
     err = xgl_stats_reset(handle);
@@ -292,5 +292,5 @@ TEST_F(XglStatsTest, ResetAndGetSequence) {
     /* Get again */
     err = xgl_stats_get(handle, &stats);
     ASSERT_EQ(err, XGL_OK);
-    EXPECT_EQ(stats.tx_packets, 0);
+    EXPECT_EQ(stats.datalink.tx_packets, 0);
 }

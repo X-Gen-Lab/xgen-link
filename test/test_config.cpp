@@ -32,16 +32,16 @@ TEST_F(XglConfigTest, GetDefaultConfig) {
     /* Verify default values (medium preset) */
     EXPECT_STREQ(config.name, "medium");
     EXPECT_EQ(config.source_id, 0);
-    EXPECT_EQ(config.tx_pool_size, 4096);
-    EXPECT_EQ(config.rx_buffer_size, 544);
-    EXPECT_EQ(config.ack_timeout_ms, 1000);
-    EXPECT_EQ(config.max_retry_count, 5);
-    EXPECT_EQ(config.window_size, 8);
-    EXPECT_EQ(config.max_frame_size, 512);
-    EXPECT_TRUE(config.enable_fragmentation);
-    EXPECT_TRUE(config.enable_compression);
-    EXPECT_FALSE(config.enable_encryption);
-    EXPECT_FALSE(config.thread_safe);
+    EXPECT_EQ(config.memory.tx_pool_size, 4096);
+    EXPECT_EQ(config.memory.rx_buffer_size, 544);
+    EXPECT_EQ(config.protocol.ack_timeout_ms, 1000);
+    EXPECT_EQ(config.protocol.max_retry_count, 5);
+    EXPECT_EQ(config.protocol.window_size, 8);
+    EXPECT_EQ(config.protocol.max_frame_size, 512);
+    EXPECT_TRUE(config.features.enable_fragmentation);
+    EXPECT_TRUE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_encryption);
+    EXPECT_FALSE(config.features.thread_safe);
 }
 
 TEST_F(XglConfigTest, GetDefaultConfigNullPointer) {
@@ -57,56 +57,56 @@ TEST_F(XglConfigTest, GetPresetTiny) {
     xgl_config_get_preset_tiny(&config);
     
     EXPECT_STREQ(config.name, "tiny");
-    EXPECT_EQ(config.tx_pool_size, 1024);
-    EXPECT_EQ(config.rx_buffer_size, 160);
-    EXPECT_EQ(config.max_retry_count, 3);
-    EXPECT_EQ(config.window_size, 2);
-    EXPECT_EQ(config.max_frame_size, 128);
-    EXPECT_FALSE(config.enable_fragmentation);
-    EXPECT_FALSE(config.enable_compression);
-    EXPECT_FALSE(config.enable_encryption);
+    EXPECT_EQ(config.memory.tx_pool_size, 1024);
+    EXPECT_EQ(config.memory.rx_buffer_size, 160);
+    EXPECT_EQ(config.protocol.max_retry_count, 3);
+    EXPECT_EQ(config.protocol.window_size, 2);
+    EXPECT_EQ(config.protocol.max_frame_size, 128);
+    EXPECT_FALSE(config.features.enable_fragmentation);
+    EXPECT_FALSE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_encryption);
 }
 
 TEST_F(XglConfigTest, GetPresetSmall) {
     xgl_config_get_preset_small(&config);
     
     EXPECT_STREQ(config.name, "small");
-    EXPECT_EQ(config.tx_pool_size, 2048);
-    EXPECT_EQ(config.rx_buffer_size, 288);
-    EXPECT_EQ(config.max_retry_count, 5);
-    EXPECT_EQ(config.window_size, 4);
-    EXPECT_EQ(config.max_frame_size, 256);
-    EXPECT_TRUE(config.enable_fragmentation);
-    EXPECT_FALSE(config.enable_compression);
-    EXPECT_FALSE(config.enable_encryption);
+    EXPECT_EQ(config.memory.tx_pool_size, 2048);
+    EXPECT_EQ(config.memory.rx_buffer_size, 288);
+    EXPECT_EQ(config.protocol.max_retry_count, 5);
+    EXPECT_EQ(config.protocol.window_size, 4);
+    EXPECT_EQ(config.protocol.max_frame_size, 256);
+    EXPECT_TRUE(config.features.enable_fragmentation);
+    EXPECT_FALSE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_encryption);
 }
 
 TEST_F(XglConfigTest, GetPresetMedium) {
     xgl_config_get_preset_medium(&config);
     
     EXPECT_STREQ(config.name, "medium");
-    EXPECT_EQ(config.tx_pool_size, 4096);
-    EXPECT_EQ(config.rx_buffer_size, 544);
-    EXPECT_EQ(config.max_retry_count, 5);
-    EXPECT_EQ(config.window_size, 8);
-    EXPECT_EQ(config.max_frame_size, 512);
-    EXPECT_TRUE(config.enable_fragmentation);
-    EXPECT_TRUE(config.enable_compression);
-    EXPECT_FALSE(config.enable_encryption);
+    EXPECT_EQ(config.memory.tx_pool_size, 4096);
+    EXPECT_EQ(config.memory.rx_buffer_size, 544);
+    EXPECT_EQ(config.protocol.max_retry_count, 5);
+    EXPECT_EQ(config.protocol.window_size, 8);
+    EXPECT_EQ(config.protocol.max_frame_size, 512);
+    EXPECT_TRUE(config.features.enable_fragmentation);
+    EXPECT_TRUE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_encryption);
 }
 
 TEST_F(XglConfigTest, GetPresetLarge) {
     xgl_config_get_preset_large(&config);
     
     EXPECT_STREQ(config.name, "large");
-    EXPECT_EQ(config.tx_pool_size, 8192);
-    EXPECT_EQ(config.rx_buffer_size, 1056);
-    EXPECT_EQ(config.max_retry_count, 7);
-    EXPECT_EQ(config.window_size, 16);
-    EXPECT_EQ(config.max_frame_size, 1024);
-    EXPECT_TRUE(config.enable_fragmentation);
-    EXPECT_TRUE(config.enable_compression);
-    EXPECT_TRUE(config.enable_encryption);
+    EXPECT_EQ(config.memory.tx_pool_size, 8192);
+    EXPECT_EQ(config.memory.rx_buffer_size, 1056);
+    EXPECT_EQ(config.protocol.max_retry_count, 7);
+    EXPECT_EQ(config.protocol.window_size, 16);
+    EXPECT_EQ(config.protocol.max_frame_size, 1024);
+    EXPECT_TRUE(config.features.enable_fragmentation);
+    EXPECT_TRUE(config.features.enable_compression);
+    EXPECT_TRUE(config.features.enable_encryption);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -124,86 +124,86 @@ TEST_F(XglConfigTest, ValidateValidConfig) {
 
 TEST_F(XglConfigTest, ValidateTxPoolSizeTooSmall) {
     xgl_config_get_default(&config);
-    config.tx_pool_size = 256;  /* Below minimum of 512 */
+    config.memory.tx_pool_size = 256;  /* Below minimum of 512 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateTxPoolSizeTooLarge) {
     xgl_config_get_default(&config);
-    config.tx_pool_size = 100000;  /* Above maximum of 65536 */
+    config.memory.tx_pool_size = 100000;  /* Above maximum of 65536 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRxBufferSizeTooSmall) {
     xgl_config_get_default(&config);
-    config.rx_buffer_size = 32;  /* Below minimum of 64 */
+    config.memory.rx_buffer_size = 32;  /* Below minimum of 64 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRxBufferSizeTooLarge) {
     xgl_config_get_default(&config);
-    config.rx_buffer_size = 8192;  /* Above maximum of 4096 */
+    config.memory.rx_buffer_size = 8192;  /* Above maximum of 4096 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateAckTimeoutTooSmall) {
     xgl_config_get_default(&config);
-    config.ack_timeout_ms = 50;  /* Below minimum of 100 */
+    config.protocol.ack_timeout_ms = 50;  /* Below minimum of 100 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateAckTimeoutTooLarge) {
     xgl_config_get_default(&config);
-    config.ack_timeout_ms = 20000;  /* Above maximum of 10000 */
+    config.protocol.ack_timeout_ms = 20000;  /* Above maximum of 10000 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRetryCountTooSmall) {
     xgl_config_get_default(&config);
-    config.max_retry_count = 0;  /* Below minimum of 1 */
+    config.protocol.max_retry_count = 0;  /* Below minimum of 1 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRetryCountTooLarge) {
     xgl_config_get_default(&config);
-    config.max_retry_count = 20;  /* Above maximum of 10 */
+    config.protocol.max_retry_count = 20;  /* Above maximum of 10 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateWindowSizeTooSmall) {
     xgl_config_get_default(&config);
-    config.window_size = 0;  /* Below minimum of 1 */
+    config.protocol.window_size = 0;  /* Below minimum of 1 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateWindowSizeTooLarge) {
     xgl_config_get_default(&config);
-    config.window_size = 64;  /* Above maximum of 32 */
+    config.protocol.window_size = 64;  /* Above maximum of 32 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateFrameSizeTooSmall) {
     xgl_config_get_default(&config);
-    config.max_frame_size = 32;  /* Below minimum of 64 */
+    config.protocol.max_frame_size = 32;  /* Below minimum of 64 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateFrameSizeTooLarge) {
     xgl_config_get_default(&config);
-    config.max_frame_size = 4096;  /* Above maximum of 2048 */
+    config.protocol.max_frame_size = 4096;  /* Above maximum of 2048 */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateFrameSizeSmallerThanHeader) {
     xgl_config_get_default(&config);
-    config.max_frame_size = 10;  /* Smaller than header + CRC */
+    config.protocol.max_frame_size = 10;  /* Smaller than header + CRC */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRxBufferTooSmallForFrame) {
     xgl_config_get_default(&config);
-    config.max_frame_size = 512;
-    config.rx_buffer_size = 256;  /* Too small for max frame */
+    config.protocol.max_frame_size = 512;
+    config.memory.rx_buffer_size = 256;  /* Too small for max frame */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_BUFFER_TOO_SMALL);
 }
 
@@ -353,7 +353,7 @@ TEST_F(XglConfigTest, CreateInstanceWithValidConfig) {
 
 TEST_F(XglConfigTest, CreateInstanceWithInvalidConfig) {
     xgl_config_get_default(&config);
-    config.tx_pool_size = 0;  /* Invalid */
+    config.memory.tx_pool_size = 0;  /* Invalid */
     
     xgl_handle_t handle = xgl_create(&config);
     EXPECT_EQ(handle, nullptr);

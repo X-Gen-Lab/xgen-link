@@ -44,22 +44,22 @@ TEST(XglTypesTest, ConfigStructure) {
     /* Set basic fields */
     config.name = "test";
     config.source_id = 1;
-    config.tx_pool_size = 1024;
-    config.rx_buffer_size = 256;
-    config.ack_timeout_ms = 1000;
-    config.max_retry_count = 5;
-    config.window_size = 4;
-    config.max_frame_size = 256;
+    config.memory.tx_pool_size = 1024;
+    config.memory.rx_buffer_size = 256;
+    config.protocol.ack_timeout_ms = 1000;
+    config.protocol.max_retry_count = 5;
+    config.protocol.window_size = 4;
+    config.protocol.max_frame_size = 256;
     
     /* Verify fields */
     EXPECT_STREQ(config.name, "test");
     EXPECT_EQ(config.source_id, 1);
-    EXPECT_EQ(config.tx_pool_size, 1024);
-    EXPECT_EQ(config.rx_buffer_size, 256);
-    EXPECT_EQ(config.ack_timeout_ms, 1000);
-    EXPECT_EQ(config.max_retry_count, 5);
-    EXPECT_EQ(config.window_size, 4);
-    EXPECT_EQ(config.max_frame_size, 256);
+    EXPECT_EQ(config.memory.tx_pool_size, 1024);
+    EXPECT_EQ(config.memory.rx_buffer_size, 256);
+    EXPECT_EQ(config.protocol.ack_timeout_ms, 1000);
+    EXPECT_EQ(config.protocol.max_retry_count, 5);
+    EXPECT_EQ(config.protocol.window_size, 4);
+    EXPECT_EQ(config.protocol.max_frame_size, 256);
 }
 
 /**
@@ -68,38 +68,38 @@ TEST(XglTypesTest, ConfigStructure) {
 TEST(XglTypesTest, ConfigPresets) {
     /* Test tiny preset */
     xgl_config_t tiny = XGL_CONFIG_PRESET_TINY;
-    EXPECT_EQ(tiny.tx_pool_size, 1024);
-    EXPECT_EQ(tiny.rx_buffer_size, 160);  /* 12 header + 128 payload + 2 CRC + padding */
-    EXPECT_EQ(tiny.window_size, 2);
-    EXPECT_EQ(tiny.max_frame_size, 128);
-    EXPECT_FALSE(tiny.enable_fragmentation);
+    EXPECT_EQ(tiny.memory.tx_pool_size, 1024);
+    EXPECT_EQ(tiny.memory.rx_buffer_size, 160);  /* 12 header + 128 payload + 2 CRC + padding */
+    EXPECT_EQ(tiny.protocol.window_size, 2);
+    EXPECT_EQ(tiny.protocol.max_frame_size, 128);
+    EXPECT_FALSE(tiny.features.enable_fragmentation);
     
     /* Test small preset */
     xgl_config_t small = XGL_CONFIG_PRESET_SMALL;
-    EXPECT_EQ(small.tx_pool_size, 2048);
-    EXPECT_EQ(small.rx_buffer_size, 288);  /* 12 header + 256 payload + 2 CRC + padding */
-    EXPECT_EQ(small.window_size, 4);
-    EXPECT_EQ(small.max_frame_size, 256);
-    EXPECT_TRUE(small.enable_fragmentation);
+    EXPECT_EQ(small.memory.tx_pool_size, 2048);
+    EXPECT_EQ(small.memory.rx_buffer_size, 288);  /* 12 header + 256 payload + 2 CRC + padding */
+    EXPECT_EQ(small.protocol.window_size, 4);
+    EXPECT_EQ(small.protocol.max_frame_size, 256);
+    EXPECT_TRUE(small.features.enable_fragmentation);
     
     /* Test medium preset */
     xgl_config_t medium = XGL_CONFIG_PRESET_MEDIUM;
-    EXPECT_EQ(medium.tx_pool_size, 4096);
-    EXPECT_EQ(medium.rx_buffer_size, 544);  /* 12 header + 512 payload + 2 CRC + padding */
-    EXPECT_EQ(medium.window_size, 8);
-    EXPECT_EQ(medium.max_frame_size, 512);
-    EXPECT_TRUE(medium.enable_fragmentation);
-    EXPECT_TRUE(medium.enable_compression);
+    EXPECT_EQ(medium.memory.tx_pool_size, 4096);
+    EXPECT_EQ(medium.memory.rx_buffer_size, 544);  /* 12 header + 512 payload + 2 CRC + padding */
+    EXPECT_EQ(medium.protocol.window_size, 8);
+    EXPECT_EQ(medium.protocol.max_frame_size, 512);
+    EXPECT_TRUE(medium.features.enable_fragmentation);
+    EXPECT_TRUE(medium.features.enable_compression);
     
     /* Test large preset */
     xgl_config_t large = XGL_CONFIG_PRESET_LARGE;
-    EXPECT_EQ(large.tx_pool_size, 8192);
-    EXPECT_EQ(large.rx_buffer_size, 1056);  /* 12 header + 1024 payload + 2 CRC + padding */
-    EXPECT_EQ(large.window_size, 16);
-    EXPECT_EQ(large.max_frame_size, 1024);
-    EXPECT_TRUE(large.enable_fragmentation);
-    EXPECT_TRUE(large.enable_compression);
-    EXPECT_TRUE(large.enable_encryption);
+    EXPECT_EQ(large.memory.tx_pool_size, 8192);
+    EXPECT_EQ(large.memory.rx_buffer_size, 1056);  /* 12 header + 1024 payload + 2 CRC + padding */
+    EXPECT_EQ(large.protocol.window_size, 16);
+    EXPECT_EQ(large.protocol.max_frame_size, 1024);
+    EXPECT_TRUE(large.features.enable_fragmentation);
+    EXPECT_TRUE(large.features.enable_compression);
+    EXPECT_TRUE(large.features.enable_encryption);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -114,17 +114,17 @@ TEST(XglTypesTest, StatisticsStructure) {
     std::memset(&stats, 0, sizeof(stats));
     
     /* Set some values */
-    stats.tx_packets = 100;
-    stats.tx_bytes = 5000;
-    stats.rx_packets = 95;
-    stats.rx_bytes = 4800;
+    stats.datalink.tx_packets = 100;
+    stats.datalink.tx_bytes = 5000;
+    stats.datalink.rx_packets = 95;
+    stats.datalink.rx_bytes = 4800;
     stats.avg_rtt_ms = 50;
     
     /* Verify fields */
-    EXPECT_EQ(stats.tx_packets, 100);
-    EXPECT_EQ(stats.tx_bytes, 5000);
-    EXPECT_EQ(stats.rx_packets, 95);
-    EXPECT_EQ(stats.rx_bytes, 4800);
+    EXPECT_EQ(stats.datalink.tx_packets, 100);
+    EXPECT_EQ(stats.datalink.tx_bytes, 5000);
+    EXPECT_EQ(stats.datalink.rx_packets, 95);
+    EXPECT_EQ(stats.datalink.rx_bytes, 4800);
     EXPECT_EQ(stats.avg_rtt_ms, 50);
 }
 

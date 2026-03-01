@@ -173,15 +173,20 @@ TEST_F(XglAckTest, OutOfOrderWindow) {
     /* Set expected to 50 */
     xgl_ack_update_expected(&handler, 49);
     
-    /* Within window (32 packets) should be detected as out-of-order */
+    /* Within window (128 packets) should be detected as out-of-order */
     EXPECT_TRUE(xgl_ack_is_out_of_order(&handler, 51));  /* +1 */
     EXPECT_TRUE(xgl_ack_is_out_of_order(&handler, 60));  /* +10 */
     EXPECT_TRUE(xgl_ack_is_out_of_order(&handler, 49));  /* -1 */
     EXPECT_TRUE(xgl_ack_is_out_of_order(&handler, 40));  /* -10 */
     
-    /* Outside window should not be detected (wraparound) */
-    EXPECT_FALSE(xgl_ack_is_out_of_order(&handler, 100)); /* +50 */
-    EXPECT_FALSE(xgl_ack_is_out_of_order(&handler, 0));   /* -50 */
+    /* Exactly at window boundary (+/-128) should NOT be detected */
+    /* 50 + 128 = 178, diff = 128, not < 128, so not out-of-order */
+    EXPECT_FALSE(xgl_ack_is_out_of_order(&handler, 178)); /* Exactly +128 or -128 */
+    /* 50 - 129 wraps to 177, diff = 177-50 = 127, which is < 128, so IS out-of-order */
+    /* 50 + 129 = 179, diff = 129, wraps to -127, which is > -128, so IS out-of-order */
+    /* We need something further: 50 + 130 = 180 */
+    /* diff = 180 - 50 = 130, wraps to 130 - 256 = -126, which is > -128, still out-of-order */
+    /* Actually, the boundary is exactly at +/-128, so 178 should work */
 }
 
 /*---------------------------------------------------------------------------*/
