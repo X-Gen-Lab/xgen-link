@@ -101,6 +101,23 @@ void xgl_tracking_allocator_reset_stats(xgl_tracking_allocator_t* tracker);
 xgl_allocator_t* xgl_tracking_allocator_get_interface(
     xgl_tracking_allocator_t* tracker);
 
+/**
+ * \brief           Allocate memory using tracking allocator
+ * \param[in,out]   tracker: Pointer to tracking allocator structure
+ * \param[in]       size: Size in bytes to allocate
+ * \return          Pointer to allocated memory, NULL on failure
+ * \note            This function updates allocation statistics
+ */
+void* xgl_tracking_alloc(xgl_tracking_allocator_t* tracker, size_t size);
+
+/**
+ * \brief           Free memory using tracking allocator
+ * \param[in,out]   tracker: Pointer to tracking allocator structure
+ * \param[in]       ptr: Pointer to memory to free
+ * \note            This function updates allocation statistics
+ */
+void xgl_tracking_free(xgl_tracking_allocator_t* tracker, void* ptr);
+
 #ifdef __cplusplus
 }
 #endif

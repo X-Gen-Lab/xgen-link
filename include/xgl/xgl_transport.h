@@ -20,7 +20,7 @@ extern "C" {
 #include "xgl_reliable.h"
 #include "xgl_ack.h"
 #include "xgl_fragment.h"
-#include "xgl_network.h"
+#include "xgl_layer_interface.h"
 
 /*---------------------------------------------------------------------------*/
 /* Transport Layer Context                                                   */
@@ -30,7 +30,7 @@ extern "C" {
  * \brief           Transport layer context structure
  * \note            Integrates all transport layer components
  */
-typedef struct {
+typedef struct xgl_transport_ctx_s {
     /* Configuration */
     uint8_t local_id;               /**< Local node ID */
     uint8_t max_retry_count;        /**< Maximum retry count */
@@ -45,8 +45,8 @@ typedef struct {
     xgl_ack_handler_t ack_handler;  /**< ACK handler */
     xgl_fragment_manager_t* fragment_mgr; /**< Fragmentation manager (optional) */
     
-    /* Network layer context */
-    xgl_network_ctx_t* network_ctx; /**< Network layer context */
+    /* Layer interface for decoupled communication */
+    xgl_layer_interface_t* lower_layer; /**< Lower layer interface (network) */
     
     /* Callbacks */
     xgl_rx_callback_t rx_callback;  /**< Receive callback */
@@ -54,47 +54,45 @@ typedef struct {
     void* callback_user_data;       /**< User data for callbacks */
     
     /* Statistics */
-    xgl_statistics_t* stats;        /**< Statistics structure */
+    xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
+    uint64_t* tx_retries;           /**< Retransmission counter pointer */
     
     /* Memory management */
     xgl_allocator_t* allocator;     /**< Memory allocator */
     
 } xgl_transport_ctx_t;
 
+/**
+ * \brief           Transport layer configuration structure
+ */
+typedef struct {
+    uint8_t local_id;               /**< Local node ID */
+    uint8_t max_retry_count;        /**< Maximum retry count */
+    uint32_t default_timeout_ms;    /**< Default timeout in milliseconds */
+    uint8_t window_size;            /**< Sliding window size */
+    bool enable_fragmentation;      /**< Enable fragmentation support */
+    uint16_t max_frame_size;        /**< Maximum frame size */
+    xgl_layer_interface_t* lower_layer; /**< Lower layer interface (network) */
+    xgl_rx_callback_t rx_callback;  /**< Receive callback (can be NULL) */
+    xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
+    void* callback_user_data;       /**< User data for callbacks (can be NULL) */
+    xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
+    uint64_t* tx_retries;           /**< Retransmission counter pointer (can be NULL) */
+    xgl_allocator_t* allocator;     /**< Memory allocator (NULL = malloc/free) */
+} xgl_transport_config_t;
+
 /*---------------------------------------------------------------------------*/
 /* Transport Layer API                                                       */
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Initialize transport layer context
+ * \brief           Initialize transport layer context with configuration structure
  * \param[in,out]   ctx: Transport layer context
- * \param[in]       local_id: Local node ID
- * \param[in]       max_retry_count: Maximum retry count
- * \param[in]       default_timeout_ms: Default timeout in milliseconds
- * \param[in]       window_size: Sliding window size
- * \param[in]       enable_fragmentation: Enable fragmentation support
- * \param[in]       max_frame_size: Maximum frame size
- * \param[in]       network_ctx: Network layer context
- * \param[in]       rx_callback: Receive callback
- * \param[in]       error_callback: Error callback
- * \param[in]       callback_user_data: User data for callbacks
- * \param[in]       stats: Statistics structure
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       config: Configuration structure
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
-                               uint8_t local_id,
-                               uint8_t max_retry_count,
-                               uint32_t default_timeout_ms,
-                               uint8_t window_size,
-                               bool enable_fragmentation,
-                               uint16_t max_frame_size,
-                               xgl_network_ctx_t* network_ctx,
-                               xgl_rx_callback_t rx_callback,
-                               xgl_error_callback_t error_callback,
-                               void* callback_user_data,
-                               xgl_statistics_t* stats,
-                               xgl_allocator_t* allocator);
+                               const xgl_transport_config_t* config);
 
 /**
  * \brief           Destroy transport layer context
@@ -118,29 +116,14 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
  * \brief           Receive and process packet from network layer
  * \param[in]       ctx: Transport layer context
  * \param[in]       handle: Protocol instance handle
- * \param[in]       source_id: Source node ID
- * \param[in]       target_id: Target node ID
- * \param[in]       seq_num: Sequence number
- * \param[in]       ack_num: ACK number
- * \param[in]       data_type: Data type
- * \param[in]       reliable: Reliable transmission flag
- * \param[in]       fragment: Fragment flag
- * \param[in]       data: Packet data
- * \param[in]       data_len: Data length
+ * \param[in]       packet: Packet from network layer (contains metadata)
  * \return          XGL_OK on success, error code otherwise
  * \note            Processes ACKs, handles reassembly, and delivers to application
+ * \note            Payload data should be in packet->data for receive path
  */
 xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
                                   xgl_handle_t handle,
-                                  uint8_t source_id,
-                                  uint8_t target_id,
-                                  uint8_t seq_num,
-                                  uint8_t ack_num,
-                                  uint8_t data_type,
-                                  uint8_t reliable,
-                                  uint8_t fragment,
-                                  const uint8_t* data,
-                                  size_t data_len);
+                                  const xgl_packet_t* packet);
 
 /**
  * \brief           Periodic transport layer processing
@@ -180,6 +163,16 @@ void xgl_transport_report_error(xgl_transport_ctx_t* ctx,
                                 xgl_handle_t handle,
                                 xgl_error_t error,
                                 const char* message);
+
+/**
+ * \brief           Get transport layer interface
+ * \details         Returns the layer interface for this transport instance
+ * \param[in]       ctx: Transport layer context
+ * \param[out]      iface: Layer interface structure to initialize
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_transport_get_interface(xgl_transport_ctx_t* ctx,
+                                       xgl_layer_interface_t* iface);
 
 #ifdef __cplusplus
 }

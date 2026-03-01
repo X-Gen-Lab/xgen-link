@@ -18,6 +18,7 @@ extern "C" {
 #include "xgl_error.h"
 #include "xgl_route.h"
 #include "xgl_packet_pool.h"
+#include "xgl_layer_interface.h"
 
 /*---------------------------------------------------------------------------*/
 /* Network Layer Configuration                                               */
@@ -34,43 +35,60 @@ extern "C" {
 #define XGL_BROADCAST_ID            0xFF
 
 /*---------------------------------------------------------------------------*/
+/* Forward Declarations                                                      */
+/*---------------------------------------------------------------------------*/
+
+/* Forward declare transport context */
+struct xgl_transport_ctx_s;
+
+/* Forward declare datalink context */
+struct xgl_datalink_ctx_s;
+
+/*---------------------------------------------------------------------------*/
 /* Network Layer Context                                                     */
 /*---------------------------------------------------------------------------*/
 
 /**
  * \brief           Network layer context structure
  */
+typedef struct xgl_network_ctx_s {
+    uint8_t local_id;               /**< Local node ID */
+    xgl_route_table_t* route_table; /**< Route table */
+    
+    /* Layer interfaces for decoupled communication */
+    xgl_layer_interface_t* upper_layer;  /**< Upper layer interface (transport) */
+    xgl_layer_interface_t* lower_layer;  /**< Lower layer interface (datalink) */
+    
+    xgl_error_callback_t error_callback; /**< Error callback */
+    void* callback_user_data;       /**< User data for callbacks */
+    xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
+} xgl_network_ctx_t;
+
+/**
+ * \brief           Network layer configuration structure
+ */
 typedef struct {
     uint8_t local_id;               /**< Local node ID */
     xgl_route_table_t* route_table; /**< Route table */
-    xgl_rx_callback_t rx_callback;  /**< Receive callback */
-    xgl_error_callback_t error_callback; /**< Error callback */
-    void* callback_user_data;       /**< User data for callbacks */
-    xgl_statistics_t* stats;        /**< Statistics structure */
-} xgl_network_ctx_t;
+    xgl_layer_interface_t* upper_layer;  /**< Upper layer interface (can be NULL) */
+    xgl_layer_interface_t* lower_layer;  /**< Lower layer interface (can be NULL) */
+    xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
+    void* callback_user_data;       /**< User data for callbacks (can be NULL) */
+    xgl_layer_stats_t* stats;       /**< Layer statistics pointer (can be NULL) */
+} xgl_network_config_t;
 
 /*---------------------------------------------------------------------------*/
 /* Network Layer API                                                         */
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Initialize network layer context
+ * \brief           Initialize network layer context with configuration structure
  * \param[in,out]   ctx: Network layer context
- * \param[in]       local_id: Local node ID
- * \param[in]       route_table: Route table
- * \param[in]       rx_callback: Receive callback
- * \param[in]       error_callback: Error callback
- * \param[in]       callback_user_data: User data for callbacks
- * \param[in]       stats: Statistics structure
+ * \param[in]       config: Configuration structure
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
-                             uint8_t local_id,
-                             xgl_route_table_t* route_table,
-                             xgl_rx_callback_t rx_callback,
-                             xgl_error_callback_t error_callback,
-                             void* callback_user_data,
-                             xgl_statistics_t* stats);
+                             const xgl_network_config_t* config);
 
 /**
  * \brief           Send packet through network layer
@@ -131,6 +149,16 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx,
                               xgl_handle_t handle,
                               xgl_error_t error,
                               const char* message);
+
+/**
+ * \brief           Get network layer interface
+ * \details         Returns the layer interface for this network instance
+ * \param[in]       ctx: Network layer context
+ * \param[out]      iface: Layer interface structure to initialize
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_network_get_interface(xgl_network_ctx_t* ctx,
+                                     xgl_layer_interface_t* iface);
 
 #ifdef __cplusplus
 }

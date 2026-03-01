@@ -38,29 +38,30 @@ typedef struct {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Build frame from packet data
+ * \brief           Frame building parameters
+ * \details         Encapsulates all parameters needed to build a frame
+ */
+typedef struct {
+    uint8_t source_id;          /**< Source node ID */
+    uint8_t target_id;          /**< Target node ID */
+    uint8_t data_type;          /**< Data type */
+    uint8_t seq_num;            /**< Sequence number */
+    uint8_t ack_num;            /**< Acknowledgment number */
+    const uint8_t* payload;     /**< Payload data */
+    size_t payload_len;         /**< Payload length */
+    bool reliable;              /**< Reliable transmission flag */
+    bool fragment;              /**< Fragment flag */
+    uint8_t priority;           /**< Priority level (0-7) */
+} xgl_frame_params_t;
+
+/**
+ * \brief           Build frame from parameters
  * \param[out]      frame: Frame structure to populate
- * \param[in]       source_id: Source node ID
- * \param[in]       target_id: Target node ID
- * \param[in]       data_type: Data type
- * \param[in]       seq_num: Sequence number
- * \param[in]       ack_num: Acknowledgment number
- * \param[in]       payload: Payload data
- * \param[in]       payload_len: Payload length
- * \param[in]       reliable: Reliable transmission flag
- * \param[in]       priority: Priority level (0-7)
+ * \param[in]       params: Frame building parameters
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_frame_build(xgl_frame_t* frame,
-                            uint8_t source_id,
-                            uint8_t target_id,
-                            uint8_t data_type,
-                            uint8_t seq_num,
-                            uint8_t ack_num,
-                            const uint8_t* payload,
-                            size_t payload_len,
-                            bool reliable,
-                            uint8_t priority);
+                            const xgl_frame_params_t* params);
 
 /**
  * \brief           Serialize frame to buffer
@@ -186,6 +187,19 @@ static inline uint8_t xgl_frame_get_datatype(const xgl_frame_header_t* header) {
 static inline void xgl_frame_set_reliable(uint8_t* attr_lsb, bool reliable) {
     *attr_lsb = (*attr_lsb & ~XGL_ATTR_RELIABLE_MASK) | 
                 (reliable ? XGL_ATTR_RELIABLE_TX : XGL_ATTR_RELIABLE_NONE);
+}
+
+/**
+ * \brief           Set fragment attribute in attributes LSB
+ * \param[in,out]   attr_lsb: Attributes LSB byte
+ * \param[in]       fragment: Fragment flag
+ */
+static inline void xgl_frame_set_fragment(uint8_t* attr_lsb, bool fragment) {
+    if (fragment) {
+        *attr_lsb |= XGL_ATTR_FRAGMENT_MASK;
+    } else {
+        *attr_lsb &= ~XGL_ATTR_FRAGMENT_MASK;
+    }
 }
 
 /**

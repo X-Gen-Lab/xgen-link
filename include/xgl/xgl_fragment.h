@@ -155,6 +155,7 @@ xgl_error_t xgl_fragment_data(xgl_fragment_manager_t* manager,
  * \param[in]       fragment_len: Fragment length in bytes
  * \param[out]      complete_data: Pointer to store complete data (if reassembly complete)
  * \param[out]      complete_len: Pointer to store complete data length
+ * \param[in]       current_time_ms: Current time in milliseconds (0 = use system time)
  * \return          XGL_OK if reassembly complete, XGL_ERR_BUSY if waiting for more fragments, error code otherwise
  */
 xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
@@ -163,7 +164,8 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
                                  const uint8_t* fragment_data,
                                  size_t fragment_len,
                                  uint8_t** complete_data,
-                                 size_t* complete_len);
+                                 size_t* complete_len,
+                                 uint32_t current_time_ms);
 
 /**
  * \brief           Process reassembly timeouts
