@@ -8,8 +8,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial project structure and documentation
-- Core protocol stack implementation planning
+
+#### Core Architecture
+- Layer interface abstraction for modular protocol stack composition
+- Time provider interface for platform-independent timing operations
+- Configuration header (xgl_config.h) for compile-time settings
+- Enhanced error code system with detailed error types
+- Layer type enumeration for protocol stack layers
+
+#### Platform Abstraction
+- Platform-specific time provider implementation
+- Improved platform abstraction layer
+
+#### API Enhancements
+- Allocator API with alignment support and statistics tracking
+- Timeout control and retransmission management in transport layer
+- Flow control and congestion management features
+- Enhanced fragmentation with improved reassembly logic
+- Improved acknowledgment handling and tracking
+
+#### Testing
+- New property-based test suites:
+  - Alignment property tests for memory operations
+  - Error handling property tests
+  - Fragment property tests for packet fragmentation
+  - Instance property tests for lifecycle management
+- Expanded property-based testing coverage:
+  - Comprehensive frame property tests
+  - Memory allocation property tests
+  - Network layer property tests with routing scenarios
+  - Significantly expanded transport layer property tests
+- New unit test suites:
+  - Layered statistics tests for per-layer metrics
+  - Time provider tests for platform abstraction
+  - Timeout control tests for retransmission logic
+- Enhanced integration tests with end-to-end scenarios
+
+#### Documentation
+- README files for all example applications:
+  - Echo server documentation with usage instructions
+  - File transfer example documentation
+  - Multi-node example documentation
+- Build and run instructions for examples
+- Troubleshooting and configuration guides
+
+#### Development Tools
+- VSCode workspace settings for consistent development environment
+
+### Changed
+
+#### Core Implementation
+- Refactored instance management with layer interface support
+- Improved send path with better error handling
+- Enhanced configuration system for new layer architecture
+- Optimized memory allocation patterns
+
+#### Protocol Layers
+- Standardized function signatures across all layers (datalink, network, transport)
+- Enhanced frame processing with improved validation
+- Improved routing table management
+- Optimized packet processing flow
+- Enhanced error recovery mechanisms in transport layer
+
+#### Examples
+- Improved echo server with better error handling
+- Enhanced file transfer with progress tracking
+- Added advanced scenarios to multi-node example
+- Updated examples to use new API features
+- Improved user interface and logging
+
+#### Testing
+- Updated all unit tests to match new API signatures
+- Enhanced mock implementations:
+  - Mock allocator with alignment and statistics support
+  - Mock callbacks with layer interface compatibility
+  - Mock PHY with realistic behavior simulation
+- Improved test coverage for error conditions
+- Enhanced assertions and validation logic
+
+#### Build System
+- Updated CMake configuration for new source files
+- Improved test build configuration
+- Updated example build settings
+- Better dependency management
+
+### Removed
+- Obsolete workspace configuration file (moved to .vscode directory)
 
 ---
 
