@@ -41,6 +41,10 @@ set(TEST_SOURCES
     test_send.cpp
     test_stats.cpp
     
+    # Architecture improvement tests
+    test_layered_stats.cpp
+    test_time_provider.cpp
+    
     # Data link tests
     test_frame.cpp
     test_parser.cpp
@@ -58,6 +62,7 @@ set(TEST_SOURCES
     test_ack.cpp
     test_fragment.cpp
     test_transport.cpp
+    test_timeout_control.cpp
     
     # Platform tests
     test_mutex.cpp
@@ -75,6 +80,10 @@ set(TEST_SOURCES
     property/test_frame_properties.cpp
     property/test_network_properties.cpp
     property/test_transport_properties.cpp
+    property/test_fragment_properties.cpp
+    property/test_instance_properties.cpp
+    property/test_error_properties.cpp
+    property/test_alignment_properties.cpp
 )
 
 #-----------------------------------------------------------------------------
@@ -112,6 +121,11 @@ target_include_directories(xgl_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/property
 )
 
+# Fix PDB locking issues on Windows with parallel compilation
+if(MSVC)
+    target_compile_options(xgl_tests PRIVATE /FS)
+endif()
+
 #-----------------------------------------------------------------------------
 # Test Discovery
 #-----------------------------------------------------------------------------
@@ -148,6 +162,14 @@ add_custom_target(run_unit_tests
     DEPENDS xgl_tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running unit tests..."
+)
+
+# Run architecture improvement tests only
+add_custom_target(run_architecture_tests
+    COMMAND xgl_tests --gtest_filter=*LayeredStats*:*TimeProvider*
+    DEPENDS xgl_tests
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMENT "Running architecture improvement tests..."
 )
 
 # Generate XML report
