@@ -192,6 +192,35 @@ typedef void (*xgl_error_callback_t)(xgl_handle_t handle,
 /*---------------------------------------------------------------------------*/
 
 /**
+ * \brief           Memory configuration
+ */
+typedef struct {
+    size_t tx_pool_size;            /**< TX memory pool size in bytes */
+    size_t rx_buffer_size;          /**< RX buffer size in bytes */
+    xgl_allocator_t* allocator;     /**< Custom allocator (NULL = malloc/free) */
+} xgl_memory_config_t;
+
+/**
+ * \brief           Protocol parameters configuration
+ */
+typedef struct {
+    uint32_t ack_timeout_ms;        /**< ACK timeout in milliseconds */
+    uint8_t max_retry_count;        /**< Maximum retry count */
+    uint8_t window_size;            /**< Sliding window size */
+    uint16_t max_frame_size;        /**< Maximum frame size in bytes */
+} xgl_protocol_config_t;
+
+/**
+ * \brief           Feature flags configuration
+ */
+typedef struct {
+    bool enable_fragmentation;      /**< Enable packet fragmentation */
+    bool enable_compression;        /**< Enable data compression */
+    bool enable_encryption;         /**< Enable data encryption */
+    bool thread_safe;               /**< Enable thread safety */
+} xgl_feature_config_t;
+
+/**
  * \brief           Protocol configuration structure
  */
 typedef struct {
@@ -202,19 +231,11 @@ typedef struct {
     uint8_t source_id;              /**< Local node ID */
     
     /*-----------------------------------------------------------------------*/
-    /* Memory Configuration                                                  */
+    /* Grouped Configuration                                                 */
     /*-----------------------------------------------------------------------*/
-    size_t tx_pool_size;            /**< TX memory pool size in bytes */
-    size_t rx_buffer_size;          /**< RX buffer size in bytes */
-    xgl_allocator_t* allocator;     /**< Custom allocator (NULL = malloc/free) */
-    
-    /*-----------------------------------------------------------------------*/
-    /* Protocol Parameters                                                   */
-    /*-----------------------------------------------------------------------*/
-    uint32_t ack_timeout_ms;        /**< ACK timeout in milliseconds */
-    uint8_t max_retry_count;        /**< Maximum retry count */
-    uint8_t window_size;            /**< Sliding window size */
-    uint16_t max_frame_size;        /**< Maximum frame size in bytes */
+    xgl_memory_config_t memory;     /**< Memory configuration */
+    xgl_protocol_config_t protocol; /**< Protocol parameters */
+    xgl_feature_config_t features;  /**< Feature flags */
     
     /*-----------------------------------------------------------------------*/
     /* Routing Configuration                                                 */
@@ -229,14 +250,6 @@ typedef struct {
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;       /**< User data for callbacks */
     
-    /*-----------------------------------------------------------------------*/
-    /* Feature Flags                                                         */
-    /*-----------------------------------------------------------------------*/
-    bool enable_fragmentation;      /**< Enable packet fragmentation */
-    bool enable_compression;        /**< Enable data compression */
-    bool enable_encryption;         /**< Enable data encryption */
-    bool thread_safe;               /**< Enable thread safety */
-    
 } xgl_config_t;
 
 /*---------------------------------------------------------------------------*/
@@ -244,7 +257,9 @@ typedef struct {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Protocol statistics structure
+ * \brief           Layer-specific statistics structure
+ * \details         Each protocol layer maintains its own statistics to avoid
+ *                  double-counting packets as they traverse the stack
  */
 typedef struct {
     /*-----------------------------------------------------------------------*/
@@ -253,7 +268,6 @@ typedef struct {
     uint64_t tx_packets;            /**< Total transmitted packets */
     uint64_t tx_bytes;              /**< Total transmitted bytes */
     uint64_t tx_errors;             /**< Transmission errors */
-    uint64_t tx_retries;            /**< Retransmission count */
     
     /*-----------------------------------------------------------------------*/
     /* Reception Statistics                                                  */
@@ -261,9 +275,28 @@ typedef struct {
     uint64_t rx_packets;            /**< Total received packets */
     uint64_t rx_bytes;              /**< Total received bytes */
     uint64_t rx_errors;             /**< Reception errors */
-    uint64_t rx_crc8_errors;        /**< CRC8 errors */
-    uint64_t rx_crc16_errors;       /**< CRC16 errors */
     uint64_t rx_dropped;            /**< Dropped packets */
+} xgl_layer_stats_t;
+
+/**
+ * \brief           Protocol statistics structure
+ * \details         Aggregated statistics across all protocol layers with
+ *                  layer-specific counters to prevent double-counting
+ */
+typedef struct {
+    /*-----------------------------------------------------------------------*/
+    /* Layer-Specific Statistics                                             */
+    /*-----------------------------------------------------------------------*/
+    xgl_layer_stats_t datalink;     /**< Data link layer statistics */
+    xgl_layer_stats_t network;      /**< Network layer statistics */
+    xgl_layer_stats_t transport;    /**< Transport layer statistics */
+    
+    /*-----------------------------------------------------------------------*/
+    /* Protocol-Specific Counters                                            */
+    /*-----------------------------------------------------------------------*/
+    uint64_t tx_retries;            /**< Retransmission count (transport) */
+    uint64_t rx_crc8_errors;        /**< CRC8 errors (datalink) */
+    uint64_t rx_crc16_errors;       /**< CRC16 errors (datalink) */
     
     /*-----------------------------------------------------------------------*/
     /* Performance Metrics                                                   */
@@ -294,6 +327,7 @@ typedef struct {
     size_t data_len;                /**< Data length */
     bool reliable;                  /**< Enable reliable transmission */
     uint8_t priority;               /**< Priority level (0-7) */
+    uint32_t timeout_ms;            /**< Timeout in ms (0 = use default) */
 } xgl_tx_data_t;
 
 /**
@@ -310,6 +344,7 @@ typedef struct {
     uint8_t data_type;              /**< Data type */
     bool reliable;                  /**< Enable reliable transmission */
     uint8_t priority;               /**< Priority level (0-7) */
+    uint32_t timeout_ms;            /**< Timeout in ms (0 = use default) */
 } xgl_tx_data_zerocopy_t;
 
 /*---------------------------------------------------------------------------*/
@@ -322,22 +357,28 @@ typedef struct {
 #define XGL_CONFIG_PRESET_TINY { \
     .name = "tiny", \
     .source_id = 0, \
-    .tx_pool_size = 1024, \
-    .rx_buffer_size = 160, \
-    .allocator = NULL, \
-    .ack_timeout_ms = 1000, \
-    .max_retry_count = 3, \
-    .window_size = 2, \
-    .max_frame_size = 128, \
+    .memory = { \
+        .tx_pool_size = 1024, \
+        .rx_buffer_size = 160, \
+        .allocator = NULL, \
+    }, \
+    .protocol = { \
+        .ack_timeout_ms = 1000, \
+        .max_retry_count = 3, \
+        .window_size = 2, \
+        .max_frame_size = 128, \
+    }, \
+    .features = { \
+        .enable_fragmentation = false, \
+        .enable_compression = false, \
+        .enable_encryption = false, \
+        .thread_safe = false, \
+    }, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
     .error_callback = NULL, \
     .callback_user_data = NULL, \
-    .enable_fragmentation = false, \
-    .enable_compression = false, \
-    .enable_encryption = false, \
-    .thread_safe = false, \
 }
 
 /**
@@ -346,22 +387,28 @@ typedef struct {
 #define XGL_CONFIG_PRESET_SMALL { \
     .name = "small", \
     .source_id = 0, \
-    .tx_pool_size = 2048, \
-    .rx_buffer_size = 288, \
-    .allocator = NULL, \
-    .ack_timeout_ms = 1000, \
-    .max_retry_count = 5, \
-    .window_size = 4, \
-    .max_frame_size = 256, \
+    .memory = { \
+        .tx_pool_size = 2048, \
+        .rx_buffer_size = 288, \
+        .allocator = NULL, \
+    }, \
+    .protocol = { \
+        .ack_timeout_ms = 1000, \
+        .max_retry_count = 5, \
+        .window_size = 4, \
+        .max_frame_size = 256, \
+    }, \
+    .features = { \
+        .enable_fragmentation = true, \
+        .enable_compression = false, \
+        .enable_encryption = false, \
+        .thread_safe = false, \
+    }, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
     .error_callback = NULL, \
     .callback_user_data = NULL, \
-    .enable_fragmentation = true, \
-    .enable_compression = false, \
-    .enable_encryption = false, \
-    .thread_safe = false, \
 }
 
 /**
@@ -370,22 +417,28 @@ typedef struct {
 #define XGL_CONFIG_PRESET_MEDIUM { \
     .name = "medium", \
     .source_id = 0, \
-    .tx_pool_size = 4096, \
-    .rx_buffer_size = 544, \
-    .allocator = NULL, \
-    .ack_timeout_ms = 1000, \
-    .max_retry_count = 5, \
-    .window_size = 8, \
-    .max_frame_size = 512, \
+    .memory = { \
+        .tx_pool_size = 4096, \
+        .rx_buffer_size = 544, \
+        .allocator = NULL, \
+    }, \
+    .protocol = { \
+        .ack_timeout_ms = 1000, \
+        .max_retry_count = 5, \
+        .window_size = 8, \
+        .max_frame_size = 512, \
+    }, \
+    .features = { \
+        .enable_fragmentation = true, \
+        .enable_compression = true, \
+        .enable_encryption = false, \
+        .thread_safe = false, \
+    }, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
     .error_callback = NULL, \
     .callback_user_data = NULL, \
-    .enable_fragmentation = true, \
-    .enable_compression = true, \
-    .enable_encryption = false, \
-    .thread_safe = false, \
 }
 
 /**
@@ -394,22 +447,28 @@ typedef struct {
 #define XGL_CONFIG_PRESET_LARGE { \
     .name = "large", \
     .source_id = 0, \
-    .tx_pool_size = 8192, \
-    .rx_buffer_size = 1056, \
-    .allocator = NULL, \
-    .ack_timeout_ms = 1000, \
-    .max_retry_count = 7, \
-    .window_size = 16, \
-    .max_frame_size = 1024, \
+    .memory = { \
+        .tx_pool_size = 8192, \
+        .rx_buffer_size = 1056, \
+        .allocator = NULL, \
+    }, \
+    .protocol = { \
+        .ack_timeout_ms = 1000, \
+        .max_retry_count = 7, \
+        .window_size = 16, \
+        .max_frame_size = 1024, \
+    }, \
+    .features = { \
+        .enable_fragmentation = true, \
+        .enable_compression = true, \
+        .enable_encryption = true, \
+        .thread_safe = false, \
+    }, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
     .error_callback = NULL, \
     .callback_user_data = NULL, \
-    .enable_fragmentation = true, \
-    .enable_compression = true, \
-    .enable_encryption = true, \
-    .thread_safe = false, \
 }
 
 #ifdef __cplusplus
