@@ -1,5 +1,5 @@
 # File Transfer Example
-# Reliable file transfer demonstrating fragmentation
+# Demonstrates reliable file transfer with fragmentation
 # Author: Nexus Team
 
 add_executable(file_transfer

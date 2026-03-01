@@ -19,3 +19,10 @@ add_subdirectory(file_transfer)
 #-----------------------------------------------------------------------------
 
 add_subdirectory(multi_node)
+
+#-----------------------------------------------------------------------------
+# Architecture Improvements Examples
+#-----------------------------------------------------------------------------
+
+# Commented out until examples are added
+# add_subdirectory(architecture_improvements)
