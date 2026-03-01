@@ -6,8 +6,1906 @@
 
 #include <gtest/gtest.h>
 #include "property_framework.h"
+#include <xgl/xgl_rtt.h>
+#include <xgl/xgl_window.h>
+#include <xgl/xgl_reliable.h>
+#include <xgl/xgl_ack.h>
+#include <xgl/xgl_types.h>
+#include <xgl/xgl_frame.h>
+#include <cmath>
+#include <set>
 
-/* Feature: x-gen-link, Property 13: Reliable Transmission Queuing */
-TEST(XglTransportProperties, Placeholder) {
-    EXPECT_EQ(1, 1);
+/*---------------------------------------------------------------------------*/
+/* Helper Functions                                                          */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Calculate absolute value for int32_t
+ */
+static inline int32_t abs_int32(int32_t value) {
+    return (value < 0) ? -value : value;
+}
+
+/**
+ * \brief           Check if value is within tolerance
+ */
+static inline bool within_tolerance(int32_t actual, int32_t expected, int32_t tolerance) {
+    return abs_int32(actual - expected) <= tolerance;
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 18: RTT Estimation                                               */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 18: RTT Estimation
+ * \details         For any received ACK, the transport layer should update 
+ *                  the RTT estimate using exponential moving average 
+ *                  (SRTT += error/8, RTTVAR += (|error| - RTTVAR)/4).
+ * \note            Validates: Requirements 6.1
+ */
+TEST(XglTransportProperties, Property18_RTTEstimation) {
+    PropertyTestGenerator gen;
+    
+    /* Test with 100+ random RTT measurements */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_rtt_estimator_t est;
+        xgl_rtt_init(&est);
+        
+        /* Generate random RTT measurement (1ms to 1000ms) */
+        int32_t measured_rtt = 1 + (gen.random_uint32() % 1000);
+        
+        /* First measurement: SRTT = R, RTTVAR = R/2 */
+        xgl_rtt_update(&est, measured_rtt);
+        
+        EXPECT_TRUE(xgl_rtt_is_initialized(&est)) 
+            << "Estimator should be initialized after first measurement";
+        
+        EXPECT_EQ(xgl_rtt_get_srtt(&est), measured_rtt)
+            << "First measurement: SRTT should equal measured RTT";
+        
+        EXPECT_EQ(xgl_rtt_get_rttvar(&est), measured_rtt / 2)
+            << "First measurement: RTTVAR should equal measured RTT / 2";
+        
+        /* Subsequent measurements: test exponential moving average */
+        int32_t prev_srtt = xgl_rtt_get_srtt(&est);
+        int32_t prev_rttvar = xgl_rtt_get_rttvar(&est);
+        
+        /* Generate second measurement */
+        int32_t measured_rtt2 = 1 + (gen.random_uint32() % 1000);
+        xgl_rtt_update(&est, measured_rtt2);
+        
+        /* Calculate expected values using RFC 6298 algorithm */
+        int32_t error = measured_rtt2 - prev_srtt;
+        int32_t expected_srtt = prev_srtt + (error >> XGL_RTT_ALPHA_SHIFT);  /* error/8 */
+        
+        int32_t abs_error = abs_int32(error);
+        int32_t rttvar_delta = abs_error - prev_rttvar;
+        int32_t expected_rttvar = prev_rttvar + (rttvar_delta >> XGL_RTT_BETA_SHIFT);  /* delta/4 */
+        
+        /* Verify SRTT update follows RFC 6298 */
+        EXPECT_EQ(xgl_rtt_get_srtt(&est), expected_srtt)
+            << "SRTT should be updated using: SRTT += error/8";
+        
+        /* Verify RTTVAR update follows RFC 6298 */
+        EXPECT_EQ(xgl_rtt_get_rttvar(&est), expected_rttvar)
+            << "RTTVAR should be updated using: RTTVAR += (|error| - RTTVAR)/4";
+    }
+}
+
+/**
+ * \brief           Test RTT estimation with sequence of measurements
+ * \details         Verifies that multiple measurements converge correctly
+ */
+TEST(XglTransportProperties, Property18_RTTEstimationSequence) {
+    PropertyTestGenerator gen;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_rtt_estimator_t est;
+        xgl_rtt_init(&est);
+        
+        /* Generate sequence of 5-10 measurements */
+        int num_measurements = 5 + (gen.random_uint8() % 6);
+        
+        for (int i = 0; i < num_measurements; ++i) {
+            int32_t prev_srtt = xgl_rtt_get_srtt(&est);
+            int32_t prev_rttvar = xgl_rtt_get_rttvar(&est);
+            bool was_initialized = xgl_rtt_is_initialized(&est);
+            
+            /* Generate random RTT (1ms to 500ms) */
+            int32_t measured_rtt = 1 + (gen.random_uint32() % 500);
+            xgl_rtt_update(&est, measured_rtt);
+            
+            /* Verify estimator is now initialized */
+            EXPECT_TRUE(xgl_rtt_is_initialized(&est));
+            
+            if (!was_initialized) {
+                /* First measurement */
+                EXPECT_EQ(xgl_rtt_get_srtt(&est), measured_rtt);
+                EXPECT_EQ(xgl_rtt_get_rttvar(&est), measured_rtt / 2);
+            } else {
+                /* Subsequent measurements - verify algorithm */
+                int32_t error = measured_rtt - prev_srtt;
+                int32_t expected_srtt = prev_srtt + (error >> XGL_RTT_ALPHA_SHIFT);
+                
+                int32_t abs_error = abs_int32(error);
+                int32_t rttvar_delta = abs_error - prev_rttvar;
+                int32_t expected_rttvar = prev_rttvar + (rttvar_delta >> XGL_RTT_BETA_SHIFT);
+                
+                EXPECT_EQ(xgl_rtt_get_srtt(&est), expected_srtt);
+                EXPECT_EQ(xgl_rtt_get_rttvar(&est), expected_rttvar);
+            }
+        }
+    }
+}
+
+/**
+ * \brief           Test RTT estimation with edge cases
+ * \details         Tests boundary conditions and special values
+ */
+TEST(XglTransportProperties, Property18_RTTEstimationEdgeCases) {
+    xgl_rtt_estimator_t est;
+    
+    /* Test with zero RTT */
+    xgl_rtt_init(&est);
+    xgl_rtt_update(&est, 0);
+    EXPECT_EQ(xgl_rtt_get_srtt(&est), 0);
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 0);
+    
+    /* Test with very small RTT */
+    xgl_rtt_init(&est);
+    xgl_rtt_update(&est, 1);
+    EXPECT_EQ(xgl_rtt_get_srtt(&est), 1);
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 0);  /* 1/2 = 0 in integer division */
+    
+    /* Test with very large RTT */
+    xgl_rtt_init(&est);
+    xgl_rtt_update(&est, 10000);
+    EXPECT_EQ(xgl_rtt_get_srtt(&est), 10000);
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 5000);
+    
+    /* Test with negative RTT (should be clamped to 0) */
+    xgl_rtt_init(&est);
+    xgl_rtt_update(&est, -100);
+    EXPECT_EQ(xgl_rtt_get_srtt(&est), 0);
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 0);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 19: RTO Calculation                                              */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 19: RTO Calculation
+ * \details         For any RTT estimate, the calculated RTO should equal 
+ *                  SRTT + 4 * RTTVAR, clamped to [MIN_RTO, MAX_RTO].
+ * \note            Validates: Requirements 6.2
+ */
+TEST(XglTransportProperties, Property19_ROCalculation) {
+    PropertyTestGenerator gen;
+    
+    /* Test with 100+ random RTT measurements */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_rtt_estimator_t est;
+        xgl_rtt_init(&est);
+        
+        /* Before initialization, should return default RTO */
+        EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_DEFAULT_RTO_MS)
+            << "Uninitialized estimator should return default RTO";
+        
+        /* Generate random RTT measurement (1ms to 2000ms) */
+        int32_t measured_rtt = 1 + (gen.random_uint32() % 2000);
+        xgl_rtt_update(&est, measured_rtt);
+        
+        /* Calculate expected RTO: SRTT + 4 * RTTVAR */
+        int32_t srtt = xgl_rtt_get_srtt(&est);
+        int32_t rttvar = xgl_rtt_get_rttvar(&est);
+        int32_t expected_rto = srtt + (XGL_RTO_K_FACTOR * rttvar);
+        
+        /* Clamp to [MIN_RTO, MAX_RTO] */
+        if (expected_rto < XGL_MIN_RTO_MS) {
+            expected_rto = XGL_MIN_RTO_MS;
+        }
+        if (expected_rto > XGL_MAX_RTO_MS) {
+            expected_rto = XGL_MAX_RTO_MS;
+        }
+        
+        int32_t actual_rto = xgl_rtt_get_rto(&est);
+        
+        EXPECT_EQ(actual_rto, expected_rto)
+            << "RTO should equal SRTT + 4 * RTTVAR, clamped to [MIN_RTO, MAX_RTO]"
+            << "\n  SRTT: " << srtt
+            << "\n  RTTVAR: " << rttvar
+            << "\n  Expected RTO: " << expected_rto
+            << "\n  Actual RTO: " << actual_rto;
+        
+        /* Verify RTO is within bounds */
+        EXPECT_GE(actual_rto, XGL_MIN_RTO_MS)
+            << "RTO should be >= MIN_RTO_MS (" << XGL_MIN_RTO_MS << ")";
+        
+        EXPECT_LE(actual_rto, XGL_MAX_RTO_MS)
+            << "RTO should be <= MAX_RTO_MS (" << XGL_MAX_RTO_MS << ")";
+    }
+}
+
+/**
+ * \brief           Test RTO calculation with multiple measurements
+ * \details         Verifies RTO updates correctly after each measurement
+ */
+TEST(XglTransportProperties, Property19_ROCalculationSequence) {
+    PropertyTestGenerator gen;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_rtt_estimator_t est;
+        xgl_rtt_init(&est);
+        
+        /* Generate sequence of measurements */
+        int num_measurements = 3 + (gen.random_uint8() % 8);
+        
+        for (int i = 0; i < num_measurements; ++i) {
+            /* Generate random RTT */
+            int32_t measured_rtt = 1 + (gen.random_uint32() % 1500);
+            xgl_rtt_update(&est, measured_rtt);
+            
+            /* Verify RTO calculation */
+            int32_t srtt = xgl_rtt_get_srtt(&est);
+            int32_t rttvar = xgl_rtt_get_rttvar(&est);
+            int32_t expected_rto = srtt + (XGL_RTO_K_FACTOR * rttvar);
+            
+            /* Apply clamping */
+            if (expected_rto < XGL_MIN_RTO_MS) {
+                expected_rto = XGL_MIN_RTO_MS;
+            }
+            if (expected_rto > XGL_MAX_RTO_MS) {
+                expected_rto = XGL_MAX_RTO_MS;
+            }
+            
+            EXPECT_EQ(xgl_rtt_get_rto(&est), expected_rto)
+                << "RTO calculation failed at measurement " << i;
+        }
+    }
+}
+
+/**
+ * \brief           Test RTO clamping to minimum value
+ * \details         Verifies RTO is clamped to MIN_RTO when calculated value is too small
+ */
+TEST(XglTransportProperties, Property19_ROClampingMinimum) {
+    xgl_rtt_estimator_t est;
+    xgl_rtt_init(&est);
+    
+    /* Use very small RTT that would result in RTO < MIN_RTO */
+    xgl_rtt_update(&est, 10);  /* SRTT=10, RTTVAR=5, RTO=10+4*5=30 */
+    
+    int32_t rto = xgl_rtt_get_rto(&est);
+    
+    /* RTO should be clamped to MIN_RTO_MS (100) */
+    EXPECT_EQ(rto, XGL_MIN_RTO_MS)
+        << "RTO should be clamped to MIN_RTO_MS when calculated value is too small";
+}
+
+/**
+ * \brief           Test RTO clamping to maximum value
+ * \details         Verifies RTO is clamped to MAX_RTO when calculated value is too large
+ */
+TEST(XglTransportProperties, Property19_ROClampingMaximum) {
+    xgl_rtt_estimator_t est;
+    xgl_rtt_init(&est);
+    
+    /* Use very large RTT that would result in RTO > MAX_RTO */
+    xgl_rtt_update(&est, 5000);  /* SRTT=5000, RTTVAR=2500, RTO=5000+4*2500=15000 */
+    
+    int32_t rto = xgl_rtt_get_rto(&est);
+    
+    /* RTO should be clamped to MAX_RTO_MS (5000) */
+    EXPECT_EQ(rto, XGL_MAX_RTO_MS)
+        << "RTO should be clamped to MAX_RTO_MS when calculated value is too large";
+}
+
+/**
+ * \brief           Test RTO with stable RTT
+ * \details         When RTT is stable, RTO should converge to a stable value
+ */
+TEST(XglTransportProperties, Property19_ROStableRTT) {
+    xgl_rtt_estimator_t est;
+    xgl_rtt_init(&est);
+    
+    /* Feed stable RTT measurements */
+    const int32_t stable_rtt = 200;
+    
+    for (int i = 0; i < 10; ++i) {
+        xgl_rtt_update(&est, stable_rtt);
+    }
+    
+    /* After many stable measurements, SRTT should converge to measured RTT */
+    int32_t srtt = xgl_rtt_get_srtt(&est);
+    EXPECT_TRUE(within_tolerance(srtt, stable_rtt, 10))
+        << "SRTT should converge to stable RTT value";
+    
+    /* RTTVAR should converge to near zero */
+    int32_t rttvar = xgl_rtt_get_rttvar(&est);
+    EXPECT_LT(rttvar, 20)
+        << "RTTVAR should be small with stable RTT";
+    
+    /* RTO should be close to SRTT when variation is low */
+    int32_t rto = xgl_rtt_get_rto(&est);
+    int32_t expected_rto = srtt + (XGL_RTO_K_FACTOR * rttvar);
+    if (expected_rto < XGL_MIN_RTO_MS) expected_rto = XGL_MIN_RTO_MS;
+    if (expected_rto > XGL_MAX_RTO_MS) expected_rto = XGL_MAX_RTO_MS;
+    
+    EXPECT_EQ(rto, expected_rto)
+        << "RTO should match calculated value with stable RTT";
+}
+
+/**
+ * \brief           Test RTO with varying RTT
+ * \details         When RTT varies, RTTVAR should increase and RTO should adapt
+ */
+TEST(XglTransportProperties, Property19_ROVaryingRTT) {
+    xgl_rtt_estimator_t est;
+    xgl_rtt_init(&est);
+    
+    /* Feed varying RTT measurements */
+    int32_t rtts[] = {100, 200, 150, 300, 100, 250, 180};
+    int num_rtts = sizeof(rtts) / sizeof(rtts[0]);
+    
+    for (int i = 0; i < num_rtts; ++i) {
+        xgl_rtt_update(&est, rtts[i]);
+        
+        /* Verify RTO is always within bounds */
+        int32_t rto = xgl_rtt_get_rto(&est);
+        EXPECT_GE(rto, XGL_MIN_RTO_MS);
+        EXPECT_LE(rto, XGL_MAX_RTO_MS);
+        
+        /* Verify RTO calculation */
+        int32_t srtt = xgl_rtt_get_srtt(&est);
+        int32_t rttvar = xgl_rtt_get_rttvar(&est);
+        int32_t expected_rto = srtt + (XGL_RTO_K_FACTOR * rttvar);
+        if (expected_rto < XGL_MIN_RTO_MS) expected_rto = XGL_MIN_RTO_MS;
+        if (expected_rto > XGL_MAX_RTO_MS) expected_rto = XGL_MAX_RTO_MS;
+        
+        EXPECT_EQ(rto, expected_rto);
+    }
+}
+
+/*---------------------------------------------------------------------------*/
+/* Additional RTT Tests                                                      */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Test RTT reset functionality
+ * \details         Verifies that reset returns estimator to initial state
+ */
+TEST(XglTransportProperties, RTTReset) {
+    xgl_rtt_estimator_t est;
+    xgl_rtt_init(&est);
+    
+    /* Update with some measurements */
+    xgl_rtt_update(&est, 100);
+    xgl_rtt_update(&est, 150);
+    xgl_rtt_update(&est, 200);
+    
+    EXPECT_TRUE(xgl_rtt_is_initialized(&est));
+    
+    /* Reset */
+    xgl_rtt_reset(&est);
+    
+    /* Should be back to initial state */
+    EXPECT_FALSE(xgl_rtt_is_initialized(&est));
+    EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_DEFAULT_RTO_MS);
+    EXPECT_EQ(xgl_rtt_get_srtt(&est), 0);
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 0);
+}
+
+/**
+ * \brief           Test NULL pointer handling
+ * \details         Verifies functions handle NULL pointers gracefully
+ */
+TEST(XglTransportProperties, RTTNullPointerHandling) {
+    /* All functions should handle NULL gracefully */
+    xgl_rtt_init(NULL);  /* Should not crash */
+    xgl_rtt_update(NULL, 100);  /* Should not crash */
+    xgl_rtt_reset(NULL);  /* Should not crash */
+    
+    EXPECT_EQ(xgl_rtt_get_rto(NULL), XGL_DEFAULT_RTO_MS);
+    EXPECT_EQ(xgl_rtt_get_srtt(NULL), 0);
+    EXPECT_EQ(xgl_rtt_get_rttvar(NULL), 0);
+    EXPECT_FALSE(xgl_rtt_is_initialized(NULL));
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 23: Sliding Window Maintenance                                   */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 23: Sliding Window Maintenance
+ * \details         For any protocol instance, the sliding window state 
+ *                  (send_base, next_seq_num) should satisfy: 
+ *                  0 <= (next_seq_num - send_base) <= window_size.
+ * \note            Validates: Requirements 7.5
+ */
+TEST(XglTransportProperties, Property23_SlidingWindowMaintenance) {
+    PropertyTestGenerator gen;
+    
+    /* Test with 100+ random window configurations and operations */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        /* Generate random window size (1-128) */
+        uint8_t window_size = 1 + (gen.random_uint8() % 128);
+        
+        xgl_sliding_window_t window;
+        xgl_error_t err = xgl_window_init(&window, window_size);
+        ASSERT_EQ(err, XGL_OK) << "Window initialization failed";
+        
+        /* Initial state should satisfy invariant */
+        uint8_t usage = xgl_window_get_usage(&window);
+        EXPECT_LE(usage, window_size)
+            << "Initial window usage should be <= window_size"
+            << "\n  send_base: " << (int)window.send_base
+            << "\n  next_seq_num: " << (int)window.next_seq_num
+            << "\n  window_size: " << (int)window_size
+            << "\n  usage: " << (int)usage;
+        
+        /* Perform random sequence of operations */
+        int num_operations = 10 + (gen.random_uint8() % 50);
+        
+        for (int op = 0; op < num_operations; ++op) {
+            /* Randomly choose operation: send (70%) or ack (30%) */
+            bool do_send = (gen.random_uint8() % 100) < 70;
+            
+            if (do_send && xgl_window_can_send(&window)) {
+                /* Send operation: advance next_seq_num */
+                uint8_t seq_before = xgl_window_get_next_seq(&window);
+                xgl_window_advance_next_seq(&window);
+                uint8_t seq_after = xgl_window_get_next_seq(&window);
+                
+                /* Verify sequence number advanced by 1 (with wraparound) */
+                EXPECT_EQ((uint8_t)(seq_before + 1), seq_after)
+                    << "Sequence number should advance by 1";
+                
+            } else if (!do_send) {
+                /* ACK operation: mark random sequence in window as ACKed */
+                uint8_t base = window.send_base;
+                uint8_t next = window.next_seq_num;
+                
+                /* Only ACK if there are outstanding packets */
+                if (base != next) {
+                    /* Generate random sequence number within window */
+                    uint8_t diff = (uint8_t)(next - base);
+                    uint8_t offset = gen.random_uint8() % diff;
+                    uint8_t seq_to_ack = (uint8_t)(base + offset);
+                    
+                    /* Mark ACK */
+                    err = xgl_window_mark_ack(&window, seq_to_ack);
+                    EXPECT_EQ(err, XGL_OK)
+                        << "Marking ACK should succeed for in-window sequence";
+                    
+                    /* Advance base if possible */
+                    xgl_window_advance_base(&window);
+                }
+            }
+            
+            /* After each operation, verify invariant holds */
+            uint8_t current_usage = xgl_window_get_usage(&window);
+            EXPECT_LE(current_usage, window_size)
+                << "Window invariant violated after operation " << op
+                << "\n  send_base: " << (int)window.send_base
+                << "\n  next_seq_num: " << (int)window.next_seq_num
+                << "\n  window_size: " << (int)window_size
+                << "\n  usage: " << (int)current_usage;
+            
+            /* Verify can_send is consistent with usage */
+            bool can_send = xgl_window_can_send(&window);
+            EXPECT_EQ(can_send, current_usage < window_size)
+                << "can_send should be true iff usage < window_size";
+        }
+        
+        /* Clean up */
+        xgl_window_destroy(&window);
+    }
+}
+
+/**
+ * \brief           Test sliding window with maximum window size
+ * \details         Verifies invariant holds with largest possible window
+ */
+TEST(XglTransportProperties, Property23_SlidingWindowMaxSize) {
+    xgl_sliding_window_t window;
+    xgl_error_t err = xgl_window_init(&window, 128);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Fill entire window */
+    for (int i = 0; i < 128; ++i) {
+        EXPECT_TRUE(xgl_window_can_send(&window))
+            << "Should be able to send until window is full";
+        xgl_window_advance_next_seq(&window);
+    }
+    
+    /* Window should now be full */
+    EXPECT_FALSE(xgl_window_can_send(&window))
+        << "Window should be full after 128 sends";
+    
+    uint8_t usage = xgl_window_get_usage(&window);
+    EXPECT_EQ(usage, 128)
+        << "Usage should equal window_size when full";
+    
+    /* Verify invariant */
+    EXPECT_LE(usage, 128)
+        << "Invariant should hold even when window is full";
+    
+    xgl_window_destroy(&window);
+}
+
+/**
+ * \brief           Test sliding window with sequence number wraparound
+ * \details         Verifies invariant holds across sequence number wraparound
+ */
+TEST(XglTransportProperties, Property23_SlidingWindowWraparound) {
+    PropertyTestGenerator gen;
+    
+    xgl_sliding_window_t window;
+    uint8_t window_size = 16;
+    xgl_error_t err = xgl_window_init(&window, window_size);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Advance to near wraparound point (250) */
+    window.send_base = 250;
+    window.next_seq_num = 250;
+    
+    /* Send packets across wraparound boundary */
+    for (int i = 0; i < 20; ++i) {
+        if (xgl_window_can_send(&window)) {
+            xgl_window_advance_next_seq(&window);
+            
+            /* Verify invariant after each send */
+            uint8_t usage = xgl_window_get_usage(&window);
+            EXPECT_LE(usage, window_size)
+                << "Invariant should hold across wraparound"
+                << "\n  send_base: " << (int)window.send_base
+                << "\n  next_seq_num: " << (int)window.next_seq_num
+                << "\n  usage: " << (int)usage;
+        }
+        
+        /* Randomly ACK some packets */
+        if ((gen.random_uint8() % 2) == 0) {
+            uint8_t base = window.send_base;
+            uint8_t next = window.next_seq_num;
+            
+            if (base != next) {
+                /* ACK the base packet to advance window */
+                xgl_window_mark_ack(&window, base);
+                xgl_window_advance_base(&window);
+            }
+        }
+    }
+    
+    /* Final invariant check */
+    uint8_t final_usage = xgl_window_get_usage(&window);
+    EXPECT_LE(final_usage, window_size)
+        << "Invariant should hold after wraparound operations";
+    
+    xgl_window_destroy(&window);
+}
+
+/**
+ * \brief           Test sliding window with all packets ACKed
+ * \details         Verifies window advances correctly when all packets are ACKed
+ */
+TEST(XglTransportProperties, Property23_SlidingWindowAllAcked) {
+    xgl_sliding_window_t window;
+    uint8_t window_size = 8;
+    xgl_error_t err = xgl_window_init(&window, window_size);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Send full window */
+    for (int i = 0; i < window_size; ++i) {
+        EXPECT_TRUE(xgl_window_can_send(&window));
+        xgl_window_advance_next_seq(&window);
+    }
+    
+    /* Window should be full */
+    EXPECT_FALSE(xgl_window_can_send(&window));
+    EXPECT_EQ(xgl_window_get_usage(&window), window_size);
+    
+    /* ACK all packets in order */
+    for (int i = 0; i < window_size; ++i) {
+        uint8_t seq = (uint8_t)(window.send_base + i);
+        err = xgl_window_mark_ack(&window, seq);
+        EXPECT_EQ(err, XGL_OK);
+    }
+    
+    /* Advance base - should advance by window_size */
+    uint8_t advanced = xgl_window_advance_base(&window);
+    EXPECT_EQ(advanced, window_size)
+        << "Should advance by full window size when all ACKed";
+    
+    /* Window should now be empty */
+    EXPECT_EQ(xgl_window_get_usage(&window), 0)
+        << "Window should be empty after all ACKs processed";
+    
+    /* Verify invariant */
+    EXPECT_LE(xgl_window_get_usage(&window), window_size);
+    
+    /* Should be able to send again */
+    EXPECT_TRUE(xgl_window_can_send(&window));
+    
+    xgl_window_destroy(&window);
+}
+
+/**
+ * \brief           Test sliding window with out-of-order ACKs
+ * \details         Verifies window handles out-of-order ACKs correctly
+ */
+TEST(XglTransportProperties, Property23_SlidingWindowOutOfOrderAcks) {
+    xgl_sliding_window_t window;
+    uint8_t window_size = 8;
+    xgl_error_t err = xgl_window_init(&window, window_size);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Record initial base */
+    uint8_t initial_base = window.send_base;
+    
+    /* Send full window */
+    for (int i = 0; i < window_size; ++i) {
+        xgl_window_advance_next_seq(&window);
+    }
+    
+    /* ACK packets out of order: 2, 4, 6, 0, 1, 3, 5, 7 */
+    /* Use initial_base to calculate absolute sequence numbers */
+    uint8_t ack_order[] = {2, 4, 6, 0, 1, 3, 5, 7};
+    
+    for (int i = 0; i < window_size; ++i) {
+        uint8_t seq = (uint8_t)(initial_base + ack_order[i]);
+        err = xgl_window_mark_ack(&window, seq);
+        EXPECT_EQ(err, XGL_OK)
+            << "Failed to mark ACK for sequence " << (int)seq;
+        
+        /* Try to advance base */
+        uint8_t prev_base = window.send_base;
+        xgl_window_advance_base(&window);
+        
+        /* Verify invariant after each ACK */
+        uint8_t usage = xgl_window_get_usage(&window);
+        EXPECT_LE(usage, window_size)
+            << "Invariant should hold with out-of-order ACKs"
+            << "\n  ACK index: " << i
+            << "\n  ACK seq: " << (int)seq
+            << "\n  prev_base: " << (int)prev_base
+            << "\n  send_base: " << (int)window.send_base
+            << "\n  next_seq_num: " << (int)window.next_seq_num
+            << "\n  usage: " << (int)usage;
+    }
+    
+    /* After all ACKs, window should be empty */
+    EXPECT_EQ(xgl_window_get_usage(&window), 0)
+        << "Window should be empty after all ACKs processed"
+        << "\n  send_base: " << (int)window.send_base
+        << "\n  next_seq_num: " << (int)window.next_seq_num;
+    
+    xgl_window_destroy(&window);
+}
+
+/**
+ * \brief           Test sliding window reset
+ * \details         Verifies reset restores window to initial state
+ */
+TEST(XglTransportProperties, Property23_SlidingWindowReset) {
+    PropertyTestGenerator gen;
+    
+    xgl_sliding_window_t window;
+    uint8_t window_size = 16;
+    xgl_error_t err = xgl_window_init(&window, window_size);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Perform random operations */
+    for (int i = 0; i < 50; ++i) {
+        if (xgl_window_can_send(&window)) {
+            xgl_window_advance_next_seq(&window);
+        }
+        
+        if ((gen.random_uint8() % 3) == 0) {
+            uint8_t base = window.send_base;
+            uint8_t next = window.next_seq_num;
+            if (base != next) {
+                uint8_t seq = (uint8_t)(base + (gen.random_uint8() % (next - base)));
+                xgl_window_mark_ack(&window, seq);
+                xgl_window_advance_base(&window);
+            }
+        }
+    }
+    
+    /* Reset window */
+    xgl_window_reset(&window);
+    
+    /* Verify reset to initial state */
+    EXPECT_EQ(window.send_base, 0);
+    EXPECT_EQ(window.next_seq_num, 0);
+    EXPECT_EQ(xgl_window_get_usage(&window), 0);
+    EXPECT_TRUE(xgl_window_can_send(&window));
+    
+    /* Verify invariant after reset */
+    EXPECT_LE(xgl_window_get_usage(&window), window_size);
+    
+    xgl_window_destroy(&window);
+}
+
+/**
+ * \brief           Test sliding window with minimum size
+ * \details         Verifies invariant holds with smallest possible window
+ */
+TEST(XglTransportProperties, Property23_SlidingWindowMinSize) {
+    xgl_sliding_window_t window;
+    xgl_error_t err = xgl_window_init(&window, 1);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* With window size 1, can only send one packet at a time */
+    EXPECT_TRUE(xgl_window_can_send(&window));
+    EXPECT_EQ(xgl_window_get_usage(&window), 0);
+    
+    /* Send one packet */
+    xgl_window_advance_next_seq(&window);
+    
+    /* Window should be full */
+    EXPECT_FALSE(xgl_window_can_send(&window));
+    EXPECT_EQ(xgl_window_get_usage(&window), 1);
+    
+    /* Verify invariant */
+    EXPECT_LE(xgl_window_get_usage(&window), 1);
+    
+    /* ACK the packet */
+    err = xgl_window_mark_ack(&window, window.send_base);
+    EXPECT_EQ(err, XGL_OK);
+    
+    uint8_t advanced = xgl_window_advance_base(&window);
+    EXPECT_EQ(advanced, 1);
+    
+    /* Window should be empty again */
+    EXPECT_TRUE(xgl_window_can_send(&window));
+    EXPECT_EQ(xgl_window_get_usage(&window), 0);
+    
+    /* Verify invariant */
+    EXPECT_LE(xgl_window_get_usage(&window), 1);
+    
+    xgl_window_destroy(&window);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 13: Reliable Transmission Queuing                                */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 13: Reliable Transmission Queuing
+ * \details         For any packet sent with reliable transmission enabled, 
+ *                  the transport layer should add it to the wait-ACK queue.
+ * \note            Validates: Requirements 5.1
+ */
+TEST(XglTransportProperties, Property13_ReliableTransmissionQueuing) {
+    PropertyTestGenerator gen;
+    
+    /* Mock PHY operations */
+    xgl_phy_ops_t phy;
+    phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+        (void)data; (void)len; (void)user_data;
+        return XGL_OK;
+    };
+    phy.rx = nullptr;
+    phy.user_data = nullptr;
+    
+    /* Test with 100+ random packet configurations */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, 5, nullptr);
+        ASSERT_EQ(err, XGL_OK) << "Queue initialization failed";
+        
+        /* Verify queue starts empty */
+        EXPECT_TRUE(xgl_reliable_is_empty(&queue))
+            << "Queue should be empty initially";
+        EXPECT_EQ(xgl_reliable_get_count(&queue), 0)
+            << "Queue count should be 0 initially";
+        
+        /* Generate random packet data */
+        size_t data_len = 1 + (gen.random_uint8() % 255);
+        std::vector<uint8_t> data = gen.random_bytes(data_len);
+        
+        uint8_t source_id = gen.random_uint8();
+        uint8_t target_id = gen.random_uint8();
+        uint8_t seq_num = gen.random_uint8();
+        uint8_t data_type = gen.random_uint8();
+        uint8_t priority = gen.random_uint8() % 8;
+        int32_t timeout_ms = 100 + (gen.random_uint32() % 5000);
+        
+        /* Add packet to queue */
+        err = xgl_reliable_add_packet(&queue, data.data(), data_len,
+                                     source_id, target_id, seq_num,
+                                     data_type, priority, timeout_ms, &phy);
+        
+        EXPECT_EQ(err, XGL_OK)
+            << "Adding packet to queue should succeed";
+        
+        /* Verify packet was added to queue */
+        EXPECT_FALSE(xgl_reliable_is_empty(&queue))
+            << "Queue should not be empty after adding packet";
+        
+        EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
+            << "Queue count should be 1 after adding one packet";
+        
+        /* Verify packet can be found in queue */
+        xgl_reliable_packet_t* found = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        ASSERT_NE(found, nullptr)
+            << "Packet should be findable in queue";
+        
+        /* Verify packet data matches */
+        EXPECT_EQ(found->seq_num, seq_num);
+        EXPECT_EQ(found->target_id, target_id);
+        EXPECT_EQ(found->source_id, source_id);
+        EXPECT_EQ(found->data_type, data_type);
+        EXPECT_EQ(found->priority, priority);
+        EXPECT_EQ(found->data_len, data_len);
+        EXPECT_EQ(found->initial_timeout_ms, timeout_ms);
+        EXPECT_EQ(found->timeout_ms, timeout_ms);
+        EXPECT_EQ(found->retry_count, 0);
+        
+        /* Clean up */
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/**
+ * \brief           Test queuing multiple packets
+ * \details         Verifies multiple packets can be queued correctly
+ */
+TEST(XglTransportProperties, Property13_ReliableTransmissionQueuingMultiple) {
+    PropertyTestGenerator gen;
+    
+    xgl_phy_ops_t phy;
+    phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+        (void)data; (void)len; (void)user_data;
+        return XGL_OK;
+    };
+    phy.rx = nullptr;
+    phy.user_data = nullptr;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, 5, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Add random number of packets (1-20) */
+        int num_packets = 1 + (gen.random_uint8() % 20);
+        
+        for (int i = 0; i < num_packets; ++i) {
+            std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 100));
+            
+            err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                         gen.random_uint8(), gen.random_uint8(),
+                                         (uint8_t)i, gen.random_uint8(),
+                                         gen.random_uint8() % 8, 1000, &phy);
+            
+            EXPECT_EQ(err, XGL_OK)
+                << "Adding packet " << i << " should succeed";
+            
+            /* Verify count increases */
+            EXPECT_EQ(xgl_reliable_get_count(&queue), (size_t)(i + 1))
+                << "Queue count should match number of packets added";
+        }
+        
+        /* Verify final count */
+        EXPECT_EQ(xgl_reliable_get_count(&queue), (size_t)num_packets);
+        EXPECT_FALSE(xgl_reliable_is_empty(&queue));
+        
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 14: Retransmission on Timeout                                    */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 14: Retransmission on Timeout
+ * \details         For any packet in the wait-ACK queue, if no ACK is received 
+ *                  within the timeout period, the packet should be retransmitted.
+ * \note            Validates: Requirements 5.2
+ */
+TEST(XglTransportProperties, Property14_RetransmissionOnTimeout) {
+    PropertyTestGenerator gen;
+    
+    /* Track transmissions */
+    struct TxTracker {
+        int tx_count = 0;
+        std::vector<uint8_t> last_data;
+    };
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        TxTracker tracker;
+        
+        /* Mock PHY that tracks transmissions */
+        xgl_phy_ops_t phy;
+        phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+            TxTracker* t = static_cast<TxTracker*>(user_data);
+            t->tx_count++;
+            t->last_data.assign(data, data + len);
+            return XGL_OK;
+        };
+        phy.rx = nullptr;
+        phy.user_data = &tracker;
+        
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, 5, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Generate random packet */
+        std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
+        uint8_t seq_num = gen.random_uint8();
+        uint8_t target_id = gen.random_uint8();
+        int32_t timeout_ms = 100 + (gen.random_uint32() % 500);
+        
+        /* Add packet to queue */
+        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                     1, target_id, seq_num, 0, 0, timeout_ms, &phy);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Set initial send timestamp */
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        ASSERT_NE(packet, nullptr);
+        packet->send_timestamp = 1000;  /* Start time */
+        
+        /* Process timeouts before timeout expires - should not retransmit */
+        uint32_t retx_count = xgl_reliable_process_timeouts(&queue, 
+                                                            1000 + timeout_ms - 1,
+                                                            nullptr);
+        EXPECT_EQ(retx_count, 0)
+            << "Should not retransmit before timeout expires";
+        EXPECT_EQ(tracker.tx_count, 0)
+            << "No transmission should occur before timeout";
+        
+        /* Process timeouts after timeout expires - should retransmit */
+        retx_count = xgl_reliable_process_timeouts(&queue,
+                                                   1000 + timeout_ms,
+                                                   nullptr);
+        EXPECT_EQ(retx_count, 1)
+            << "Should retransmit exactly once when timeout expires";
+        EXPECT_EQ(tracker.tx_count, 1)
+            << "PHY tx should be called once for retransmission";
+        
+        /* Verify packet is still in queue */
+        EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
+            << "Packet should remain in queue after retransmission";
+        
+        /* Verify retry count incremented */
+        packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        ASSERT_NE(packet, nullptr);
+        EXPECT_EQ(packet->retry_count, 1)
+            << "Retry count should be incremented after retransmission";
+        
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/**
+ * \brief           Test multiple retransmissions
+ * \details         Verifies packet is retransmitted multiple times on repeated timeouts
+ */
+TEST(XglTransportProperties, Property14_RetransmissionMultiple) {
+    PropertyTestGenerator gen;
+    
+    struct TxTracker {
+        int tx_count = 0;
+    };
+    
+    TxTracker tracker;
+    
+    xgl_phy_ops_t phy;
+    phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+        (void)data; (void)len;
+        TxTracker* t = static_cast<TxTracker*>(user_data);
+        t->tx_count++;
+        return XGL_OK;
+    };
+    phy.rx = nullptr;
+    phy.user_data = &tracker;
+    
+    xgl_reliable_queue_t queue;
+    xgl_error_t err = xgl_reliable_init(&queue, 5, nullptr);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Add packet */
+    std::vector<uint8_t> data = gen.random_bytes(20);
+    err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                 1, 2, 10, 0, 0, 100, &phy);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Set initial timestamp */
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    ASSERT_NE(packet, nullptr);
+    packet->send_timestamp = 1000;
+    
+    /* Simulate 3 timeouts */
+    uint32_t current_time = 1000;
+    for (int i = 0; i < 3; ++i) {
+        /* Advance time past timeout */
+        current_time += packet->timeout_ms;
+        
+        uint32_t retx = xgl_reliable_process_timeouts(&queue, current_time, nullptr);
+        EXPECT_EQ(retx, 1) << "Should retransmit on timeout " << i;
+        
+        /* Verify retry count */
+        packet = xgl_reliable_find_packet(&queue, 10, 2);
+        ASSERT_NE(packet, nullptr);
+        EXPECT_EQ(packet->retry_count, (uint8_t)(i + 1));
+    }
+    
+    /* Verify total transmissions */
+    EXPECT_EQ(tracker.tx_count, 3);
+    
+    xgl_reliable_destroy(&queue);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 15: Retry Exhaustion Handling                                    */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 15: Retry Exhaustion Handling
+ * \details         For any packet that exceeds maximum retry count, the transport 
+ *                  layer should invoke the error callback and remove the packet 
+ *                  from the queue.
+ * \note            Validates: Requirements 5.3
+ */
+TEST(XglTransportProperties, Property15_RetryExhaustionHandling) {
+    PropertyTestGenerator gen;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_phy_ops_t phy;
+        phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+            (void)data; (void)len; (void)user_data;
+            return XGL_OK;
+        };
+        phy.rx = nullptr;
+        phy.user_data = nullptr;
+        
+        /* Random max retry count (1-10) */
+        uint8_t max_retry = 1 + (gen.random_uint8() % 10);
+        
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, max_retry, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Add packet */
+        std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
+        uint8_t seq_num = gen.random_uint8();
+        uint8_t target_id = gen.random_uint8();
+        
+        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                     1, target_id, seq_num, 0, 0, 100, &phy);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Set initial timestamp */
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        ASSERT_NE(packet, nullptr);
+        packet->send_timestamp = 1000;
+        
+        /* Exhaust retries */
+        uint32_t current_time = 1000;
+        for (uint8_t i = 0; i < max_retry; ++i) {
+            current_time += packet->timeout_ms;
+            xgl_reliable_process_timeouts(&queue, current_time, nullptr);
+            
+            /* Packet should still be in queue */
+            EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
+                << "Packet should remain in queue until max retries exceeded";
+            
+            packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+            ASSERT_NE(packet, nullptr);
+        }
+        
+        /* One more timeout should remove packet */
+        current_time += packet->timeout_ms;
+        xgl_reliable_packet_t* exhausted = nullptr;
+        xgl_reliable_process_timeouts(&queue, current_time, &exhausted);
+        
+        /* Packet should be removed from queue */
+        EXPECT_EQ(xgl_reliable_get_count(&queue), 0)
+            << "Packet should be removed after max retries exceeded";
+        
+        EXPECT_TRUE(xgl_reliable_is_empty(&queue))
+            << "Queue should be empty after retry exhaustion";
+        
+        /* Verify packet was returned as exhausted */
+        ASSERT_NE(exhausted, nullptr)
+            << "Exhausted packet should be returned to caller";
+        
+        EXPECT_EQ(exhausted->seq_num, seq_num);
+        EXPECT_EQ(exhausted->target_id, target_id);
+        EXPECT_EQ(exhausted->retry_count, max_retry);
+        
+        /* Clean up exhausted packet */
+        if (exhausted != nullptr && exhausted->data != nullptr) {
+            free(exhausted->data);
+        }
+        free(exhausted);
+        
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/**
+ * \brief           Test retry exhaustion with multiple packets
+ * \details         Verifies only exhausted packets are removed
+ */
+TEST(XglTransportProperties, Property15_RetryExhaustionMultiplePackets) {
+    PropertyTestGenerator gen;
+    
+    xgl_phy_ops_t phy;
+    phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+        (void)data; (void)len; (void)user_data;
+        return XGL_OK;
+    };
+    phy.rx = nullptr;
+    phy.user_data = nullptr;
+    
+    xgl_reliable_queue_t queue;
+    xgl_error_t err = xgl_reliable_init(&queue, 3, nullptr);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Add 3 packets - only set timestamp for first one */
+    for (int i = 0; i < 3; ++i) {
+        std::vector<uint8_t> data = gen.random_bytes(20);
+        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                     1, 2, (uint8_t)i, 0, 0, 100, &phy);
+        ASSERT_EQ(err, XGL_OK);
+    }
+    
+    /* Only set timestamp for first packet - others have timestamp=0 (not sent yet) */
+    xgl_reliable_packet_t* packet0 = xgl_reliable_find_packet(&queue, 0, 2);
+    ASSERT_NE(packet0, nullptr);
+    packet0->send_timestamp = 1000;
+    
+    EXPECT_EQ(xgl_reliable_get_count(&queue), 3);
+    
+    /* Exhaust first packet only by processing timeouts */
+    /* Packet starts at 1000ms with 100ms timeout */
+    /* After 3 retries with exponential backoff: 100, 200, 400, 800 */
+    
+    uint32_t current_time = 1000;
+    
+    /* Trigger retries until exhaustion */
+    for (int retry = 0; retry <= 3; ++retry) {
+        /* Advance time past current timeout */
+        current_time += packet0->timeout_ms;
+        
+        xgl_reliable_packet_t* exhausted = nullptr;
+        xgl_reliable_process_timeouts(&queue, current_time, &exhausted);
+        
+        if (retry < 3) {
+            /* Should still be in queue */
+            EXPECT_EQ(xgl_reliable_get_count(&queue), 3)
+                << "All packets should remain during retries (retry " << retry << ")";
+            EXPECT_EQ(exhausted, nullptr)
+                << "No packet should be exhausted yet (retry " << retry << ")";
+            
+            /* Update packet pointer after processing */
+            packet0 = xgl_reliable_find_packet(&queue, 0, 2);
+            ASSERT_NE(packet0, nullptr)
+                << "Packet 0 should still exist after retry " << retry;
+        } else {
+            /* Should be removed */
+            EXPECT_NE(exhausted, nullptr)
+                << "Packet should be exhausted after max retries";
+            
+            if (exhausted != nullptr) {
+                EXPECT_EQ(exhausted->seq_num, 0)
+                    << "First packet should be exhausted";
+                free(exhausted->data);
+                free(exhausted);
+            }
+        }
+    }
+    
+    /* First packet should be removed, others remain (they were never sent) */
+    EXPECT_EQ(xgl_reliable_get_count(&queue), 2)
+        << "Only exhausted packet should be removed";
+    
+    EXPECT_EQ(xgl_reliable_find_packet(&queue, 0, 2), nullptr)
+        << "Packet 0 should be removed";
+    EXPECT_NE(xgl_reliable_find_packet(&queue, 1, 2), nullptr)
+        << "Packet 1 should still exist (never sent)";
+    EXPECT_NE(xgl_reliable_find_packet(&queue, 2, 2), nullptr)
+        << "Packet 2 should still exist (never sent)";
+    
+    xgl_reliable_destroy(&queue);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 20: Exponential Backoff                                          */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 20: Exponential Backoff
+ * \details         For any packet that is retransmitted multiple times, 
+ *                  the timeout should increase exponentially with each retry.
+ * \note            Validates: Requirements 6.4
+ */
+TEST(XglTransportProperties, Property20_ExponentialBackoff) {
+    PropertyTestGenerator gen;
+    
+    /* Test with 100+ random initial timeouts */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        /* Generate random initial timeout (50ms to 2000ms) */
+        int32_t initial_timeout = 50 + (gen.random_uint32() % 1950);
+        
+        /* Test backoff calculation for retry counts 0-10 */
+        int32_t prev_timeout = initial_timeout;
+        
+        for (uint8_t retry = 1; retry <= 10; ++retry) {
+            int32_t backoff_timeout = xgl_reliable_calc_backoff(initial_timeout, retry);
+            
+            /* Verify exponential growth: timeout should double each retry */
+            int32_t expected_timeout = initial_timeout * (1 << retry);  /* 2^retry */
+            
+            /* Cap at 30000ms */
+            if (expected_timeout > 30000) {
+                expected_timeout = 30000;
+            }
+            
+            EXPECT_EQ(backoff_timeout, expected_timeout)
+                << "Backoff timeout should follow exponential pattern"
+                << "\n  initial_timeout: " << initial_timeout
+                << "\n  retry: " << (int)retry
+                << "\n  expected: " << expected_timeout
+                << "\n  actual: " << backoff_timeout;
+            
+            /* Verify timeout increases (or stays at cap) */
+            EXPECT_GE(backoff_timeout, prev_timeout)
+                << "Timeout should never decrease with more retries";
+            
+            /* Verify timeout doesn't exceed maximum */
+            EXPECT_LE(backoff_timeout, 30000)
+                << "Timeout should be capped at 30000ms";
+            
+            prev_timeout = backoff_timeout;
+        }
+    }
+}
+
+/**
+ * \brief           Test exponential backoff in queue processing
+ * \details         Verifies timeout increases in actual queue operations
+ */
+TEST(XglTransportProperties, Property20_ExponentialBackoffInQueue) {
+    PropertyTestGenerator gen;
+    
+    xgl_phy_ops_t phy;
+    phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+        (void)data; (void)len; (void)user_data;
+        return XGL_OK;
+    };
+    phy.rx = nullptr;
+    phy.user_data = nullptr;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, 10, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Random initial timeout */
+        int32_t initial_timeout = 100 + (gen.random_uint32() % 500);
+        
+        /* Add packet */
+        std::vector<uint8_t> data = gen.random_bytes(20);
+        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                     1, 2, 10, 0, 0, initial_timeout, &phy);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Set initial timestamp */
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+        ASSERT_NE(packet, nullptr);
+        packet->send_timestamp = 1000;
+        
+        /* Track timeout progression */
+        std::vector<int32_t> timeouts;
+        timeouts.push_back(packet->timeout_ms);
+        
+        /* Trigger 5 retransmissions */
+        uint32_t current_time = 1000;
+        for (int i = 0; i < 5; ++i) {
+            current_time += packet->timeout_ms;
+            xgl_reliable_process_timeouts(&queue, current_time, nullptr);
+            
+            packet = xgl_reliable_find_packet(&queue, 10, 2);
+            ASSERT_NE(packet, nullptr);
+            
+            timeouts.push_back(packet->timeout_ms);
+            
+            /* Verify timeout increased */
+            EXPECT_GT(packet->timeout_ms, timeouts[i])
+                << "Timeout should increase after retry " << i;
+            
+            /* Verify exponential pattern */
+            int32_t expected = xgl_reliable_calc_backoff(initial_timeout, packet->retry_count);
+            EXPECT_EQ(packet->timeout_ms, expected)
+                << "Timeout should match exponential backoff calculation";
+        }
+        
+        /* Verify exponential growth pattern */
+        for (size_t i = 1; i < timeouts.size(); ++i) {
+            EXPECT_GE(timeouts[i], timeouts[i-1])
+                << "Timeouts should be monotonically increasing";
+        }
+        
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/**
+ * \brief           Test backoff with edge cases
+ * \details         Verifies backoff handles boundary conditions correctly
+ */
+TEST(XglTransportProperties, Property20_ExponentialBackoffEdgeCases) {
+    /* Test with very small initial timeout */
+    int32_t backoff = xgl_reliable_calc_backoff(1, 5);
+    EXPECT_EQ(backoff, 32);  /* 1 * 2^5 = 32 */
+    
+    /* Test with zero initial timeout */
+    backoff = xgl_reliable_calc_backoff(0, 5);
+    EXPECT_EQ(backoff, 0);
+    
+    /* Test with large initial timeout that would overflow */
+    backoff = xgl_reliable_calc_backoff(10000, 5);
+    EXPECT_LE(backoff, 30000);  /* Should be capped */
+    
+    /* Test with maximum retry count */
+    backoff = xgl_reliable_calc_backoff(100, 255);
+    EXPECT_LE(backoff, 30000);  /* Should be capped */
+    EXPECT_GT(backoff, 0);
+    
+    /* Test that backoff is capped at 30000 */
+    backoff = xgl_reliable_calc_backoff(5000, 10);
+    EXPECT_EQ(backoff, 30000);
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 16: ACK Processing                                               */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 16: ACK Processing
+ * \details         For any received ACK with matching sequence number and 
+ *                  target ID, the transport layer should remove the 
+ *                  corresponding packet from the wait-ACK queue.
+ * \note            Validates: Requirements 5.4
+ */
+TEST(XglTransportProperties, Property16_ACKProcessing) {
+    PropertyTestGenerator gen;
+    
+    /* Test with 100+ random ACK scenarios */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_phy_ops_t phy;
+        phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+            (void)data; (void)len; (void)user_data;
+            return XGL_OK;
+        };
+        phy.rx = nullptr;
+        phy.user_data = nullptr;
+        
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, 5, nullptr);
+        ASSERT_EQ(err, XGL_OK) << "Queue initialization failed";
+        
+        /* Generate random packet parameters */
+        uint8_t source_id = gen.random_uint8();
+        uint8_t target_id = gen.random_uint8();
+        uint8_t seq_num = gen.random_uint8();
+        std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
+        
+        /* Add packet to queue */
+        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                     source_id, target_id, seq_num,
+                                     0, 0, 1000, &phy);
+        ASSERT_EQ(err, XGL_OK) << "Failed to add packet to queue";
+        
+        /* Verify packet is in queue */
+        EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
+            << "Queue should contain one packet";
+        
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        ASSERT_NE(packet, nullptr)
+            << "Packet should be findable in queue";
+        
+        /* Process ACK with matching sequence number and target ID */
+        xgl_error_t remove_err = xgl_reliable_remove_packet(&queue, seq_num, target_id);
+        
+        EXPECT_EQ(remove_err, XGL_OK)
+            << "ACK processing should remove matching packet from queue"
+            << "\n  seq_num: " << (int)seq_num
+            << "\n  target_id: " << (int)target_id;
+        
+        /* Verify packet was removed from queue */
+        EXPECT_EQ(xgl_reliable_get_count(&queue), 0)
+            << "Queue should be empty after ACK processing";
+        
+        EXPECT_TRUE(xgl_reliable_is_empty(&queue))
+            << "Queue should be empty after ACK removes packet";
+        
+        /* Verify packet is no longer findable */
+        packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        EXPECT_EQ(packet, nullptr)
+            << "Packet should not be findable after ACK processing";
+        
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/**
+ * \brief           Test ACK processing with multiple packets
+ * \details         Verifies ACK removes only the matching packet
+ */
+TEST(XglTransportProperties, Property16_ACKProcessingMultiplePackets) {
+    PropertyTestGenerator gen;
+    
+    xgl_phy_ops_t phy;
+    phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+        (void)data; (void)len; (void)user_data;
+        return XGL_OK;
+    };
+    phy.rx = nullptr;
+    phy.user_data = nullptr;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, 10, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Add multiple packets with different sequence numbers */
+        const int num_packets = 5;
+        uint8_t target_id = gen.random_uint8();
+        
+        for (int i = 0; i < num_packets; ++i) {
+            std::vector<uint8_t> data = gen.random_bytes(20);
+            err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                         1, target_id, (uint8_t)i,
+                                         0, 0, 1000, &phy);
+            ASSERT_EQ(err, XGL_OK);
+        }
+        
+        EXPECT_EQ(xgl_reliable_get_count(&queue), (size_t)num_packets);
+        
+        /* ACK middle packet (seq_num = 2) */
+        xgl_error_t remove_err = xgl_reliable_remove_packet(&queue, 2, target_id);
+        EXPECT_EQ(remove_err, XGL_OK);
+        
+        /* Verify only that packet was removed */
+        EXPECT_EQ(xgl_reliable_get_count(&queue), (size_t)(num_packets - 1))
+            << "Only ACKed packet should be removed";
+        
+        /* Verify other packets still exist */
+        EXPECT_NE(xgl_reliable_find_packet(&queue, 0, target_id), nullptr);
+        EXPECT_NE(xgl_reliable_find_packet(&queue, 1, target_id), nullptr);
+        EXPECT_EQ(xgl_reliable_find_packet(&queue, 2, target_id), nullptr);  /* Removed */
+        EXPECT_NE(xgl_reliable_find_packet(&queue, 3, target_id), nullptr);
+        EXPECT_NE(xgl_reliable_find_packet(&queue, 4, target_id), nullptr);
+        
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/**
+ * \brief           Test ACK processing with non-matching sequence number
+ * \details         Verifies ACK with wrong sequence number doesn't remove packet
+ */
+TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
+    PropertyTestGenerator gen;
+    
+    xgl_phy_ops_t phy;
+    phy.tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+        (void)data; (void)len; (void)user_data;
+        return XGL_OK;
+    };
+    phy.rx = nullptr;
+    phy.user_data = nullptr;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_reliable_queue_t queue;
+        xgl_error_t err = xgl_reliable_init(&queue, 5, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Add packet with specific sequence number */
+        uint8_t seq_num = gen.random_uint8();
+        uint8_t target_id = gen.random_uint8();
+        std::vector<uint8_t> data = gen.random_bytes(20);
+        
+        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+                                     1, target_id, seq_num, 0, 0, 1000, &phy);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Try to ACK with different sequence number */
+        uint8_t wrong_seq = (uint8_t)(seq_num + 1);
+        xgl_error_t remove_err = xgl_reliable_remove_packet(&queue, wrong_seq, target_id);
+        
+        EXPECT_NE(remove_err, XGL_OK)
+            << "ACK with non-matching sequence number should not remove packet";
+        
+        /* Verify packet still exists */
+        EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
+            << "Packet should remain in queue";
+        
+        EXPECT_NE(xgl_reliable_find_packet(&queue, seq_num, target_id), nullptr)
+            << "Original packet should still be findable";
+        
+        xgl_reliable_destroy(&queue);
+    }
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 17: ACK Generation                                               */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 17: ACK Generation
+ * \details         For any received reliable packet, the transport layer 
+ *                  should send an ACK containing the packet's sequence number.
+ * \note            Validates: Requirements 5.5
+ */
+TEST(XglTransportProperties, Property17_ACKGeneration) {
+    PropertyTestGenerator gen;
+    
+    /* Test with 100+ random packet configurations */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        /* Generate random packet parameters */
+        uint8_t seq_num = gen.random_uint8();
+        uint8_t source_id = gen.random_uint8();
+        uint8_t target_id = gen.random_uint8();
+        
+        /* Generate ACK packet */
+        uint8_t ack_buffer[XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE];
+        size_t ack_len = 0;
+        
+        xgl_error_t err = xgl_ack_generate(seq_num, source_id, target_id,
+                                          ack_buffer, sizeof(ack_buffer), &ack_len);
+        
+        ASSERT_EQ(err, XGL_OK)
+            << "ACK generation should succeed";
+        
+        /* Verify ACK length is correct (header + CRC16, no payload) */
+        EXPECT_EQ(ack_len, XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE)
+            << "ACK should be header + CRC16 with no payload";
+        
+        /* Parse ACK frame header */
+        xgl_frame_header_t* header = (xgl_frame_header_t*)ack_buffer;
+        
+        /* Verify SOF */
+        EXPECT_EQ(header->sof, XGL_SOF)
+            << "ACK should have correct SOF marker";
+        
+        /* Verify source and target are swapped */
+        EXPECT_EQ(header->source_id, target_id)
+            << "ACK source should be original target";
+        
+        EXPECT_EQ(header->target_id, source_id)
+            << "ACK target should be original source";
+        
+        /* Verify ACK number matches original sequence number */
+        EXPECT_EQ(header->ack_num, seq_num)
+            << "ACK number should match original packet sequence number";
+        
+        /* Verify reliable attribute is set to ACK */
+        uint8_t reliable = (header->attr_lsb & XGL_ATTR_RELIABLE_MASK) >> XGL_ATTR_RELIABLE_SHIFT;
+        EXPECT_EQ(reliable, (XGL_ATTR_RELIABLE_ACK >> XGL_ATTR_RELIABLE_SHIFT))
+            << "ACK should have reliable attribute set to ACK type";
+        
+        /* Verify data length is zero (no payload) */
+        uint16_t data_len = header->data_len;  /* Already in little-endian in struct */
+        EXPECT_EQ(data_len, 0)
+            << "ACK should have zero payload length";
+    }
+}
+
+/**
+ * \brief           Test ACK generation with buffer too small
+ * \details         Verifies error handling when buffer is insufficient
+ */
+TEST(XglTransportProperties, Property17_ACKGenerationBufferTooSmall) {
+    PropertyTestGenerator gen;
+    
+    uint8_t seq_num = gen.random_uint8();
+    uint8_t source_id = gen.random_uint8();
+    uint8_t target_id = gen.random_uint8();
+    
+    /* Try with buffer that's too small */
+    uint8_t small_buffer[10];  /* Need at least 14 bytes */
+    size_t ack_len = 0;
+    
+    xgl_error_t err = xgl_ack_generate(seq_num, source_id, target_id,
+                                      small_buffer, sizeof(small_buffer), &ack_len);
+    
+    EXPECT_EQ(err, XGL_ERR_BUFFER_TOO_SMALL)
+        << "ACK generation should fail with buffer too small error";
+}
+
+/**
+ * \brief           Test ACK generation with NULL parameters
+ * \details         Verifies error handling with invalid parameters
+ */
+TEST(XglTransportProperties, Property17_ACKGenerationNullParameters) {
+    uint8_t buffer[20];
+    size_t ack_len = 0;
+    
+    /* NULL buffer */
+    xgl_error_t err = xgl_ack_generate(0, 1, 2, nullptr, sizeof(buffer), &ack_len);
+    EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
+    
+    /* NULL ack_len */
+    err = xgl_ack_generate(0, 1, 2, buffer, sizeof(buffer), nullptr);
+    EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
+}
+
+/**
+ * \brief           Test ACK generation with various sequence numbers
+ * \details         Verifies ACK generation works across full sequence number range
+ */
+TEST(XglTransportProperties, Property17_ACKGenerationSequenceRange) {
+    PropertyTestGenerator gen;
+    
+    /* Test boundary values and random values */
+    uint8_t test_seq_nums[] = {0, 1, 127, 128, 254, 255};
+    
+    for (size_t i = 0; i < sizeof(test_seq_nums) / sizeof(test_seq_nums[0]); ++i) {
+        uint8_t seq_num = test_seq_nums[i];
+        uint8_t source_id = gen.random_uint8();
+        uint8_t target_id = gen.random_uint8();
+        
+        uint8_t ack_buffer[XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE];
+        size_t ack_len = 0;
+        
+        xgl_error_t err = xgl_ack_generate(seq_num, source_id, target_id,
+                                          ack_buffer, sizeof(ack_buffer), &ack_len);
+        
+        ASSERT_EQ(err, XGL_OK)
+            << "ACK generation should succeed for seq_num " << (int)seq_num;
+        
+        xgl_frame_header_t* header = (xgl_frame_header_t*)ack_buffer;
+        EXPECT_EQ(header->ack_num, seq_num)
+            << "ACK number should match for seq_num " << (int)seq_num;
+    }
+}
+
+/*---------------------------------------------------------------------------*/
+/* Property 22: Duplicate Packet Handling                                    */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Feature: x-gen-link, Property 22: Duplicate Packet Handling
+ * \details         For any duplicate packet (same sequence number), the 
+ *                  transport layer should discard it and send an ACK.
+ * \note            Validates: Requirements 7.4
+ */
+TEST(XglTransportProperties, Property22_DuplicatePacketHandling) {
+    PropertyTestGenerator gen;
+    
+    /* Test with 100+ random duplicate scenarios */
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_ack_handler_t handler;
+        xgl_error_t err = xgl_ack_init(&handler, nullptr);
+        ASSERT_EQ(err, XGL_OK) << "ACK handler initialization failed";
+        
+        /* Generate random sequence number */
+        uint8_t seq_num = gen.random_uint8();
+        
+        /* First reception - should not be duplicate */
+        bool is_duplicate = xgl_ack_is_duplicate(&handler, seq_num);
+        EXPECT_FALSE(is_duplicate)
+            << "First reception should not be marked as duplicate"
+            << "\n  seq_num: " << (int)seq_num;
+        
+        /* Mark as received */
+        err = xgl_ack_mark_received(&handler, seq_num);
+        ASSERT_EQ(err, XGL_OK)
+            << "Marking sequence number as received should succeed";
+        
+        /* Second reception - should be duplicate */
+        is_duplicate = xgl_ack_is_duplicate(&handler, seq_num);
+        EXPECT_TRUE(is_duplicate)
+            << "Second reception should be marked as duplicate"
+            << "\n  seq_num: " << (int)seq_num;
+        
+        /* Third reception - should still be duplicate */
+        is_duplicate = xgl_ack_is_duplicate(&handler, seq_num);
+        EXPECT_TRUE(is_duplicate)
+            << "Subsequent receptions should remain marked as duplicate";
+        
+        xgl_ack_destroy(&handler);
+    }
+}
+
+/**
+ * \brief           Test duplicate detection with multiple sequence numbers
+ * \details         Verifies duplicate detection works independently for different sequences
+ */
+TEST(XglTransportProperties, Property22_DuplicatePacketHandlingMultiple) {
+    PropertyTestGenerator gen;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_ack_handler_t handler;
+        xgl_error_t err = xgl_ack_init(&handler, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Generate random number of unique sequence numbers (5-20) */
+        int num_sequences = 5 + (gen.random_uint8() % 16);
+        std::vector<uint8_t> sequences;
+        std::set<uint8_t> seen;  /* Track unique sequences */
+        
+        /* Generate unique sequences */
+        while ((int)sequences.size() < num_sequences) {
+            uint8_t seq = gen.random_uint8();
+            if (seen.find(seq) == seen.end()) {
+                seen.insert(seq);
+                sequences.push_back(seq);
+            }
+        }
+        
+        for (uint8_t seq : sequences) {
+            /* First reception - not duplicate */
+            EXPECT_FALSE(xgl_ack_is_duplicate(&handler, seq))
+                << "First reception of seq " << (int)seq << " should not be duplicate";
+            
+            /* Mark as received */
+            err = xgl_ack_mark_received(&handler, seq);
+            ASSERT_EQ(err, XGL_OK);
+            
+            /* Second reception - duplicate */
+            EXPECT_TRUE(xgl_ack_is_duplicate(&handler, seq))
+                << "Second reception of seq " << (int)seq << " should be duplicate";
+        }
+        
+        /* Verify all marked sequences are still detected as duplicates */
+        for (uint8_t seq : sequences) {
+            EXPECT_TRUE(xgl_ack_is_duplicate(&handler, seq))
+                << "Sequence " << (int)seq << " should remain marked as duplicate";
+        }
+        
+        xgl_ack_destroy(&handler);
+    }
+}
+
+/**
+ * \brief           Test duplicate detection across full sequence number range
+ * \details         Verifies duplicate detection works for all 256 possible sequence numbers
+ */
+TEST(XglTransportProperties, Property22_DuplicatePacketHandlingFullRange) {
+    xgl_ack_handler_t handler;
+    xgl_error_t err = xgl_ack_init(&handler, nullptr);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Mark all 256 sequence numbers as received */
+    for (int seq = 0; seq < 256; ++seq) {
+        EXPECT_FALSE(xgl_ack_is_duplicate(&handler, (uint8_t)seq))
+            << "Sequence " << seq << " should not be duplicate initially";
+        
+        err = xgl_ack_mark_received(&handler, (uint8_t)seq);
+        ASSERT_EQ(err, XGL_OK);
+    }
+    
+    /* Verify all are now marked as duplicates */
+    for (int seq = 0; seq < 256; ++seq) {
+        EXPECT_TRUE(xgl_ack_is_duplicate(&handler, (uint8_t)seq))
+            << "Sequence " << seq << " should be marked as duplicate";
+    }
+    
+    xgl_ack_destroy(&handler);
+}
+
+/**
+ * \brief           Test duplicate detection after reset
+ * \details         Verifies reset clears duplicate tracking
+ */
+TEST(XglTransportProperties, Property22_DuplicatePacketHandlingReset) {
+    PropertyTestGenerator gen;
+    
+    xgl_ack_handler_t handler;
+    xgl_error_t err = xgl_ack_init(&handler, nullptr);
+    ASSERT_EQ(err, XGL_OK);
+    
+    /* Mark some random sequences as received */
+    std::vector<uint8_t> sequences;
+    for (int i = 0; i < 20; ++i) {
+        uint8_t seq = gen.random_uint8();
+        sequences.push_back(seq);
+        xgl_ack_mark_received(&handler, seq);
+    }
+    
+    /* Verify they're marked as duplicates */
+    for (uint8_t seq : sequences) {
+        EXPECT_TRUE(xgl_ack_is_duplicate(&handler, seq));
+    }
+    
+    /* Reset handler */
+    xgl_ack_reset(&handler);
+    
+    /* Verify duplicates are cleared */
+    for (uint8_t seq : sequences) {
+        EXPECT_FALSE(xgl_ack_is_duplicate(&handler, seq))
+            << "After reset, sequence " << (int)seq << " should not be duplicate";
+    }
+    
+    xgl_ack_destroy(&handler);
+}
+
+/**
+ * \brief           Test duplicate detection with NULL handler
+ * \details         Verifies functions handle NULL gracefully
+ */
+TEST(XglTransportProperties, Property22_DuplicatePacketHandlingNullHandler) {
+    /* NULL handler should return false (not duplicate) */
+    EXPECT_FALSE(xgl_ack_is_duplicate(nullptr, 0));
+    EXPECT_FALSE(xgl_ack_is_duplicate(nullptr, 255));
+    
+    /* NULL handler should return error */
+    xgl_error_t err = xgl_ack_mark_received(nullptr, 0);
+    EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
+}
+
+/**
+ * \brief           Test out-of-order packet detection
+ * \details         Verifies out-of-order detection works correctly
+ */
+TEST(XglTransportProperties, Property22_OutOfOrderDetection) {
+    PropertyTestGenerator gen;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_ack_handler_t handler;
+        xgl_error_t err = xgl_ack_init(&handler, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Set expected sequence number */
+        uint8_t expected = gen.random_uint8();
+        handler.expected_seq_num = expected;
+        
+        /* Packet with expected sequence - not out of order */
+        EXPECT_FALSE(xgl_ack_is_out_of_order(&handler, expected))
+            << "Packet with expected sequence should not be out-of-order";
+        
+        /* Packet ahead of expected - out of order */
+        uint8_t ahead = (uint8_t)(expected + 5);
+        EXPECT_TRUE(xgl_ack_is_out_of_order(&handler, ahead))
+            << "Packet ahead of expected should be out-of-order";
+        
+        /* Packet behind expected - out of order */
+        if (expected >= 5) {
+            uint8_t behind = (uint8_t)(expected - 5);
+            EXPECT_TRUE(xgl_ack_is_out_of_order(&handler, behind))
+                << "Packet behind expected should be out-of-order";
+        }
+        
+        xgl_ack_destroy(&handler);
+    }
+}
+
+/**
+ * \brief           Test expected sequence number update
+ * \details         Verifies expected sequence number advances correctly
+ */
+TEST(XglTransportProperties, Property22_ExpectedSequenceUpdate) {
+    PropertyTestGenerator gen;
+    
+    for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
+        xgl_ack_handler_t handler;
+        xgl_error_t err = xgl_ack_init(&handler, nullptr);
+        ASSERT_EQ(err, XGL_OK);
+        
+        /* Generate random starting sequence */
+        uint8_t seq = gen.random_uint8();
+        
+        /* Update expected sequence */
+        xgl_ack_update_expected(&handler, seq);
+        
+        /* Expected should be seq + 1 (with wraparound) */
+        EXPECT_EQ(handler.expected_seq_num, (uint8_t)(seq + 1))
+            << "Expected sequence should be updated to seq + 1";
+        
+        /* Test wraparound */
+        xgl_ack_update_expected(&handler, 255);
+        EXPECT_EQ(handler.expected_seq_num, 0)
+            << "Expected sequence should wrap around from 255 to 0";
+        
+        xgl_ack_destroy(&handler);
+    }
 }
