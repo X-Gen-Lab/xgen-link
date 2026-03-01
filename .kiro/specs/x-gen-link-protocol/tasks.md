@@ -37,7 +37,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Implement CRC16 (MODBUS polynomial) with lookup table
   - _Requirements: 13.1, 13.2, 13.5_
 
-- [ ]* 4.1 Write property test for CRC calculation
+- [x] 4.1 Write property test for CRC calculation
+
   - **Property 4: CRC Calculation Correctness**
   - **Validates: Requirements 13.1, 13.2, 13.3**
 
@@ -50,7 +51,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add endianness detection
   - _Requirements: 12.1, 12.2, 12.5, 51.2, 51.3, 52.2_
 
-- [ ]* 5.1 Write property test for serialization
+- [x] 5.1 Write property test for serialization
+
   - **Property 3: Serialization Round-Trip**
   - **Validates: Requirements 12.1, 12.2, 51.2, 51.3**
 
@@ -99,11 +101,13 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add allocator wrapper for tracking
   - _Requirements: 2.1, 10.4_
 
-- [ ]* 11.1 Write property test for custom allocator
+- [x] 11.1 Write property test for custom allocator
+
   - **Property 7: Custom Allocator Usage**
   - **Validates: Requirements 2.1**
 
-- [ ]* 11.2 Write property test for memory management
+- [x] 11.2 Write property test for memory management
+
   - **Property 1: Memory Leak Prevention**
   - **Property 8: Allocation Failure Handling**
   - **Property 9: Memory Pool Exhaustion**
@@ -137,7 +141,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Track error statistics
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ]* 15.1 Write property test for frame handling
+- [x] 15.1 Write property test for frame handling
+
   - **Property 2: CRC Error Detection**
   - **Property 5: Frame Encapsulation Round-Trip**
   - **Property 27: Field Validation**
@@ -170,7 +175,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Handle wraparound (0-255)
   - _Requirements: 7.1, 7.2_
 
-- [ ]* 19.1 Write property test for network layer
+- [x] 19.1 Write property test for network layer
+
   - **Property 10: Route Lookup Correctness**
   - **Property 11: Route Not Found Handling**
   - **Property 12: Packet Forwarding to Self**
@@ -188,7 +194,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add RTO clamping (min/max bounds)
   - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ]* 21.1 Write property test for RTT estimation
+- [x] 21.1 Write property test for RTT estimation
+
   - **Property 18: RTT Estimation**
   - **Property 19: RTO Calculation**
   - **Validates: Requirements 6.1, 6.2**
@@ -202,7 +209,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Track ACK bitmap
   - _Requirements: 7.5, 24.1, 24.2, 24.3_
 
-- [ ]* 22.1 Write property test for sliding window
+- [x] 22.1 Write property test for sliding window
+
   - **Property 23: Sliding Window Maintenance**
   - **Validates: Requirements 7.5**
 
@@ -215,7 +223,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Track retry count
   - _Requirements: 5.1, 5.2, 5.3, 6.4_
 
-- [ ]* 23.1 Write property test for reliable transmission
+- [x] 23.1 Write property test for reliable transmission
+
   - **Property 13: Reliable Transmission Queuing**
   - **Property 14: Retransmission on Timeout**
   - **Property 15: Retry Exhaustion Handling**
@@ -230,7 +239,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Handle out-of-order packets
   - _Requirements: 5.4, 5.5, 7.4_
 
-- [ ]* 24.1 Write property test for ACK handling
+- [x] 24.1 Write property test for ACK handling
+
   - **Property 16: ACK Processing**
   - **Property 17: ACK Generation**
   - **Property 22: Duplicate Packet Handling**
@@ -244,7 +254,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add reassembly timeout handling
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-- [ ]* 25.1 Write property test for fragmentation
+- [x] 25.1 Write property test for fragmentation
+
   - **Property 29: Fragmentation Correctness**
   - **Property 30: Fragment Timeout Handling**
   - **Validates: Requirements 14.1, 14.2, 14.3, 14.4, 14.5**
@@ -309,7 +320,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add configuration validation
   - _Requirements: 1.1, 1.2, 1.3, 10.2_
 
-- [ ]* 33.1 Write property test for instance management
+- [x] 33.1 Write property test for instance management
+
   - **Property 6: Instance Isolation**
   - **Validates: Requirements 1.4**
 
@@ -337,7 +349,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Use atomic operations for statistics updates
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 27.1, 27.2, 27.3_
 
-- [ ]* 36.1 Write property test for error handling
+- [x] 36.1 Write property test for error handling
+
   - **Property 24: Error Code Specificity**
   - **Property 25: Error Callback Invocation**
   - **Property 26: Error Statistics**
@@ -355,7 +368,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
 - [x] 38. Checkpoint - Ensure public API works correctly
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ]* 39. Setup test infrastructure with Google Test
+- [x] 39. Setup test infrastructure with Google Test
+
   - Create test/CMakeLists.txt with Google Test integration
   - Setup FetchContent for Google Test v1.14.0
   - Create test/mocks/ directory with mock objects
@@ -366,7 +380,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add random input generators for protocol structures
   - _Requirements: 19.1, 19.2, 19.3_
 
-- [ ]* 40. Create integration test suite
+- [x] 40. Create integration test suite
+
   - Create test/integration/test_integration.cpp
   - Add end-to-end send/receive test using Google Test
   - Add multi-instance test
@@ -375,18 +390,21 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Use Google Mock for PHY layer simulation
   - _Requirements: 19.2_
 
-- [ ]* 41. Write property test for alignment safety
+- [x] 41. Write property test for alignment safety
+
   - **Property 28: Alignment Safety**
   - **Validates: Requirements 12.5, 52.2**
 
-- [ ]* 41. Create echo server example
+- [x] 41. Create echo server example
+
   - Create examples/echo_server/
   - Implement simple echo server
   - Demonstrate basic send/receive
   - Add README with explanation
   - _Requirements: 40.1, 40.2_
 
-- [ ]* 42. Create file transfer example
+- [x] 42. Create file transfer example
+
   - Create examples/file_transfer/
   - Implement reliable file transfer
   - Demonstrate fragmentation
@@ -395,7 +413,8 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add README with explanation
   - _Requirements: 40.1, 40.3_
 
-- [ ]* 43. Create multi-node network example
+- [x] 43. Create multi-node network example
+
   - Create examples/multi_node/
   - Implement three-node network simulation
   - Demonstrate routing
@@ -404,7 +423,7 @@ This implementation plan breaks down the x_gen_link protocol into discrete, acti
   - Add README with explanation
   - _Requirements: 40.1, 40.4_
 
-- [ ] 44. Final checkpoint - Ensure all core functionality works
+- [x] 44. Final checkpoint - Ensure all core functionality works
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
