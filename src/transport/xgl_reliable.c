@@ -109,9 +109,7 @@ xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
         return XGL_ERR_INVALID_PARAM;
     }
     
-    if (phy == NULL) {
-        return XGL_ERR_INVALID_PARAM;
-    }
+    /* Note: phy can be NULL in layered architecture - retransmission handled by network layer */
     
     /* Allocate packet structure */
     xgl_reliable_packet_t* packet = (xgl_reliable_packet_t*)

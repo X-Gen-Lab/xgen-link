@@ -5,6 +5,7 @@
  */
 
 #include <xgl/xgl_ack.h>
+#include <xgl/xgl_sequence.h>
 #include <xgl/xgl_crc.h>
 #include <xgl/xgl_serialize.h>
 #include <stdlib.h>
@@ -258,33 +259,25 @@ bool xgl_ack_is_out_of_order(const xgl_ack_handler_t* handler,
         return false;
     }
     
-    /* Check if sequence number is not the expected one */
-    /* Handle wraparound: if difference is small, it's likely out-of-order */
-    /* If difference is large (> 128), it might be a late packet from previous cycle */
-    
-    int16_t diff = (int16_t)seq_num - (int16_t)handler->expected_seq_num;
-    
-    /* If seq_num < expected, it's either out-of-order or very late */
-    if (diff < 0) {
-        /* Check if it's within reasonable window (e.g., 32 packets back) */
-        if (diff > -32) {
-            return true;  /* Out-of-order within window */
-        }
-        /* Otherwise, it's likely from previous cycle (wraparound) */
+    /* If seq_num equals expected, it's in order */
+    if (seq_num == handler->expected_seq_num) {
         return false;
     }
     
-    /* If seq_num > expected, it's out-of-order (future packet) */
-    if (diff > 0) {
-        /* Check if it's within reasonable window (e.g., 32 packets ahead) */
-        if (diff < 32) {
-            return true;  /* Out-of-order within window */
-        }
-        /* Otherwise, it's likely from next cycle (wraparound) */
-        return false;
+    /* Use sequence number comparison that handles wraparound */
+    int16_t diff = xgl_sequence_diff(seq_num, handler->expected_seq_num);
+    
+    /* If seq_num is ahead of expected (positive diff), it's out-of-order */
+    if (diff > 0 && diff < 128) {
+        return true;  /* Future packet within reasonable window */
     }
     
-    /* seq_num == expected, not out-of-order */
+    /* If seq_num is behind expected (negative diff), it's out-of-order */
+    if (diff < 0 && diff > -128) {
+        return true;  /* Late packet within reasonable window */
+    }
+    
+    /* Otherwise, it's too far away (likely from different cycle) */
     return false;
 }
 

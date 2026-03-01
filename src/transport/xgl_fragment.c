@@ -5,6 +5,7 @@
  */
 
 #include <xgl/xgl_fragment.h>
+#include <xgl/xgl_time.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -173,13 +174,19 @@ xgl_error_t xgl_fragment_data(xgl_fragment_manager_t* manager,
                               size_t* fragment_lens,
                               size_t* fragment_count,
                               uint8_t* fragment_id) {
-    if (manager == NULL || data == NULL || data_len == 0) {
-        return XGL_ERR_INVALID_PARAM;
+    /* Check for NULL pointers first */
+    if (manager == NULL || data == NULL) {
+        return XGL_ERR_NULL_POINTER;
     }
     
     if (fragments == NULL || fragment_lens == NULL || 
         fragment_count == NULL || fragment_id == NULL) {
         return XGL_ERR_NULL_POINTER;
+    }
+    
+    /* Check for invalid parameters */
+    if (data_len == 0) {
+        return XGL_ERR_INVALID_PARAM;
     }
     
     /* Calculate fragment header size */
@@ -262,7 +269,8 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
                                  const uint8_t* fragment_data,
                                  size_t fragment_len,
                                  uint8_t** complete_data,
-                                 size_t* complete_len) {
+                                 size_t* complete_len,
+                                 uint32_t current_time_ms) {
     if (manager == NULL || fragment_data == NULL || fragment_len == 0) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -393,10 +401,10 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
     mark_fragment_received(buffer, frag_info->fragment_index);
     buffer->received_count++;
     
-    /* Set first fragment timestamp if this is the first fragment */
+    /* Set initial send timestamp */
     if (buffer->received_count == 1) {
-        /* Note: Timestamp should be provided by caller or use platform time */
-        buffer->first_fragment_time = 0;  /* Placeholder */
+        /* Capture timestamp when first fragment is received */
+        buffer->first_fragment_time = (current_time_ms == 0) ? xgl_time_ms() : current_time_ms;
     }
     
     /* Check if reassembly is complete */
