@@ -60,28 +60,24 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
  * \brief           Initialize network layer context
  */
 xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
-                             uint8_t local_id,
-                             xgl_route_table_t* route_table,
-                             xgl_rx_callback_t rx_callback,
-                             xgl_error_callback_t error_callback,
-                             void* callback_user_data,
-                             xgl_statistics_t* stats) {
-    if (ctx == NULL) {
+                             const xgl_network_config_t* config) {
+    if (ctx == NULL || config == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     
-    if (route_table == NULL) {
+    if (config->route_table == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
     
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_network_ctx_t));
-    ctx->local_id = local_id;
-    ctx->route_table = route_table;
-    ctx->rx_callback = rx_callback;
-    ctx->error_callback = error_callback;
-    ctx->callback_user_data = callback_user_data;
-    ctx->stats = stats;
+    ctx->local_id = config->local_id;
+    ctx->route_table = config->route_table;
+    ctx->upper_layer = config->upper_layer;
+    ctx->lower_layer = config->lower_layer;
+    ctx->error_callback = config->error_callback;
+    ctx->callback_user_data = config->callback_user_data;
+    ctx->stats = config->stats;
     
     return XGL_OK;
 }
@@ -149,8 +145,56 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
         }
     }
     
-    /* Packet is now ready for data link layer transmission */
-    /* The actual transmission will be handled by the transport/datalink layer */
+    /* Build frame from packet for datalink transmission */
+    xgl_frame_t frame;
+    xgl_frame_params_t params = {
+        .source_id = packet->source_id,
+        .target_id = packet->target_id,
+        .data_type = packet->data_type,
+        .seq_num = packet->seq_num,
+        .ack_num = packet->ack_num,
+        .payload = packet->data->data,
+        .payload_len = packet->data->data_len,
+        .reliable = packet->reliable,
+        .fragment = packet->fragment,
+        .priority = packet->priority
+    };
+    
+    xgl_error_t err = xgl_frame_build(&frame, &params);
+    
+    if (err != XGL_OK) {
+        if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
+        }
+        return err;
+    }
+    
+    /* Send frame through data link layer via interface */
+    if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
+        /* No datalink interface available, cannot send */
+        if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
+        }
+        return XGL_ERR_INVALID_PARAM;
+    }
+    
+    /* Prepare frame data for lower layer */
+    struct {
+        xgl_frame_t* frame;
+        xgl_phy_ops_t* phy;
+    } send_data = {
+        .frame = &frame,
+        .phy = packet->phy
+    };
+    
+    err = ctx->lower_layer->send(ctx->lower_layer->ctx, (xgl_handle_t)ctx->callback_user_data, &send_data);
+    
+    if (err != XGL_OK) {
+        if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
+        }
+        return err;
+    }
     
     return XGL_OK;
 }
@@ -195,7 +239,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
     
     /* Check if packet is addressed to local node */
     if (xgl_network_is_local(ctx, target_id)) {
-        /* Packet is for this node - forward to transport layer or application */
+        /* Packet is for this node - forward to transport layer */
         
         /* Update statistics */
         if (ctx->stats != NULL) {
@@ -203,11 +247,39 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             ctx->stats->rx_bytes += payload_len;
         }
         
-        /* Invoke receive callback if registered */
-        if (ctx->rx_callback != NULL) {
-            ctx->rx_callback(handle, source_id, data_type,
-                           payload, payload_len,
-                           ctx->callback_user_data);
+        /* Forward to transport layer via interface */
+        if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
+            /* Extract frame attributes and build packet structure */
+            xgl_frame_header_t header;
+            xgl_frame_decode_header(&header, frame_buf);
+            
+            /* Build packet data structure for payload */
+            xgl_packet_data_t packet_data = {
+                .ref_count = 1,
+                .data_len = payload_len,
+                .data = (uint8_t*)payload  /* Cast away const for structure */
+            };
+            
+            /* Build complete packet structure for transport layer */
+            xgl_packet_t packet = {
+                .source_id = source_id,
+                .target_id = target_id,
+                .data_type = data_type,
+                .seq_num = header.seq_num,
+                .ack_num = header.ack_num,
+                .reliable = (header.attr_lsb & XGL_ATTR_RELIABLE_MASK) >> XGL_ATTR_RELIABLE_SHIFT,
+                .fragment = (header.attr_lsb & XGL_ATTR_FRAGMENT_MASK) >> XGL_ATTR_FRAGMENT_SHIFT,
+                .priority = (header.attr_lsb & XGL_ATTR_PRIORITY_MASK) >> XGL_ATTR_PRIORITY_SHIFT,
+                .data = &packet_data,
+                .phy = NULL    /* Not needed for receive path */
+            };
+            
+            /* Call transport layer receive via interface */
+            err = ctx->upper_layer->receive(ctx->upper_layer->ctx, handle, &packet);
+            if (err != XGL_OK) {
+                /* Transport layer processing failed */
+                return err;
+            }
         }
         
         return XGL_OK;
@@ -314,4 +386,97 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx,
     if (ctx->stats != NULL) {
         ctx->stats->tx_errors++;
     }
+}
+
+/*---------------------------------------------------------------------------*/
+/* Layer Interface Implementation                                            */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Network layer send implementation (called by upper layers)
+ * \details         This function is called by transport layer to send packets
+ */
+static xgl_error_t network_send_impl(void* ctx,
+                                    xgl_handle_t handle,
+                                    void* data) {
+    xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
+    xgl_packet_t* packet = (xgl_packet_t*)data;
+    
+    (void)handle;  /* Unused in this implementation */
+    
+    if (net_ctx == NULL || packet == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    /* Forward to network send function */
+    return xgl_network_send(net_ctx, packet, false);
+}
+
+/**
+ * \brief           Network layer receive implementation (called by lower layers)
+ * \details         This function is called by datalink layer to deliver frames
+ */
+static xgl_error_t network_receive_impl(void* ctx,
+                                       xgl_handle_t handle,
+                                       void* data) {
+    xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
+    
+    if (net_ctx == NULL || data == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    /* Extract frame buffer and length from data */
+    struct {
+        uint8_t* frame_buf;
+        size_t frame_len;
+    }* frame_data = data;
+    
+    /* Forward to network receive function */
+    return xgl_network_receive(net_ctx, handle, frame_data->frame_buf, frame_data->frame_len);
+}
+
+/**
+ * \brief           Network layer error reporting implementation
+ * \details         This function is called to report errors to upper layers
+ */
+static xgl_error_t network_report_error_impl(void* ctx,
+                                            xgl_handle_t handle,
+                                            void* data) {
+    xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
+    xgl_layer_error_info_t* error_info = (xgl_layer_error_info_t*)data;
+    
+    if (net_ctx == NULL || error_info == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    /* Forward error to callback if available */
+    if (net_ctx->error_callback != NULL) {
+        net_ctx->error_callback(handle, error_info->error,
+                               error_info->message,
+                               net_ctx->callback_user_data);
+    }
+    
+    return XGL_OK;
+}
+
+/**
+ * \brief           Get network layer interface
+ * \details         Returns the layer interface for this network instance
+ * \param[in]       ctx: Network layer context
+ * \param[out]      iface: Layer interface structure to initialize
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_network_get_interface(xgl_network_ctx_t* ctx,
+                                     xgl_layer_interface_t* iface) {
+    if (ctx == NULL || iface == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    xgl_layer_interface_init(iface,
+                            ctx,
+                            network_send_impl,
+                            network_receive_impl,
+                            network_report_error_impl);
+    
+    return XGL_OK;
 }

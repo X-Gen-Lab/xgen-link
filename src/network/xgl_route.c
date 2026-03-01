@@ -69,6 +69,9 @@ static xgl_error_t xgl_route_grow_capacity(xgl_route_table_t* table) {
         return XGL_ERR_NO_MEMORY;
     }
     
+    /* Initialize new array to zero */
+    memset(new_routes, 0, sizeof(xgl_route_item_t) * new_capacity);
+    
     /* Copy existing routes */
     if (table->routes != NULL && table->route_count > 0) {
         memcpy(new_routes, table->routes,
@@ -79,6 +82,13 @@ static xgl_error_t xgl_route_grow_capacity(xgl_route_table_t* table) {
     /* Update table */
     table->routes = new_routes;
     table->route_capacity = new_capacity;
+    
+    /* CRITICAL: Update all hashtable pointers to point to new array */
+    for (size_t i = 0; i < table->route_count; i++) {
+        xgl_hashtable_insert(&table->hashtable,
+                           table->routes[i].target_id,
+                           &table->routes[i]);
+    }
     
     return XGL_OK;
 }
@@ -120,6 +130,9 @@ xgl_error_t xgl_route_table_init(xgl_route_table_t* table,
             xgl_hashtable_destroy(&table->hashtable);
             return XGL_ERR_NO_MEMORY;
         }
+        
+        /* Initialize routes array to zero */
+        memset(table->routes, 0, sizeof(xgl_route_item_t) * initial_capacity);
         
         table->route_capacity = initial_capacity;
     }

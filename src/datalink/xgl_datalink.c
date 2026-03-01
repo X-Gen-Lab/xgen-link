@@ -10,6 +10,7 @@
 #include <xgl/xgl_crc.h>
 #include <xgl/xgl_serialize.h>
 #include <xgl/xgl_error.h>
+#include <xgl/xgl_config.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -21,29 +22,29 @@
  * \brief           Initialize data link layer context
  */
 xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
-                              uint8_t* rx_cache,
-                              size_t rx_cache_size,
-                              xgl_statistics_t* stats,
-                              uint8_t source_id,
-                              xgl_rx_callback_t rx_callback,
-                              xgl_error_callback_t error_callback,
-                              void* callback_user_data) {
-    if (ctx == NULL || rx_cache == NULL || stats == NULL) {
+                              const xgl_datalink_config_t* config) {
+    if (ctx == NULL || config == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    if (config->rx_cache == NULL || config->stats == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_datalink_ctx_t));
-    ctx->rx_cache = rx_cache;
-    ctx->rx_cache_size = rx_cache_size;
-    ctx->stats = stats;
-    ctx->source_id = source_id;
-    ctx->rx_callback = rx_callback;
-    ctx->error_callback = error_callback;
-    ctx->callback_user_data = callback_user_data;
+    ctx->rx_cache = config->rx_cache;
+    ctx->rx_cache_size = config->rx_cache_size;
+    ctx->stats = config->stats;
+    ctx->rx_crc8_errors = config->rx_crc8_errors;
+    ctx->rx_crc16_errors = config->rx_crc16_errors;
+    ctx->source_id = config->source_id;
+    ctx->upper_layer = config->upper_layer;
+    ctx->error_callback = config->error_callback;
+    ctx->callback_user_data = config->callback_user_data;
     
     /* Initialize parser */
-    xgl_error_t err = xgl_parser_init(&ctx->parser, rx_cache, rx_cache_size);
+    xgl_error_t err = xgl_parser_init(&ctx->parser, config->rx_cache, config->rx_cache_size);
     if (err != XGL_OK) {
         return err;
     }
@@ -58,12 +59,10 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
 /**
  * \brief           Send frame via physical layer
  */
-xgl_error_t xgl_datalink_send(xgl_phy_ops_t* phy,
-                              const xgl_frame_t* frame,
-                              xgl_statistics_t* stats,
-                              xgl_error_callback_t error_callback,
-                              void* callback_user_data) {
-    if (phy == NULL || frame == NULL) {
+xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
+                              xgl_phy_ops_t* phy,
+                              const xgl_frame_t* frame) {
+    if (ctx == NULL || phy == NULL || frame == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     
@@ -75,7 +74,7 @@ xgl_error_t xgl_datalink_send(xgl_phy_ops_t* phy,
     size_t frame_size = xgl_frame_calculate_size(frame->payload_len);
     
     /* Use stack buffer for small frames, heap for large frames */
-    uint8_t stack_buffer[256];
+    uint8_t stack_buffer[XGL_DATALINK_STACK_BUFFER_SIZE];
     uint8_t* frame_buffer = NULL;
     bool use_heap = false;
     
@@ -85,12 +84,12 @@ xgl_error_t xgl_datalink_send(xgl_phy_ops_t* phy,
         /* Allocate from heap for large frames */
         frame_buffer = (uint8_t*)malloc(frame_size);
         if (frame_buffer == NULL) {
-            if (stats != NULL) {
-                stats->tx_errors++;
+            if (ctx->stats != NULL) {
+                ctx->stats->tx_errors++;
             }
-            if (error_callback != NULL) {
-                error_callback(NULL, XGL_ERR_NO_MEMORY, 
-                              "Failed to allocate frame buffer", callback_user_data);
+            if (ctx->error_callback != NULL) {
+                ctx->error_callback(NULL, XGL_ERR_NO_MEMORY, 
+                              "Failed to allocate frame buffer", ctx->callback_user_data);
             }
             return XGL_ERR_NO_MEMORY;
         }
@@ -102,11 +101,11 @@ xgl_error_t xgl_datalink_send(xgl_phy_ops_t* phy,
     /* Serialize frame to buffer */
     xgl_error_t err = xgl_frame_serialize(frame_buffer, frame_size, frame, &bytes_written);
     if (err != XGL_OK) {
-        if (stats != NULL) {
-            stats->tx_errors++;
+        if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
         }
-        if (error_callback != NULL) {
-            error_callback(NULL, err, "Frame serialization failed", callback_user_data);
+        if (ctx->error_callback != NULL) {
+            ctx->error_callback(NULL, err, "Frame serialization failed", ctx->callback_user_data);
         }
         if (use_heap) {
             free(frame_buffer);
@@ -117,11 +116,11 @@ xgl_error_t xgl_datalink_send(xgl_phy_ops_t* phy,
     /* Transmit via physical layer */
     err = phy->tx(frame_buffer, bytes_written, phy->user_data);
     if (err != XGL_OK) {
-        if (stats != NULL) {
-            stats->tx_errors++;
+        if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
         }
-        if (error_callback != NULL) {
-            error_callback(NULL, err, "Physical layer transmission failed", callback_user_data);
+        if (ctx->error_callback != NULL) {
+            ctx->error_callback(NULL, err, "Physical layer transmission failed", ctx->callback_user_data);
         }
         if (use_heap) {
             free(frame_buffer);
@@ -130,9 +129,9 @@ xgl_error_t xgl_datalink_send(xgl_phy_ops_t* phy,
     }
     
     /* Update statistics */
-    if (stats != NULL) {
-        stats->tx_packets++;
-        stats->tx_bytes += bytes_written;
+    if (ctx->stats != NULL) {
+        ctx->stats->tx_packets++;
+        ctx->stats->tx_bytes += bytes_written;
     }
     
     /* Free heap buffer if used */
@@ -146,13 +145,11 @@ xgl_error_t xgl_datalink_send(xgl_phy_ops_t* phy,
 /**
  * \brief           Send raw frame buffer via physical layer
  */
-xgl_error_t xgl_datalink_send_raw(xgl_phy_ops_t* phy,
+xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx,
+                                  xgl_phy_ops_t* phy,
                                   const uint8_t* frame_buffer,
-                                  size_t frame_len,
-                                  xgl_statistics_t* stats,
-                                  xgl_error_callback_t error_callback,
-                                  void* callback_user_data) {
-    if (phy == NULL || frame_buffer == NULL) {
+                                  size_t frame_len) {
+    if (ctx == NULL || phy == NULL || frame_buffer == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     
@@ -167,19 +164,19 @@ xgl_error_t xgl_datalink_send_raw(xgl_phy_ops_t* phy,
     /* Transmit via physical layer */
     xgl_error_t err = phy->tx(frame_buffer, frame_len, phy->user_data);
     if (err != XGL_OK) {
-        if (stats != NULL) {
-            stats->tx_errors++;
+        if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
         }
-        if (error_callback != NULL) {
-            error_callback(NULL, err, "Physical layer transmission failed", callback_user_data);
+        if (ctx->error_callback != NULL) {
+            ctx->error_callback(NULL, err, "Physical layer transmission failed", ctx->callback_user_data);
         }
         return err;
     }
     
     /* Update statistics */
-    if (stats != NULL) {
-        stats->tx_packets++;
-        stats->tx_bytes += frame_len;
+    if (ctx->stats != NULL) {
+        ctx->stats->tx_packets++;
+        ctx->stats->tx_bytes += frame_len;
     }
     
     return XGL_OK;
@@ -218,7 +215,7 @@ xgl_error_t xgl_datalink_receive(xgl_datalink_ctx_t* ctx,
     }
     
     /* Read data from physical layer */
-    uint8_t rx_buffer[256];  /* Temporary RX buffer */
+    uint8_t rx_buffer[XGL_DATALINK_RX_CHUNK_SIZE];
     size_t rx_len = sizeof(rx_buffer);
     
     xgl_error_t err = phy->rx(rx_buffer, &rx_len, phy->user_data);
@@ -287,6 +284,19 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
     
+    /* Maximum frame size check - prevent buffer overflow attacks */
+    if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
+        if (ctx->stats != NULL) {
+            ctx->stats->rx_errors++;
+        }
+        if (ctx->error_callback != NULL) {
+            ctx->error_callback(NULL, XGL_ERR_INVALID_FRAME,
+                              "Frame size exceeds maximum allowed",
+                              ctx->callback_user_data);
+        }
+        return XGL_ERR_INVALID_FRAME;
+    }
+    
     /* Verify SOF */
     if (frame_buffer[0] != XGL_SOF) {
         if (ctx->stats != NULL) {
@@ -302,8 +312,10 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
     /* Validate header CRC8 */
     if (!xgl_frame_validate_header_crc(&header)) {
         if (ctx->stats != NULL) {
-            ctx->stats->rx_crc8_errors++;
             ctx->stats->rx_errors++;
+        }
+        if (ctx->rx_crc8_errors != NULL) {
+            (*ctx->rx_crc8_errors)++;
         }
         if (ctx->error_callback != NULL) {
             ctx->error_callback(NULL, XGL_ERR_CRC_FAILED, 
@@ -320,8 +332,10 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
     
     if (calculated_crc != received_crc) {
         if (ctx->stats != NULL) {
-            ctx->stats->rx_crc16_errors++;
             ctx->stats->rx_errors++;
+        }
+        if (ctx->rx_crc16_errors != NULL) {
+            (*ctx->rx_crc16_errors)++;
         }
         if (ctx->error_callback != NULL) {
             ctx->error_callback(NULL, XGL_ERR_CRC_FAILED, 
@@ -354,15 +368,129 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         ctx->stats->rx_bytes += frame_len;
     }
     
-    /* Invoke receive callback if registered */
-    if (ctx->rx_callback != NULL) {
-        ctx->rx_callback(NULL, 
-                        header.source_id, 
-                        xgl_frame_get_datatype(&header), 
-                        payload, 
-                        payload_len, 
-                        ctx->callback_user_data);
+    /* Forward to network layer via interface */
+    if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
+        /* Create a temporary packet structure to pass frame data */
+        /* The frame buffer contains the complete frame with header and CRC */
+        /* Network layer will extract the necessary information */
+        
+        /* For now, we pass the frame buffer directly through the interface */
+        /* The network layer's receive function expects frame_buf and frame_len */
+        /* We'll use a simple wrapper structure to pass both parameters */
+        
+        struct {
+            uint8_t* frame_buf;
+            size_t frame_len;
+        } frame_data = {
+            .frame_buf = (uint8_t*)frame_buffer,
+            .frame_len = frame_len
+        };
+        
+        xgl_error_t err = ctx->upper_layer->receive(
+            ctx->upper_layer->ctx,
+            (xgl_handle_t)ctx->callback_user_data,
+            &frame_data
+        );
+        
+        if (err != XGL_OK) {
+            /* Network layer processing failed, but we already validated the frame */
+            /* This is not a datalink error, so we don't return error */
+        }
     }
+    
+    return XGL_OK;
+}
+
+/*---------------------------------------------------------------------------*/
+/* Layer Interface Implementation                                            */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Datalink layer send implementation (called by upper layers)
+ * \details         This function is called by network layer to send frames
+ */
+static xgl_error_t datalink_send_impl(void* ctx,
+                                     xgl_handle_t handle,
+                                     void* data) {
+    xgl_datalink_ctx_t* dl_ctx = (xgl_datalink_ctx_t*)ctx;
+    
+    (void)handle;  /* Unused in this implementation */
+    
+    if (dl_ctx == NULL || data == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    /* Extract frame and PHY from data */
+    struct {
+        xgl_frame_t* frame;
+        xgl_phy_ops_t* phy;
+    }* send_data = data;
+    
+    if (send_data->frame == NULL || send_data->phy == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    /* Forward to datalink send function */
+    return xgl_datalink_send(dl_ctx, send_data->phy, send_data->frame);
+}
+
+/**
+ * \brief           Datalink layer receive implementation (for upper layers)
+ * \details         This function is called by upper layers to receive frames
+ *                  Currently not used as datalink pushes data up via callbacks
+ */
+static xgl_error_t datalink_receive_impl(void* ctx,
+                                        xgl_handle_t handle,
+                                        void* data) {
+    (void)ctx;
+    (void)handle;
+    (void)data;
+    /* Datalink pushes data up, doesn't pull */
+    return XGL_ERR_INVALID_PARAM;
+}
+
+/**
+ * \brief           Datalink layer error reporting implementation
+ * \details         This function is called to report errors to upper layers
+ */
+static xgl_error_t datalink_report_error_impl(void* ctx,
+                                              xgl_handle_t handle,
+                                              void* data) {
+    xgl_datalink_ctx_t* dl_ctx = (xgl_datalink_ctx_t*)ctx;
+    xgl_layer_error_info_t* error_info = (xgl_layer_error_info_t*)data;
+    
+    if (dl_ctx == NULL || error_info == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    /* Forward error to callback if available */
+    if (dl_ctx->error_callback != NULL) {
+        dl_ctx->error_callback(handle, error_info->error,
+                              error_info->message,
+                              dl_ctx->callback_user_data);
+    }
+    
+    return XGL_OK;
+}
+
+/**
+ * \brief           Get datalink layer interface
+ * \details         Returns the layer interface for this datalink instance
+ * \param[in]       ctx: Datalink layer context
+ * \param[out]      iface: Layer interface structure to initialize
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_datalink_get_interface(xgl_datalink_ctx_t* ctx,
+                                      xgl_layer_interface_t* iface) {
+    if (ctx == NULL || iface == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    
+    xgl_layer_interface_init(iface,
+                            ctx,
+                            datalink_send_impl,
+                            datalink_receive_impl,
+                            datalink_report_error_impl);
     
     return XGL_OK;
 }

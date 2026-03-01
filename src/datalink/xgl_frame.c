@@ -71,19 +71,11 @@ void xgl_frame_decode_header(xgl_frame_header_t* header, const uint8_t* buffer) 
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Build frame from packet data
+ * \brief           Build frame from parameters
  */
 xgl_error_t xgl_frame_build(xgl_frame_t* frame,
-                            uint8_t source_id,
-                            uint8_t target_id,
-                            uint8_t data_type,
-                            uint8_t seq_num,
-                            uint8_t ack_num,
-                            const uint8_t* payload,
-                            size_t payload_len,
-                            bool reliable,
-                            uint8_t priority) {
-    if (frame == NULL) {
+                            const xgl_frame_params_t* params) {
+    if (frame == NULL || params == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     
@@ -93,19 +85,20 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     /* Build header */
     frame->header.sof = XGL_SOF;
     xgl_frame_set_version(&frame->header, XGL_PROTOCOL_VERSION);
-    xgl_frame_set_datatype(&frame->header, data_type);
-    frame->header.source_id = source_id;
-    frame->header.target_id = target_id;
-    frame->header.data_len = (uint16_t)payload_len;
-    frame->header.seq_num = seq_num;
-    frame->header.ack_num = ack_num;
+    xgl_frame_set_datatype(&frame->header, params->data_type);
+    frame->header.source_id = params->source_id;
+    frame->header.target_id = params->target_id;
+    frame->header.data_len = (uint16_t)params->payload_len;
+    frame->header.seq_num = params->seq_num;
+    frame->header.ack_num = params->ack_num;
     frame->header.reserved = 0;
     
     /* Set attributes */
     frame->header.attr_lsb = 0;
     frame->header.attr_msb = 0;
-    xgl_frame_set_reliable(&frame->header.attr_lsb, reliable);
-    xgl_frame_set_priority(&frame->header.attr_lsb, priority);
+    xgl_frame_set_reliable(&frame->header.attr_lsb, params->reliable);
+    xgl_frame_set_fragment(&frame->header.attr_lsb, params->fragment);
+    xgl_frame_set_priority(&frame->header.attr_lsb, params->priority);
     
     /* Calculate header CRC8 (first 11 bytes of header, excluding CRC8 itself) */
     uint8_t header_buf[XGL_FRAME_HEADER_SIZE];
@@ -113,8 +106,8 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.crc8 = xgl_crc8_maxim(header_buf, 11);
     
     /* Set payload */
-    frame->payload = payload;
-    frame->payload_len = payload_len;
+    frame->payload = params->payload;
+    frame->payload_len = params->payload_len;
     
     /* CRC16 will be calculated during serialization */
     frame->crc16 = 0;
