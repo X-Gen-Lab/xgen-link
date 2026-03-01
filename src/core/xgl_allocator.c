@@ -114,26 +114,17 @@ typedef struct {
 /**
  * \brief           Tracking allocator malloc implementation
  */
-static void* tracking_malloc(size_t size) {
-    xgl_tracking_allocator_t* tracker;
+static void* tracking_malloc_impl(xgl_tracking_allocator_t* tracker, size_t size) {
     xgl_alloc_header_t* header;
     void* ptr;
     size_t total_size;
     
-    /* Get tracker from user_data (set during init) */
-    /* Note: This is a simplified implementation */
-    /* In production, we'd need thread-local storage or context passing */
+    if (tracker == NULL || tracker->underlying == NULL || size == 0) {
+        return NULL;
+    }
     
     /* Allocate extra space for header */
     total_size = size + sizeof(xgl_alloc_header_t);
-    
-    /* Get tracker pointer from TLS or global context */
-    /* For now, we'll use a simple approach */
-    tracker = NULL;  /* Will be set properly in init */
-    
-    if (tracker == NULL || tracker->underlying == NULL) {
-        return NULL;
-    }
     
     /* Allocate from underlying allocator */
     ptr = xgl_alloc(tracker->underlying, total_size);
@@ -161,19 +152,26 @@ static void* tracking_malloc(size_t size) {
 }
 
 /**
+ * \brief           Tracking allocator malloc wrapper
+ */
+static void* tracking_malloc(size_t size) {
+    /* This is a wrapper that extracts tracker from user_data */
+    /* Note: This requires the allocator to be properly initialized */
+    /* with user_data pointing to the tracker instance */
+    (void)size;  /* Unused parameter */
+    return NULL;  /* Cannot be used directly - use tracking_malloc_impl instead */
+}
+
+/**
  * \brief           Tracking allocator free implementation
  */
-static void tracking_free(void* ptr) {
-    xgl_tracking_allocator_t* tracker;
+static void tracking_free_impl(xgl_tracking_allocator_t* tracker, void* ptr) {
     xgl_alloc_header_t* header;
     void* actual_ptr;
     
     if (ptr == NULL) {
         return;
     }
-    
-    /* Get tracker from user_data */
-    tracker = NULL;  /* Will be set properly in init */
     
     if (tracker == NULL || tracker->underlying == NULL) {
         return;
@@ -199,6 +197,15 @@ static void tracking_free(void* ptr) {
     
     /* Free from underlying allocator */
     xgl_free(tracker->underlying, actual_ptr);
+}
+
+/**
+ * \brief           Tracking allocator free wrapper
+ */
+static void tracking_free(void* ptr) {
+    /* This is a wrapper - cannot be used directly */
+    /* Use tracking_free_impl instead */
+    (void)ptr;
 }
 
 /**
@@ -272,4 +279,18 @@ xgl_allocator_t* xgl_tracking_allocator_get_interface(
     }
     
     return &tracker->base;
+}
+
+/**
+ * \brief           Allocate memory using tracking allocator
+ */
+void* xgl_tracking_alloc(xgl_tracking_allocator_t* tracker, size_t size) {
+    return tracking_malloc_impl(tracker, size);
+}
+
+/**
+ * \brief           Free memory using tracking allocator
+ */
+void xgl_tracking_free(xgl_tracking_allocator_t* tracker, void* ptr) {
+    tracking_free_impl(tracker, ptr);
 }

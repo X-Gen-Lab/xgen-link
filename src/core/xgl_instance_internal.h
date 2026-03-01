@@ -18,10 +18,33 @@ extern "C" {
 #include <xgl/xgl_window.h>
 #include <xgl/xgl_rtt.h>
 #include <xgl/xgl_parser.h>
+#include <xgl/xgl_datalink.h>
+#include <xgl/xgl_network.h>
+#include <xgl/xgl_transport.h>
+#include <xgl/xgl_layer_interface.h>
 
 /*---------------------------------------------------------------------------*/
 /* Internal Instance Structure                                               */
 /*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Unified layer contexts manager
+ * \details         Manages all protocol layer contexts and interfaces in one place.
+ *                  This structure provides a clean separation between layer contexts
+ *                  and their interfaces, following the design pattern from
+ *                  LAYER_DECOUPLING_DESIGN.md
+ */
+typedef struct xgl_layer_contexts_s {
+    /* Layer contexts - embedded directly */
+    xgl_datalink_ctx_t datalink_ctx;   /**< Data link layer context */
+    xgl_network_ctx_t network_ctx;     /**< Network layer context */
+    xgl_transport_ctx_t transport_ctx; /**< Transport layer context */
+    
+    /* Layer interfaces for decoupled communication */
+    xgl_layer_interface_t datalink_iface;  /**< Datalink interface */
+    xgl_layer_interface_t network_iface;   /**< Network interface */
+    xgl_layer_interface_t transport_iface; /**< Transport interface */
+} xgl_layer_contexts_t;
 
 /**
  * \brief           Protocol instance internal structure
@@ -52,19 +75,9 @@ struct xgl_instance {
     size_t seq_numbers_count;       /**< Number of sequence numbers */
     
     /*-----------------------------------------------------------------------*/
-    /* Transport Layer                                                       */
+    /* Protocol Stack Layers (Unified Management)                            */
     /*-----------------------------------------------------------------------*/
-    xgl_list_t wait_ack_list;       /**< Wait-ACK list */
-    xgl_sliding_window_t* windows;  /**< Sliding windows (per route) */
-    xgl_rtt_estimator_t* rtt_est;   /**< RTT estimators (per route) */
-    size_t windows_count;           /**< Number of windows */
-    
-    /*-----------------------------------------------------------------------*/
-    /* Data Link Layer                                                       */
-    /*-----------------------------------------------------------------------*/
-    xgl_list_t rx_parser_list;      /**< RX parser list */
-    uint8_t* rx_buffer;             /**< RX buffer */
-    size_t rx_buffer_size;          /**< RX buffer size */
+    xgl_layer_contexts_t layers;    /**< Unified layer contexts and interfaces */
     
     /*-----------------------------------------------------------------------*/
     /* Statistics                                                            */

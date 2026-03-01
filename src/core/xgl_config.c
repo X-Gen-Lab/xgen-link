@@ -118,39 +118,39 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
     
     /* Validate memory configuration */
-    if (config->tx_pool_size < XGL_MIN_TX_POOL_SIZE || 
-        config->tx_pool_size > XGL_MAX_TX_POOL_SIZE) {
+    if (config->memory.tx_pool_size < XGL_MIN_TX_POOL_SIZE || 
+        config->memory.tx_pool_size > XGL_MAX_TX_POOL_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
     
-    if (config->rx_buffer_size < XGL_MIN_RX_BUFFER_SIZE || 
-        config->rx_buffer_size > XGL_MAX_RX_BUFFER_SIZE) {
+    if (config->memory.rx_buffer_size < XGL_MIN_RX_BUFFER_SIZE || 
+        config->memory.rx_buffer_size > XGL_MAX_RX_BUFFER_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
     
     /* Validate protocol parameters */
-    if (config->ack_timeout_ms < XGL_MIN_ACK_TIMEOUT_MS || 
-        config->ack_timeout_ms > XGL_MAX_ACK_TIMEOUT_MS) {
+    if (config->protocol.ack_timeout_ms < XGL_MIN_ACK_TIMEOUT_MS || 
+        config->protocol.ack_timeout_ms > XGL_MAX_ACK_TIMEOUT_MS) {
         return XGL_ERR_INVALID_PARAM;
     }
     
-    if (config->max_retry_count < XGL_MIN_RETRY_COUNT || 
-        config->max_retry_count > XGL_MAX_RETRY_COUNT) {
+    if (config->protocol.max_retry_count < XGL_MIN_RETRY_COUNT || 
+        config->protocol.max_retry_count > XGL_MAX_RETRY_COUNT) {
         return XGL_ERR_INVALID_PARAM;
     }
     
-    if (config->window_size < XGL_MIN_WINDOW_SIZE || 
-        config->window_size > XGL_MAX_WINDOW_SIZE) {
+    if (config->protocol.window_size < XGL_MIN_WINDOW_SIZE || 
+        config->protocol.window_size > XGL_MAX_WINDOW_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
     
-    if (config->max_frame_size < XGL_MIN_FRAME_SIZE || 
-        config->max_frame_size > XGL_MAX_FRAME_SIZE) {
+    if (config->protocol.max_frame_size < XGL_MIN_FRAME_SIZE || 
+        config->protocol.max_frame_size > XGL_MAX_FRAME_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
     
     /* Validate frame size is larger than header */
-    if (config->max_frame_size < XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
+    if (config->protocol.max_frame_size < XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
     
@@ -159,7 +159,7 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
      * max_frame_size is the payload size, so total frame is:
      * XGL_FRAME_HEADER_SIZE + max_frame_size + XGL_CRC16_SIZE
      */
-    if (config->rx_buffer_size < config->max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
+    if (config->memory.rx_buffer_size < config->protocol.max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     

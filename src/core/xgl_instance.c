@@ -34,7 +34,7 @@ xgl_handle_t xgl_create(const xgl_config_t* config) {
     }
     
     /* Determine allocator to use */
-    allocator = config->allocator;
+    allocator = config->memory.allocator;
     if (allocator == NULL) {
         allocator = xgl_allocator_get_default();
     }
@@ -66,7 +66,6 @@ xgl_handle_t xgl_create(const xgl_config_t* config) {
  */
 xgl_error_t xgl_init(xgl_handle_t handle) {
     xgl_error_t err;
-    size_t i;
     size_t small_count, medium_count, large_count;
     size_t packet_count;
     
@@ -82,7 +81,7 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     
 #ifdef XGL_THREAD_SAFE
     /* Initialize mutex if thread safety is enabled */
-    if (handle->config.thread_safe) {
+    if (handle->config.features.thread_safe) {
         err = xgl_mutex_init(&handle->mutex);
         if (err != XGL_OK) {
             goto cleanup;
@@ -96,9 +95,9 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     
     /* Calculate pool sizes based on configuration */
     /* Allocate ~40% small, ~40% medium, ~20% large blocks */
-    small_count = handle->config.tx_pool_size / XGL_TIERED_POOL_SMALL_SIZE * 4 / 10;
-    medium_count = handle->config.tx_pool_size / XGL_TIERED_POOL_MEDIUM_SIZE * 4 / 10;
-    large_count = handle->config.tx_pool_size / XGL_TIERED_POOL_LARGE_SIZE * 2 / 10;
+    small_count = handle->config.memory.tx_pool_size / XGL_TIERED_POOL_SMALL_SIZE * 4 / 10;
+    medium_count = handle->config.memory.tx_pool_size / XGL_TIERED_POOL_MEDIUM_SIZE * 4 / 10;
+    large_count = handle->config.memory.tx_pool_size / XGL_TIERED_POOL_LARGE_SIZE * 2 / 10;
     
     /* Ensure at least one block of each size */
     if (small_count == 0) small_count = 1;
@@ -113,7 +112,7 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     }
     
     /* Calculate packet pool size (estimate ~10% of TX pool size) */
-    packet_count = handle->config.tx_pool_size / 256;
+    packet_count = handle->config.memory.tx_pool_size / 256;
     if (packet_count < 4) packet_count = 4;  /* Minimum 4 packets */
     if (packet_count > 64) packet_count = 64; /* Maximum 64 packets */
     
@@ -152,55 +151,92 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     }
     memset(handle->seq_numbers, 0, handle->seq_numbers_count);
     
-    /* Allocate sliding windows array (one per possible target ID) */
-    handle->windows_count = 256;
-    handle->windows = (xgl_sliding_window_t*)xgl_alloc(handle->allocator,
-                                                       handle->windows_count * 
-                                                       sizeof(xgl_sliding_window_t));
-    if (handle->windows == NULL) {
+    /* Allocate RX buffer for datalink layer */
+    size_t rx_buffer_size = handle->config.memory.rx_buffer_size;
+    uint8_t* rx_buffer = (uint8_t*)xgl_alloc(handle->allocator, rx_buffer_size);
+    if (rx_buffer == NULL) {
         err = XGL_ERR_NO_MEMORY;
         goto cleanup_seq_numbers;
     }
     
-    /* Initialize each sliding window */
-    for (i = 0; i < handle->windows_count; i++) {
-        handle->windows[i].window_size = handle->config.window_size;
-        handle->windows[i].send_base = 0;
-        handle->windows[i].next_seq_num = 0;
-        handle->windows[i].expected_seq_num = 0;
-        handle->windows[i].ack_received = NULL;  /* Allocated on demand */
+    /* Initialize data link layer */
+    xgl_datalink_config_t datalink_config = {
+        .rx_cache = rx_buffer,
+        .rx_cache_size = rx_buffer_size,
+        .source_id = handle->config.source_id,
+        .stats = &handle->stats.datalink,
+        .rx_crc8_errors = &handle->stats.rx_crc8_errors,
+        .rx_crc16_errors = &handle->stats.rx_crc16_errors,
+        .upper_layer = NULL,  /* Will be set after network layer init */
+        .error_callback = handle->config.error_callback,
+        .callback_user_data = handle->config.callback_user_data
+    };
+    err = xgl_datalink_init(&handle->layers.datalink_ctx, &datalink_config);
+    if (err != XGL_OK) {
+        goto cleanup_rx_buffer;
     }
     
-    /* Allocate RTT estimators array (one per possible target ID) */
-    handle->rtt_est = (xgl_rtt_estimator_t*)xgl_alloc(handle->allocator,
-                                                      handle->windows_count * 
-                                                      sizeof(xgl_rtt_estimator_t));
-    if (handle->rtt_est == NULL) {
-        err = XGL_ERR_NO_MEMORY;
-        goto cleanup_windows;
+    /* Initialize network layer */
+    xgl_network_config_t network_config = {
+        .local_id = handle->config.source_id,
+        .route_table = &handle->route_table,
+        .upper_layer = NULL,  /* Will be set after transport layer init */
+        .lower_layer = NULL,  /* Will be set after creating datalink interface */
+        .error_callback = handle->config.error_callback,
+        .callback_user_data = handle->config.callback_user_data,
+        .stats = &handle->stats.network
+    };
+    err = xgl_network_init(&handle->layers.network_ctx, &network_config);
+    if (err != XGL_OK) {
+        goto cleanup_rx_buffer;
     }
     
-    /* Initialize each RTT estimator */
-    for (i = 0; i < handle->windows_count; i++) {
-        handle->rtt_est[i].srtt = 0;
-        handle->rtt_est[i].rttvar = 0;
-        handle->rtt_est[i].rto = (int32_t)handle->config.ack_timeout_ms;
+    /* Initialize transport layer */
+    xgl_transport_config_t transport_config = {
+        .local_id = handle->config.source_id,
+        .max_retry_count = handle->config.protocol.max_retry_count,
+        .default_timeout_ms = handle->config.protocol.ack_timeout_ms,
+        .window_size = handle->config.protocol.window_size,
+        .enable_fragmentation = handle->config.features.enable_fragmentation,
+        .max_frame_size = handle->config.protocol.max_frame_size,
+        .lower_layer = NULL,  /* Will be set after creating network interface */
+        .rx_callback = handle->config.rx_callback,
+        .error_callback = handle->config.error_callback,
+        .callback_user_data = handle->config.callback_user_data,
+        .stats = &handle->stats.transport,
+        .tx_retries = &handle->stats.tx_retries,
+        .allocator = handle->allocator
+    };
+    err = xgl_transport_init(&handle->layers.transport_ctx, &transport_config);
+    if (err != XGL_OK) {
+        goto cleanup_rx_buffer;
     }
     
-    /* Initialize wait-ACK list */
-    xgl_list_init(&handle->wait_ack_list);
-    
-    /* Initialize RX parser list */
-    xgl_list_init(&handle->rx_parser_list);
-    
-    /* Allocate RX buffer */
-    handle->rx_buffer_size = handle->config.rx_buffer_size;
-    handle->rx_buffer = (uint8_t*)xgl_alloc(handle->allocator, 
-                                            handle->rx_buffer_size);
-    if (handle->rx_buffer == NULL) {
-        err = XGL_ERR_NO_MEMORY;
-        goto cleanup_rtt_est;
+    /* Create layer interfaces */
+    err = xgl_datalink_get_interface(&handle->layers.datalink_ctx, &handle->layers.datalink_iface);
+    if (err != XGL_OK) {
+        goto cleanup_rx_buffer;
     }
+    
+    err = xgl_network_get_interface(&handle->layers.network_ctx, &handle->layers.network_iface);
+    if (err != XGL_OK) {
+        goto cleanup_rx_buffer;
+    }
+    
+    err = xgl_transport_get_interface(&handle->layers.transport_ctx, &handle->layers.transport_iface);
+    if (err != XGL_OK) {
+        goto cleanup_rx_buffer;
+    }
+    
+    /* Wire up layer interfaces */
+    /* Datalink -> Network -> Transport -> Application */
+    handle->layers.datalink_ctx.upper_layer = &handle->layers.network_iface;
+    handle->layers.network_ctx.lower_layer = &handle->layers.datalink_iface;
+    handle->layers.network_ctx.upper_layer = &handle->layers.transport_iface;
+    handle->layers.transport_ctx.lower_layer = &handle->layers.network_iface;
+    
+    /* Pass handle for callbacks */
+    handle->layers.datalink_ctx.callback_user_data = handle;
     
     /* Mark as initialized */
     handle->initialized = true;
@@ -208,13 +244,8 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     return XGL_OK;
     
     /* Cleanup on error */
-cleanup_rtt_est:
-    xgl_free(handle->allocator, handle->rtt_est);
-    handle->rtt_est = NULL;
-    
-cleanup_windows:
-    xgl_free(handle->allocator, handle->windows);
-    handle->windows = NULL;
+cleanup_rx_buffer:
+    xgl_free(handle->allocator, rx_buffer);
     
 cleanup_seq_numbers:
     xgl_free(handle->allocator, handle->seq_numbers);
@@ -231,7 +262,7 @@ cleanup_tx_pool:
     
 cleanup:
 #ifdef XGL_THREAD_SAFE
-    if (handle->config.thread_safe) {
+    if (handle->config.features.thread_safe) {
         xgl_mutex_destroy(&handle->mutex);
     }
 #endif
@@ -248,36 +279,21 @@ cleanup:
  * \details         Cleans up all allocated resources and frees instance
  */
 void xgl_destroy(xgl_handle_t handle) {
-    size_t i;
-    
     /* Validate handle */
     if (handle == NULL) {
         return;
     }
     
-    /* Free RX buffer */
-    if (handle->rx_buffer != NULL) {
-        xgl_free(handle->allocator, handle->rx_buffer);
-        handle->rx_buffer = NULL;
+    /* Destroy transport layer */
+    xgl_transport_destroy(&handle->layers.transport_ctx);
+    
+    /* Free datalink layer's RX buffer */
+    if (handle->layers.datalink_ctx.rx_cache != NULL) {
+        xgl_free(handle->allocator, handle->layers.datalink_ctx.rx_cache);
+        handle->layers.datalink_ctx.rx_cache = NULL;
     }
     
-    /* Free RTT estimators */
-    if (handle->rtt_est != NULL) {
-        xgl_free(handle->allocator, handle->rtt_est);
-        handle->rtt_est = NULL;
-    }
-    
-    /* Free sliding windows and their ACK bitmaps */
-    if (handle->windows != NULL) {
-        for (i = 0; i < handle->windows_count; i++) {
-            if (handle->windows[i].ack_received != NULL) {
-                xgl_free(handle->allocator, handle->windows[i].ack_received);
-                handle->windows[i].ack_received = NULL;
-            }
-        }
-        xgl_free(handle->allocator, handle->windows);
-        handle->windows = NULL;
-    }
+    /* Network and datalink layers don't need explicit destroy */
     
     /* Free sequence numbers */
     if (handle->seq_numbers != NULL) {
@@ -296,7 +312,7 @@ void xgl_destroy(xgl_handle_t handle) {
     
 #ifdef XGL_THREAD_SAFE
     /* Destroy mutex if thread safety was enabled */
-    if (handle->config.thread_safe) {
+    if (handle->config.features.thread_safe) {
         xgl_mutex_destroy(&handle->mutex);
     }
 #endif
@@ -321,4 +337,61 @@ const char* xgl_version_string(void) {
  */
 uint32_t xgl_version_int(void) {
     return XGL_VERSION_INT;
+}
+
+/*---------------------------------------------------------------------------*/
+/* Runtime Processing                                                        */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Run protocol processing (call periodically)
+ * \details         Handles timeouts, retransmissions, and RX processing
+ * \param[in]       handle: Instance handle
+ * \param[in]       freq_hz: Calling frequency in Hz
+ * \note            Should be called from main loop or timer interrupt
+ * \note            Typical frequencies: 10-1000 Hz depending on requirements
+ */
+void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
+    size_t i;
+    uint32_t current_time_ms;
+    
+    /* Validate handle */
+    if (handle == NULL || !handle->initialized) {
+        return;
+    }
+    
+    /* Suppress unused parameter warning */
+    (void)freq_hz;
+    
+    /* Get current time */
+    current_time_ms = xgl_time_ms();
+    
+#ifdef XGL_THREAD_SAFE
+    /* Lock mutex if thread safety is enabled */
+    if (handle->config.features.thread_safe) {
+        xgl_mutex_lock(&handle->mutex);
+    }
+#endif
+    
+    /* Process each route's physical layer for reception */
+    for (i = 0; i < handle->config.route_table_len; i++) {
+        xgl_route_item_t* route = &handle->config.route_table[i];
+        if (route->phy != NULL && route->phy->rx != NULL) {
+            /* Receive and parse frames from this PHY through data link layer */
+            xgl_datalink_receive(&handle->layers.datalink_ctx, 
+                                route->phy, 
+                                current_time_ms, 
+                                1000);  /* 1 second parser timeout */
+        }
+    }
+    
+    /* Process transport layer timeouts and retransmissions */
+    xgl_transport_run(&handle->layers.transport_ctx, handle, current_time_ms);
+    
+#ifdef XGL_THREAD_SAFE
+    /* Unlock mutex */
+    if (handle->config.features.thread_safe) {
+        xgl_mutex_unlock(&handle->mutex);
+    }
+#endif
 }
