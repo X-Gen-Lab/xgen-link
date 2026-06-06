@@ -13,7 +13,7 @@ Host archive size is not a substitute for target flash size. For MCU release bui
 
 ## Dynamic Allocation Count
 
-`test/test_footprint.cpp` uses a counting allocator around `xgl_create`, `xgl_init`, and `xgl_destroy`. The test checks that allocations and frees balance, and records the init-time allocation count used by the default tiny SDK profile.
+`test/test_footprint.cpp` uses counting and tracking allocators around `xgl_create`, `xgl_init`, `xgl_send`, and `xgl_destroy`. The tests check that allocations and frees balance, record init-time allocation, and prove that tiny-profile single-frame unreliable TX does not allocate during the runtime TX phase.
 
 The broader allocation policy is documented in [Resource Model](resource_model.md). The current report is a baseline; production profiles should extend it with allocation phase counts for steady TX/RX, reliable retransmission, and fragment reassembly.
 

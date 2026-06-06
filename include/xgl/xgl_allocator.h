@@ -50,6 +50,18 @@ void xgl_free(xgl_allocator_t* allocator, void* ptr);
 /*---------------------------------------------------------------------------*/
 
 /**
+ * \brief           Allocation accounting phase
+ */
+typedef enum {
+    XGL_ALLOCATOR_PHASE_INIT = 0,       /**< Instance creation and initialization */
+    XGL_ALLOCATOR_PHASE_RUNTIME_TX,     /**< Steady-state transmit path */
+    XGL_ALLOCATOR_PHASE_RUNTIME_RX,     /**< Steady-state receive path */
+    XGL_ALLOCATOR_PHASE_RELIABLE,       /**< Reliable retransmission storage */
+    XGL_ALLOCATOR_PHASE_FRAGMENT,       /**< Fragmentation and reassembly */
+    XGL_ALLOCATOR_PHASE_COUNT
+} xgl_allocator_phase_t;
+
+/**
  * \brief           Tracking allocator statistics
  */
 typedef struct {
@@ -62,12 +74,21 @@ typedef struct {
 } xgl_allocator_stats_t;
 
 /**
+ * \brief           Per-phase allocation statistics
+ */
+typedef struct {
+    xgl_allocator_stats_t phase[XGL_ALLOCATOR_PHASE_COUNT];
+} xgl_allocator_phase_stats_t;
+
+/**
  * \brief           Tracking allocator structure
  */
 typedef struct {
     xgl_allocator_t base;           /**< Base allocator interface */
     xgl_allocator_t* underlying;    /**< Underlying allocator */
     xgl_allocator_stats_t stats;    /**< Allocation statistics */
+    xgl_allocator_phase_stats_t phase_stats; /**< Per-phase statistics */
+    xgl_allocator_phase_t current_phase; /**< Current accounting phase */
 } xgl_tracking_allocator_t;
 
 /**
@@ -92,6 +113,23 @@ void xgl_tracking_allocator_get_stats(const xgl_tracking_allocator_t* tracker,
  * \param[in,out]   tracker: Pointer to tracking allocator structure
  */
 void xgl_tracking_allocator_reset_stats(xgl_tracking_allocator_t* tracker);
+
+/**
+ * \brief           Set current tracking phase
+ * \param[in,out]   tracker: Pointer to tracking allocator structure
+ * \param[in]       phase: Allocation phase
+ */
+void xgl_tracking_allocator_set_phase(xgl_tracking_allocator_t* tracker,
+                                      xgl_allocator_phase_t phase);
+
+/**
+ * \brief           Get per-phase tracking statistics
+ * \param[in]       tracker: Pointer to tracking allocator structure
+ * \param[out]      stats: Pointer to per-phase statistics structure to fill
+ */
+void xgl_tracking_allocator_get_phase_stats(
+    const xgl_tracking_allocator_t* tracker,
+    xgl_allocator_phase_stats_t* stats);
 
 /**
  * \brief           Get base allocator interface from tracking allocator

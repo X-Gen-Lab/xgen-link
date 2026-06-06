@@ -4,10 +4,11 @@ xgen-link is intended for bounded embedded systems. This document separates curr
 
 ## Allocation Phases
 
-The SDK tracks memory in four phases:
+The SDK tracks memory in five phases:
 
 - Init phase: `xgl_create` and `xgl_init` allocate instance, route, RX cache, sequence, ACK, reliable, fragment, and pool resources.
-- Steady TX/RX phase: normal non-fragmented unreliable traffic should avoid unbounded allocation.
+- Runtime TX phase: normal non-fragmented unreliable transmit traffic should avoid allocation.
+- Runtime RX phase: normal non-fragmented receive traffic should avoid allocation.
 - Reliable phase: reliable TX currently stores retransmission data and may allocate queue nodes and packet copies.
 - Fragment phase: fragmentation and reassembly currently allocate fragment arrays, fragment data, reassembly buffers, and bitmaps.
 
@@ -57,6 +58,8 @@ Each production profile should report:
 - runtime allocation count and bytes by traffic phase
 - peak reliable queue usage
 - peak fragment reassembly usage
+
+The tracking allocator exposes these phases through `xgl_tracking_allocator_set_phase` and `xgl_tracking_allocator_get_phase_stats`. Tests use this API to prove that the tiny-profile single-frame unreliable TX acceptance path has zero runtime TX allocation.
 
 ## Design Rules
 

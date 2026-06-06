@@ -267,6 +267,67 @@ TEST_F(XglAllocatorTest, TrackingAllocatorGetInterface) {
 }
 
 /**
+ * \brief           Test tracking allocator interface allocation path
+ */
+TEST_F(XglAllocatorTest, TrackingAllocatorInterfaceAllocatesAndTracks) {
+    xgl_tracking_allocator_t tracker;
+    xgl_allocator_stats_t stats;
+
+    ASSERT_EQ(xgl_tracking_allocator_init(&tracker, nullptr), 0);
+
+    xgl_allocator_t* interface = xgl_tracking_allocator_get_interface(&tracker);
+    ASSERT_NE(interface, nullptr);
+
+    void* ptr = xgl_alloc(interface, 64);
+    ASSERT_NE(ptr, nullptr);
+    memset(ptr, 0xAB, 64);
+
+    xgl_tracking_allocator_get_stats(&tracker, &stats);
+    EXPECT_EQ(stats.alloc_count, 1U);
+    EXPECT_EQ(stats.total_allocated, 64U);
+    EXPECT_EQ(stats.current_allocated, 64U);
+
+    xgl_free(interface, ptr);
+
+    xgl_tracking_allocator_get_stats(&tracker, &stats);
+    EXPECT_EQ(stats.free_count, 1U);
+    EXPECT_EQ(stats.total_freed, 64U);
+    EXPECT_EQ(stats.current_allocated, 0U);
+}
+
+/**
+ * \brief           Test tracking allocator phase statistics
+ */
+TEST_F(XglAllocatorTest, TrackingAllocatorPhaseStats) {
+    xgl_tracking_allocator_t tracker;
+    xgl_allocator_phase_stats_t phase_stats;
+
+    ASSERT_EQ(xgl_tracking_allocator_init(&tracker, nullptr), 0);
+    xgl_allocator_t* interface = xgl_tracking_allocator_get_interface(&tracker);
+    ASSERT_NE(interface, nullptr);
+
+    void* init_ptr = xgl_alloc(interface, 32);
+    ASSERT_NE(init_ptr, nullptr);
+
+    xgl_tracking_allocator_set_phase(&tracker, XGL_ALLOCATOR_PHASE_RUNTIME_TX);
+    void* tx_ptr = xgl_alloc(interface, 48);
+    ASSERT_NE(tx_ptr, nullptr);
+
+    xgl_tracking_allocator_get_phase_stats(&tracker, &phase_stats);
+    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_INIT].alloc_count, 1U);
+    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_INIT].total_allocated, 32U);
+    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_RUNTIME_TX].alloc_count, 1U);
+    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_RUNTIME_TX].total_allocated, 48U);
+
+    xgl_free(interface, init_ptr);
+    xgl_free(interface, tx_ptr);
+
+    xgl_tracking_allocator_get_phase_stats(&tracker, &phase_stats);
+    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_INIT].current_allocated, 0U);
+    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_RUNTIME_TX].current_allocated, 0U);
+}
+
+/**
  * \brief           Test tracking allocator with NULL parameter
  */
 TEST_F(XglAllocatorTest, TrackingAllocatorGetInterfaceNull) {
@@ -333,4 +394,3 @@ TEST_F(XglAllocatorTest, LargeAllocation) {
     /* Free */
     xgl_free(nullptr, ptr);
 }
-
