@@ -37,6 +37,7 @@ option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
 option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ON)
 option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" ON)
+option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" ON)
 
 #-----------------------------------------------------------------------------
 # Compiler Warnings
@@ -179,6 +180,18 @@ if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
     endif()
 endif()
 
+if(XGL_BUILD_SDK_CONSUMER_SMOKE)
+    add_custom_target(xgl_sdk_consumer_smoke
+        COMMAND ${CMAKE_COMMAND}
+            -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
+        DEPENDS xgl
+        COMMENT "Validating installed xgl CMake package with a consumer project"
+        VERBATIM
+    )
+endif()
+
 #-----------------------------------------------------------------------------
 # Tests
 #-----------------------------------------------------------------------------
@@ -186,6 +199,15 @@ endif()
 if(XGL_BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)
+    if(XGL_BUILD_SDK_CONSUMER_SMOKE)
+        add_test(NAME xgl_sdk_consumer_smoke
+            COMMAND ${CMAKE_COMMAND}
+                -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
+        )
+        set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES TIMEOUT 60)
+    endif()
 endif()
 
 #-----------------------------------------------------------------------------
