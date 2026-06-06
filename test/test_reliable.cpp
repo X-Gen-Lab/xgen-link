@@ -145,7 +145,7 @@ TEST_F(XglReliableTest, AddPacketWithZeroLength) {
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
 
-TEST_F(XglReliableTest, AddPacketWithNullPhy) {
+TEST_F(XglReliableTest, AddPacketWithNullPhyAllowed) {
     uint8_t data[] = {0x01, 0x02};
     
     xgl_error_t err = xgl_reliable_add_packet(
@@ -154,7 +154,8 @@ TEST_F(XglReliableTest, AddPacketWithNullPhy) {
         1, 2, 10, 5, 3, 1000, nullptr
     );
     
-    EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(err, XGL_OK);
+    EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
 }
 
 /*---------------------------------------------------------------------------*/

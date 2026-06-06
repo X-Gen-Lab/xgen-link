@@ -147,6 +147,13 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
     
     /* Build frame from packet for datalink transmission */
     xgl_frame_t frame;
+    uint8_t reliable_type = XGL_ATTR_RELIABLE_NONE;
+    if (packet->reliable == XGL_ATTR_RELIABLE_ACK) {
+        reliable_type = XGL_ATTR_RELIABLE_ACK;
+    } else if (packet->reliable != 0U) {
+        reliable_type = XGL_ATTR_RELIABLE_TX;
+    }
+
     xgl_frame_params_t params = {
         .source_id = packet->source_id,
         .target_id = packet->target_id,
@@ -156,6 +163,7 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
         .payload = packet->data->data,
         .payload_len = packet->data->data_len,
         .reliable = packet->reliable,
+        .reliable_type = reliable_type,
         .fragment = packet->fragment,
         .priority = packet->priority
     };
@@ -205,7 +213,7 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
  */
 xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                                 xgl_handle_t handle,
-                                uint8_t* frame_buf,
+                                const uint8_t* frame_buf,
                                 size_t frame_len) {
     if (ctx == NULL || frame_buf == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -257,7 +265,8 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             xgl_packet_data_t packet_data = {
                 .ref_count = 1,
                 .data_len = payload_len,
-                .data = (uint8_t*)payload  /* Cast away const for structure */
+                .data = payload,
+                .owned_data = NULL
             };
             
             /* Build complete packet structure for transport layer */
@@ -267,7 +276,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .data_type = data_type,
                 .seq_num = header.seq_num,
                 .ack_num = header.ack_num,
-                .reliable = (header.attr_lsb & XGL_ATTR_RELIABLE_MASK) >> XGL_ATTR_RELIABLE_SHIFT,
+                .reliable = header.attr_lsb & XGL_ATTR_RELIABLE_MASK,
                 .fragment = (header.attr_lsb & XGL_ATTR_FRAGMENT_MASK) >> XGL_ATTR_FRAGMENT_SHIFT,
                 .priority = (header.attr_lsb & XGL_ATTR_PRIORITY_MASK) >> XGL_ATTR_PRIORITY_SHIFT,
                 .data = &packet_data,
@@ -427,7 +436,7 @@ static xgl_error_t network_receive_impl(void* ctx,
     
     /* Extract frame buffer and length from data */
     struct {
-        uint8_t* frame_buf;
+        const uint8_t* frame_buf;
         size_t frame_len;
     }* frame_data = data;
     

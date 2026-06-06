@@ -96,7 +96,11 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     /* Set attributes */
     frame->header.attr_lsb = 0;
     frame->header.attr_msb = 0;
-    xgl_frame_set_reliable(&frame->header.attr_lsb, params->reliable);
+    if (params->reliable_type != XGL_ATTR_RELIABLE_NONE) {
+        xgl_frame_set_reliable_type(&frame->header.attr_lsb, params->reliable_type);
+    } else {
+        xgl_frame_set_reliable(&frame->header.attr_lsb, params->reliable);
+    }
     xgl_frame_set_fragment(&frame->header.attr_lsb, params->fragment);
     xgl_frame_set_priority(&frame->header.attr_lsb, params->priority);
     

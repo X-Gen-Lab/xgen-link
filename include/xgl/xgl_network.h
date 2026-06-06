@@ -113,7 +113,7 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
  */
 xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                                 xgl_handle_t handle,
-                                uint8_t* frame_buf,
+                                const uint8_t* frame_buf,
                                 size_t frame_len);
 
 /**

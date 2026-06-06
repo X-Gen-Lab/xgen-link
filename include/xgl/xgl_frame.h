@@ -50,6 +50,7 @@ typedef struct {
     const uint8_t* payload;     /**< Payload data */
     size_t payload_len;         /**< Payload length */
     bool reliable;              /**< Reliable transmission flag */
+    uint8_t reliable_type;      /**< Raw reliable attribute type, 0 uses reliable flag */
     bool fragment;              /**< Fragment flag */
     uint8_t priority;           /**< Priority level (0-7) */
 } xgl_frame_params_t;
@@ -149,7 +150,9 @@ static inline size_t xgl_frame_calculate_size(size_t payload_len) {
  * \param[in]       version: Protocol version (0-15)
  */
 static inline void xgl_frame_set_version(xgl_frame_header_t* header, uint8_t version) {
-    header->version_datatype = (header->version_datatype & 0x0F) | ((version & 0x0F) << 4);
+    uint32_t version_field = ((uint32_t)version & 0x0FU) << 4;
+    header->version_datatype = (uint8_t)(((uint32_t)header->version_datatype & 0x0FU) |
+                                         version_field);
 }
 
 /**
@@ -187,6 +190,16 @@ static inline uint8_t xgl_frame_get_datatype(const xgl_frame_header_t* header) {
 static inline void xgl_frame_set_reliable(uint8_t* attr_lsb, bool reliable) {
     *attr_lsb = (*attr_lsb & ~XGL_ATTR_RELIABLE_MASK) | 
                 (reliable ? XGL_ATTR_RELIABLE_TX : XGL_ATTR_RELIABLE_NONE);
+}
+
+/**
+ * \brief           Set reliable attribute type in attributes LSB
+ * \param[in,out]   attr_lsb: Attributes LSB byte
+ * \param[in]       reliable_type: Raw reliable type bits
+ */
+static inline void xgl_frame_set_reliable_type(uint8_t* attr_lsb, uint8_t reliable_type) {
+    *attr_lsb = (*attr_lsb & (uint8_t)~XGL_ATTR_RELIABLE_MASK) |
+                (reliable_type & XGL_ATTR_RELIABLE_MASK);
 }
 
 /**

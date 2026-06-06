@@ -9,6 +9,7 @@
 #include "xgl/xgl_route.h"
 #include "xgl/xgl_frame.h"
 #include "xgl/xgl_config.h"
+#include "xgl/xgl_time.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -49,41 +50,103 @@ static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,
                                      uint8_t seq_num,
                                      uint8_t source_id) {
-    xgl_error_t err;
-    uint8_t ack_buffer[XGL_ACK_BUFFER_SIZE];
-    size_t ack_len;
-    
-    err = xgl_ack_generate(seq_num, source_id, ctx->local_id,
-                          ack_buffer, sizeof(ack_buffer), &ack_len);
-    if (err != XGL_OK) {
-        return err;
-    }
-    
-    /* Send ACK through network layer */
     xgl_packet_data_t ack_packet_data = {
         .ref_count = 1,
-        .data_len = ack_len,
-        .data = ack_buffer
+        .data_len = 0,
+        .data = NULL,
+        .owned_data = NULL
     };
     
     xgl_packet_t ack_packet = {
         .source_id = ctx->local_id,
         .target_id = source_id,
-        .data_type = 0xFF,  /* ACK data type */
+        .data_type = 0,
         .seq_num = 0,
         .ack_num = seq_num,
-        .reliable = false,
-        .fragment = false,  /* ACKs are never fragmented */
-        .priority = 7,  /* Highest priority */
+        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .fragment = false,
+        .priority = 7,
         .data = &ack_packet_data,
-        .phy = NULL  /* Will be set by network layer */
+        .phy = NULL
     };
     
     if (ctx->lower_layer != NULL && ctx->lower_layer->send != NULL) {
-        xgl_layer_send(ctx->lower_layer, handle, &ack_packet);
+        return xgl_layer_send(ctx->lower_layer, handle, &ack_packet);
     }
     
-    return XGL_OK;
+    return XGL_ERR_INVALID_PARAM;
+}
+
+static uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
+                                                  xgl_handle_t handle,
+                                                  uint32_t current_time_ms) {
+    uint32_t retransmit_count = 0;
+    xgl_list_node_t* node;
+    xgl_list_node_t* tmp;
+
+    XGL_LIST_FOR_EACH_SAFE(&ctx->reliable_queue.wait_ack_list, node, tmp) {
+        xgl_reliable_packet_t* rel_packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+
+        if (rel_packet->send_timestamp == 0U) {
+            continue;
+        }
+
+        uint32_t elapsed_ms = current_time_ms - rel_packet->send_timestamp;
+        if (elapsed_ms < (uint32_t)rel_packet->timeout_ms) {
+            continue;
+        }
+
+        if (rel_packet->retry_count >= ctx->reliable_queue.max_retry_count) {
+            uint8_t seq_num = rel_packet->seq_num;
+            uint8_t target_id = rel_packet->target_id;
+
+            (void)xgl_reliable_remove_packet(&ctx->reliable_queue, seq_num, target_id);
+            if (ctx->error_callback != NULL) {
+                ctx->error_callback(handle, XGL_ERR_ACK_TIMEOUT,
+                                  "Packet retry count exhausted",
+                                  ctx->callback_user_data);
+            }
+            if (ctx->stats != NULL) {
+                ctx->stats->tx_errors++;
+            }
+            continue;
+        }
+
+        xgl_packet_data_t packet_data = {
+            .ref_count = 1,
+            .data_len = rel_packet->data_len,
+            .data = rel_packet->data,
+            .owned_data = NULL
+        };
+
+        xgl_packet_t packet = {
+            .source_id = rel_packet->source_id,
+            .target_id = rel_packet->target_id,
+            .seq_num = rel_packet->seq_num,
+            .ack_num = 0,
+            .data_type = rel_packet->data_type,
+            .reliable = true,
+            .fragment = false,
+            .priority = rel_packet->priority,
+            .data = &packet_data,
+            .phy = rel_packet->phy
+        };
+
+        xgl_error_t err = xgl_layer_send(ctx->lower_layer, handle, &packet);
+        if (err == XGL_OK) {
+            rel_packet->retry_count++;
+            rel_packet->timeout_ms = xgl_reliable_calc_backoff(
+                rel_packet->initial_timeout_ms,
+                rel_packet->retry_count
+            );
+            rel_packet->send_timestamp = current_time_ms;
+            retransmit_count++;
+        } else if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
+        }
+    }
+
+    return retransmit_count;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -298,7 +361,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             } else {
                 timeout_ms = xgl_rtt_get_rto(&ctx->rtt_est);
                 if (timeout_ms == 0) {
-                    timeout_ms = ctx->default_timeout_ms;
+                    timeout_ms = (int32_t)ctx->default_timeout_ms;
                 }
             }
             
@@ -319,14 +382,21 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                     transport_free(ctx->allocator, fragment_lens);
                     return err;
                 }
+
+                xgl_reliable_packet_t* rel_packet =
+                    xgl_reliable_find_packet(&ctx->reliable_queue, seq_num, tx_data->target_id);
+                if (rel_packet != NULL) {
+                    rel_packet->send_timestamp = xgl_time_ms();
+                }
             }
             
             /* Send fragment through network layer via interface */
-            xgl_packet_data_t packet_data = {
-                .ref_count = 1,
-                .data_len = fragment_lens[i],
-                .data = fragments[i]
-            };
+                xgl_packet_data_t packet_data = {
+                    .ref_count = 1,
+                    .data_len = fragment_lens[i],
+                    .data = fragments[i],
+                    .owned_data = NULL
+                };
             
             xgl_packet_t packet = {
                 .source_id = ctx->local_id,
@@ -388,16 +458,17 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             timeout_ms = (int32_t)tx_data->timeout_ms;
         } else {
             timeout_ms = xgl_rtt_get_rto(&ctx->rtt_est);
-            if (timeout_ms == 0) {
-                timeout_ms = ctx->default_timeout_ms;
-            }
+                if (timeout_ms == 0) {
+                    timeout_ms = (int32_t)ctx->default_timeout_ms;
+                }
         }
         
         /* Create packet data structure for network layer */
         xgl_packet_data_t packet_data = {
             .ref_count = 1,
             .data_len = tx_data->data_len,
-            .data = (uint8_t*)tx_data->data  /* Cast away const for packet structure */
+            .data = tx_data->data,
+            .owned_data = NULL
         };
         
         xgl_packet_t packet = {
@@ -441,6 +512,12 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                                          tx_data->priority, timeout_ms, packet.phy);
             if (err != XGL_OK) {
                 return err;
+            }
+
+            xgl_reliable_packet_t* rel_packet =
+                xgl_reliable_find_packet(&ctx->reliable_queue, seq_num, tx_data->target_id);
+            if (rel_packet != NULL) {
+                rel_packet->send_timestamp = xgl_time_ms();
             }
         }
     }
@@ -491,17 +568,22 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         if (err != XGL_OK || !is_valid) {
             return err;
         }
+
+        xgl_reliable_packet_t* rel_packet = xgl_reliable_find_packet(&ctx->reliable_queue,
+                                                                      ack_num, source_id);
+        uint32_t measured_rtt_ms = 0;
+        bool has_rtt_sample = false;
+        if (rel_packet != NULL && rel_packet->send_timestamp != 0U) {
+            measured_rtt_ms = xgl_time_ms() - rel_packet->send_timestamp;
+            has_rtt_sample = true;
+        }
         
         /* Remove packet from reliable queue */
         err = xgl_reliable_remove_packet(&ctx->reliable_queue, ack_num, source_id);
         if (err == XGL_OK) {
             /* Update RTT estimate */
-            xgl_reliable_packet_t* rel_packet = xgl_reliable_find_packet(&ctx->reliable_queue, 
-                                                                          ack_num, source_id);
-            if (rel_packet) {
-                /* Calculate RTT (current_time - send_timestamp) */
-                /* Note: We need current time here, but it's not passed in */
-                /* For now, we'll skip RTT update */
+            if (has_rtt_sample) {
+                xgl_rtt_update(&ctx->rtt_est, (int32_t)measured_rtt_ms);
             }
             
             /* Advance sliding window */
@@ -517,20 +599,17 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
     
-    /* Check for duplicate packet */
-    if (xgl_ack_is_duplicate(&ctx->ack_handler, seq_num)) {
-        /* Send ACK for duplicate - sender may have missed our previous ACK */
-        if (reliable == XGL_ATTR_RELIABLE_TX) {
-            transport_send_ack(ctx, handle, seq_num, source_id);
-        }
-        return XGL_OK;  /* Discard duplicate, don't process again */
-    }
-    
-    /* Mark sequence number as received */
-    xgl_ack_mark_received(&ctx->ack_handler, seq_num);
-    
-    /* Send ACK if reliable transmission */
+    /* Check for duplicate reliable packet */
     if (reliable == XGL_ATTR_RELIABLE_TX) {
+        if (xgl_ack_is_duplicate(&ctx->ack_handler, seq_num)) {
+            /* Sender may have missed our previous ACK. */
+            transport_send_ack(ctx, handle, seq_num, source_id);
+            return XGL_OK;
+        }
+
+        /* Mark sequence number as received and ACK it. */
+        xgl_ack_mark_received(&ctx->ack_handler, seq_num);
+        xgl_ack_update_expected(&ctx->ack_handler, seq_num);
         transport_send_ack(ctx, handle, seq_num, source_id);
     }
     
@@ -594,24 +673,7 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
     
-    /* Process reliable transmission timeouts */
-    xgl_reliable_packet_t* retry_exhausted = NULL;
-    uint32_t retransmit_count = xgl_reliable_process_timeouts(&ctx->reliable_queue,
-                                                               current_time_ms,
-                                                               &retry_exhausted);
-    
-    /* Handle retry exhausted packets */
-    if (retry_exhausted) {
-        /* Report error */
-        if (ctx->error_callback) {
-            ctx->error_callback(handle, XGL_ERR_ACK_TIMEOUT,
-                              "Packet retry count exhausted",
-                              ctx->callback_user_data);
-        }
-        
-        /* Update statistics */
-        ctx->stats->tx_errors++;
-    }
+    uint32_t retransmit_count = transport_process_retransmissions(ctx, handle, current_time_ms);
     
     /* Update retransmission statistics */
     if (retransmit_count > 0 && ctx->tx_retries != NULL) {
