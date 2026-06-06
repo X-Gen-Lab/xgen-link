@@ -11,6 +11,7 @@ This directory contains the documentation for the xgen-link protocol stack.
 - [Production SDK plan](production_sdk_plan.md)
 - [Resource model](resource_model.md)
 - [Static analysis baseline](static_analysis.md)
+- [Release validation](release_validation.md)
 - Usage examples
 - Design decisions
 

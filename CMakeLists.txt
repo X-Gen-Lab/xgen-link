@@ -38,6 +38,7 @@ option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
 option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ON)
 option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" ON)
 option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" ON)
+option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" ON)
 
 #-----------------------------------------------------------------------------
 # Compiler Warnings
@@ -208,6 +209,29 @@ if(XGL_BUILD_TESTS)
         )
         set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES TIMEOUT 60)
     endif()
+endif()
+
+if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
+    set(XGL_RELEASE_VALIDATION_DEPS xgl)
+    if(XGL_BUILD_TESTS)
+        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_tests)
+    endif()
+    if(XGL_BUILD_FOOTPRINT_REPORT)
+        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_footprint)
+    endif()
+    if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
+        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_static_analysis)
+    endif()
+    if(XGL_BUILD_SDK_CONSUMER_SMOKE)
+        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_sdk_consumer_smoke)
+    endif()
+
+    add_custom_target(xgl_release_validation
+        COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_CURRENT_BINARY_DIR} --output-on-failure
+        DEPENDS ${XGL_RELEASE_VALIDATION_DEPS}
+        COMMENT "Running xgl release validation checks"
+        VERBATIM
+    )
 endif()
 
 #-----------------------------------------------------------------------------
