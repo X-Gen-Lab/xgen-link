@@ -5,12 +5,18 @@ Modern, robust, and highly configurable communication protocol stack for resourc
 ## Features
 
 - **Multi-instance architecture**: Support multiple independent protocol stacks
-- **Zero-copy optimization**: Minimize memory bandwidth and CPU overhead
+- **MVP communication loop**: Single-link point-to-point send/receive, optional ACK-based reliable send, timeout retransmission, and RX callback
 - **Compile-time configuration**: Eliminate unused code through Kconfig
 - **Thread safety**: Optional mutex protection for RTOS environments
 - **Bare-metal support**: Run without RTOS dependencies
 - **Minimal footprint**: 32KB RAM, 50KB Flash for basic configuration
 - **Industrial quality**: Comprehensive testing, documentation, and CI/CD
+
+## MVP Scope
+
+The current acceptance baseline focuses on a single physical link with point-to-point communication. Unreliable send, reliable send, ACK handling, timeout retransmission, and receive callbacks are implemented and covered by tests.
+
+Compression, encryption, and true zero-copy transmission are not part of the current MVP. Related constants and API shapes may exist for compatibility, but they should be treated as placeholders until implementation and acceptance tests are added.
 
 ## Quick Start
 

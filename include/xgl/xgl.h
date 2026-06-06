@@ -15,7 +15,8 @@
  *
  * \par Features
  *                  - Multi-instance architecture for multiple communication channels
- *                  - Zero-copy transmission for minimal memory overhead
+ *                  - Single-link point-to-point MVP communication loop
+ *                  - Reliable and unreliable transmission with ACK timeout handling
  *                  - Adaptive retransmission with RTT estimation (RFC 6298)
  *                  - Sliding window flow control
  *                  - Packet fragmentation and reassembly
@@ -101,7 +102,10 @@
  * }
  * \endcode
  *
- * \par Zero-Copy Example
+ * \par Zero-Copy Compatibility Example
+ * \note            The current zero-copy API is a compatibility shim that
+ *                  validates the caller-provided layout, then sends through
+ *                  the standard transport path. It is not true zero-copy yet.
  * \code{.c}
  * // Allocate buffer with header space
  * uint8_t buffer[XGL_FRAME_HEADER_SIZE + 100];
@@ -372,7 +376,7 @@ void xgl_config_get_preset_small(xgl_config_t* config);
  * \brief           Get medium configuration preset
  * \param[out]      config: Configuration structure to fill
  * \note            Optimized for 128KB RAM, 256KB Flash
- * \note            Includes fragmentation and compression
+ * \note            Includes fragmentation; compression is reserved and not implemented yet
  * \note            Values: 4KB TX pool, 544B RX buffer, 512B max frame
  */
 void xgl_config_get_preset_medium(xgl_config_t* config);
@@ -381,7 +385,7 @@ void xgl_config_get_preset_medium(xgl_config_t* config);
  * \brief           Get large configuration preset
  * \param[out]      config: Configuration structure to fill
  * \note            Optimized for 256KB+ RAM, 512KB+ Flash
- * \note            Full features including encryption
+ * \note            Encryption is reserved and not implemented yet
  * \note            Values: 8KB TX pool, 1056B RX buffer, 1024B max frame
  */
 void xgl_config_get_preset_large(xgl_config_t* config);
@@ -458,14 +462,14 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config);
 xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
 
 /**
- * \brief           Send data (zero-copy mode)
+ * \brief           Send data through the zero-copy-compatible API
  * \param[in]       handle: Instance handle
  * \param[in]       tx_data: Zero-copy transmission data structure
  * \return          XGL_OK on success, error code otherwise
  * \note            Buffer must have XGL_FRAME_HEADER_SIZE bytes reserved at start
- * \note            No data copy is performed (50% reduction in memory bandwidth)
- * \note            Buffer ownership transfers to protocol stack temporarily
- * \warning         Do not modify buffer until transmission completes
+ * \note            Current implementation validates a zero-copy buffer layout,
+ *                  then sends through the standard transport path.
+ * \warning         This is not true zero-copy yet.
  *
  * \par Example
  * \code{.c}
@@ -605,7 +609,7 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
  * \par Memory Management
  *      - Use custom allocator for deterministic allocation
  *      - Memory pools eliminate heap fragmentation
- *      - Zero-copy API reduces memory bandwidth by 50%
+ *      - Zero-copy API is currently a compatibility shim, not true zero-copy
  *      - All memory is freed on xgl_destroy()
  *
  * \par Error Handling
@@ -615,7 +619,7 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
  *      - Check statistics for error counters
  *
  * \par Performance Optimization
- *      - Use zero-copy API for high-throughput applications
+ *      - Prefer standard send until true zero-copy has implementation coverage
  *      - Adjust window size based on RTT and bandwidth
  *      - Use unreliable transmission for time-sensitive data
  *      - Call xgl_run() at appropriate frequency (higher = lower latency)
@@ -636,8 +640,8 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
  * \par Resource Requirements
  *      Tiny:   32KB RAM,  50KB Flash  (basic features)
  *      Small:  64KB RAM, 100KB Flash  (+ fragmentation)
- *      Medium: 128KB RAM, 256KB Flash (+ compression)
- *      Large:  256KB RAM, 512KB Flash (+ encryption)
+ *      Medium: 128KB RAM, 256KB Flash (compression reserved)
+ *      Large:  256KB RAM, 512KB Flash (encryption reserved)
  *
  * \par Typical Use Cases
  *      - Sensor networks (unreliable, low power)
