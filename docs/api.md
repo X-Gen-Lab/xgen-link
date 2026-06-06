@@ -22,6 +22,8 @@
 - The current true zero-copy acceptance path is single-frame unreliable send.
 - Reliable zero-copy requests keep reliable retransmission semantics and may copy into the retransmission queue.
 
+Compression and encryption flags are reserved for optional codec modules. They are not enabled by the built-in presets and are not applied by the base link path.
+
 ## Routing
 
 Each route maps a target node ID to a PHY. Multi-PHY forwarding uses the route table on receive when the frame target is not local or broadcast.

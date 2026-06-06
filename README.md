@@ -16,7 +16,7 @@ Modern, robust, and highly configurable communication protocol stack for resourc
 
 The current acceptance baseline focuses on a single physical link with point-to-point communication. Unreliable send, reliable send, ACK handling, timeout retransmission, and receive callbacks are implemented and covered by tests.
 
-Compression, encryption, and true zero-copy transmission are not part of the current MVP. Related constants and API shapes may exist for compatibility, but they should be treated as placeholders until implementation and acceptance tests are added.
+Compression and encryption are optional codec-module capabilities and are not part of the base MVP link path. `xgl_send_zerocopy` has a true zero-copy acceptance path for single-frame unreliable transmission; reliable zero-copy requests preserve retransmission semantics and may copy into the reliable queue.
 
 ## Quick Start
 
@@ -63,6 +63,8 @@ int main(void) {
 - [Architecture Overview](docs/architecture.md)
 - [API Reference](docs/api.md)
 - [Porting Guide](docs/porting.md)
+- [Production SDK Plan](docs/production_sdk_plan.md)
+- [Resource Model](docs/resource_model.md)
 - [Examples](examples/)
 
 ## Requirements

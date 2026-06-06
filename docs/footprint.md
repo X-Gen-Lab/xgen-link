@@ -15,6 +15,8 @@ Host archive size is not a substitute for target flash size. For MCU release bui
 
 `test/test_footprint.cpp` uses a counting allocator around `xgl_create`, `xgl_init`, and `xgl_destroy`. The test checks that allocations and frees balance, and records the init-time allocation count used by the default tiny SDK profile.
 
+The broader allocation policy is documented in [Resource Model](resource_model.md). The current report is a baseline; production profiles should extend it with allocation phase counts for steady TX/RX, reliable retransmission, and fragment reassembly.
+
 ## Stack Measurement
 
 The portable implementation has explicit stack buffers in datalink TX/RX. Target builds should also enable compiler stack usage output or RTOS high-water mark checks:

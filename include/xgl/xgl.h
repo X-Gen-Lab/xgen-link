@@ -102,10 +102,11 @@
  * }
  * \endcode
  *
- * \par Zero-Copy Compatibility Example
- * \note            The current zero-copy API is a compatibility shim that
- *                  validates the caller-provided layout, then sends through
- *                  the standard transport path. It is not true zero-copy yet.
+ * \par Zero-Copy Example
+ * \note            Single-frame unreliable sends are framed in the caller
+ *                  buffer and passed directly to the PHY. Reliable sends may
+ *                  copy into the retransmission queue to preserve ACK/retry
+ *                  semantics.
  * \code{.c}
  * // Allocate buffer with header space
  * uint8_t buffer[XGL_FRAME_HEADER_SIZE + 100];
@@ -613,7 +614,8 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
  * \par Memory Management
  *      - Use custom allocator for deterministic allocation
  *      - Memory pools eliminate heap fragmentation
- *      - Zero-copy API is currently a compatibility shim, not true zero-copy
+ *      - Single-frame unreliable zero-copy TX uses the caller frame buffer
+ *      - Reliable zero-copy requests may copy for retransmission storage
  *      - All memory is freed on xgl_destroy()
  *
  * \par Error Handling
@@ -623,7 +625,8 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
  *      - Check statistics for error counters
  *
  * \par Performance Optimization
- *      - Prefer standard send until true zero-copy has implementation coverage
+ *      - Prefer zero-copy for single-frame unreliable TX when caller buffers
+ *        can reserve header and CRC space
  *      - Adjust window size based on RTT and bandwidth
  *      - Use unreliable transmission for time-sensitive data
  *      - Call xgl_run() at appropriate frequency (higher = lower latency)

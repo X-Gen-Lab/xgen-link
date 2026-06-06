@@ -8,6 +8,8 @@ This directory contains the documentation for the xgen-link protocol stack.
 - [API guide](api.md)
 - [Porting guide](porting.md)
 - [Footprint report](footprint.md)
+- [Production SDK plan](production_sdk_plan.md)
+- [Resource model](resource_model.md)
 - [Static analysis baseline](static_analysis.md)
 - Usage examples
 - Design decisions
