@@ -36,6 +36,7 @@ option(XGL_BUILD_EXAMPLES "Build examples" ON)
 option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
 option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ON)
+option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" ON)
 
 #-----------------------------------------------------------------------------
 # Compiler Warnings
@@ -152,6 +153,30 @@ if(XGL_BUILD_FOOTPRINT_REPORT)
         VERBATIM
     )
     add_custom_target(xgl_footprint DEPENDS ${XGL_FOOTPRINT_REPORT})
+endif()
+
+if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
+    find_program(XGL_CPPCHECK_EXE NAMES cppcheck)
+    if(XGL_CPPCHECK_EXE)
+        add_custom_target(xgl_static_analysis
+            COMMAND ${XGL_CPPCHECK_EXE}
+                --enable=warning,style,performance,portability
+                --std=c11
+                --inline-suppr
+                --error-exitcode=1
+                -I ${CMAKE_CURRENT_SOURCE_DIR}/include
+                ${XGL_SOURCES}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Running embedded C static analysis baseline"
+            VERBATIM
+        )
+    else()
+        add_custom_target(xgl_static_analysis
+            COMMAND ${CMAKE_COMMAND} -E echo "cppcheck not found; install cppcheck to run the embedded C static analysis baseline"
+            COMMENT "Static analysis baseline is unavailable"
+            VERBATIM
+        )
+    endif()
 endif()
 
 #-----------------------------------------------------------------------------
