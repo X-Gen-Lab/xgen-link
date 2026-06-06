@@ -191,6 +191,9 @@ extern "C" {
 #include "xgl_tiered_pool.h"
 #include "xgl_packet_pool.h"
 
+/* Optional modules */
+#include "xgl_codec.h"
+
 /* Utilities */
 #include "xgl_list.h"
 #include "xgl_hashtable.h"

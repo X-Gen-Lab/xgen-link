@@ -95,6 +95,9 @@ set(XGL_SOURCES
     src/core/xgl_packet_pool.c
     src/core/xgl_allocator.c
 
+    # Optional Modules
+    src/codec/xgl_codec.c
+
     # Data Link Layer
     src/datalink/xgl_frame.c
     src/datalink/xgl_parser.c

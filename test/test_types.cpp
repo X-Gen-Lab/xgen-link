@@ -89,7 +89,7 @@ TEST(XglTypesTest, ConfigPresets) {
     EXPECT_EQ(medium.protocol.window_size, 8);
     EXPECT_EQ(medium.protocol.max_frame_size, 512);
     EXPECT_TRUE(medium.features.enable_fragmentation);
-    EXPECT_TRUE(medium.features.enable_compression);
+    EXPECT_FALSE(medium.features.enable_compression);
     
     /* Test large preset */
     xgl_config_t large = XGL_CONFIG_PRESET_LARGE;
@@ -98,8 +98,8 @@ TEST(XglTypesTest, ConfigPresets) {
     EXPECT_EQ(large.protocol.window_size, 16);
     EXPECT_EQ(large.protocol.max_frame_size, 1024);
     EXPECT_TRUE(large.features.enable_fragmentation);
-    EXPECT_TRUE(large.features.enable_compression);
-    EXPECT_TRUE(large.features.enable_encryption);
+    EXPECT_FALSE(large.features.enable_compression);
+    EXPECT_FALSE(large.features.enable_encryption);
 }
 
 /*---------------------------------------------------------------------------*/

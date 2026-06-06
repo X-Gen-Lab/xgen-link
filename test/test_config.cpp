@@ -39,7 +39,7 @@ TEST_F(XglConfigTest, GetDefaultConfig) {
     EXPECT_EQ(config.protocol.window_size, 8);
     EXPECT_EQ(config.protocol.max_frame_size, 512);
     EXPECT_TRUE(config.features.enable_fragmentation);
-    EXPECT_TRUE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_compression);
     EXPECT_FALSE(config.features.enable_encryption);
     EXPECT_FALSE(config.features.thread_safe);
 }
@@ -91,7 +91,7 @@ TEST_F(XglConfigTest, GetPresetMedium) {
     EXPECT_EQ(config.protocol.window_size, 8);
     EXPECT_EQ(config.protocol.max_frame_size, 512);
     EXPECT_TRUE(config.features.enable_fragmentation);
-    EXPECT_TRUE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_compression);
     EXPECT_FALSE(config.features.enable_encryption);
 }
 
@@ -105,8 +105,8 @@ TEST_F(XglConfigTest, GetPresetLarge) {
     EXPECT_EQ(config.protocol.window_size, 16);
     EXPECT_EQ(config.protocol.max_frame_size, 1024);
     EXPECT_TRUE(config.features.enable_fragmentation);
-    EXPECT_TRUE(config.features.enable_compression);
-    EXPECT_TRUE(config.features.enable_encryption);
+    EXPECT_FALSE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_encryption);
 }
 
 /*---------------------------------------------------------------------------*/

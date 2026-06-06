@@ -181,7 +181,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
     EXPECT_EQ(config.memory.tx_pool_size, 4096);
     EXPECT_EQ(config.protocol.max_frame_size, 512);
-    EXPECT_TRUE(config.features.enable_compression);
+    EXPECT_FALSE(config.features.enable_compression);
     
     /* Test large preset */
     xgl_config_get_preset_large(&config);
@@ -189,7 +189,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
     EXPECT_EQ(config.memory.tx_pool_size, 8192);
     EXPECT_EQ(config.protocol.max_frame_size, 1024);
-    EXPECT_TRUE(config.features.enable_encryption);
+    EXPECT_FALSE(config.features.enable_encryption);
 }
 
 /*---------------------------------------------------------------------------*/

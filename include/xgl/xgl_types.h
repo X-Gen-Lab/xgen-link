@@ -431,7 +431,7 @@ typedef struct {
     }, \
     .features = { \
         .enable_fragmentation = true, \
-        .enable_compression = true, \
+        .enable_compression = false, \
         .enable_encryption = false, \
         .thread_safe = false, \
     }, \
@@ -461,8 +461,8 @@ typedef struct {
     }, \
     .features = { \
         .enable_fragmentation = true, \
-        .enable_compression = true, \
-        .enable_encryption = true, \
+        .enable_compression = false, \
+        .enable_encryption = false, \
         .thread_safe = false, \
     }, \
     .route_table = NULL, \
