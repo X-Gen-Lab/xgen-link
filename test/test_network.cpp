@@ -342,6 +342,48 @@ TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
     EXPECT_EQ(phy_tx_count, initial_tx_count + 1);  // Should forward
 }
 
+TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
+    int first_phy_count = 0;
+    int second_phy_count = 0;
+    xgl_phy_ops_t first_phy = {
+        .tx = test_phy_tx,
+        .rx = test_phy_rx,
+        .user_data = &first_phy_count
+    };
+    xgl_phy_ops_t second_phy = {
+        .tx = test_phy_tx,
+        .rx = test_phy_rx,
+        .user_data = &second_phy_count
+    };
+
+    ASSERT_EQ(xgl_route_table_add(&route_table, 4, &first_phy, 256, 100, 10), XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, 5, &second_phy, 256, 100, 1), XGL_OK);
+
+    uint8_t frame_buf[64];
+    memset(frame_buf, 0, sizeof(frame_buf));
+
+    frame_buf[0] = XGL_SOF;
+    frame_buf[1] = (1 << 4) | 1;
+    frame_buf[2] = REMOTE_ID;
+    frame_buf[3] = 5;
+    frame_buf[4] = 0x40;
+    frame_buf[5] = 0;
+    frame_buf[6] = 5;
+    frame_buf[7] = 0;
+    frame_buf[8] = 0;
+    frame_buf[9] = 0;
+    frame_buf[10] = 0;
+    frame_buf[11] = 0;
+    memcpy(&frame_buf[12], "hello", 5);
+    frame_buf[17] = 0;
+    frame_buf[18] = 0;
+
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf, 19), XGL_OK);
+    EXPECT_EQ(first_phy_count, 0);
+    EXPECT_EQ(second_phy_count, 1);
+    EXPECT_EQ(stats.tx_packets, 1);
+}
+
 TEST_F(XglNetworkTest, ReceivePacketNoRouteForForwarding) {
     /* Build frame for unknown node */
     uint8_t frame_buf[64];

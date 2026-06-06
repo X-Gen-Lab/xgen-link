@@ -206,6 +206,59 @@ TEST_F(XglFragmentTest, LargeData) {
     xgl_fragment_free_data(&manager, complete_data);
 }
 
+TEST_F(XglFragmentTest, ReassembleStressReverseOrderLargePayload) {
+    const size_t data_len = 4096;
+    const size_t max_fragment_size = 64;
+    std::vector<uint8_t> data(data_len);
+    for (size_t i = 0; i < data_len; i++) {
+        data[i] = static_cast<uint8_t>((i * 31U) & 0xFFU);
+    }
+
+    uint8_t* fragments[128];
+    size_t fragment_lens[128];
+    size_t fragment_count = 128;
+    uint8_t fragment_id;
+
+    xgl_error_t err = xgl_fragment_data(&manager,
+                                        data.data(),
+                                        data.size(),
+                                        max_fragment_size,
+                                        fragments,
+                                        fragment_lens,
+                                        &fragment_count,
+                                        &fragment_id);
+    ASSERT_EQ(err, XGL_OK);
+    ASSERT_GT(fragment_count, 32U);
+
+    uint8_t* complete_data = nullptr;
+    size_t complete_len = 0;
+
+    for (size_t i = fragment_count; i > 0; i--) {
+        size_t index = i - 1U;
+        err = xgl_fragment_process(&manager,
+                                   3,
+                                   9,
+                                   fragments[index],
+                                   fragment_lens[index],
+                                   &complete_data,
+                                   &complete_len,
+                                   1000);
+        if (index > 0U) {
+            EXPECT_EQ(err, XGL_ERR_BUSY);
+            EXPECT_EQ(complete_data, nullptr);
+        }
+    }
+
+    EXPECT_EQ(err, XGL_OK);
+    ASSERT_NE(complete_data, nullptr);
+    EXPECT_EQ(complete_len, data_len);
+    EXPECT_EQ(memcmp(complete_data, data.data(), data_len), 0);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
+
+    xgl_fragment_free_fragments(&manager, fragments, fragment_count);
+    xgl_fragment_free_data(&manager, complete_data);
+}
+
 TEST_F(XglFragmentTest, InvalidParameters) {
     std::vector<uint8_t> data(100, 0xAA);
     uint8_t* fragments[10];
