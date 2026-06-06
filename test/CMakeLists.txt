@@ -36,6 +36,7 @@ set(TEST_SOURCES
     test_allocator.cpp
     test_instance.cpp
     test_config.cpp
+    test_footprint.cpp
     test_send.cpp
     test_stats.cpp
     

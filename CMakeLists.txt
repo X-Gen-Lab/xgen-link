@@ -35,6 +35,7 @@ option(XGL_BUILD_TESTS "Build tests" OFF)
 option(XGL_BUILD_EXAMPLES "Build examples" ON)
 option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
+option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ON)
 
 #-----------------------------------------------------------------------------
 # Compiler Warnings
@@ -134,6 +135,21 @@ target_include_directories(xgl
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+if(XGL_BUILD_FOOTPRINT_REPORT)
+    set(XGL_FOOTPRINT_REPORT ${CMAKE_CURRENT_BINARY_DIR}/footprint/xgl-footprint.txt)
+    add_custom_command(
+        OUTPUT ${XGL_FOOTPRINT_REPORT}
+        COMMAND ${CMAKE_COMMAND}
+            -D XGL_TARGET_FILE=$<TARGET_FILE:xgl>
+            -D XGL_REPORT_FILE=${XGL_FOOTPRINT_REPORT}
+            -D XGL_PROJECT_VERSION=${PROJECT_VERSION}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/footprint_report.cmake
+        DEPENDS xgl ${CMAKE_CURRENT_SOURCE_DIR}/tools/footprint_report.cmake
+        VERBATIM
+    )
+    add_custom_target(xgl_footprint DEPENDS ${XGL_FOOTPRINT_REPORT})
+endif()
 
 #-----------------------------------------------------------------------------
 # Tests
