@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates reliable file transfer using the x_gen_link protocol stack. It showcases how to transfer large files with automatic fragmentation, progress reporting, error handling, and data integrity verification.
+This example demonstrates reliable file transfer using the xgen-link protocol stack. It showcases how to transfer large files with automatic fragmentation, progress reporting, error handling, and data integrity verification.
 
 ## What This Example Demonstrates
 
@@ -124,7 +124,7 @@ xgl_stats_get(handle, &stats);
 
 ```
 =================================================
-  x_gen_link File Transfer Example
+  xgen-link File Transfer Example
 =================================================
 This example demonstrates reliable file transfer
 with automatic fragmentation and progress reporting.
@@ -532,7 +532,7 @@ After understanding this example, explore:
 
 ## References
 
-- [x_gen_link User Guide](../../docs/README.md)
+- [xgen-link User Guide](../../docs/README.md)
 - [API Documentation](../../include/xgl/xgl.h)
 - [Echo Server Example](../echo_server/README.md)
 - [Multi-Node Example](../multi_node/README.md)

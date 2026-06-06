@@ -1,6 +1,6 @@
 # Platform Abstraction Layer
 
-This directory contains platform-specific implementations for the x_gen_link protocol stack.
+This directory contains platform-specific implementations for the xgen-link protocol stack.
 
 ## Mutex Abstraction (xgl_mutex.h/c)
 
@@ -164,7 +164,7 @@ This implementation satisfies the following requirements:
 
 ## Time Abstraction (xgl_time.h/c)
 
-The time abstraction provides platform-independent timing operations for the x_gen_link protocol stack.
+The time abstraction provides platform-independent timing operations for the xgen-link protocol stack.
 
 ### Supported Platforms
 

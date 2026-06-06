@@ -1,6 +1,6 @@
 /**
  * \file            xgl_types.h
- * \brief           x_gen_link Protocol Core Data Types and Structures
+ * \brief           xgen-link Protocol Core Data Types and Structures
  * \author          Nexus Team
  */
 

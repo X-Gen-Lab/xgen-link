@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates the basic usage of the x_gen_link protocol stack by implementing a simple echo server. The server receives messages and echoes them back to the sender, showcasing fundamental send/receive operations.
+This example demonstrates the basic usage of the xgen-link protocol stack by implementing a simple echo server. The server receives messages and echoes them back to the sender, showcasing fundamental send/receive operations.
 
 ## What This Example Demonstrates
 
@@ -87,7 +87,7 @@ xgl_stats_get(handle, &stats);  // Get statistics
 
 ```
 =================================================
-  x_gen_link Echo Server Example
+  xgen-link Echo Server Example
 =================================================
 This example demonstrates basic send/receive
 functionality by echoing received data back.
@@ -321,7 +321,7 @@ After understanding this example, explore:
 
 ## References
 
-- [x_gen_link User Guide](../../docs/README.md)
+- [xgen-link User Guide](../../docs/README.md)
 - [API Documentation](../../include/xgl/xgl.h)
 - [Architecture Overview](../../docs/README.md)
 - [Porting Guide](../../docs/README.md)

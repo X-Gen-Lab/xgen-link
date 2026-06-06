@@ -1,13 +1,13 @@
 /**
  * \file            xgl.h
- * \brief           x_gen_link Protocol Stack - Main Public API
+ * \brief           xgen-link Protocol Stack - Main Public API
  * \author          Nexus Team
  * \version         1.0.0
  * \date            2026-02-28
  *
  * \copyright       Copyright (c) 2026 Nexus Team
  *
- * \details         x_gen_link is a modern, robust, and highly configurable
+ * \details         xgen-link is a modern, robust, and highly configurable
  *                  communication protocol stack designed for resource-constrained
  *                  embedded systems. It provides reliable data transmission with
  *                  support for multiple instances, thread safety, adaptive
@@ -651,7 +651,7 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
  *      - Architecture: docs/architecture.md
  *      - Porting Guide: docs/porting.md
  *      - Examples: examples/
- *      - API Reference: https://nexus-team.github.io/x_gen_link/
+ *      - API Reference: https://nexus-team.github.io/xgen-link/
  */
 
 #ifdef __cplusplus

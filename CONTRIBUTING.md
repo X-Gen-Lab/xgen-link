@@ -1,6 +1,6 @@
-# Contributing to x_gen_link
+# Contributing to xgen-link
 
-Thank you for your interest in contributing to x_gen_link! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to xgen-link! This document provides guidelines for contributing to the project.
 
 ## Code of Conduct
 
@@ -27,7 +27,7 @@ brew install cmake git
 
 ```bash
 git clone <repository-url>
-cd x_gen_link
+cd xgen-link
 
 # Configure with CMake preset
 cmake --preset debug
@@ -42,7 +42,7 @@ ctest --preset test
 ### IDE Setup
 
 **VS Code** (recommended):
-- Open the `x_gen_link` folder
+- Open the `xgen-link` folder
 - Install recommended extensions (C/C++, CMake Tools)
 - Use CMake presets for configuration
 
@@ -298,7 +298,7 @@ doxygen Doxyfile
 
 ## Performance Considerations
 
-When contributing to x_gen_link, keep in mind:
+When contributing to xgen-link, keep in mind:
 
 1. **Memory Efficiency**: Minimize RAM and Flash usage
 2. **CPU Overhead**: Optimize critical paths

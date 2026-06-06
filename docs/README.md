@@ -1,6 +1,6 @@
-# x_gen_link Documentation
+# xgen-link Documentation
 
-This directory contains the documentation for the x_gen_link protocol stack.
+This directory contains the documentation for the xgen-link protocol stack.
 
 ## Contents
 

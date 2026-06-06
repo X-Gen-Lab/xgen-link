@@ -1,4 +1,4 @@
-# x_gen_link Protocol Stack
+# xgen-link Protocol Stack
 # Modern embedded communication protocol implementation
 # Author: Nexus Team
 
@@ -10,7 +10,7 @@ cmake_minimum_required(VERSION 3.21)
 
 project(xgl
     VERSION 1.0.0
-    DESCRIPTION "x_gen_link Protocol Stack"
+    DESCRIPTION "xgen-link Protocol Stack"
     LANGUAGES C CXX
 )
 

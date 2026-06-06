@@ -456,7 +456,7 @@ static void print_protocol_stats(xgl_handle_t sender, xgl_handle_t receiver)
 int main(void)
 {
     printf("=================================================\n");
-    printf("  x_gen_link File Transfer Example\n");
+    printf("  xgen-link File Transfer Example\n");
     printf("=================================================\n");
     printf("This example demonstrates reliable file transfer\n");
     printf("with automatic fragmentation and progress reporting.\n");

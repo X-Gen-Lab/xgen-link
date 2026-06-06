@@ -1,6 +1,6 @@
 /**
  * \file            xgl_error.h
- * \brief           x_gen_link Protocol Error Codes and Handling
+ * \brief           xgen-link Protocol Error Codes and Handling
  * \author          Nexus Team
  */
 

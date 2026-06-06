@@ -253,7 +253,7 @@ static void print_statistics(xgl_handle_t handle)
 int main(void)
 {
     printf("=================================================\n");
-    printf("  x_gen_link Echo Server Example\n");
+    printf("  xgen-link Echo Server Example\n");
     printf("=================================================\n");
     printf("This example demonstrates basic send/receive\n");
     printf("functionality by echoing received data back.\n");
@@ -340,7 +340,7 @@ int main(void)
         xgl_run(handle, 100);
     }
     
-    send_test_message(handle, 1, "x_gen_link protocol");  /* Send to self */
+    send_test_message(handle, 1, "xgen-link protocol");  /* Send to self */
     
     printf("\n[MAIN] Running protocol processing (iteration 3)...\n");
     for (int i = 0; i < 10; i++) {

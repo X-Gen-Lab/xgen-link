@@ -398,7 +398,7 @@ static void print_network_statistics(xgl_handle_t node1,
 int main(void)
 {
     printf("=================================================\n");
-    printf("  x_gen_link Multi-Node Network Example\n");
+    printf("  xgen-link Multi-Node Network Example\n");
     printf("=================================================\n");
     printf("This example demonstrates a three-node network\n");
     printf("with routing and packet forwarding.\n");
@@ -606,7 +606,7 @@ int main(void)
     /* Send messages from Node 1 to Node 3 */
     send_message(node1, "Hello from Node 1!");
     send_message(node1, "Testing multi-hop routing");
-    send_message(node1, "x_gen_link protocol rocks!");
+    send_message(node1, "xgen-link protocol rocks!");
     
     /* Run protocol processing to complete communication */
     printf("\n[MAIN] Processing protocol messages...\n");

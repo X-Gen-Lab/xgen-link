@@ -1,14 +1,14 @@
-# x_gen_link Protocol Configuration
+# xgen-link Protocol Configuration
 # Compile-time configuration options
 # Author: Nexus Team
 
-menu "x_gen_link Protocol Configuration"
+menu "xgen-link Protocol Configuration"
 
 config XGL_ENABLE
-    bool "Enable x_gen_link Protocol"
+    bool "Enable xgen-link Protocol"
     default y
     help
-      Enable the x_gen_link communication protocol stack.
+      Enable the xgen-link communication protocol stack.
 
 config XGL_MAX_INSTANCES
     int "Maximum protocol instances"

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates a three-node network with routing and packet forwarding capabilities using the x_gen_link protocol stack. It showcases how to build multi-hop networks where intermediate nodes forward packets between source and destination.
+This example demonstrates a three-node network with routing and packet forwarding capabilities using the xgen-link protocol stack. It showcases how to build multi-hop networks where intermediate nodes forward packets between source and destination.
 
 ## What This Example Demonstrates
 
@@ -170,7 +170,7 @@ xgl_run(node3, 100);
 
 ```
 =================================================
-  x_gen_link Multi-Node Network Example
+  xgen-link Multi-Node Network Example
 =================================================
 This example demonstrates a three-node network
 with routing and packet forwarding.
@@ -569,7 +569,7 @@ After understanding this example, explore:
 
 ## References
 
-- [x_gen_link User Guide](../../docs/README.md)
+- [xgen-link User Guide](../../docs/README.md)
 - [API Documentation](../../include/xgl/xgl.h)
 - [Echo Server Example](../echo_server/README.md)
 - [File Transfer Example](../file_transfer/README.md)

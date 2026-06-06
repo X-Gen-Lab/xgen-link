@@ -1,5 +1,5 @@
 # Examples Configuration
-# Example applications demonstrating x_gen_link usage
+# Example applications demonstrating xgen-link usage
 # Author: Nexus Team
 
 #-----------------------------------------------------------------------------

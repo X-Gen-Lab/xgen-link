@@ -1,6 +1,6 @@
 # Platform Detection (xgl_platform.h)
 
-The platform detection module provides compile-time and runtime detection of platform characteristics for the x_gen_link protocol stack.
+The platform detection module provides compile-time and runtime detection of platform characteristics for the xgen-link protocol stack.
 
 ## Features
 

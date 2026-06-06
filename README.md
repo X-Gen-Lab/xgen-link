@@ -1,4 +1,4 @@
-# x_gen_link Protocol Stack
+# xgen-link Protocol Stack
 
 Modern, robust, and highly configurable communication protocol stack for resource-constrained embedded systems.
 
