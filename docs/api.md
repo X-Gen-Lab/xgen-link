@@ -20,6 +20,7 @@
 - `data_offset` is `XGL_FRAME_HEADER_SIZE`.
 - `buffer_size` has room for header, payload, and CRC16.
 - The current true zero-copy acceptance path is single-frame unreliable send.
+- Reliable zero-copy requests keep reliable retransmission semantics and may copy into the retransmission queue.
 
 ## Routing
 

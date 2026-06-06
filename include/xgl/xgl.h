@@ -470,9 +470,10 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
  * \param[in]       tx_data: Zero-copy transmission data structure
  * \return          XGL_OK on success, error code otherwise
  * \note            Buffer must have XGL_FRAME_HEADER_SIZE bytes reserved at start
- * \note            Current implementation validates a zero-copy buffer layout,
- *                  then sends through the standard transport path.
- * \warning         This is not true zero-copy yet.
+ * \note            Unreliable single-frame sends are framed in the caller buffer
+ *                  and transmitted without an intermediate frame copy.
+ * \note            Reliable sends keep retransmission semantics and may copy into
+ *                  the reliable queue.
  *
  * \par Example
  * \code{.c}

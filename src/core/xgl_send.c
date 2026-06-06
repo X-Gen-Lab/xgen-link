@@ -8,6 +8,7 @@
 #include <xgl/xgl_frame.h>
 #include <xgl/xgl_datalink.h>
 #include <xgl/xgl_route.h>
+#include <xgl/xgl_crc.h>
 #include "xgl_instance_internal.h"
 #include <string.h>
 
@@ -69,7 +70,7 @@ static xgl_error_t validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_da
     }
     
     /* Check buffer size is sufficient */
-    if (tx_data->buffer_size < tx_data->data_offset + tx_data->data_len) {
+    if (tx_data->buffer_size < tx_data->data_offset + tx_data->data_len + XGL_CRC16_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     
@@ -142,7 +143,6 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data) {
 xgl_error_t xgl_send_zerocopy(xgl_handle_t handle, 
                               const xgl_tx_data_zerocopy_t* tx_data) {
     xgl_error_t err;
-    xgl_tx_data_t standard_tx_data;
     
     /* Validate handle */
     if (handle == NULL) {
@@ -170,17 +170,52 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
     }
 #endif
     
-    /* Convert zero-copy data to standard format */
-    standard_tx_data.target_id = tx_data->target_id;
-    standard_tx_data.data_type = tx_data->data_type;
-    standard_tx_data.data = tx_data->buffer + tx_data->data_offset;
-    standard_tx_data.data_len = tx_data->data_len;
-    standard_tx_data.reliable = tx_data->reliable;
-    standard_tx_data.priority = tx_data->priority;
-    standard_tx_data.timeout_ms = tx_data->timeout_ms;
-    
-    /* Send through transport layer */
-    err = xgl_transport_send(&handle->layers.transport_ctx, handle, &standard_tx_data);
+    if (tx_data->reliable) {
+        xgl_tx_data_t standard_tx_data = {
+            .target_id = tx_data->target_id,
+            .data_type = tx_data->data_type,
+            .data = tx_data->buffer + tx_data->data_offset,
+            .data_len = tx_data->data_len,
+            .reliable = tx_data->reliable,
+            .priority = tx_data->priority,
+            .timeout_ms = tx_data->timeout_ms
+        };
+        err = xgl_transport_send(&handle->layers.transport_ctx, handle, &standard_tx_data);
+    } else {
+        xgl_route_item_t* route = xgl_route_table_lookup(&handle->route_table,
+                                                         tx_data->target_id);
+        if (route == NULL) {
+            err = XGL_ERR_ROUTE_NOT_FOUND;
+        } else if (route->phy == NULL || route->phy->tx == NULL) {
+            err = XGL_ERR_INVALID_PARAM;
+        } else {
+            size_t frame_len = 0;
+            err = xgl_frame_build_zerocopy(tx_data->buffer,
+                                           tx_data->buffer_size,
+                                           tx_data->data_offset,
+                                           tx_data->data_len,
+                                           handle->config.source_id,
+                                           tx_data->target_id,
+                                           tx_data->data_type,
+                                           0,
+                                           0,
+                                           false,
+                                           tx_data->priority,
+                                           &frame_len);
+            if (err == XGL_OK) {
+                err = xgl_datalink_send_raw(&handle->layers.datalink_ctx,
+                                            route->phy,
+                                            tx_data->buffer,
+                                            frame_len);
+            }
+            if (err == XGL_OK) {
+                handle->stats.transport.tx_packets++;
+                handle->stats.transport.tx_bytes += tx_data->data_len;
+                handle->stats.network.tx_packets++;
+                handle->stats.network.tx_bytes += tx_data->data_len;
+            }
+        }
+    }
     
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex if thread safety is enabled */
@@ -191,4 +226,3 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
     
     return err;
 }
-

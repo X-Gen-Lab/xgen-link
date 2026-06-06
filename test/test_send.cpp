@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <xgl/xgl.h>
+#include <cstring>
 
 /*---------------------------------------------------------------------------*/
 /* Mock Physical Layer                                                       */
@@ -308,3 +309,30 @@ TEST_F(XglSendTest, ZeroCopySendWithBufferTooSmall) {
     EXPECT_EQ(err, XGL_ERR_BUFFER_TOO_SMALL);
 }
 
+TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
+    uint8_t buffer[64] = {};
+    const char payload[] = "zcopy";
+    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+
+    xgl_tx_data_zerocopy_t tx_data = {
+        .buffer = buffer,
+        .buffer_size = sizeof(buffer),
+        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_len = sizeof(payload) - 1U,
+        .target_id = 2,
+        .data_type = 1,
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 0
+    };
+
+    EXPECT_CALL(*mock_phy, tx(buffer,
+                              XGL_FRAME_HEADER_SIZE + tx_data.data_len + XGL_CRC16_SIZE,
+                              testing::_))
+        .Times(1)
+        .WillOnce(testing::Return(XGL_OK));
+
+    EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
+    EXPECT_EQ(buffer[0], XGL_SOF);
+    EXPECT_EQ(std::memcmp(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U), 0);
+}

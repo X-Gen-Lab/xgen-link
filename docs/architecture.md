@@ -32,7 +32,7 @@ PHY rx -> datalink parser -> network route table -> egress PHY tx
 
 ## Ownership
 
-The standard send API borrows caller data only for the duration of the call. Reliable retransmission stores a copy in the reliable queue. The zero-copy API is intended for caller-owned buffers with reserved header and trailer space; the current guaranteed true zero-copy path is single-frame unreliable TX.
+The standard send API borrows caller data only for the duration of the call. Reliable retransmission stores a copy in the reliable queue. The zero-copy API is intended for caller-owned buffers with reserved header and trailer space; single-frame unreliable TX is framed in the caller buffer and sent through datalink raw TX.
 
 ## Embedded Boundaries
 
