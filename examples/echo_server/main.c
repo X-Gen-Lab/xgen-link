@@ -97,6 +97,9 @@ static xgl_error_t phy_rx(uint8_t* buffer, size_t* len, void* user_data)
  */
 static int echo_depth = 0;
 static const int MAX_ECHO_DEPTH = 1;  /* Only echo once, don't echo echoes */
+static int received_count = 0;
+static int echoed_count = 0;
+static int error_count = 0;
 
 /**
  * \brief           Receive callback - echoes data back to sender
@@ -121,6 +124,7 @@ static void on_receive(xgl_handle_t handle,
     
     printf("\n[ECHO] Received %zu bytes from node %d (type 0x%02X)\n", 
            len, source_id, data_type);
+    received_count++;
     
     /* Print received data as string if printable */
     printf("[ECHO] Data: \"");
@@ -158,6 +162,7 @@ static void on_receive(xgl_handle_t handle,
         printf("[ECHO] Failed to echo data: %s\n", xgl_error_string(err));
         echo_depth--;  /* Decrement on failure */
     } else {
+        echoed_count++;
         printf("[ECHO] Echoed %zu bytes back to node %d (depth: %d)\n", len, source_id, echo_depth);
     }
 }
@@ -177,6 +182,7 @@ static void on_error(xgl_handle_t handle,
     (void)handle;
     (void)user_data;
     
+    error_count++;
     printf("[ERROR] Code %d: %s\n", error, message);
 }
 
@@ -349,6 +355,16 @@ int main(void)
     
     /* Print final statistics */
     print_statistics(handle);
+
+    if (error_count != 0 || received_count < 3 || echoed_count < 3) {
+        printf("[ACCEPTANCE] FAILED: received=%d echoed=%d errors=%d\n",
+               received_count, echoed_count, error_count);
+        xgl_destroy(handle);
+        return 1;
+    }
+
+    printf("[ACCEPTANCE] PASSED: received=%d echoed=%d errors=%d\n",
+           received_count, echoed_count, error_count);
     
     /* Cleanup */
     printf("\n[CLEANUP] Destroying protocol instance...\n");
