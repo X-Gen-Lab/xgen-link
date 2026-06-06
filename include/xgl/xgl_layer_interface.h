@@ -16,6 +16,7 @@ extern "C" {
 #include <stdbool.h>
 #include "xgl_error.h"
 #include "xgl_types.h"
+#include "xgl_frame.h"
 
 /*---------------------------------------------------------------------------*/
 /* Forward Declarations                                                      */
@@ -52,6 +53,22 @@ typedef struct {
     xgl_error_t error;              /**< Error code */
     const char* message;            /**< Error message */
 } xgl_layer_error_info_t;
+
+/**
+ * \brief           Frame transmit message for network-to-datalink calls
+ */
+typedef struct {
+    xgl_frame_t* frame;             /**< Frame to transmit */
+    xgl_phy_ops_t* phy;             /**< Egress PHY */
+} xgl_frame_tx_message_t;
+
+/**
+ * \brief           Frame receive message for datalink-to-network calls
+ */
+typedef struct {
+    const uint8_t* frame_buf;       /**< Complete serialized frame */
+    size_t frame_len;               /**< Serialized frame length */
+} xgl_frame_rx_message_t;
 
 /*---------------------------------------------------------------------------*/
 /* Layer Interface Structure                                                 */

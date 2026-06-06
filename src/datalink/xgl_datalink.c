@@ -374,10 +374,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         /* The network layer's receive function expects frame_buf and frame_len */
         /* We'll use a simple wrapper structure to pass both parameters */
         
-        struct {
-            const uint8_t* frame_buf;
-            size_t frame_len;
-        } frame_data = {
+        xgl_frame_rx_message_t frame_data = {
             .frame_buf = frame_buffer,
             .frame_len = frame_len
         };
@@ -417,10 +414,7 @@ static xgl_error_t datalink_send_impl(void* ctx,
     }
     
     /* Extract frame and PHY from data */
-    struct {
-        xgl_frame_t* frame;
-        xgl_phy_ops_t* phy;
-    }* send_data = data;
+    xgl_frame_tx_message_t* send_data = (xgl_frame_tx_message_t*)data;
     
     if (send_data->frame == NULL || send_data->phy == NULL) {
         return XGL_ERR_NULL_POINTER;

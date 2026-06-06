@@ -37,3 +37,7 @@ The standard send API borrows caller data only for the duration of the call. Rel
 ## Embedded Boundaries
 
 Core protocol code avoids hardware headers. Board-specific code lives behind `xgl_phy_ops_t`, platform time/mutex/atomic functions, and the allocator interface. Compression and encryption belong behind the codec module boundary and are not mixed into the base link path.
+
+## Layer Contracts
+
+Adjacent layers communicate through `xgl_layer_interface_t`. Packet sends use `xgl_packet_t`; serialized frame receive and frame transmit use named message contracts (`xgl_frame_rx_message_t` and `xgl_frame_tx_message_t`) so layer boundaries do not depend on anonymous struct layouts.

@@ -187,10 +187,7 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
     }
     
     /* Prepare frame data for lower layer */
-    struct {
-        xgl_frame_t* frame;
-        xgl_phy_ops_t* phy;
-    } send_data = {
+    xgl_frame_tx_message_t send_data = {
         .frame = &frame,
         .phy = packet->phy
     };
@@ -435,10 +432,7 @@ static xgl_error_t network_receive_impl(void* ctx,
     }
     
     /* Extract frame buffer and length from data */
-    struct {
-        const uint8_t* frame_buf;
-        size_t frame_len;
-    }* frame_data = data;
+    xgl_frame_rx_message_t* frame_data = (xgl_frame_rx_message_t*)data;
     
     /* Forward to network receive function */
     return xgl_network_receive(net_ctx, handle, frame_data->frame_buf, frame_data->frame_len);
