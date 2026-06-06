@@ -6,7 +6,36 @@
 
 #include "xgl/xgl_platform.h"
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
+
+static int append_platform_info(char* buffer,
+                                size_t size,
+                                size_t* written,
+                                const char* format,
+                                ...) {
+    if (*written >= size) {
+        return 0;
+    }
+
+    va_list args;
+    va_start(args, format);
+    int ret = vsnprintf(buffer + *written, size - *written, format, args);
+    va_end(args);
+
+    if (ret < 0) {
+        return -1;
+    }
+
+    size_t remaining = size - *written;
+    if ((size_t)ret >= remaining) {
+        *written = size - 1U;
+        return 1;
+    }
+
+    *written += (size_t)ret;
+    return 0;
+}
 
 /**
  * \brief           Print platform information to string
@@ -19,68 +48,62 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     xgl_platform_info_t info;
     xgl_platform_get_info(&info);
     
-    int written = 0;
+    size_t written = 0;
     int ret;
     
     /* Compiler information */
-    ret = snprintf(buffer + written, size - written,
-                   "Compiler: %s (version %u)\n",
-                   info.compiler_name, info.compiler_version);
-    if (ret < 0 || (size_t)ret >= size - written) {
-        return written;
+    ret = append_platform_info(buffer, size, &written,
+                               "Compiler: %s (version %u)\n",
+                               info.compiler_name, info.compiler_version);
+    if (ret != 0) {
+        return (int)written;
     }
-    written += ret;
     
     /* Operating system */
-    ret = snprintf(buffer + written, size - written,
-                   "OS: %s\n",
-                   info.os_name);
-    if (ret < 0 || (size_t)ret >= size - written) {
-        return written;
+    ret = append_platform_info(buffer, size, &written,
+                               "OS: %s\n",
+                               info.os_name);
+    if (ret != 0) {
+        return (int)written;
     }
-    written += ret;
     
     /* Architecture */
     if (info.arch_subname[0] != '\0') {
-        ret = snprintf(buffer + written, size - written,
-                       "Architecture: %s (%s)\n",
-                       info.arch_name, info.arch_subname);
+        ret = append_platform_info(buffer, size, &written,
+                                   "Architecture: %s (%s)\n",
+                                   info.arch_name, info.arch_subname);
     } else {
-        ret = snprintf(buffer + written, size - written,
-                       "Architecture: %s\n",
-                       info.arch_name);
+        ret = append_platform_info(buffer, size, &written,
+                                   "Architecture: %s\n",
+                                   info.arch_name);
     }
-    if (ret < 0 || (size_t)ret >= size - written) {
-        return written;
+    if (ret != 0) {
+        return (int)written;
     }
-    written += ret;
     
     /* Pointer size */
-    ret = snprintf(buffer + written, size - written,
-                   "Pointer Size: %u-bit\n",
-                   info.pointer_size * 8);
-    if (ret < 0 || (size_t)ret >= size - written) {
-        return written;
+    ret = append_platform_info(buffer, size, &written,
+                               "Pointer Size: %u-bit\n",
+                               info.pointer_size * 8U);
+    if (ret != 0) {
+        return (int)written;
     }
-    written += ret;
     
     /* Endianness */
-    ret = snprintf(buffer + written, size - written,
-                   "Endianness: %s\n",
-                   info.endian_name);
-    if (ret < 0 || (size_t)ret >= size - written) {
-        return written;
+    ret = append_platform_info(buffer, size, &written,
+                               "Endianness: %s\n",
+                               info.endian_name);
+    if (ret != 0) {
+        return (int)written;
     }
-    written += ret;
     
     /* Alignment */
-    ret = snprintf(buffer + written, size - written,
-                   "Alignment: %s (%u-byte required)\n",
-                   info.alignment_name, info.alignment_required);
-    if (ret < 0 || (size_t)ret >= size - written) {
-        return written;
+    ret = append_platform_info(buffer, size, &written,
+                               "Alignment: %s (%u-byte required)\n",
+                               info.alignment_name, info.alignment_required);
+    if (ret != 0) {
+        return (int)written;
     }
-    written += ret;
     
-    return written;
+    return (int)written;
 }

@@ -113,8 +113,8 @@ uint32_t xgl_time_ms(void) {
     QueryPerformanceCounter(&current_time);
     
     /* Calculate elapsed time in milliseconds */
-    uint64_t elapsed = current_time.QuadPart - start_time.QuadPart;
-    return (uint32_t)((elapsed * 1000) / frequency.QuadPart);
+    uint64_t elapsed = (uint64_t)(current_time.QuadPart - start_time.QuadPart);
+    return (uint32_t)((elapsed * 1000U) / (uint64_t)frequency.QuadPart);
 }
 
 /**
@@ -127,8 +127,8 @@ uint32_t xgl_time_us(void) {
     QueryPerformanceCounter(&current_time);
     
     /* Calculate elapsed time in microseconds */
-    uint64_t elapsed = current_time.QuadPart - start_time.QuadPart;
-    return (uint32_t)((elapsed * 1000000) / frequency.QuadPart);
+    uint64_t elapsed = (uint64_t)(current_time.QuadPart - start_time.QuadPart);
+    return (uint32_t)((elapsed * 1000000U) / (uint64_t)frequency.QuadPart);
 }
 
 /**

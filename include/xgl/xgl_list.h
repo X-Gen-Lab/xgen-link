@@ -164,7 +164,7 @@ xgl_list_node_t* xgl_list_prev(const xgl_list_node_t* node);
  * \return          Pointer to containing structure
  */
 #define XGL_LIST_ENTRY(ptr, type, member) \
-    ((type*)((char*)(ptr) - offsetof(type, member)))
+    ((type*)(void*)((char*)(ptr) - offsetof(type, member)))
 
 /**
  * \brief           Iterate over list

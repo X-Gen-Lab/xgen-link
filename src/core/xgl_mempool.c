@@ -7,6 +7,16 @@
 #include <xgl/xgl_mempool.h>
 #include <string.h>
 
+static void mempool_store_next(void* block, void* next) {
+    memcpy(block, &next, sizeof(next));
+}
+
+static void* mempool_load_next(const void* block) {
+    void* next;
+    memcpy(&next, block, sizeof(next));
+    return next;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Memory Pool Initialization                                                */
 /*---------------------------------------------------------------------------*/
@@ -21,7 +31,6 @@ int xgl_mempool_init(xgl_mempool_t* pool, void* buffer, size_t buffer_size,
                      size_t block_size) {
     size_t i;
     uint8_t* block_ptr;
-    void** next_ptr;
     
     /* Validate parameters */
     if (pool == NULL || buffer == NULL || buffer_size == 0 || block_size == 0) {
@@ -51,8 +60,7 @@ int xgl_mempool_init(xgl_mempool_t* pool, void* buffer, size_t buffer_size,
     /* Build free list by linking all blocks */
     for (i = 0; i < pool->block_count; i++) {
         block_ptr = pool->pool + (i * block_size);
-        next_ptr = (void**)block_ptr;
-        *next_ptr = pool->free_list;
+        mempool_store_next(block_ptr, pool->free_list);
         pool->free_list = block_ptr;
     }
     
@@ -82,7 +90,6 @@ void xgl_mempool_destroy(xgl_mempool_t* pool) {
  */
 void* xgl_mempool_alloc(xgl_mempool_t* pool) {
     void* block;
-    void** next_ptr;
     size_t used_count;
     
     /* Validate parameter */
@@ -97,8 +104,7 @@ void* xgl_mempool_alloc(xgl_mempool_t* pool) {
     
     /* Remove first block from free list */
     block = pool->free_list;
-    next_ptr = (void**)block;
-    pool->free_list = *next_ptr;
+    pool->free_list = mempool_load_next(block);
     
     /* Update statistics */
     pool->free_count--;
@@ -115,16 +121,13 @@ void* xgl_mempool_alloc(xgl_mempool_t* pool) {
  * \details         Adds the block to the head of the free list
  */
 void xgl_mempool_free(xgl_mempool_t* pool, void* ptr) {
-    void** next_ptr;
-    
     /* Validate parameters */
     if (pool == NULL || ptr == NULL) {
         return;
     }
     
     /* Add block to head of free list */
-    next_ptr = (void**)ptr;
-    *next_ptr = pool->free_list;
+    mempool_store_next(ptr, pool->free_list);
     pool->free_list = ptr;
     
     /* Update statistics */

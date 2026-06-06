@@ -137,7 +137,8 @@ typedef struct {
 typedef struct {
     uint32_t ref_count;             /**< Reference count (atomic if thread-safe) */
     size_t data_len;                /**< Data length in bytes */
-    uint8_t* data;                  /**< Pointer to data buffer */
+    const uint8_t* data;            /**< Pointer to packet data */
+    uint8_t* owned_data;            /**< Owned data buffer, NULL for borrowed data */
 } xgl_packet_data_t;
 
 /*---------------------------------------------------------------------------*/

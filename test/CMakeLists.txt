@@ -19,8 +19,6 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(googletest)
 
-include(GoogleTest)
-
 #-----------------------------------------------------------------------------
 # Test Sources
 #-----------------------------------------------------------------------------
@@ -127,13 +125,13 @@ if(MSVC)
 endif()
 
 #-----------------------------------------------------------------------------
-# Test Discovery
+# CTest Entry
 #-----------------------------------------------------------------------------
 
-gtest_discover_tests(xgl_tests
+add_test(NAME xgl_tests COMMAND xgl_tests)
+set_tests_properties(xgl_tests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    PROPERTIES
-        TIMEOUT 30
+    TIMEOUT 30
 )
 
 #-----------------------------------------------------------------------------

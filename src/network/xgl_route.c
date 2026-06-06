@@ -245,13 +245,14 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
     }
     
     /* Remove from routes array by shifting remaining routes */
-    if ((size_t)index < table->route_count - 1) {
-        memmove(&table->routes[index],
-                &table->routes[index + 1],
-                sizeof(xgl_route_item_t) * (table->route_count - index - 1));
+    size_t route_index = (size_t)index;
+    if (route_index < table->route_count - 1U) {
+        memmove(&table->routes[route_index],
+                &table->routes[route_index + 1U],
+                sizeof(xgl_route_item_t) * (table->route_count - route_index - 1U));
         
         /* Update hash table pointers for shifted routes */
-        for (size_t i = index; i < table->route_count - 1; i++) {
+        for (size_t i = route_index; i < table->route_count - 1U; i++) {
             xgl_hashtable_insert(&table->hashtable,
                                table->routes[i].target_id,
                                &table->routes[i]);

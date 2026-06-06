@@ -101,7 +101,7 @@ static bool is_fragment_received(xgl_reassembly_buffer_t* buffer,
     
     /* Calculate byte and bit position */
     size_t byte_index = fragment_index / 8;
-    uint8_t bit_mask = 1 << (fragment_index % 8);
+    uint8_t bit_mask = (uint8_t)(1U << (fragment_index % 8U));
     
     return (buffer->received_bitmap[byte_index] & bit_mask) != 0;
 }
@@ -117,7 +117,7 @@ static void mark_fragment_received(xgl_reassembly_buffer_t* buffer,
     
     /* Calculate byte and bit position */
     size_t byte_index = fragment_index / 8;
-    uint8_t bit_mask = 1 << (fragment_index % 8);
+    uint8_t bit_mask = (uint8_t)(1U << (fragment_index % 8U));
     
     buffer->received_bitmap[byte_index] |= bit_mask;
 }
@@ -239,11 +239,13 @@ xgl_error_t xgl_fragment_data(xgl_fragment_manager_t* manager,
         }
         
         /* Fill fragment header */
-        xgl_fragment_info_t* frag_info = (xgl_fragment_info_t*)fragment;
-        frag_info->fragment_id = *fragment_id;
-        frag_info->fragment_index = (uint8_t)i;
-        frag_info->total_fragments = (uint8_t)num_fragments;
-        frag_info->fragment_offset = (uint16_t)offset;
+        xgl_fragment_info_t frag_info = {
+            .fragment_id = *fragment_id,
+            .fragment_index = (uint8_t)i,
+            .total_fragments = (uint8_t)num_fragments,
+            .fragment_offset = (uint16_t)offset
+        };
+        memcpy(fragment, &frag_info, sizeof(frag_info));
         
         /* Copy payload data */
         memcpy(fragment + header_size, data + offset, payload_size);
@@ -284,8 +286,9 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
         return XGL_ERR_INVALID_FRAME;
     }
     
-    const xgl_fragment_info_t* frag_info = 
-        (const xgl_fragment_info_t*)fragment_data;
+    xgl_fragment_info_t frag_info_storage;
+    memcpy(&frag_info_storage, fragment_data, sizeof(frag_info_storage));
+    const xgl_fragment_info_t* frag_info = &frag_info_storage;
     
     /* Validate fragment info */
     if (frag_info->fragment_index >= frag_info->total_fragments) {

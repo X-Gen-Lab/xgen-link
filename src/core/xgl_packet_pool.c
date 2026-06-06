@@ -186,8 +186,9 @@ void xgl_packet_data_unref(xgl_packet_data_t* data,
     
     /* Free data if reference count reaches zero */
     if (data->ref_count == 0) {
-        if (data->data != NULL) {
-            free_mem(allocator, data->data);
+        if (data->owned_data != NULL) {
+            free_mem(allocator, data->owned_data);
+            data->owned_data = NULL;
             data->data = NULL;
         }
         free_mem(allocator, data);
@@ -211,14 +212,15 @@ xgl_packet_data_t* xgl_packet_data_create(const uint8_t* data, size_t len,
     }
     
     /* Allocate data buffer */
-    pkt_data->data = (uint8_t*)alloc_mem(allocator, len);
-    if (pkt_data->data == NULL) {
+    pkt_data->owned_data = (uint8_t*)alloc_mem(allocator, len);
+    if (pkt_data->owned_data == NULL) {
         free_mem(allocator, pkt_data);
         return NULL;
     }
     
     /* Copy data and initialize fields */
-    memcpy(pkt_data->data, data, len);
+    memcpy(pkt_data->owned_data, data, len);
+    pkt_data->data = pkt_data->owned_data;
     pkt_data->data_len = len;
     pkt_data->ref_count = 1;  /* Initial reference count */
     

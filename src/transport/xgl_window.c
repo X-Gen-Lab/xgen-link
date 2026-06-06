@@ -133,7 +133,7 @@ uint8_t xgl_window_advance_base(xgl_sliding_window_t* window) {
         return 0;
     }
     
-    uint8_t advanced = 0;
+    uint16_t advanced = 0;
     
     /* Advance base while consecutive ACKs are received */
     while (window->ack_received[window->send_base]) {
@@ -150,7 +150,7 @@ uint8_t xgl_window_advance_base(xgl_sliding_window_t* window) {
         }
     }
     
-    return advanced;
+    return (uint8_t)advanced;
 }
 
 /**

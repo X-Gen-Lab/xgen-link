@@ -18,43 +18,38 @@ extern "C" {
 /* Compiler Detection                                                        */
 /*---------------------------------------------------------------------------*/
 
-/* GCC Compiler */
-#if defined(__GNUC__) && !defined(__clang__)
-    #define XGL_COMPILER_GCC
-    #define XGL_COMPILER_NAME "GCC"
-    #define XGL_COMPILER_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
-#endif
-
 /* Clang Compiler */
 #if defined(__clang__)
     #define XGL_COMPILER_CLANG
     #define XGL_COMPILER_NAME "Clang"
     #define XGL_COMPILER_VERSION (__clang_major__ * 10000 + __clang_minor__ * 100 + __clang_patchlevel__)
-#endif
+
+/* GCC Compiler */
+#elif defined(__GNUC__)
+    #define XGL_COMPILER_GCC
+    #define XGL_COMPILER_NAME "GCC"
+    #define XGL_COMPILER_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 
 /* MSVC Compiler */
-#if defined(_MSC_VER)
+#elif defined(_MSC_VER)
     #define XGL_COMPILER_MSVC
     #define XGL_COMPILER_NAME "MSVC"
     #define XGL_COMPILER_VERSION _MSC_VER
-#endif
 
 /* ARM Compiler */
-#if defined(__ARMCC_VERSION)
+#elif defined(__ARMCC_VERSION)
     #define XGL_COMPILER_ARM
     #define XGL_COMPILER_NAME "ARM"
     #define XGL_COMPILER_VERSION __ARMCC_VERSION
-#endif
 
 /* IAR Compiler */
-#if defined(__IAR_SYSTEMS_ICC__)
+#elif defined(__IAR_SYSTEMS_ICC__)
     #define XGL_COMPILER_IAR
     #define XGL_COMPILER_NAME "IAR"
     #define XGL_COMPILER_VERSION __VER__
-#endif
 
 /* Keil Compiler */
-#if defined(__CC_ARM)
+#elif defined(__CC_ARM)
     #define XGL_COMPILER_KEIL
     #define XGL_COMPILER_NAME "Keil"
     #define XGL_COMPILER_VERSION __ARMCC_VERSION

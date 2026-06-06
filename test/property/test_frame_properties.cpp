@@ -430,8 +430,19 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
         
         /* Build and serialize frame */
         xgl_frame_t frame;
-        xgl_error_t err = xgl_frame_build(&frame, source_id, target_id, data_type,
-                                         0, 0, payload.data(), payload_len, false, 0);
+        xgl_frame_params_t params = {
+            .source_id = source_id,
+            .target_id = target_id,
+            .data_type = data_type,
+            .seq_num = 0,
+            .ack_num = 0,
+            .payload = payload.data(),
+            .payload_len = payload_len,
+            .reliable = false,
+            .fragment = false,
+            .priority = 0
+        };
+        xgl_error_t err = xgl_frame_build(&frame, &params);
         ASSERT_EQ(err, XGL_OK);
         
         std::vector<uint8_t> buffer(xgl_frame_calculate_size(payload_len));

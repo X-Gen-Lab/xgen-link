@@ -345,13 +345,9 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_CRC_FAILED;
     }
     
-    /* Extract payload */
-    const uint8_t* payload = NULL;
     size_t payload_len = header.data_len;
     
     if (payload_len > 0) {
-        payload = &frame_buffer[XGL_FRAME_HEADER_SIZE];
-        
         /* Verify payload length matches frame size */
         size_t expected_frame_len = XGL_FRAME_HEADER_SIZE + payload_len + XGL_CRC16_SIZE;
         if (frame_len != expected_frame_len) {
@@ -379,10 +375,10 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         /* We'll use a simple wrapper structure to pass both parameters */
         
         struct {
-            uint8_t* frame_buf;
+            const uint8_t* frame_buf;
             size_t frame_len;
         } frame_data = {
-            .frame_buf = (uint8_t*)frame_buffer,
+            .frame_buf = frame_buffer,
             .frame_len = frame_len
         };
         

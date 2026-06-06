@@ -56,7 +56,7 @@ static void ack_free(xgl_allocator_t* allocator, void* ptr) {
 static void set_bit(uint8_t* bitmap, uint8_t bit_index) {
     size_t byte_index = bit_index / 8;
     uint8_t bit_offset = bit_index % 8;
-    bitmap[byte_index] |= (1 << bit_offset);
+    bitmap[byte_index] |= (uint8_t)(1U << bit_offset);
 }
 
 /**
@@ -65,16 +65,7 @@ static void set_bit(uint8_t* bitmap, uint8_t bit_index) {
 static bool get_bit(const uint8_t* bitmap, uint8_t bit_index) {
     size_t byte_index = bit_index / 8;
     uint8_t bit_offset = bit_index % 8;
-    return (bitmap[byte_index] & (1 << bit_offset)) != 0;
-}
-
-/**
- * \brief           Clear bit in bitmap
- */
-static void clear_bit(uint8_t* bitmap, uint8_t bit_index) {
-    size_t byte_index = bit_index / 8;
-    uint8_t bit_offset = bit_index % 8;
-    bitmap[byte_index] &= ~(1 << bit_offset);
+    return (bitmap[byte_index] & (uint8_t)(1U << bit_offset)) != 0;
 }
 
 /*---------------------------------------------------------------------------*/

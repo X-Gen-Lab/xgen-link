@@ -37,8 +37,11 @@ option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
 # Compiler Warnings
 #-----------------------------------------------------------------------------
 
+set(XGL_C_WARNINGS)
+set(XGL_CXX_WARNINGS)
+
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(
+    list(APPEND XGL_C_WARNINGS
         -Wall
         -Wextra
         -Werror
@@ -52,7 +55,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wno-unused-parameter
     )
 elseif(MSVC)
-    add_compile_options(
+    list(APPEND XGL_C_WARNINGS
         /W4
         /WX
         /permissive-
@@ -87,17 +90,17 @@ set(XGL_SOURCES
     src/core/xgl_tiered_pool.c
     src/core/xgl_packet_pool.c
     src/core/xgl_allocator.c
-    
+
     # Data Link Layer
     src/datalink/xgl_frame.c
     src/datalink/xgl_parser.c
     src/datalink/xgl_datalink.c
-    
+
     # Network Layer
     src/network/xgl_route.c
     src/network/xgl_network.c
     src/network/xgl_sequence.c
-    
+
     # Transport Layer
     src/transport/xgl_rtt.c
     src/transport/xgl_window.c
@@ -105,7 +108,7 @@ set(XGL_SOURCES
     src/transport/xgl_ack.c
     src/transport/xgl_fragment.c
     src/transport/xgl_transport.c
-    
+
     # Platform Abstraction
     src/platform/xgl_mutex.c
     src/platform/xgl_time.c
@@ -118,6 +121,8 @@ set(XGL_SOURCES
 #-----------------------------------------------------------------------------
 
 add_library(xgl STATIC ${XGL_SOURCES})
+
+target_compile_options(xgl PRIVATE ${XGL_C_WARNINGS})
 
 target_include_directories(xgl
     PUBLIC
@@ -175,8 +180,10 @@ install(DIRECTORY include/
 #-----------------------------------------------------------------------------
 
 if(XGL_ENABLE_COVERAGE)
-    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
         target_compile_options(xgl PRIVATE --coverage)
         target_link_options(xgl PRIVATE --coverage)
+    elseif(WIN32)
+        message(STATUS "Code coverage is not enabled for Windows builds")
     endif()
 endif()

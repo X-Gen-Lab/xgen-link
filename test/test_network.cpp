@@ -195,16 +195,17 @@ TEST_F(XglNetworkTest, SendPacketWithoutRoute) {
     xgl_packet_data_t packet_data = {
         .ref_count = 1,
         .data_len = 10,
-        .data = (uint8_t*)"test_data"
+        .data = (uint8_t*)"test_data",
+        .owned_data = nullptr
     };
     
     xgl_packet_t packet = {
         .source_id = LOCAL_ID,
         .target_id = REMOTE_ID,
         .data_type = 1,
-        .data = &packet_data,
         .reliable = 1,
-        .priority = 0
+        .priority = 0,
+        .data = &packet_data
     };
     
     xgl_error_t err = xgl_network_send(&network_ctx, &packet, false);
@@ -218,18 +219,19 @@ TEST_F(XglNetworkTest, SendPacketWithRoute) {
     xgl_packet_data_t packet_data = {
         .ref_count = 1,
         .data_len = 10,
-        .data = (uint8_t*)"test_data"
+        .data = (uint8_t*)"test_data",
+        .owned_data = nullptr
     };
     
     xgl_packet_t packet = {
         .source_id = LOCAL_ID,
         .target_id = REMOTE_ID,
-        .data_type = 1,
         .seq_num = 0,
         .ack_num = 0,
-        .data = &packet_data,
+        .data_type = 1,
         .reliable = 1,
-        .priority = 0
+        .priority = 0,
+        .data = &packet_data
     };
     
     /* Mock lower layer interface */
@@ -397,16 +399,17 @@ TEST_F(XglNetworkTest, ErrorCallbackInvoked) {
     xgl_packet_data_t packet_data = {
         .ref_count = 1,
         .data_len = 10,
-        .data = (uint8_t*)"test_data"
+        .data = (uint8_t*)"test_data",
+        .owned_data = nullptr
     };
     
     xgl_packet_t packet = {
         .source_id = LOCAL_ID,
         .target_id = 99,  // No route
         .data_type = 1,
-        .data = &packet_data,
         .reliable = 1,
-        .priority = 0
+        .priority = 0,
+        .data = &packet_data
     };
     
     xgl_network_send(&network_ctx, &packet, false);
