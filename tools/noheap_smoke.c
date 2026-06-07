@@ -12,6 +12,10 @@ int main(void) {
         return 1;
     }
 
+    if (xgl_allocator_get_default() != NULL) {
+        return 6;
+    }
+
     xgl_tracking_allocator_t tracker;
     if (xgl_tracking_allocator_init(&tracker, NULL) == 0) {
         return 2;
