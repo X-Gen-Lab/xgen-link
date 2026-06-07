@@ -16,6 +16,7 @@ extern "C" {
 #include "xgl_error.h"
 #include "xgl_list.h"
 #include "xgl_types.h"
+#include "xgl_wire.h"
 
 /*---------------------------------------------------------------------------*/
 /* Reliable Packet Structure                                                */
@@ -139,6 +140,23 @@ xgl_error_t xgl_reliable_remove_packet(xgl_reliable_queue_t* queue,
 xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
                                               uint32_t packet_number,
                                               uint16_t target_id);
+
+/**
+ * \brief           Remove acknowledged packets described by ACK ranges
+ * \details         Each range length is a packet count. The first range starts
+ *                  at largest_ack; later ranges skip gap unacknowledged packets.
+ * \param[in,out]   queue: Reliable queue structure
+ * \param[in]       target_id: Target node ID
+ * \param[in]       largest_ack: Largest acknowledged packet number
+ * \param[in]       ranges: ACK ranges
+ * \param[in]       range_count: Number of ACK ranges
+ * \return          Number of packets removed from the wait-ACK queue
+ */
+size_t xgl_reliable_remove_ack_ranges(xgl_reliable_queue_t* queue,
+                                      uint16_t target_id,
+                                      uint32_t largest_ack,
+                                      const xgl_wire_ack_range_t* ranges,
+                                      size_t range_count);
 
 /**
  * \brief           Process timeouts and retransmit packets
