@@ -165,6 +165,9 @@ TEST_F(XglConfigTest, GetPresetProductionRequiresAuthentication) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 
     config.memory.allocator = xgl_allocator_get_default();
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+
+    provider.tag_len = 4U;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 }
 
@@ -213,6 +216,9 @@ TEST_F(XglConfigTest, ValidateAuthRequiredNeedsProvider) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 
     config.memory.allocator = xgl_allocator_get_default();
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+
+    provider.tag_len = 4U;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 }
 

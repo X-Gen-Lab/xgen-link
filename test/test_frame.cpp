@@ -238,6 +238,7 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameAddsSecurityExtensionAndTrailer) {
     xgl_auth_provider_t provider = {
         .sign = frame_test_auth_sign,
         .verify = frame_test_auth_verify,
+        .tag_len = 4,
         .user_data = nullptr
     };
     xgl_frame_t frame;
@@ -305,6 +306,38 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameAddsSecurityExtensionAndTrailer) {
 
     uint16_t received_crc = xgl_deserialize_u16_le(&buffer[bytes_written - XGL_CRC16_SIZE]);
     EXPECT_EQ(received_crc, xgl_crc16_modbus(buffer, bytes_written - XGL_CRC16_SIZE));
+}
+
+TEST(XglFrameTest, SerializeAuthenticatedFrameRejectsUnspecifiedTagLength) {
+    xgl_auth_provider_t provider = {
+        .sign = frame_test_auth_sign,
+        .verify = frame_test_auth_verify,
+        .tag_len = 0,
+        .user_data = nullptr
+    };
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x10, 0x20};
+    uint8_t buffer[128] = {};
+    size_t bytes_written = 0;
+
+    xgl_frame_params_t params = {
+        .source_id = 1,
+        .target_id = 2,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0
+    };
+
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    EXPECT_EQ(xgl_frame_serialize_authenticated(buffer,
+                                                sizeof(buffer),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &bytes_written),
+              XGL_ERR_INVALID_PARAM);
 }
 
 TEST(XglFrameTest, SerializeAuthenticatedFrameUsesConfiguredTagLengthAndSignsOnce) {
