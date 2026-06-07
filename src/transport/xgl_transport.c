@@ -194,7 +194,6 @@ static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
     xgl_reliable_clear(&peer->reliable_queue);
     xgl_window_reset(&peer->tx_window);
     xgl_window_reset(&ctx->window);
-    xgl_ack_reset(&ctx->ack_handler);
     if (ctx->fragment_mgr != NULL) {
         (void)xgl_fragment_clear_reassembly_scope(ctx->fragment_mgr,
                                                   peer->peer_id,
