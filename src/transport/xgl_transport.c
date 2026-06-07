@@ -83,9 +83,37 @@ static xgl_transport_peer_state_t* transport_find_peer(xgl_transport_ctx_t* ctx,
     return NULL;
 }
 
-static xgl_transport_peer_state_t* transport_get_or_create_peer(xgl_transport_ctx_t* ctx,
-                                                                uint16_t peer_id) {
-    xgl_transport_peer_state_t* peer = transport_find_peer(ctx, peer_id);
+static xgl_transport_peer_state_t* transport_find_peer_scope(xgl_transport_ctx_t* ctx,
+                                                             uint16_t peer_id,
+                                                             uint32_t connection_id,
+                                                             uint32_t session_epoch) {
+    if (ctx == NULL) {
+        return NULL;
+    }
+
+    xgl_transport_peer_state_t* peer = ctx->peers;
+    while (peer != NULL) {
+        if (peer->peer_id == peer_id &&
+            peer->has_connection_scope &&
+            peer->connection_id == connection_id &&
+            peer->session_epoch == session_epoch) {
+            return peer;
+        }
+        peer = peer->next;
+    }
+
+    return NULL;
+}
+
+static xgl_transport_peer_state_t* transport_get_or_create_peer_internal(
+    xgl_transport_ctx_t* ctx,
+    uint16_t peer_id,
+    uint32_t connection_id,
+    uint32_t session_epoch,
+    bool has_connection_scope) {
+    xgl_transport_peer_state_t* peer = has_connection_scope ?
+        transport_find_peer_scope(ctx, peer_id, connection_id, session_epoch) :
+        transport_find_peer(ctx, peer_id);
     if (peer != NULL) {
         return peer;
     }
@@ -98,6 +126,9 @@ static xgl_transport_peer_state_t* transport_get_or_create_peer(xgl_transport_ct
 
     memset(peer, 0, sizeof(*peer));
     peer->peer_id = peer_id;
+    peer->has_connection_scope = has_connection_scope;
+    peer->connection_id = has_connection_scope ? connection_id : 0U;
+    peer->session_epoch = has_connection_scope ? session_epoch : 0U;
     peer->session_id = (uint16_t)(ctx->next_session_id & XGL_SESSION_ID_MASK);
     if (peer->session_id == 0U) {
         peer->session_id = 1U;
@@ -126,6 +157,23 @@ static xgl_transport_peer_state_t* transport_get_or_create_peer(xgl_transport_ct
     peer->next = ctx->peers;
     ctx->peers = peer;
     return peer;
+}
+
+static xgl_transport_peer_state_t* transport_get_or_create_peer(xgl_transport_ctx_t* ctx,
+                                                                uint16_t peer_id) {
+    return transport_get_or_create_peer_internal(ctx, peer_id, 0U, 0U, false);
+}
+
+static xgl_transport_peer_state_t* transport_get_or_create_peer_scope(
+    xgl_transport_ctx_t* ctx,
+    uint16_t peer_id,
+    uint32_t connection_id,
+    uint32_t session_epoch) {
+    return transport_get_or_create_peer_internal(ctx,
+                                                 peer_id,
+                                                 connection_id,
+                                                 session_epoch,
+                                                 true);
 }
 
 static void transport_destroy_peers(xgl_transport_ctx_t* ctx) {
@@ -1418,6 +1466,8 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     uint16_t source_id = packet->source_id;
     uint8_t data_type = packet->data_type;
     uint8_t reliable = packet->reliable;
+    bool has_connection_scope =
+        (packet->connection_id != 0U || packet->session_epoch != 0U);
 
     if (data_type == XGL_TRANSPORT_CONTROL_HELLO ||
         data_type == XGL_TRANSPORT_CONTROL_RESET) {
@@ -1434,7 +1484,15 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     
     /* Check if this is an ACK packet */
     if (reliable == XGL_RELIABILITY_ACK_ONLY) {
-        xgl_transport_peer_state_t* peer = transport_find_peer(ctx, source_id);
+        xgl_transport_peer_state_t* peer = has_connection_scope ?
+            transport_find_peer_scope(ctx,
+                                      source_id,
+                                      packet->connection_id,
+                                      packet->session_epoch) :
+            transport_find_peer(ctx, source_id);
+        if (peer == NULL && has_connection_scope) {
+            peer = transport_find_peer(ctx, source_id);
+        }
         if (peer == NULL) {
             return XGL_ERR_SEQUENCE_ERROR;
         }
@@ -1486,9 +1544,19 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
 
     xgl_transport_peer_state_t* rx_peer = NULL;
     if (packet->session_id != 0U) {
-        rx_peer = transport_find_peer(ctx, source_id);
+        rx_peer = has_connection_scope ?
+            transport_find_peer_scope(ctx,
+                                      source_id,
+                                      packet->connection_id,
+                                      packet->session_epoch) :
+            transport_find_peer(ctx, source_id);
         if (rx_peer == NULL) {
-            rx_peer = transport_get_or_create_peer(ctx, source_id);
+            rx_peer = has_connection_scope ?
+                transport_get_or_create_peer_scope(ctx,
+                                                   source_id,
+                                                   packet->connection_id,
+                                                   packet->session_epoch) :
+                transport_get_or_create_peer(ctx, source_id);
             if (rx_peer == NULL) {
                 return XGL_ERR_NO_MEMORY;
             }
@@ -1505,7 +1573,12 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     /* Check for duplicate reliable packet */
     if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
         if (rx_peer == NULL) {
-            rx_peer = transport_get_or_create_peer(ctx, source_id);
+            rx_peer = has_connection_scope ?
+                transport_get_or_create_peer_scope(ctx,
+                                                   source_id,
+                                                   packet->connection_id,
+                                                   packet->session_epoch) :
+                transport_get_or_create_peer(ctx, source_id);
             if (rx_peer == NULL) {
                 return XGL_ERR_NO_MEMORY;
             }

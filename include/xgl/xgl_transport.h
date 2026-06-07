@@ -50,6 +50,9 @@ typedef struct xgl_transport_rx_buffered_packet_s {
 typedef struct xgl_transport_peer_state_s {
     struct xgl_transport_peer_state_s* next; /**< Linked-list node */
     uint16_t peer_id;                        /**< Remote node ID */
+    bool has_connection_scope;               /**< Peer state is scoped by connection/session */
+    uint32_t connection_id;                  /**< Production connection ID for scoped state */
+    uint32_t session_epoch;                  /**< Production session epoch for scoped state */
     uint16_t session_id;                     /**< Peer transport session/epoch */
     bool hello_sent;                         /**< HELLO has been sent for this session */
     bool session_established;                /**< Peer session is known locally */
