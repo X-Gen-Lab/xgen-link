@@ -159,6 +159,33 @@ TEST(XglFrameTest, SerializeFrame) {
     EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 3], 0xDD);
 }
 
+TEST(XglFrameTest, SerializeFramePreserves16BitNodeIds) {
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0xAA};
+    uint8_t buffer[256] = {};
+    size_t bytes_written = 0;
+
+    xgl_frame_params_t params = {
+        .source_id = 0x1234,
+        .target_id = 0x2345,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 1
+    };
+
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    ASSERT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &bytes_written), XGL_OK);
+
+    xgl_wire_header_t decoded = {};
+    ASSERT_EQ(xgl_wire_decode_header(&decoded, buffer, XGL_FRAME_HEADER_SIZE), XGL_OK);
+    EXPECT_EQ(decoded.source_id, 0x1234);
+    EXPECT_EQ(decoded.target_id, 0x2345);
+}
+
 TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0x01, 0x02, 0x03, 0x04};
