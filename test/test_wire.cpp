@@ -154,6 +154,39 @@ TEST(XglWireTest, EncodesAndDecodesAckRangeExtension) {
     EXPECT_EQ(decoded_ranges[1].length, 1U);
 }
 
+TEST(XglWireTest, EncodesAndDecodesSackExtension) {
+    const uint8_t bitmap[] = {0b10101100U, 0b00010001U};
+    uint8_t value[16] = {};
+    size_t value_len = 0;
+
+    ASSERT_EQ(xgl_wire_encode_sack_ext_value(value,
+                                             sizeof(value),
+                                             0x0A0B0C0DU,
+                                             bitmap,
+                                             sizeof(bitmap),
+                                             &value_len),
+              XGL_OK);
+
+    EXPECT_EQ(value_len, 7U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[0]), 0x0A0B0C0DU);
+    EXPECT_EQ(value[4], sizeof(bitmap));
+    EXPECT_EQ(memcmp(&value[5], bitmap, sizeof(bitmap)), 0);
+
+    uint32_t base_packet = 0;
+    uint8_t decoded_bitmap[2] = {};
+    size_t decoded_bitmap_len = 0;
+    ASSERT_EQ(xgl_wire_decode_sack_ext_value(value,
+                                             value_len,
+                                             &base_packet,
+                                             decoded_bitmap,
+                                             sizeof(decoded_bitmap),
+                                             &decoded_bitmap_len),
+              XGL_OK);
+    EXPECT_EQ(base_packet, 0x0A0B0C0DU);
+    EXPECT_EQ(decoded_bitmap_len, sizeof(bitmap));
+    EXPECT_EQ(memcmp(decoded_bitmap, bitmap, sizeof(bitmap)), 0);
+}
+
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
     uint8_t invalid[] = {
         XGL_WIRE_EXT_ACK_RANGE,
