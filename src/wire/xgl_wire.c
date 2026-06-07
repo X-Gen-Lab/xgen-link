@@ -526,6 +526,9 @@ xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
         frame_len == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
+    if (provider->tag_len == 0U || provider->tag_len > UINT8_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
 
     size_t tag_offset = aad_len + payload_len;
     if (tag_offset > buffer_size) {
@@ -546,7 +549,7 @@ xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
         return err;
     }
 
-    if (provider->tag_len != 0U && tag_len != provider->tag_len) {
+    if (tag_len != provider->tag_len) {
         return XGL_ERR_INVALID_FRAME;
     }
 
@@ -569,10 +572,16 @@ xgl_error_t xgl_wire_verify_auth_trailer(const uint8_t* buffer,
         valid == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
+    if (provider->tag_len == 0U || provider->tag_len > UINT8_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
 
     *valid = false;
     size_t tag_offset = aad_len + payload_len;
     if (tag_offset >= frame_len) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    if (frame_len - tag_offset != provider->tag_len) {
         return XGL_ERR_INVALID_FRAME;
     }
 
