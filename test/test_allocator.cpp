@@ -303,6 +303,24 @@ TEST_F(XglAllocatorTest, TrackingAllocatorInterfaceAllocatesAndTracks) {
     EXPECT_EQ(stats.current_allocated, 0U);
 }
 
+TEST_F(XglAllocatorTest, TrackingAllocatorDirectCallbacksFailClosed) {
+    xgl_tracking_allocator_t first;
+    xgl_tracking_allocator_t second;
+    xgl_allocator_stats_t first_stats;
+    xgl_allocator_stats_t second_stats;
+
+    ASSERT_EQ(xgl_tracking_allocator_init(&first, nullptr), 0);
+    ASSERT_EQ(xgl_tracking_allocator_init(&second, nullptr), 0);
+
+    void* ptr = first.base.malloc(16);
+    EXPECT_EQ(ptr, nullptr);
+
+    xgl_tracking_allocator_get_stats(&first, &first_stats);
+    xgl_tracking_allocator_get_stats(&second, &second_stats);
+    EXPECT_EQ(first_stats.alloc_count, 0U);
+    EXPECT_EQ(second_stats.alloc_count, 0U);
+}
+
 /**
  * \brief           Test tracking allocator phase statistics
  */
