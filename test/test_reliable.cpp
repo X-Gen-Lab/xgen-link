@@ -9,6 +9,7 @@
 #include <xgl/xgl_reliable.h>
 #include <xgl/xgl_types.h>
 #include <xgl/xgl_error.h>
+#include <xgl/xgl_wire.h>
 
 using ::testing::_;
 using ::testing::Return;
@@ -263,6 +264,58 @@ TEST_F(XglReliableTest, FindAndRemovePacketBy32BitPacketNumber) {
     EXPECT_NE(xgl_reliable_find_packet_number(&queue, second_packet_number, 0x2345),
               nullptr);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
+}
+
+TEST_F(XglReliableTest, RemovePacketsByAckRangesKeepsHoles) {
+    uint8_t data[] = {0x01, 0x02, 0x03};
+    const uint16_t target_id = 0x2345;
+
+    const uint32_t packet_numbers[] = {100, 101, 102, 103, 105, 106};
+    for (uint32_t packet_number : packet_numbers) {
+        ASSERT_EQ(xgl_reliable_add_packet_number(&queue,
+                                                 data,
+                                                 sizeof(data),
+                                                 0x1234,
+                                                 target_id,
+                                                 packet_number,
+                                                 5,
+                                                 3,
+                                                 1000,
+                                                 &phy_ops),
+                  XGL_OK);
+    }
+    ASSERT_EQ(xgl_reliable_add_packet_number(&queue,
+                                             data,
+                                             sizeof(data),
+                                             0x1234,
+                                             0x3456,
+                                             106,
+                                             5,
+                                             3,
+                                             1000,
+                                             &phy_ops),
+              XGL_OK);
+
+    const xgl_wire_ack_range_t ranges[] = {
+        {.gap = 0, .length = 2},
+        {.gap = 2, .length = 2}
+    };
+
+    size_t removed = xgl_reliable_remove_ack_ranges(&queue,
+                                                    target_id,
+                                                    106,
+                                                    ranges,
+                                                    2);
+
+    EXPECT_EQ(removed, 4U);
+    EXPECT_EQ(xgl_reliable_get_count(&queue), 3U);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 106, target_id), nullptr);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 105, target_id), nullptr);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 102, target_id), nullptr);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 101, target_id), nullptr);
+    EXPECT_NE(xgl_reliable_find_packet_number(&queue, 103, target_id), nullptr);
+    EXPECT_NE(xgl_reliable_find_packet_number(&queue, 100, target_id), nullptr);
+    EXPECT_NE(xgl_reliable_find_packet_number(&queue, 106, 0x3456), nullptr);
 }
 
 /*---------------------------------------------------------------------------*/
