@@ -182,7 +182,6 @@ extern "C" {
 #include "xgl_rtt.h"
 #include "xgl_window.h"
 #include "xgl_reliable.h"
-#include "xgl_ack.h"
 #include "xgl_fragment.h"
 #include "xgl_transport.h"
 
