@@ -53,6 +53,7 @@ typedef struct {
     size_t small_count;         /**< Number of small blocks */
     size_t medium_count;        /**< Number of medium blocks */
     size_t large_count;         /**< Number of large blocks */
+    bool owns_buffers;          /**< True when buffers were allocated internally */
 } xgl_tiered_pool_t;
 
 /*---------------------------------------------------------------------------*/
@@ -69,6 +70,28 @@ typedef struct {
  */
 int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
                          size_t medium_count, size_t large_count);
+
+/**
+ * \brief           Initialize tiered memory pool from application buffers
+ * \details         This no-heap path is intended for production MCU profiles.
+ *                  Non-zero block counts require a non-NULL matching buffer
+ *                  sized count * XGL_TIERED_POOL_*_SIZE bytes.
+ * \param[in,out]   pool: Pointer to tiered pool structure
+ * \param[in]       small_buffer: Buffer for small blocks, or NULL if count is 0
+ * \param[in]       small_count: Number of small blocks
+ * \param[in]       medium_buffer: Buffer for medium blocks, or NULL if count is 0
+ * \param[in]       medium_count: Number of medium blocks
+ * \param[in]       large_buffer: Buffer for large blocks, or NULL if count is 0
+ * \param[in]       large_count: Number of large blocks
+ * \return          0 on success, -1 on error
+ */
+int xgl_tiered_pool_init_static(xgl_tiered_pool_t* pool,
+                                uint8_t* small_buffer,
+                                size_t small_count,
+                                uint8_t* medium_buffer,
+                                size_t medium_count,
+                                uint8_t* large_buffer,
+                                size_t large_count);
 
 /**
  * \brief           Destroy tiered memory pool

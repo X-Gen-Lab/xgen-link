@@ -8,6 +8,25 @@
 #include "xgl/xgl_allocator.h"
 #include <string.h>
 
+static bool tiered_pool_size_overflows(size_t count, size_t block_size) {
+    return count > ((size_t)-1) / block_size;
+}
+
+static int tiered_pool_init_one(xgl_mempool_t* mempool,
+                                uint8_t* buffer,
+                                size_t count,
+                                size_t block_size) {
+    if (count == 0) {
+        return 0;
+    }
+
+    if (buffer == NULL || tiered_pool_size_overflows(count, block_size)) {
+        return -1;
+    }
+
+    return xgl_mempool_init(mempool, buffer, count * block_size, block_size);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Tiered Pool Initialization                                                */
 /*---------------------------------------------------------------------------*/
@@ -24,6 +43,7 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
     
     /* Initialize structure */
     memset(pool, 0, sizeof(xgl_tiered_pool_t));
+    pool->owns_buffers = true;
     
     pool->small_count = small_count;
     pool->medium_count = medium_count;
@@ -82,6 +102,59 @@ error_cleanup:
 }
 
 /**
+ * \brief           Initialize tiered memory pool from application buffers
+ */
+int xgl_tiered_pool_init_static(xgl_tiered_pool_t* pool,
+                                uint8_t* small_buffer,
+                                size_t small_count,
+                                uint8_t* medium_buffer,
+                                size_t medium_count,
+                                uint8_t* large_buffer,
+                                size_t large_count) {
+    if (pool == NULL) {
+        return -1;
+    }
+
+    memset(pool, 0, sizeof(xgl_tiered_pool_t));
+
+    if (tiered_pool_init_one(&pool->small_pool,
+                             small_buffer,
+                             small_count,
+                             XGL_TIERED_POOL_SMALL_SIZE) != 0) {
+        goto error_cleanup;
+    }
+    if (tiered_pool_init_one(&pool->medium_pool,
+                             medium_buffer,
+                             medium_count,
+                             XGL_TIERED_POOL_MEDIUM_SIZE) != 0) {
+        goto error_cleanup;
+    }
+    if (tiered_pool_init_one(&pool->large_pool,
+                             large_buffer,
+                             large_count,
+                             XGL_TIERED_POOL_LARGE_SIZE) != 0) {
+        goto error_cleanup;
+    }
+
+    pool->small_buffer = small_count > 0 ? small_buffer : NULL;
+    pool->medium_buffer = medium_count > 0 ? medium_buffer : NULL;
+    pool->large_buffer = large_count > 0 ? large_buffer : NULL;
+    pool->small_count = small_count;
+    pool->medium_count = medium_count;
+    pool->large_count = large_count;
+    pool->owns_buffers = false;
+
+    return 0;
+
+error_cleanup:
+    xgl_mempool_destroy(&pool->small_pool);
+    xgl_mempool_destroy(&pool->medium_pool);
+    xgl_mempool_destroy(&pool->large_pool);
+    memset(pool, 0, sizeof(xgl_tiered_pool_t));
+    return -1;
+}
+
+/**
  * \brief           Destroy tiered memory pool
  * \details         Frees all allocated buffers and destroys pools
  */
@@ -102,15 +175,15 @@ void xgl_tiered_pool_destroy(xgl_tiered_pool_t* pool) {
     }
     
     /* Free buffers */
-    if (pool->small_buffer != NULL) {
+    if (pool->owns_buffers && pool->small_buffer != NULL) {
         xgl_free(NULL, pool->small_buffer);
         pool->small_buffer = NULL;
     }
-    if (pool->medium_buffer != NULL) {
+    if (pool->owns_buffers && pool->medium_buffer != NULL) {
         xgl_free(NULL, pool->medium_buffer);
         pool->medium_buffer = NULL;
     }
-    if (pool->large_buffer != NULL) {
+    if (pool->owns_buffers && pool->large_buffer != NULL) {
         xgl_free(NULL, pool->large_buffer);
         pool->large_buffer = NULL;
     }
