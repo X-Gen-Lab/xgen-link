@@ -66,6 +66,34 @@ static xgl_error_t wire_test_auth_verify(uint32_t key_id,
     return XGL_OK;
 }
 
+struct WireCountingAuthContext {
+    size_t sign_calls;
+};
+
+static xgl_error_t wire_counting_auth_sign(uint32_t key_id,
+                                           const uint8_t* aad,
+                                           size_t aad_len,
+                                           const uint8_t* payload,
+                                           size_t payload_len,
+                                           uint8_t* tag,
+                                           size_t tag_capacity,
+                                           size_t* tag_len,
+                                           void* user_data) {
+    (void)key_id;
+    (void)aad;
+    (void)aad_len;
+    (void)payload;
+    (void)payload_len;
+    (void)tag;
+    (void)tag_capacity;
+    (void)tag_len;
+    auto* ctx = static_cast<WireCountingAuthContext*>(user_data);
+    if (ctx != nullptr) {
+        ctx->sign_calls++;
+    }
+    return XGL_ERR_BUFFER_TOO_SMALL;
+}
+
 TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;
@@ -465,6 +493,34 @@ TEST(XglWireTest, AuthenticationTrailerRejectsUnspecifiedTagLength) {
                                            &provider,
                                            &frame_len),
               XGL_ERR_INVALID_PARAM);
+}
+
+TEST(XglWireTest, AuthenticationTrailerRejectsShortTagCapacityBeforeSigning) {
+    WireCountingAuthContext ctx = {};
+    xgl_auth_provider_t provider = {
+        .sign = wire_counting_auth_sign,
+        .verify = wire_test_auth_verify,
+        .tag_len = 8,
+        .user_data = &ctx
+    };
+
+    uint8_t frame[19] = {
+        'X', 'G', 2, 24,
+        1, 0, 8, 0,
+        0x34, 0x12, 0x78, 0x56,
+        'p', 'i', 'n', 'g'
+    };
+    size_t frame_len = 0;
+
+    EXPECT_EQ(xgl_wire_append_auth_trailer(frame,
+                                           sizeof(frame),
+                                           12,
+                                           4,
+                                           7,
+                                           &provider,
+                                           &frame_len),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(ctx.sign_calls, 0U);
 }
 
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
