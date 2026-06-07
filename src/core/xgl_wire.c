@@ -261,3 +261,72 @@ xgl_error_t xgl_wire_decode_ack_range_ext_value(const uint8_t* buffer,
 
     return XGL_OK;
 }
+
+xgl_error_t xgl_wire_encode_sack_ext_value(uint8_t* buffer,
+                                           size_t buffer_size,
+                                           uint32_t base_packet,
+                                           const uint8_t* bitmap,
+                                           size_t bitmap_len,
+                                           size_t* bytes_written) {
+    if (buffer == NULL || bytes_written == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (bitmap_len > 0U && bitmap == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    size_t required_size = 5U + bitmap_len;
+    if (bitmap_len > UINT8_MAX || required_size > UINT8_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    if (buffer_size < required_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    xgl_serialize_u32_le(&buffer[0], base_packet);
+    buffer[4] = (uint8_t)bitmap_len;
+    if (bitmap_len > 0U) {
+        memcpy(&buffer[5], bitmap, bitmap_len);
+    }
+
+    *bytes_written = required_size;
+    return XGL_OK;
+}
+
+xgl_error_t xgl_wire_decode_sack_ext_value(const uint8_t* buffer,
+                                           size_t buffer_size,
+                                           uint32_t* base_packet,
+                                           uint8_t* bitmap,
+                                           size_t bitmap_capacity,
+                                           size_t* bitmap_len) {
+    if (buffer == NULL || base_packet == NULL || bitmap_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (buffer_size < 5U) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    size_t encoded_bitmap_len = buffer[4];
+    if ((5U + encoded_bitmap_len) != buffer_size) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    if (encoded_bitmap_len > 0U && bitmap == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (bitmap_capacity < encoded_bitmap_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    *base_packet = xgl_deserialize_u32_le(&buffer[0]);
+    *bitmap_len = encoded_bitmap_len;
+    if (encoded_bitmap_len > 0U) {
+        memcpy(bitmap, &buffer[5], encoded_bitmap_len);
+    }
+
+    return XGL_OK;
+}

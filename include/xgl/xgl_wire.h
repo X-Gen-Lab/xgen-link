@@ -132,6 +132,20 @@ xgl_error_t xgl_wire_decode_ack_range_ext_value(const uint8_t* buffer,
                                                 size_t range_capacity,
                                                 size_t* range_count);
 
+xgl_error_t xgl_wire_encode_sack_ext_value(uint8_t* buffer,
+                                           size_t buffer_size,
+                                           uint32_t base_packet,
+                                           const uint8_t* bitmap,
+                                           size_t bitmap_len,
+                                           size_t* bytes_written);
+
+xgl_error_t xgl_wire_decode_sack_ext_value(const uint8_t* buffer,
+                                           size_t buffer_size,
+                                           uint32_t* base_packet,
+                                           uint8_t* bitmap,
+                                           size_t bitmap_capacity,
+                                           size_t* bitmap_len);
+
 #ifdef __cplusplus
 }
 #endif
