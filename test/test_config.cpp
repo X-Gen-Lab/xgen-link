@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_allocator.h>
 
 static xgl_error_t mock_auth_sign(uint32_t /*key_id*/,
                                   const uint8_t* /*aad*/,
@@ -161,6 +162,9 @@ TEST_F(XglConfigTest, GetPresetProductionRequiresAuthentication) {
         .user_data = nullptr
     };
     config.auth_provider = &provider;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+
+    config.memory.allocator = xgl_allocator_get_default();
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 }
 
