@@ -138,7 +138,7 @@ TEST_F(XglParserTest, InitSuccess) {
     
     xgl_error_t err = xgl_parser_init(&test_parser, buffer.data(), buffer.size());
     EXPECT_EQ(err, XGL_OK);
-    EXPECT_EQ(test_parser.state, XGL_PARSE_SOF);
+    EXPECT_EQ(test_parser.state, XGL_PARSE_MAGIC);
     EXPECT_EQ(test_parser.cache_len, 0);
 }
 
@@ -176,7 +176,7 @@ TEST_F(XglParserTest, ResetParser) {
     xgl_parser_reset(&parser);
     
     /* Verify reset state */
-    EXPECT_EQ(parser.state, XGL_PARSE_SOF);
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     EXPECT_EQ(parser.cache_len, 0);
     EXPECT_EQ(parser.index, 0);
     EXPECT_EQ(parser.timestamp, 0);
@@ -188,19 +188,19 @@ TEST_F(XglParserTest, ResetNullPointer) {
 }
 
 /*---------------------------------------------------------------------------*/
-/* SOF Detection Tests                                                       */
+/* Magic Detection Tests                                                     */
 /*---------------------------------------------------------------------------*/
 
-TEST_F(XglParserTest, FindSOF) {
+TEST_F(XglParserTest, FindMagic) {
     /* Feed garbage bytes */
     xgl_parse_result_t result;
     result = xgl_parser_feed_byte(&parser, 0x00, 0);
     EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
-    EXPECT_EQ(parser.state, XGL_PARSE_SOF);
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     
     result = xgl_parser_feed_byte(&parser, 0xFF, 0);
     EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
-    EXPECT_EQ(parser.state, XGL_PARSE_SOF);
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     
     /* Feed production magic */
     result = xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 0);
@@ -368,7 +368,7 @@ TEST_F(XglParserTest, InvalidExtensionLengthResetsParser) {
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
             EXPECT_EQ(i, XGL_WIRE_BASE_HEADER_SIZE + invalid_ext.size() - 1U);
-            EXPECT_EQ(parser.state, XGL_PARSE_SOF);
+            EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
             break;
         }
     }
@@ -416,7 +416,7 @@ TEST_F(XglParserTest, InvalidHeaderCRC16) {
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
             EXPECT_EQ(i, XGL_FRAME_HEADER_SIZE - 1U);
-            EXPECT_EQ(parser.state, XGL_PARSE_SOF);  /* Reset to SOF */
+            EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);  /* Reset to magic search */
             break;
         }
     }
@@ -439,7 +439,7 @@ TEST_F(XglParserTest, InvalidCRC16) {
     
     /* Should detect CRC16 error */
     EXPECT_EQ(result, XGL_PARSE_RESULT_ERROR);
-    EXPECT_EQ(parser.state, XGL_PARSE_SOF);  /* Reset to SOF */
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);  /* Reset to magic search */
 }
 
 TEST_F(XglParserTest, FrameTooLarge) {
@@ -463,7 +463,7 @@ TEST_F(XglParserTest, FrameTooLarge) {
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
             EXPECT_EQ(i, XGL_FRAME_HEADER_SIZE - 1U);
-            EXPECT_EQ(small_parser.state, XGL_PARSE_SOF);
+            EXPECT_EQ(small_parser.state, XGL_PARSE_MAGIC);
             break;
         }
     }
@@ -489,8 +489,8 @@ TEST_F(XglParserTest, TimeoutDetection) {
 }
 
 TEST_F(XglParserTest, NoTimeoutWhenIdle) {
-    /* Parser in SOF state (idle) */
-    EXPECT_EQ(parser.state, XGL_PARSE_SOF);
+    /* Parser in magic-search state (idle) */
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     
     /* Should never timeout when idle */
     bool timeout = xgl_parser_check_timeout(&parser, 999999, XGL_PARSER_TIMEOUT_MS);
@@ -503,7 +503,7 @@ TEST_F(XglParserTest, NoTimeoutWhenIdle) {
 
 TEST_F(XglParserTest, StateTransitions) {
     /* Initial state */
-    EXPECT_EQ(parser.state, XGL_PARSE_SOF);
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     
     /* Feed magic -> HEADER */
     xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 0);
@@ -513,7 +513,7 @@ TEST_F(XglParserTest, StateTransitions) {
     std::vector<uint8_t> payload = {0x01, 0x02};
     std::vector<uint8_t> frame = create_valid_frame(payload);
     
-    /* Feed header bytes (skip SOF, already fed) */
+    /* Feed header bytes (first magic byte already fed) */
     for (size_t i = 1; i < XGL_FRAME_HEADER_SIZE; ++i) {
         xgl_parser_feed_byte(&parser, frame[i], 0);
     }

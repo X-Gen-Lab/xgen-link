@@ -31,7 +31,7 @@ xgl_error_t xgl_parser_init(xgl_parser_t* parser,
     
     /* Initialize parser structure */
     memset(parser, 0, sizeof(xgl_parser_t));
-    parser->state = XGL_PARSE_SOF;
+    parser->state = XGL_PARSE_MAGIC;
     parser->cache = cache_buffer;
     parser->cache_size = cache_size;
     parser->cache_len = 0;
@@ -56,7 +56,7 @@ void xgl_parser_reset(xgl_parser_t* parser) {
         return;
     }
     
-    parser->state = XGL_PARSE_SOF;
+    parser->state = XGL_PARSE_MAGIC;
     parser->cache_len = 0;
     parser->index = 0;
     parser->timestamp = 0;
@@ -148,18 +148,18 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
     
     switch (parser->state) {
         /*-------------------------------------------------------------------*/
-        /* State: Searching for SOF                                         */
+        /* State: Searching for production magic                            */
         /*-------------------------------------------------------------------*/
-        case XGL_PARSE_SOF:
+        case XGL_PARSE_MAGIC:
             if (byte == XGL_WIRE_MAGIC_0) {
-                /* Found SOF, store it and move to header state */
+                /* Found first magic byte, store it and move to header state */
                 parser->cache[0] = byte;
                 parser->cache_len = 1;
                 parser->index = 0;
                 parser->timestamp = current_time_ms;
                 parser->state = XGL_PARSE_HEADER;
             }
-            /* Ignore all other bytes while searching for SOF */
+            /* Ignore all other bytes while searching for magic */
             return XGL_PARSE_RESULT_INCOMPLETE;
         
         /*-------------------------------------------------------------------*/
@@ -280,8 +280,8 @@ bool xgl_parser_check_timeout(const xgl_parser_t* parser,
         return false;
     }
     
-    /* No timeout if parser is idle (waiting for SOF) */
-    if (parser->state == XGL_PARSE_SOF) {
+    /* No timeout if parser is idle (waiting for production magic) */
+    if (parser->state == XGL_PARSE_MAGIC) {
         return false;
     }
     

@@ -351,7 +351,7 @@ TEST(XglFrameTest, SerializeFrameNullPointers) {
 TEST(XglFrameTest, BuildZeroCopyFrame) {
     /* Allocate buffer with space for header */
     uint8_t buffer[256];
-    size_t data_offset = XGL_FRAME_HEADER_SIZE;  /* Header includes SOF */
+    size_t data_offset = XGL_FRAME_HEADER_SIZE;  /* Header includes production magic */
     size_t data_len = 8;
     size_t frame_len;
     
@@ -387,7 +387,7 @@ TEST(XglFrameTest, ZeroCopyInvalidOffset) {
     uint8_t buffer[256];
     size_t frame_len;
     
-    /* Offset too small (no room for header with SOF) */
+    /* Offset too small (no room for fixed header) */
     xgl_error_t result = xgl_frame_build_zerocopy(
         buffer, sizeof(buffer),
         10,  /* Too small, needs to be at least 12 */

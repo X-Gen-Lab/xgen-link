@@ -25,7 +25,7 @@ extern "C" {
 /**
  * \brief           Complete frame structure
  * \details         Represents a complete protocol frame with all components
- * \note            The header already contains SOF, so no separate SOF field
+ * \note            The fixed header already contains the production magic bytes
  */
 typedef struct {
     xgl_wire_header_t header;       /**< Production logical wire header */
@@ -135,7 +135,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
 /**
  * \brief           Calculate frame size
  * \param[in]       payload_len: Payload length in bytes
- * \return          Total frame size (header with SOF + payload + CRC16)
+ * \return          Total frame size (fixed header + payload + CRC16)
  */
 static inline size_t xgl_frame_calculate_size(size_t payload_len) {
     return XGL_FRAME_HEADER_SIZE + payload_len + XGL_CRC16_SIZE;

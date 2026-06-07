@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.21)
 #-----------------------------------------------------------------------------
 
 project(xgl
-    VERSION 1.0.0
+    VERSION 2.0.0
     DESCRIPTION "xgen-link Protocol Stack"
     LANGUAGES C CXX
 )

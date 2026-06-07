@@ -431,7 +431,7 @@ TEST(XglErrorProperties, ErrorStatistics) {
         
         for (int i = 0; i < 20; ++i) {
             /* Randomly send to valid or invalid route */
-            uint8_t target_id = (gen.random_uint8() % 10 < 8) ? 2 : 99;  /* 80% valid, 20% invalid */
+            uint16_t target_id = (gen.random_uint8() % 10 < 8) ? 2U : 999U;  /* 80% valid, 20% invalid */
             
             xgl_tx_data_t tx_data = {
                 .target_id = target_id,

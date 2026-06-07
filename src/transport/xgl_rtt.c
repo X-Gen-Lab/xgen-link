@@ -2,7 +2,7 @@
  * \file            xgl_rtt.c
  * \brief           RTT estimator implementation
  * \author          Nexus Team
- * \version         1.0.0
+ * \version         2.0.0
  * \date            2026-02-28
  *
  * \copyright       Copyright (c) 2026 Nexus Team

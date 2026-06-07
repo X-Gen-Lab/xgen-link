@@ -78,7 +78,7 @@ void xgl_config_get_preset_small(xgl_config_t* config) {
  * \brief           Get medium configuration preset
  * \details         Optimized for 128KB RAM, 256KB Flash
  *                  Includes fragmentation. Compression is reserved and not
- *                  implemented in the current MVP.
+ *                  implemented in the current release.
  */
 void xgl_config_get_preset_medium(xgl_config_t* config) {
     if (config == NULL) {
@@ -92,7 +92,7 @@ void xgl_config_get_preset_medium(xgl_config_t* config) {
 /**
  * \brief           Get large configuration preset
  * \details         Optimized for 256KB+ RAM, 512KB+ Flash
- *                  Encryption is reserved and not implemented in the current MVP.
+ *                  Encryption is reserved and not implemented in the current release.
  */
 void xgl_config_get_preset_large(xgl_config_t* config) {
     if (config == NULL) {

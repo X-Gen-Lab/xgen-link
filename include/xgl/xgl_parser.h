@@ -25,7 +25,7 @@ extern "C" {
  * \brief           Parser state enumeration
  */
 typedef enum {
-    XGL_PARSE_SOF,              /**< Searching for start of frame */
+    XGL_PARSE_MAGIC,              /**< Searching for production magic */
     XGL_PARSE_HEADER,           /**< Receiving frame header */
     XGL_PARSE_PAYLOAD,          /**< Receiving payload data */
     XGL_PARSE_CRC,              /**< Receiving CRC16 */
@@ -124,7 +124,7 @@ xgl_error_t xgl_parser_get_frame(const xgl_parser_t* parser,
  * \return          Current parser state
  */
 static inline xgl_parse_state_t xgl_parser_get_state(const xgl_parser_t* parser) {
-    return parser ? parser->state : XGL_PARSE_SOF;
+    return parser ? parser->state : XGL_PARSE_MAGIC;
 }
 
 /**

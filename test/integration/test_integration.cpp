@@ -317,7 +317,7 @@ TEST_F(XglIntegrationTest, VersionInformation) {
     /* Test version integer */
     uint32_t version_int = xgl_version_int();
     EXPECT_EQ(version_int, XGL_VERSION_INT);
-    EXPECT_EQ(version_int, 10000);  /* 1.0.0 */
+    EXPECT_EQ(version_int, 20000);  /* 2.0.0 */
 }
 
 /*---------------------------------------------------------------------------*/

@@ -30,8 +30,8 @@ TEST(XglFrameProperties, CrcErrorDetection) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame parameters */
-        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
         uint32_t packet_number = gen.random_uint32();
         bool reliable = (gen.random_uint8() & 1) != 0;
@@ -149,8 +149,8 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame parameters */
-        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
         uint32_t packet_number = gen.random_uint32();
         bool reliable = (gen.random_uint8() & 1) != 0;
@@ -263,10 +263,10 @@ TEST(XglFrameProperties, FieldValidation) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random but valid frame parameters */
-        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
-        uint8_t packet_number = gen.random_uint8();
+        uint32_t packet_number = gen.random_uint32();
         uint8_t ack_range = gen.random_uint8();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07;  /* Valid: 3 bits (0-7) */
@@ -404,8 +404,8 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame */
-        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
         size_t payload_len = gen.random_uint32() % 256;
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
@@ -489,15 +489,15 @@ TEST(XglFrameProperties, ParserRejectsGarbageData) {
         for (size_t i = 0; i < garbage.size(); ++i) {
             xgl_parse_result_t result = xgl_parser_feed_byte(&parser, garbage[i], static_cast<uint32_t>(i));
             
-            /* Should always be incomplete (searching for SOF) */
+            /* Should always be incomplete (searching for production magic) */
             EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE)
                 << "Parser accepted garbage at iteration " << iteration
                 << " byte " << i;
         }
         
-        /* Parser should still be in SOF state */
-        EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_SOF)
-            << "Parser left SOF state after garbage at iteration " << iteration;
+        /* Parser should still be in magic-search state */
+        EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_MAGIC)
+            << "Parser left magic-search state after garbage at iteration " << iteration;
     }
 }
 

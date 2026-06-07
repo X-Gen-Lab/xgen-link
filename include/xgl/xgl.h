@@ -2,7 +2,7 @@
  * \file            xgl.h
  * \brief           xgen-link Protocol Stack - Main Public API
  * \author          Nexus Team
- * \version         1.0.0
+ * \version         2.0.0
  * \date            2026-02-28
  *
  * \copyright       Copyright (c) 2026 Nexus Team
@@ -15,7 +15,7 @@
  *
  * \par Features
  *                  - Multi-instance architecture for multiple communication channels
- *                  - Single-link point-to-point MVP communication loop
+ *                  - Production v2 multi-node reliable communication loop
  *                  - Reliable and unreliable transmission with ACK timeout handling
  *                  - Adaptive retransmission with RTT estimation (RFC 6298)
  *                  - Sliding window flow control
@@ -42,7 +42,7 @@
  * }
  *
  * // Receive callback
- * void on_receive(xgl_handle_t handle, uint8_t source_id, uint8_t data_type,
+ * void on_receive(xgl_handle_t handle, uint16_t source_id, uint8_t data_type,
  *                 const uint8_t* data, size_t len, void* user_data) {
  *     printf("Received %zu bytes from node %d\n", len, source_id);
  * }
@@ -212,7 +212,7 @@ extern "C" {
  * \brief           Protocol major version
  * \note            Incremented for breaking API changes
  */
-#define XGL_VERSION_MAJOR       1
+#define XGL_VERSION_MAJOR       2
 
 /**
  * \brief           Protocol minor version
@@ -229,7 +229,7 @@ extern "C" {
 /**
  * \brief           Protocol version string
  */
-#define XGL_VERSION_STRING      "1.0.0"
+#define XGL_VERSION_STRING      "2.0.0"
 
 /**
  * \brief           Protocol version as integer (MAJOR * 10000 + MINOR * 100 + PATCH)
@@ -251,7 +251,7 @@ extern "C" {
 
 /**
  * \brief           Get protocol version string at runtime
- * \return          Version string (e.g., "1.0.0")
+ * \return          Version string (e.g., "2.0.0")
  */
 const char* xgl_version_string(void);
 

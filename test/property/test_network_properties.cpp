@@ -85,11 +85,11 @@ TEST(XglNetworkProperties, RouteLookupCorrectness) {
         
         /* Generate random number of routes (1-20) */
         size_t num_routes = 1 + (gen.random_uint32() % 20);
-        std::map<uint8_t, xgl_phy_ops_t*> expected_routes;
+        std::map<uint16_t, xgl_phy_ops_t*> expected_routes;
         
         /* Add random routes */
         for (size_t i = 0; i < num_routes; ++i) {
-            uint8_t target_id = gen.random_uint8();
+            uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
             
             /* Skip if already exists (avoid duplicates) */
             if (expected_routes.find(target_id) != expected_routes.end()) {
@@ -113,7 +113,7 @@ TEST(XglNetworkProperties, RouteLookupCorrectness) {
         
         /* Verify all routes can be looked up correctly */
         for (const auto& pair : expected_routes) {
-            uint8_t target_id = pair.first;
+            uint16_t target_id = pair.first;
             xgl_phy_ops_t* expected_phy = pair.second;
             
             xgl_route_item_t* route = xgl_route_table_lookup(&route_table, target_id);
@@ -160,11 +160,11 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
         
         /* Add some random routes */
         size_t num_routes = 1 + (gen.random_uint32() % 10);
-        std::set<uint8_t> added_routes;
+        std::set<uint16_t> added_routes;
         std::vector<xgl_phy_ops_t> phy_ops(num_routes);
         
         for (size_t i = 0; i < num_routes; ++i) {
-            uint8_t target_id = gen.random_uint8();
+            uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
             
             /* Skip if already exists */
             if (added_routes.find(target_id) != added_routes.end()) {
@@ -179,15 +179,15 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
         }
         
         /* Try to lookup a target_id that doesn't exist */
-        uint8_t missing_target_id;
+        uint16_t missing_target_id;
         int attempts = 0;
         do {
-            missing_target_id = gen.random_uint8();
+            missing_target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
             attempts++;
-        } while (added_routes.find(missing_target_id) != added_routes.end() && attempts < 256);
+        } while (added_routes.find(missing_target_id) != added_routes.end() && attempts < 1024);
         
-        /* If we couldn't find a missing ID (all 256 IDs are used), skip this iteration */
-        if (attempts >= 256) {
+        /* If we couldn't find a missing ID, skip this iteration */
+        if (attempts >= 1024) {
             xgl_route_table_destroy(&route_table);
             continue;
         }
@@ -249,7 +249,7 @@ TEST(XglNetworkProperties, PacketForwardingToSelf) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random local node ID */
-        uint8_t local_id = gen.random_uint8();
+        uint16_t local_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         
         /* Create route table (can be empty for this test) */
         xgl_route_table_t route_table;
@@ -281,9 +281,9 @@ TEST(XglNetworkProperties, PacketForwardingToSelf) {
             << iteration;
         
         /* Test 3: Packet addressed to different ID should not be for local node */
-        uint8_t other_id;
+        uint16_t other_id;
         do {
-            other_id = gen.random_uint8();
+            other_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         } while (other_id == local_id || other_id == XGL_BROADCAST_ID);
         
         EXPECT_FALSE(xgl_network_is_local(&ctx, other_id))
@@ -292,10 +292,10 @@ TEST(XglNetworkProperties, PacketForwardingToSelf) {
             << ") at iteration " << iteration;
         
         /* Test 4: Address validation */
-        uint8_t source_id = gen.random_uint8();
+        uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         /* Ensure source_id is valid (not 0 or broadcast) */
         while (source_id == 0 || source_id == XGL_BROADCAST_ID) {
-            source_id = gen.random_uint8();
+            source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         }
         
         /* Valid addressing: packet to local node */

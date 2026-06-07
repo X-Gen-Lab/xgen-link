@@ -645,9 +645,9 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuing) {
         size_t data_len = 1 + (gen.random_uint8() % 255);
         std::vector<uint8_t> data = gen.random_bytes(data_len);
         
-        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t packet_number = gen.random_uint8();
+        uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint32_t packet_number = gen.random_uint32();
         uint8_t data_type = gen.random_uint8();
         uint8_t priority = gen.random_uint8() % 8;
         int32_t timeout_ms = 100 + (gen.random_uint32() % 5000);
@@ -715,8 +715,10 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuingMultiple) {
             std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 100));
             
             err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
-                                         gen.random_uint8(), gen.random_uint8(),
-                                         (uint8_t)i, gen.random_uint8(),
+                                         static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U),
+                                         static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U),
+                                         static_cast<uint32_t>(i),
+                                         gen.random_uint8(),
                                          gen.random_uint8() % 8, 1000, &phy);
             
             EXPECT_EQ(err, XGL_OK)
@@ -774,8 +776,8 @@ TEST(XglTransportProperties, Property14_RetransmissionOnTimeout) {
         
         /* Generate random packet */
         std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
-        uint8_t packet_number = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
+        uint32_t packet_number = gen.random_uint32();
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         int32_t timeout_ms = 100 + (gen.random_uint32() % 500);
         
         /* Add packet to queue */
@@ -911,8 +913,8 @@ TEST(XglTransportProperties, Property15_RetryExhaustionHandling) {
         
         /* Add packet */
         std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
-        uint8_t packet_number = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
+        uint32_t packet_number = gen.random_uint32();
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         
         err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                      1, target_id, packet_number, 0, 0, 100, &phy);
@@ -1231,9 +1233,9 @@ TEST(XglTransportProperties, Property16_ACKProcessing) {
         ASSERT_EQ(err, XGL_OK) << "Queue initialization failed";
         
         /* Generate random packet parameters */
-        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
-        uint8_t packet_number = gen.random_uint8();
+        uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
+        uint32_t packet_number = gen.random_uint32();
         std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
         
         /* Add packet to queue */
@@ -1296,7 +1298,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingMultiplePackets) {
         
         /* Add multiple packets with different Packet numbers */
         const int num_packets = 5;
-        uint8_t target_id = gen.random_uint8();
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         
         for (int i = 0; i < num_packets; ++i) {
             std::vector<uint8_t> data = gen.random_bytes(20);
@@ -1348,8 +1350,8 @@ TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
         ASSERT_EQ(err, XGL_OK);
         
         /* Add packet with specific Packet number */
-        uint8_t packet_number = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
+        uint32_t packet_number = gen.random_uint32();
+        uint16_t target_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         std::vector<uint8_t> data = gen.random_bytes(20);
         
         err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
@@ -1357,7 +1359,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
         ASSERT_EQ(err, XGL_OK);
         
         /* Try to ACK with different Packet number */
-        uint8_t wrong_packet_number = (uint8_t)(packet_number + 1);
+        uint32_t wrong_packet_number = packet_number + 1U;
         xgl_error_t remove_err = xgl_reliable_remove_packet_number(&queue, wrong_packet_number, target_id);
         
         EXPECT_NE(remove_err, XGL_OK)
