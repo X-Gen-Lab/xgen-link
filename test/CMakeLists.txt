@@ -41,6 +41,7 @@ set(TEST_SOURCES
     test_codec.cpp
     test_send.cpp
     test_stats.cpp
+    test_security.cpp
     
     # Architecture improvement tests
     test_layered_stats.cpp
