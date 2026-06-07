@@ -19,6 +19,7 @@ struct LowerLayerSpy {
     xgl_packet_t last_packet = {};
     std::vector<xgl_packet_t> sent_packets;
     std::vector<std::vector<uint8_t>> sent_payloads;
+    std::vector<std::vector<uint8_t>> sent_extensions;
 };
 
 struct RxTracker {
@@ -46,6 +47,12 @@ static xgl_error_t spy_send(void* ctx, xgl_handle_t handle, void* data) {
                                         packet->data->data + packet->data->data_len);
     } else {
         spy->sent_payloads.emplace_back();
+    }
+    if (packet->extensions != nullptr && packet->extensions_len > 0U) {
+        spy->sent_extensions.emplace_back(packet->extensions,
+                                         packet->extensions + packet->extensions_len);
+    } else {
+        spy->sent_extensions.emplace_back();
     }
     return XGL_OK;
 }
@@ -924,6 +931,75 @@ TEST(XglTransportTest, ReliableReceiveUsesPacketNumberForDuplicateDetection) {
     EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
     EXPECT_EQ(spy.last_packet.ack_num, 1U);
 
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, FragmentedSendUsesFragmentExtensionNotPayloadPrefix) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.enable_fragmentation = true;
+    config.max_frame_size = 40;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+        'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+        'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+        'Y', 'Z', '0', '1', '2', '3', '4', '5',
+        '6', '7', '8', '9', 'a', 'b', 'c', 'd'
+    };
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+
+    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    ASSERT_GT(spy.sent_packets.size(), 1U);
+    ASSERT_EQ(spy.sent_packets.size(), spy.sent_extensions.size());
+    ASSERT_EQ(spy.sent_packets.size(), spy.sent_payloads.size());
+
+    size_t observed_payload_bytes = 0;
+    for (size_t i = 0; i < spy.sent_packets.size(); ++i) {
+        EXPECT_TRUE(spy.sent_packets[i].fragment);
+        ASSERT_FALSE(spy.sent_extensions[i].empty());
+        xgl_wire_ext_cursor_t cursor = {};
+        ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
+                                           spy.sent_extensions[i].data(),
+                                           spy.sent_extensions[i].size()),
+                  XGL_OK);
+        xgl_wire_ext_t ext = {};
+        ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+        EXPECT_EQ(ext.type, XGL_WIRE_EXT_FRAGMENT);
+
+        uint32_t message_id = 0;
+        uint32_t fragment_offset = 0;
+        uint32_t message_len = 0;
+        ASSERT_EQ(xgl_wire_decode_fragment_ext_value(ext.value,
+                                                     ext.len,
+                                                     &message_id,
+                                                     &fragment_offset,
+                                                     &message_len),
+                  XGL_OK);
+        EXPECT_EQ(message_len, sizeof(payload));
+        ASSERT_LT(fragment_offset, sizeof(payload));
+        ASSERT_FALSE(spy.sent_payloads[i].empty());
+        EXPECT_EQ(spy.sent_payloads[i][0], payload[fragment_offset]);
+        observed_payload_bytes += spy.sent_payloads[i].size();
+    }
+
+    EXPECT_EQ(observed_payload_bytes, sizeof(payload));
     xgl_transport_destroy(&ctx);
 }
 
