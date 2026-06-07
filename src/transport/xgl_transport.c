@@ -138,6 +138,18 @@ static uint32_t transport_allocate_packet_number(xgl_transport_ctx_t* ctx,
     return packet_number;
 }
 
+static uint32_t transport_receive_packet_number(const xgl_packet_t* packet) {
+    if (packet == NULL) {
+        return 0U;
+    }
+
+    if (packet->packet_number == 0U && packet->seq_num != 0U) {
+        return packet->seq_num;
+    }
+
+    return packet->packet_number;
+}
+
 static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
                                        xgl_transport_peer_state_t* peer,
                                        uint16_t session_id) {
@@ -156,6 +168,8 @@ static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
         xgl_fragment_clear_reassembly(ctx->fragment_mgr);
     }
     xgl_rtt_init(&peer->rtt_est);
+    peer->rx_next_packet_number = 0U;
+    peer->rx_has_packet_number_state = false;
     peer->last_active_ms = xgl_time_ms();
 }
 
@@ -967,7 +981,6 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     
     /* Extract packet fields */
     uint16_t source_id = packet->source_id;
-    uint8_t seq_num = packet->seq_num;
     uint8_t ack_num = packet->ack_num;
     uint8_t data_type = packet->data_type;
     uint8_t reliable = packet->reliable;
@@ -1071,29 +1084,44 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
+    xgl_transport_peer_state_t* rx_peer = NULL;
     if (packet->session_id != 0U) {
-        xgl_transport_peer_state_t* peer = transport_find_peer(ctx, source_id);
-        if (peer == NULL) {
-        peer = transport_get_or_create_peer(ctx, source_id);
-            if (peer == NULL) {
+        rx_peer = transport_find_peer(ctx, source_id);
+        if (rx_peer == NULL) {
+            rx_peer = transport_get_or_create_peer(ctx, source_id);
+            if (rx_peer == NULL) {
                 return XGL_ERR_NO_MEMORY;
             }
-            transport_reset_peer_state(ctx, peer, packet->session_id);
-        } else if (packet->session_id != peer->session_id) {
+            transport_reset_peer_state(ctx, rx_peer, packet->session_id);
+        } else if (packet->session_id != rx_peer->session_id) {
             return XGL_ERR_SEQUENCE_ERROR;
         }
     }
     
     /* Check for duplicate reliable packet */
     if (reliable == XGL_ATTR_RELIABLE_TX) {
-        if (xgl_ack_is_duplicate_from(&ctx->ack_handler, source_id, seq_num)) {
+        if (rx_peer == NULL) {
+            rx_peer = transport_get_or_create_peer(ctx, source_id);
+            if (rx_peer == NULL) {
+                return XGL_ERR_NO_MEMORY;
+            }
+        }
+
+        uint32_t packet_number = transport_receive_packet_number(packet);
+        if (!rx_peer->rx_has_packet_number_state) {
+            rx_peer->rx_next_packet_number =
+                (packet->packet_number != 0U) ? packet_number : 0U;
+            rx_peer->rx_has_packet_number_state = true;
+        }
+
+        if (packet_number < rx_peer->rx_next_packet_number) {
             /* Sender may have missed our previous ACK. */
-            transport_send_ack(ctx, handle, packet->packet_number, source_id, packet->session_id);
+            transport_send_ack(ctx, handle, packet_number, source_id, packet->session_id);
             return XGL_OK;
         }
 
-        if (xgl_ack_is_out_of_order_from(&ctx->ack_handler, source_id, seq_num)) {
-            uint8_t expected_seq = xgl_ack_get_expected_from(&ctx->ack_handler, source_id);
+        if (packet_number > rx_peer->rx_next_packet_number) {
+            uint8_t expected_seq = (uint8_t)(rx_peer->rx_next_packet_number & 0xFFU);
             (void)transport_send_control(ctx,
                                          handle,
                                          source_id,
@@ -1106,18 +1134,9 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             return XGL_ERR_SEQUENCE_ERROR;
         }
 
-        /* Mark sequence number as received and ACK it. */
-        err = xgl_ack_mark_received_from(&ctx->ack_handler, source_id, seq_num);
-        if (err != XGL_OK) {
-            return err;
-        }
+        rx_peer->rx_next_packet_number = packet_number + 1U;
 
-        err = xgl_ack_update_expected_from(&ctx->ack_handler, source_id, seq_num);
-        if (err != XGL_OK) {
-            return err;
-        }
-
-        transport_send_ack(ctx, handle, packet->packet_number, source_id, packet->session_id);
+        transport_send_ack(ctx, handle, packet_number, source_id, packet->session_id);
     }
     
     /* Check if packet has fragment flag */

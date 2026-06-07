@@ -47,6 +47,8 @@ typedef struct xgl_transport_peer_state_s {
     xgl_reliable_queue_t reliable_queue;     /**< Peer-specific wait-ACK queue */
     xgl_rtt_estimator_t rtt_est;             /**< Peer-specific RTT estimator */
     uint32_t last_active_ms;                 /**< Last activity timestamp */
+    uint32_t rx_next_packet_number;          /**< Next in-order packet number expected from peer */
+    bool rx_has_packet_number_state;         /**< Receive packet-number state initialized */
 } xgl_transport_peer_state_t;
 
 /**
