@@ -39,6 +39,72 @@ static xgl_error_t mock_phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
     return XGL_OK;
 }
 
+static xgl_error_t send_test_auth_sign(uint32_t key_id,
+                                       const uint8_t* aad,
+                                       size_t aad_len,
+                                       const uint8_t* payload,
+                                       size_t payload_len,
+                                       uint8_t* tag,
+                                       size_t tag_capacity,
+                                       size_t* tag_len,
+                                       void* user_data) {
+    (void)user_data;
+    if (tag == nullptr || tag_len == nullptr) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if ((aad == nullptr && aad_len > 0U) ||
+        (payload == nullptr && payload_len > 0U)) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (tag_capacity < 8U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint32_t acc = key_id;
+    for (size_t i = 0; i < aad_len; ++i) {
+        acc = (acc * 33U) ^ aad[i];
+    }
+    for (size_t i = 0; i < payload_len; ++i) {
+        acc = (acc * 33U) ^ payload[i];
+    }
+    for (size_t i = 0; i < 8U; ++i) {
+        tag[i] = static_cast<uint8_t>((acc >> ((i % 4U) * 8U)) & 0xFFU);
+    }
+    *tag_len = 8U;
+    return XGL_OK;
+}
+
+static xgl_error_t send_test_auth_verify(uint32_t key_id,
+                                         const uint8_t* aad,
+                                         size_t aad_len,
+                                         const uint8_t* payload,
+                                         size_t payload_len,
+                                         const uint8_t* tag,
+                                         size_t tag_len,
+                                         bool* valid,
+                                         void* user_data) {
+    if (tag == nullptr || valid == nullptr) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    uint8_t expected[8] = {};
+    size_t expected_len = 0;
+    xgl_error_t err = send_test_auth_sign(key_id,
+                                          aad,
+                                          aad_len,
+                                          payload,
+                                          payload_len,
+                                          expected,
+                                          sizeof(expected),
+                                          &expected_len,
+                                          user_data);
+    if (err != XGL_OK) {
+        return err;
+    }
+    *valid = tag_len == expected_len &&
+             std::memcmp(tag, expected, expected_len) == 0;
+    return XGL_OK;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */
 /*---------------------------------------------------------------------------*/
@@ -389,6 +455,43 @@ TEST_F(XglSendTest, ZeroCopyReliableIsRejectedInsteadOfImplicitCopyFallback) {
         .target_id = 2,
         .data_type = 1,
         .reliable = true,
+        .priority = 0,
+        .timeout_ms = 0
+    };
+
+    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
+    EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_ERR_INVALID_PARAM);
+}
+
+TEST_F(XglSendTest, ZeroCopyRejectedWhenAuthenticationRequired) {
+    xgl_destroy(handle);
+    handle = nullptr;
+
+    xgl_auth_provider_t provider = {
+        .sign = send_test_auth_sign,
+        .verify = send_test_auth_verify,
+        .user_data = nullptr
+    };
+    config.auth_required = true;
+    config.auth_key_id = 7;
+    config.auth_provider = &provider;
+
+    handle = xgl_create(&config);
+    ASSERT_NE(handle, nullptr);
+    ASSERT_EQ(xgl_init(handle), XGL_OK);
+
+    uint8_t buffer[96] = {};
+    const char payload[] = "auth-zcopy";
+    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+
+    xgl_tx_data_zerocopy_t tx_data = {
+        .buffer = buffer,
+        .buffer_size = sizeof(buffer),
+        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_len = sizeof(payload) - 1U,
+        .target_id = 2,
+        .data_type = 1,
+        .reliable = false,
         .priority = 0,
         .timeout_ms = 0
     };

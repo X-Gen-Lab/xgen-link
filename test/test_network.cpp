@@ -5,8 +5,10 @@
  */
 
 #include <gtest/gtest.h>
+#include <xgl/xgl_frame.h>
 #include <xgl/xgl_network.h>
 #include <xgl/xgl_route.h>
+#include <xgl/xgl_wire.h>
 #include <cstring>
 #include <vector>
 
@@ -26,6 +28,86 @@ static xgl_error_t test_phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
     (void)buffer;
     (void)user_data;
     *len = 0;
+    return XGL_OK;
+}
+
+struct CaptureTx {
+    int count = 0;
+    std::vector<uint8_t> bytes;
+};
+
+static xgl_error_t capture_phy_tx(const uint8_t* data, size_t len, void* user_data) {
+    auto* capture = static_cast<CaptureTx*>(user_data);
+    if (capture != nullptr) {
+        capture->count++;
+        capture->bytes.assign(data, data + len);
+    }
+    return XGL_OK;
+}
+
+static xgl_error_t network_test_auth_sign(uint32_t key_id,
+                                          const uint8_t* aad,
+                                          size_t aad_len,
+                                          const uint8_t* payload,
+                                          size_t payload_len,
+                                          uint8_t* tag,
+                                          size_t tag_capacity,
+                                          size_t* tag_len,
+                                          void* user_data) {
+    (void)user_data;
+    if (tag == nullptr || tag_len == nullptr) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if ((aad == nullptr && aad_len > 0U) ||
+        (payload == nullptr && payload_len > 0U)) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (tag_capacity < 8U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint32_t acc = key_id ^ 0xA5A5A5A5U;
+    for (size_t i = 0; i < aad_len; ++i) {
+        acc = (acc * 31U) ^ aad[i];
+    }
+    for (size_t i = 0; i < payload_len; ++i) {
+        acc = (acc * 31U) ^ payload[i];
+    }
+    for (size_t i = 0; i < 8U; ++i) {
+        tag[i] = static_cast<uint8_t>((acc >> ((i % 4U) * 8U)) & 0xFFU);
+    }
+    *tag_len = 8U;
+    return XGL_OK;
+}
+
+static xgl_error_t network_test_auth_verify(uint32_t key_id,
+                                            const uint8_t* aad,
+                                            size_t aad_len,
+                                            const uint8_t* payload,
+                                            size_t payload_len,
+                                            const uint8_t* tag,
+                                            size_t tag_len,
+                                            bool* valid,
+                                            void* user_data) {
+    if (tag == nullptr || valid == nullptr) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    uint8_t expected[8] = {};
+    size_t expected_len = 0;
+    xgl_error_t err = network_test_auth_sign(key_id,
+                                             aad,
+                                             aad_len,
+                                             payload,
+                                             payload_len,
+                                             expected,
+                                             sizeof(expected),
+                                             &expected_len,
+                                             user_data);
+    if (err != XGL_OK) {
+        return err;
+    }
+    *valid = tag_len == expected_len &&
+             std::memcmp(tag, expected, expected_len) == 0;
     return XGL_OK;
 }
 
@@ -359,6 +441,74 @@ TEST_F(XglNetworkTest, ForwardingDropsExpiredTtl) {
     EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size()), XGL_ERR_TTL_EXPIRED);
     EXPECT_EQ(phy_tx_count, 0);
     EXPECT_EQ(stats.rx_dropped, 1);
+}
+
+TEST_F(XglNetworkTest, ForwardingResignsAuthenticatedFrameAfterTtlDecrement) {
+    xgl_auth_provider_t provider = {
+        .sign = network_test_auth_sign,
+        .verify = network_test_auth_verify,
+        .user_data = nullptr
+    };
+    network_ctx.auth_required = true;
+    network_ctx.auth_key_id = 7;
+    network_ctx.auth_provider = &provider;
+
+    CaptureTx capture;
+    xgl_phy_ops_t capture_phy = {
+        .tx = capture_phy_tx,
+        .rx = test_phy_rx,
+        .user_data = &capture
+    };
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &capture_phy, 256, 100, 1),
+              XGL_OK);
+
+    const char payload[] = "signed-hop";
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = REMOTE_ID,
+        .target_id = FORWARD_ID,
+        .data_type = 1,
+        .payload = reinterpret_cast<const uint8_t*>(payload),
+        .payload_len = sizeof(payload) - 1U,
+        .reliable = true,
+        .priority = 0,
+        .ttl = 4
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> encoded(256);
+    size_t encoded_len = 0;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded.data(),
+                                                encoded.size(),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+    encoded.resize(encoded_len);
+
+    ASSERT_EQ(xgl_network_receive(&network_ctx, nullptr, encoded.data(), encoded.size()),
+              XGL_OK);
+    ASSERT_EQ(capture.count, 1);
+    ASSERT_FALSE(capture.bytes.empty());
+
+    xgl_wire_header_t forwarded = {};
+    ASSERT_EQ(xgl_wire_decode_header(&forwarded,
+                                     capture.bytes.data(),
+                                     capture.bytes.size()),
+              XGL_OK);
+    EXPECT_EQ(forwarded.ttl, 3U);
+
+    bool valid = false;
+    EXPECT_EQ(xgl_wire_verify_auth_trailer(capture.bytes.data(),
+                                           capture.bytes.size() - XGL_CRC16_SIZE,
+                                           forwarded.header_len,
+                                           forwarded.payload_len,
+                                           7,
+                                           &provider,
+                                           &valid),
+              XGL_OK);
+    EXPECT_TRUE(valid);
 }
 
 TEST_F(XglNetworkTest, ReceivePacketNoRouteForForwarding) {
