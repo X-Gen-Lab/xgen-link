@@ -359,50 +359,6 @@ TEST(XglFrameTest, SerializeFrameNullPointers) {
 }
 
 /*---------------------------------------------------------------------------*/
-/* Header Encoding/Decoding Tests                                           */
-/*---------------------------------------------------------------------------*/
-
-TEST(XglFrameTest, EncodeDecodeHeader) {
-    xgl_legacy_frame_header_t header_orig, header_decoded;
-    uint8_t buffer[XGL_FRAME_HEADER_SIZE];
-    
-    /* Initialize header */
-    memset(&header_orig, 0, sizeof(header_orig));
-    header_orig.sof = XGL_SOF;
-    xgl_frame_set_version(&header_orig, 0x01);
-    xgl_frame_set_datatype(&header_orig, 0x05);
-    header_orig.source_id = 0x10;
-    header_orig.target_id = 0x20;
-    header_orig.attr_lsb = 0x43;  /* Reliable TX + Priority 3 */
-    header_orig.attr_msb = 0x00;
-    header_orig.data_len = 0x1234;
-    header_orig.seq_num = 0x42;
-    header_orig.ack_num = 0x99;
-    header_orig.reserved = 0x00;
-    header_orig.crc8 = 0xAB;
-    
-    /* Encode */
-    xgl_frame_encode_header(buffer, &header_orig);
-    
-    /* Decode */
-    xgl_frame_decode_header(&header_decoded, buffer);
-    
-    /* Verify */
-    EXPECT_EQ(header_decoded.sof, header_orig.sof);
-    EXPECT_EQ(xgl_frame_get_version(&header_decoded), xgl_frame_get_version(&header_orig));
-    EXPECT_EQ(xgl_frame_get_datatype(&header_decoded), xgl_frame_get_datatype(&header_orig));
-    EXPECT_EQ(header_decoded.source_id, header_orig.source_id);
-    EXPECT_EQ(header_decoded.target_id, header_orig.target_id);
-    EXPECT_EQ(header_decoded.attr_lsb, header_orig.attr_lsb);
-    EXPECT_EQ(header_decoded.attr_msb, header_orig.attr_msb);
-    EXPECT_EQ(header_decoded.data_len, header_orig.data_len);
-    EXPECT_EQ(header_decoded.seq_num, header_orig.seq_num);
-    EXPECT_EQ(header_decoded.ack_num, 0);
-    EXPECT_EQ(header_decoded.reserved, header_orig.reserved);
-    EXPECT_NE(header_decoded.crc8, 0);
-}
-
-/*---------------------------------------------------------------------------*/
 /* Zero-Copy Tests                                                           */
 /*---------------------------------------------------------------------------*/
 

@@ -70,13 +70,11 @@ TEST(XglFrameProperties, CrcErrorDetection) {
             std::vector<uint8_t> corrupted = buffer;
             corrupted[22] ^= 0x01;  /* Flip one bit in header CRC16 */
             
-            /* Decode header and validate */
-            xgl_legacy_frame_header_t header;
-            xgl_frame_decode_header(&header, corrupted.data());
-            
-            /* Header CRC16 validation should fail */
-            bool valid = xgl_frame_validate_header_crc(&header);
-            EXPECT_FALSE(valid)
+            xgl_wire_header_t header = {};
+            EXPECT_EQ(xgl_wire_decode_header(&header,
+                                             corrupted.data(),
+                                             XGL_FRAME_HEADER_SIZE),
+                      XGL_ERR_CRC_FAILED)
                 << "Header CRC16 corruption not detected at iteration " << iteration;
         }
         
@@ -109,11 +107,11 @@ TEST(XglFrameProperties, CrcErrorDetection) {
         
         /* Test that valid frame passes both CRC checks */
         {
-            /* Decode header and validate header CRC16 */
-            xgl_legacy_frame_header_t header;
-            xgl_frame_decode_header(&header, buffer.data());
-            bool valid_header_crc = xgl_frame_validate_header_crc(&header);
-            EXPECT_TRUE(valid_header_crc)
+            xgl_wire_header_t header = {};
+            EXPECT_EQ(xgl_wire_decode_header(&header,
+                                             buffer.data(),
+                                             XGL_FRAME_HEADER_SIZE),
+                      XGL_OK)
                 << "Valid header CRC16 rejected at iteration " << iteration;
             
             /* Parse the valid frame */
@@ -214,37 +212,35 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
         ASSERT_EQ(err, XGL_OK);
         ASSERT_EQ(parsed_len, bytes_written);
         
-        /* Decode parsed header */
-        xgl_legacy_frame_header_t parsed_header;
-        xgl_frame_decode_header(&parsed_header, parsed_buffer);
+        xgl_wire_header_t parsed_header = {};
+        ASSERT_EQ(xgl_wire_decode_header(&parsed_header,
+                                         parsed_buffer,
+                                         XGL_FRAME_HEADER_SIZE),
+                  XGL_OK);
         
         /* Verify all header fields match */
         EXPECT_EQ(parsed_buffer[0], XGL_WIRE_MAGIC_0)
             << "Magic byte 0 mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_buffer[1], XGL_WIRE_MAGIC_1)
             << "Magic byte 1 mismatch at iteration " << iteration;
-        EXPECT_EQ(xgl_frame_get_version(&parsed_header), XGL_PROTOCOL_VERSION)
+        EXPECT_EQ(parsed_header.version, XGL_WIRE_VERSION)
             << "Version mismatch at iteration " << iteration;
-        EXPECT_EQ(xgl_frame_get_datatype(&parsed_header), data_type)
+        EXPECT_EQ(parsed_header.packet_type, data_type)
             << "Data type mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_header.source_id, source_id)
             << "Source ID mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_header.target_id, target_id)
             << "Target ID mismatch at iteration " << iteration;
-        EXPECT_EQ(parsed_header.seq_num, seq_num)
+        EXPECT_EQ(parsed_header.packet_number, seq_num)
             << "Sequence number mismatch at iteration " << iteration;
-        EXPECT_EQ(parsed_header.ack_num, 0)
-            << "ACK number should not be encoded in the production base header";
-        EXPECT_EQ(parsed_header.data_len, payload_len)
+        EXPECT_EQ(parsed_header.payload_len, payload_len)
             << "Payload length mismatch at iteration " << iteration;
         
-        /* Verify attributes */
-        uint8_t parsed_reliable = xgl_frame_get_reliable(parsed_header.attr_lsb);
-        uint8_t expected_reliable = reliable ? 1 : 0;  /* 0=NONE, 1=TX, 2=ACK */
-        EXPECT_EQ(parsed_reliable, expected_reliable)
+        uint8_t expected_reliable = reliable ? XGL_WIRE_FLAG_ACK_ELICITING : 0U;
+        EXPECT_EQ(parsed_header.flags & XGL_WIRE_FLAG_ACK_ELICITING, expected_reliable)
             << "Reliable flag mismatch at iteration " << iteration;
         
-        EXPECT_EQ(xgl_frame_get_priority(parsed_header.attr_lsb), priority)
+        EXPECT_EQ(parsed_header.traffic_class & XGL_ATTR_PRIORITY_MASK, priority)
             << "Priority mismatch at iteration " << iteration;
         
         /* Verify payload data */
@@ -305,47 +301,38 @@ TEST(XglFrameProperties, FieldValidation) {
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &bytes_written);
         ASSERT_EQ(err, XGL_OK);
         
-        /* Decode and validate header fields are within valid ranges */
-        xgl_legacy_frame_header_t header;
-        xgl_frame_decode_header(&header, buffer.data());
+        xgl_wire_header_t header = {};
+        ASSERT_EQ(xgl_wire_decode_header(&header,
+                                         buffer.data(),
+                                         XGL_FRAME_HEADER_SIZE),
+                  XGL_OK);
         
         EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0)
             << "Magic byte 0 validation failed at iteration " << iteration;
         EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1)
             << "Magic byte 1 validation failed at iteration " << iteration;
         
-        /* Validate version (4 bits, 0-15) */
-        uint8_t version = xgl_frame_get_version(&header);
-        EXPECT_LE(version, 0x0F)
+        EXPECT_EQ(header.version, XGL_WIRE_VERSION)
             << "Version out of range at iteration " << iteration;
         
-        /* Validate data type (4 bits, 0-15) */
-        uint8_t parsed_data_type = xgl_frame_get_datatype(&header);
-        EXPECT_LE(parsed_data_type, 0x0F)
+        EXPECT_LE(header.packet_type, 0x7F)
             << "Data type out of range at iteration " << iteration;
-        EXPECT_EQ(parsed_data_type, data_type)
+        EXPECT_EQ(header.packet_type, data_type)
             << "Data type mismatch at iteration " << iteration;
         
-        /* Validate priority (3 bits, 0-7) */
-        uint8_t parsed_priority = xgl_frame_get_priority(header.attr_lsb);
+        uint8_t parsed_priority = (uint8_t)(header.traffic_class & XGL_ATTR_PRIORITY_MASK);
         EXPECT_LE(parsed_priority, 0x07)
             << "Priority out of range at iteration " << iteration;
         EXPECT_EQ(parsed_priority, priority)
             << "Priority mismatch at iteration " << iteration;
         
-        /* Validate reliable flag (2 bits, specific values) */
-        uint8_t parsed_reliable = xgl_frame_get_reliable(header.attr_lsb);
-        EXPECT_TRUE(parsed_reliable == 0 || parsed_reliable == 1 || parsed_reliable == 2)
-            << "Reliable flag has invalid value at iteration " << iteration
-            << " (value=" << (int)parsed_reliable << ")";
+        uint8_t expected_reliable = reliable ? XGL_WIRE_FLAG_ACK_ELICITING : 0U;
+        EXPECT_EQ(header.flags & XGL_WIRE_FLAG_ACK_ELICITING, expected_reliable)
+            << "Reliable flag mismatch at iteration " << iteration;
         
         /* Validate data length matches payload */
-        EXPECT_EQ(header.data_len, payload_len)
+        EXPECT_EQ(header.payload_len, payload_len)
             << "Data length validation failed at iteration " << iteration;
-        
-        /* Validate header CRC16 */
-        EXPECT_TRUE(xgl_frame_validate_header_crc(&header))
-            << "Header CRC16 validation failed at iteration " << iteration;
         
         /* Validate CRC16 */
         size_t crc16_offset = bytes_written - 2;

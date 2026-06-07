@@ -16,58 +16,9 @@
 /* Protocol Version                                                          */
 /*---------------------------------------------------------------------------*/
 
-#define XGL_PROTOCOL_VERSION    0x01
 #define XGL_FRAME_DEFAULT_TTL   8U
 
 #define XGL_AUTH_TRAILER_TAG_CAPACITY 32U
-
-/*---------------------------------------------------------------------------*/
-/* Frame Header Encoding/Decoding                                            */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Encode frame header to buffer
- * \note            Header already contains SOF, so we encode the entire structure
- */
-void xgl_frame_encode_header(uint8_t* buffer, const xgl_legacy_frame_header_t* header) {
-    if (buffer == NULL || header == NULL) {
-        return;
-    }
-
-    uint8_t flags = 0;
-    uint8_t reliable = (uint8_t)(header->attr_lsb & XGL_ATTR_RELIABLE_MASK);
-    if (reliable == XGL_ATTR_RELIABLE_TX) {
-        flags |= XGL_WIRE_FLAG_ACK_ELICITING;
-    } else if (reliable == XGL_ATTR_RELIABLE_ACK) {
-        flags |= XGL_WIRE_FLAG_CONTROL;
-    }
-    if ((header->attr_lsb & XGL_ATTR_FRAGMENT_MASK) != 0U) {
-        flags |= XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
-    }
-
-    uint8_t packet_type = xgl_frame_get_datatype(header);
-    if (packet_type == XGL_PACKET_TYPE_INVALID) {
-        packet_type = XGL_PACKET_TYPE_DATA;
-    }
-
-    xgl_wire_header_t wire = {
-        .version = XGL_WIRE_VERSION,
-        .header_len = XGL_WIRE_BASE_HEADER_SIZE,
-        .packet_type = (reliable == XGL_ATTR_RELIABLE_ACK) ?
-                       XGL_PACKET_TYPE_ACK : packet_type,
-        .flags = flags,
-        .ttl = header->reserved,
-        .traffic_class = (uint8_t)(header->attr_lsb & XGL_ATTR_PRIORITY_MASK),
-        .source_id = header->source_id,
-        .target_id = header->target_id,
-        .connection_id = (uint32_t)(header->attr_msb & XGL_ATTR_SESSION_MASK),
-        .packet_number = header->seq_num,
-        .payload_len = header->data_len,
-        .header_crc16 = 0
-    };
-
-    (void)xgl_wire_encode_header(buffer, XGL_WIRE_BASE_HEADER_SIZE, &wire);
-}
 
 static xgl_error_t encode_frame_wire_header(uint8_t* buffer,
                                             size_t buffer_size,
@@ -102,49 +53,6 @@ static xgl_error_t encode_frame_wire_header(uint8_t* buffer,
     *header_len = produced_header_len;
     return XGL_OK;
 }
-
-/**
- * \brief           Decode frame header from buffer
- */
-void xgl_frame_decode_header(xgl_legacy_frame_header_t* header, const uint8_t* buffer) {
-    if (header == NULL || buffer == NULL) {
-        return;
-    }
-
-    xgl_wire_header_t wire;
-    memset(&wire, 0, sizeof(wire));
-    if (xgl_wire_decode_header(&wire, buffer, XGL_WIRE_BASE_HEADER_SIZE) != XGL_OK) {
-        memset(header, 0, sizeof(*header));
-        return;
-    }
-
-    header->sof = XGL_SOF;
-    header->version_datatype = 0;
-    xgl_frame_set_version(header, XGL_PROTOCOL_VERSION);
-    xgl_frame_set_datatype(header, wire.packet_type);
-    header->source_id = wire.source_id;
-    header->target_id = wire.target_id;
-    header->attr_lsb = (uint8_t)(wire.traffic_class & XGL_ATTR_PRIORITY_MASK);
-    if ((wire.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
-        header->attr_lsb |= XGL_ATTR_RELIABLE_TX;
-    } else if (wire.packet_type == XGL_PACKET_TYPE_ACK ||
-               (wire.flags & XGL_WIRE_FLAG_CONTROL) != 0U) {
-        header->attr_lsb |= XGL_ATTR_RELIABLE_ACK;
-    }
-    if ((wire.flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U) {
-        header->attr_lsb |= XGL_ATTR_FRAGMENT_MASK;
-    }
-    header->attr_msb = (uint8_t)(wire.connection_id & XGL_ATTR_SESSION_MASK);
-    header->data_len = wire.payload_len;
-    header->seq_num = (uint8_t)(wire.packet_number & 0xFFU);
-    header->ack_num = 0;
-    header->reserved = wire.ttl;
-    header->crc8 = (uint8_t)(wire.header_crc16 & 0xFFU);
-}
-
-/*---------------------------------------------------------------------------*/
-/* Frame Building                                                            */
-/*---------------------------------------------------------------------------*/
 
 /**
  * \brief           Build frame from parameters
@@ -471,30 +379,32 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     
     /* Calculate header position (before data) */
     size_t header_offset = data_offset - XGL_FRAME_HEADER_SIZE;
-    
-    /* Build header structure */
-    xgl_legacy_frame_header_t header;
-    memset(&header, 0, sizeof(header));
-    header.sof = XGL_SOF;
-    xgl_frame_set_version(&header, XGL_PROTOCOL_VERSION);
-    xgl_frame_set_datatype(&header, data_type);
-    header.source_id = source_id;
-    header.target_id = target_id;
-    header.data_len = (uint16_t)data_len;
-    header.seq_num = seq_num;
-    header.ack_num = ack_num;
-    header.reserved = XGL_FRAME_DEFAULT_TTL;
-    
-    /* Set attributes */
-    header.attr_lsb = 0;
-    header.attr_msb = 0;
-    xgl_frame_set_reliable(&header.attr_lsb, reliable);
-    xgl_frame_set_priority(&header.attr_lsb, priority);
-    
-    /* Encode header to buffer */
-    xgl_frame_encode_header(&buffer[header_offset], &header);
-    
-    /* Header CRC is generated by xgl_frame_encode_header. */
+
+    (void)ack_num;
+    uint8_t flags = reliable ? XGL_WIRE_FLAG_ACK_ELICITING : 0U;
+    uint8_t packet_type = (data_type != XGL_PACKET_TYPE_INVALID) ?
+                          data_type : XGL_PACKET_TYPE_DATA;
+    xgl_wire_header_t wire = {
+        .version = XGL_WIRE_VERSION,
+        .header_len = XGL_WIRE_BASE_HEADER_SIZE,
+        .packet_type = packet_type,
+        .flags = flags,
+        .ttl = XGL_FRAME_DEFAULT_TTL,
+        .traffic_class = (uint8_t)(priority & XGL_ATTR_PRIORITY_MASK),
+        .source_id = source_id,
+        .target_id = target_id,
+        .connection_id = 0,
+        .packet_number = seq_num,
+        .payload_len = (uint16_t)data_len,
+        .header_crc16 = 0
+    };
+
+    xgl_error_t err = xgl_wire_encode_header(&buffer[header_offset],
+                                             XGL_WIRE_BASE_HEADER_SIZE,
+                                             &wire);
+    if (err != XGL_OK) {
+        return err;
+    }
     
     /* Calculate and write frame CRC16 */
     size_t crc_offset = data_offset + data_len;
@@ -503,25 +413,4 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     
     *frame_len = required_size;
     return XGL_OK;
-}
-
-/*---------------------------------------------------------------------------*/
-/* Frame Validation                                                          */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Validate frame header CRC8
- */
-bool xgl_frame_validate_header_crc(const xgl_legacy_frame_header_t* header) {
-    if (header == NULL) {
-        return false;
-    }
-
-    if (header->sof != XGL_SOF ||
-        header->source_id == 0U ||
-        header->target_id == 0U) {
-        return false;
-    }
-
-    return true;
 }
