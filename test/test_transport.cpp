@@ -228,6 +228,62 @@ TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, ReliableSendUsesMonotonicPacketNumbersPastEightBitWrap) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.window_size = 8;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+
+    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    ASSERT_NE(peer, nullptr);
+
+    xgl_reliable_clear(&peer->reliable_queue);
+    xgl_window_reset(&peer->tx_window);
+    xgl_window_reset(&ctx.window);
+    peer->tx_window.send_base_packet_number = 254;
+    peer->tx_window.next_packet_number = 254;
+    ctx.window.send_base_packet_number = 254;
+    ctx.window.next_packet_number = 254;
+    spy.sent_packets.clear();
+    spy.send_count = 0;
+
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    }
+
+    ASSERT_EQ(spy.sent_packets.size(), 3U);
+    EXPECT_EQ(spy.sent_packets[0].packet_number, 254U);
+    EXPECT_EQ(spy.sent_packets[1].packet_number, 255U);
+    EXPECT_EQ(spy.sent_packets[2].packet_number, 256U);
+    EXPECT_EQ(spy.sent_packets[2].seq_num, 0U);
+
+    EXPECT_NE(xgl_reliable_find_packet_number(&peer->reliable_queue, 254, 2), nullptr);
+    EXPECT_NE(xgl_reliable_find_packet_number(&peer->reliable_queue, 255, 2), nullptr);
+    EXPECT_NE(xgl_reliable_find_packet_number(&peer->reliable_queue, 256, 2), nullptr);
+    EXPECT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 3U);
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, AckFromUnexpectedSourceIsRejected) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
