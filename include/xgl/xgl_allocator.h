@@ -26,7 +26,9 @@ extern "C" {
 /**
  * \brief           Get default allocator (malloc/free wrapper)
  * \return          Pointer to default allocator structure
- * \note            The default allocator uses standard malloc/free
+ * \note            The default allocator uses standard malloc/free when
+ *                  XGL_ALLOW_FALLBACK_MALLOC is 1. Strict no-heap builds
+ *                  return NULL.
  */
 xgl_allocator_t* xgl_allocator_get_default(void);
 

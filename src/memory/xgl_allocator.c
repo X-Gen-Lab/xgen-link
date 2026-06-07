@@ -15,6 +15,7 @@
 /**
  * \brief           Default malloc wrapper
  */
+#if XGL_ALLOW_FALLBACK_MALLOC
 static void* default_malloc(size_t size) {
     return malloc(size);
 }
@@ -34,6 +35,7 @@ static xgl_allocator_t default_allocator = {
     .free = default_free,
     .user_data = NULL
 };
+#endif
 
 static void* tracking_malloc(size_t size);
 static void tracking_free(void* ptr);
@@ -44,7 +46,11 @@ static void tracking_free_impl(xgl_tracking_allocator_t* tracker, void* ptr);
  * \brief           Get default allocator
  */
 xgl_allocator_t* xgl_allocator_get_default(void) {
+#if XGL_ALLOW_FALLBACK_MALLOC
     return &default_allocator;
+#else
+    return NULL;
+#endif
 }
 
 /*---------------------------------------------------------------------------*/
