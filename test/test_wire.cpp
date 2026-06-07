@@ -107,6 +107,53 @@ TEST(XglWireTest, EncodesAndWalksTlvExtensions) {
     EXPECT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_ERR_NOT_FOUND);
 }
 
+TEST(XglWireTest, EncodesAndDecodesAckRangeExtension) {
+    const xgl_wire_ack_range_t ranges[] = {
+        {.gap = 0, .length = 3},
+        {.gap = 2, .length = 1}
+    };
+    uint8_t value[32] = {};
+    size_t value_len = 0;
+
+    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(value,
+                                                  sizeof(value),
+                                                  0x01020304U,
+                                                  250U,
+                                                  ranges,
+                                                  2,
+                                                  &value_len),
+              XGL_OK);
+
+    EXPECT_EQ(value_len, 17U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[0]), 0x01020304U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[4]), 250U);
+    EXPECT_EQ(value[8], 2U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[9]), 0U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[11]), 3U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[13]), 2U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[15]), 1U);
+
+    uint32_t largest_ack = 0;
+    uint32_t ack_delay_us = 0;
+    xgl_wire_ack_range_t decoded_ranges[2] = {};
+    size_t decoded_count = 0;
+    ASSERT_EQ(xgl_wire_decode_ack_range_ext_value(value,
+                                                  value_len,
+                                                  &largest_ack,
+                                                  &ack_delay_us,
+                                                  decoded_ranges,
+                                                  2,
+                                                  &decoded_count),
+              XGL_OK);
+    EXPECT_EQ(largest_ack, 0x01020304U);
+    EXPECT_EQ(ack_delay_us, 250U);
+    EXPECT_EQ(decoded_count, 2U);
+    EXPECT_EQ(decoded_ranges[0].gap, 0U);
+    EXPECT_EQ(decoded_ranges[0].length, 3U);
+    EXPECT_EQ(decoded_ranges[1].gap, 2U);
+    EXPECT_EQ(decoded_ranges[1].length, 1U);
+}
+
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
     uint8_t invalid[] = {
         XGL_WIRE_EXT_ACK_RANGE,
