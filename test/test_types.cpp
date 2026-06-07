@@ -28,6 +28,8 @@
 #error "xgl/xgl.h must not expose internal protocol layer headers in the production API"
 #endif
 
+#include "xgl/xgl_packet_pool.h"
+
 /*---------------------------------------------------------------------------*/
 /* Type Size Tests                                                           */
 /*---------------------------------------------------------------------------*/

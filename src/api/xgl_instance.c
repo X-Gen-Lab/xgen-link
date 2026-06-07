@@ -5,12 +5,14 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_allocator.h>
 #include <xgl/xgl_tiered_pool.h>
 #include <xgl/xgl_packet_pool.h>
 #include <xgl/xgl_route.h>
 #include <xgl/xgl_window.h>
 #include <xgl/xgl_rtt.h>
 #include <xgl/xgl_parser.h>
+#include <xgl/xgl_time.h>
 #include "xgl_instance_internal.h"
 #include <string.h>
 

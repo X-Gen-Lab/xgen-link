@@ -5,6 +5,7 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_network.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/

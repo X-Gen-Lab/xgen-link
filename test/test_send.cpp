@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_network.h>
 #include <xgl/xgl_wire.h>
 #include <cstring>
 #include <vector>

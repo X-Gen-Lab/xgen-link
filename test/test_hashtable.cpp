@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_hashtable.h>
 #include <cstring>
 
 /*---------------------------------------------------------------------------*/

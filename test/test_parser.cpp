@@ -7,6 +7,8 @@
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
 #include <xgl/xgl_crc.h>
+#include <xgl/xgl_frame.h>
+#include <xgl/xgl_parser.h>
 #include <xgl/xgl_serialize.h>
 #include <xgl/xgl_wire.h>
 #include <vector>

@@ -165,47 +165,10 @@ extern "C" {
 /* Public Header Includes                                                    */
 /*---------------------------------------------------------------------------*/
 
-/* Core types and error handling */
+/* Public API types, errors, and configuration constants */
 #include "xgl_error.h"
 #include "xgl_types.h"
-#include "xgl_security.h"
-
-/* Data link layer */
-#include "xgl_crc.h"
-#include "xgl_serialize.h"
-#include "xgl_frame.h"
-#include "xgl_parser.h"
-#include "xgl_datalink.h"
-
-/* Network layer */
-#include "xgl_route.h"
-#include "xgl_network.h"
-
-/* Transport layer */
-#include "xgl_rtt.h"
-#include "xgl_window.h"
-#include "xgl_reliable.h"
-#include "xgl_fragment.h"
-#include "xgl_transport.h"
-
-/* Memory management */
-#include "xgl_allocator.h"
-#include "xgl_mempool.h"
-#include "xgl_tiered_pool.h"
-#include "xgl_packet_pool.h"
-
-/* Optional modules */
-#include "xgl_codec.h"
-
-/* Utilities */
-#include "xgl_list.h"
-#include "xgl_hashtable.h"
-
-/* Platform abstraction */
-#include "xgl_platform.h"
-#include "xgl_mutex.h"
-#include "xgl_time.h"
-#include "xgl_atomic.h"
+#include "xgl_config.h"
 
 /*---------------------------------------------------------------------------*/
 /* Version Information                                                       */
