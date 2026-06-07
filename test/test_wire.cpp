@@ -6,6 +6,66 @@
 
 #include <cstring>
 
+static xgl_error_t wire_test_auth_sign(uint32_t key_id,
+                                       const uint8_t* aad,
+                                       size_t aad_len,
+                                       const uint8_t* payload,
+                                       size_t payload_len,
+                                       uint8_t* tag,
+                                       size_t tag_capacity,
+                                       size_t* tag_len,
+                                       void* user_data) {
+    (void)user_data;
+    if (tag == nullptr || tag_len == nullptr || tag_capacity < 4U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint32_t acc = key_id;
+    for (size_t i = 0; i < aad_len; ++i) {
+        acc = (acc * 33U) ^ aad[i];
+    }
+    for (size_t i = 0; i < payload_len; ++i) {
+        acc = (acc * 33U) ^ payload[i];
+    }
+
+    xgl_serialize_u32_le(tag, acc);
+    *tag_len = 4U;
+    return XGL_OK;
+}
+
+static xgl_error_t wire_test_auth_verify(uint32_t key_id,
+                                         const uint8_t* aad,
+                                         size_t aad_len,
+                                         const uint8_t* payload,
+                                         size_t payload_len,
+                                         const uint8_t* tag,
+                                         size_t tag_len,
+                                         bool* valid,
+                                         void* user_data) {
+    (void)user_data;
+    if (tag == nullptr || valid == nullptr) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    uint8_t expected[4] = {};
+    size_t expected_len = 0;
+    xgl_error_t err = wire_test_auth_sign(key_id,
+                                          aad,
+                                          aad_len,
+                                          payload,
+                                          payload_len,
+                                          expected,
+                                          sizeof(expected),
+                                          &expected_len,
+                                          nullptr);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    *valid = (tag_len == expected_len && std::memcmp(tag, expected, expected_len) == 0);
+    return XGL_OK;
+}
+
 TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;
@@ -299,6 +359,56 @@ TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
     EXPECT_EQ(next_hop, 0x5678U);
     EXPECT_EQ(route_epoch, 0xCAFEBABEU);
     EXPECT_EQ(metric, 9U);
+}
+
+TEST(XglWireTest, AppendsAndVerifiesAuthenticationTrailer) {
+    xgl_auth_provider_t provider = {
+        .sign = wire_test_auth_sign,
+        .verify = wire_test_auth_verify,
+        .user_data = nullptr
+    };
+
+    uint8_t frame[64] = {
+        'X', 'G', 2, 24,
+        1, 0, 8, 0,
+        0x34, 0x12, 0x78, 0x56,
+        'p', 'i', 'n', 'g'
+    };
+    const size_t aad_len = 12;
+    const size_t payload_len = 4;
+    size_t frame_len = 0;
+
+    ASSERT_EQ(xgl_wire_append_auth_trailer(frame,
+                                           sizeof(frame),
+                                           aad_len,
+                                           payload_len,
+                                           7,
+                                           &provider,
+                                           &frame_len),
+              XGL_OK);
+    EXPECT_EQ(frame_len, aad_len + payload_len + 4U);
+
+    bool valid = false;
+    EXPECT_EQ(xgl_wire_verify_auth_trailer(frame,
+                                           frame_len,
+                                           aad_len,
+                                           payload_len,
+                                           7,
+                                           &provider,
+                                           &valid),
+              XGL_OK);
+    EXPECT_TRUE(valid);
+
+    frame[13] ^= 0x01U;
+    EXPECT_EQ(xgl_wire_verify_auth_trailer(frame,
+                                           frame_len,
+                                           aad_len,
+                                           payload_len,
+                                           7,
+                                           &provider,
+                                           &valid),
+              XGL_OK);
+    EXPECT_FALSE(valid);
 }
 
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
