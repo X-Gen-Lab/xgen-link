@@ -78,9 +78,9 @@ TEST(XglFrameTest, BuildBasicFrame) {
     xgl_frame_params_t params = {
         .source_id = 0x10,
         .target_id = 0x20,
-        .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .connection_id = 0x01020304,
+        .packet_number = 0x11223344,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = true,
@@ -90,23 +90,19 @@ TEST(XglFrameTest, BuildBasicFrame) {
     xgl_error_t result = xgl_frame_build(&frame, &params);
     
     EXPECT_EQ(result, XGL_OK);
-    EXPECT_EQ(frame.header.sof, XGL_SOF);
-    EXPECT_EQ(xgl_frame_get_version(&frame.header), 0x01);
-    EXPECT_EQ(xgl_frame_get_datatype(&frame.header), 0x05);
+    EXPECT_EQ(frame.header.version, XGL_WIRE_VERSION);
+    EXPECT_EQ(frame.header.header_len, XGL_WIRE_BASE_HEADER_SIZE);
+    EXPECT_EQ(frame.header.packet_type, XGL_PACKET_TYPE_DATA);
     EXPECT_EQ(frame.header.source_id, 0x10);
     EXPECT_EQ(frame.header.target_id, 0x20);
-    EXPECT_EQ(frame.header.data_len, sizeof(payload));
-    EXPECT_EQ(frame.header.seq_num, 0x42);
-    EXPECT_EQ(frame.header.ack_num, 0x00);
+    EXPECT_EQ(frame.header.connection_id, 0x01020304U);
+    EXPECT_EQ(frame.header.packet_number, 0x11223344U);
+    EXPECT_EQ(frame.header.payload_len, sizeof(payload));
     EXPECT_EQ(frame.payload, payload);
     EXPECT_EQ(frame.payload_len, sizeof(payload));
     
-    /* Check attributes */
-    uint8_t reliable_attr = xgl_frame_get_reliable(frame.header.attr_lsb);
-    EXPECT_EQ(reliable_attr, XGL_ATTR_RELIABLE_TX >> XGL_ATTR_RELIABLE_SHIFT);
-    
-    uint8_t priority = xgl_frame_get_priority(frame.header.attr_lsb);
-    EXPECT_EQ(priority, 3);
+    EXPECT_NE(frame.header.flags & XGL_WIRE_FLAG_ACK_ELICITING, 0);
+    EXPECT_EQ(frame.header.traffic_class & XGL_ATTR_PRIORITY_MASK, 3);
 }
 
 TEST(XglFrameTest, BuildFrameNullPointer) {
