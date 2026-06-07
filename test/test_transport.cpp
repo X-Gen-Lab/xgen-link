@@ -8,6 +8,7 @@
 #include <xgl/xgl.h>
 #include <xgl/xgl_transport.h>
 #include <xgl/xgl_reliable.h>
+#include <xgl/xgl_wire.h>
 #include <cstring>
 #include <vector>
 
@@ -140,6 +141,88 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
 
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &ack_packet), XGL_OK);
     EXPECT_EQ(xgl_reliable_get_count(&find_peer(&ctx, 2)->reliable_queue), 0);
+    EXPECT_TRUE(xgl_transport_can_send(&ctx));
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.window_size = 8;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    for (int i = 0; i < 4; ++i) {
+        xgl_tx_data_t tx_data = {
+            .target_id = 2,
+            .data_type = 1,
+            .data = payload,
+            .data_len = sizeof(payload),
+            .reliable = true,
+            .priority = 0,
+            .timeout_ms = 100
+        };
+        ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    }
+
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    ASSERT_NE(peer, nullptr);
+    ASSERT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 4U);
+
+    uint8_t ack_value[16] = {};
+    size_t ack_value_len = 0;
+    const xgl_wire_ack_range_t ranges[] = {
+        {.gap = 0, .length = 4}
+    };
+    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(ack_value,
+                                                  sizeof(ack_value),
+                                                  3,
+                                                  0,
+                                                  ranges,
+                                                  1,
+                                                  &ack_value_len),
+              XGL_OK);
+
+    uint8_t ext[32] = {};
+    size_t ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(ext,
+                                  sizeof(ext),
+                                  XGL_WIRE_EXT_ACK_RANGE,
+                                  ack_value,
+                                  ack_value_len,
+                                  &ext_len),
+              XGL_OK);
+
+    xgl_packet_data_t ack_ext_data = {
+        .ref_count = 1,
+        .data_len = ext_len,
+        .data = ext,
+        .owned_data = nullptr
+    };
+    xgl_packet_t ack_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 3,
+        .session_id = peer->session_id,
+        .packet_type = XGL_PACKET_TYPE_ACK,
+        .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
+        .data_type = 0,
+        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .priority = 7,
+        .data = &ack_ext_data
+    };
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &ack_packet), XGL_OK);
+    EXPECT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 0U);
     EXPECT_TRUE(xgl_transport_can_send(&ctx));
 
     xgl_transport_destroy(&ctx);
