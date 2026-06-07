@@ -26,6 +26,49 @@ static void reliable_free(xgl_allocator_t* allocator, void* ptr) {
     xgl_free(allocator, ptr);
 }
 
+static size_t reliable_index_bucket(uint16_t target_id,
+                                    uint32_t packet_number) {
+    uint32_t mixed = packet_number ^ ((uint32_t)target_id * 2654435761UL);
+    return (size_t)(mixed % XGL_RELIABLE_INDEX_BUCKETS);
+}
+
+static void reliable_index_packet(xgl_reliable_queue_t* queue,
+                                  xgl_reliable_packet_t* packet) {
+    if (queue == NULL || packet == NULL) {
+        return;
+    }
+
+    size_t bucket = reliable_index_bucket(packet->target_id,
+                                          packet->packet_number);
+    packet->index_next = queue->index_buckets[bucket];
+    queue->index_buckets[bucket] = packet;
+}
+
+static void reliable_unindex_packet(xgl_reliable_queue_t* queue,
+                                    xgl_reliable_packet_t* packet) {
+    if (queue == NULL || packet == NULL) {
+        return;
+    }
+
+    size_t bucket = reliable_index_bucket(packet->target_id,
+                                          packet->packet_number);
+    xgl_reliable_packet_t* previous = NULL;
+    xgl_reliable_packet_t* current = queue->index_buckets[bucket];
+    while (current != NULL) {
+        if (current == packet) {
+            if (previous == NULL) {
+                queue->index_buckets[bucket] = current->index_next;
+            } else {
+                previous->index_next = current->index_next;
+            }
+            current->index_next = NULL;
+            return;
+        }
+        previous = current;
+        current = current->index_next;
+    }
+}
+
 /**
  * \brief           Free reliable packet and its data
  */
@@ -63,6 +106,8 @@ xgl_error_t xgl_reliable_init(xgl_reliable_queue_t* queue,
     if (queue == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
+
+    memset(queue, 0, sizeof(*queue));
     
     /* Initialize wait-ACK list */
     xgl_list_init(&queue->wait_ack_list);
@@ -146,6 +191,7 @@ xgl_error_t xgl_reliable_add_packet_number(xgl_reliable_queue_t* queue,
     
     /* Add to wait-ACK list */
     xgl_list_insert_tail(&queue->wait_ack_list, &packet->node);
+    reliable_index_packet(queue, packet);
     
     return XGL_OK;
 }
@@ -189,20 +235,13 @@ xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
         return XGL_ERR_NULL_POINTER;
     }
     
-    /* Find packet with matching packet number and target ID */
-    xgl_list_node_t* node;
-    XGL_LIST_FOR_EACH(&queue->wait_ack_list, node) {
-        xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        
-        if (packet->packet_number == packet_number && packet->target_id == target_id) {
-            /* Remove from list */
-            xgl_list_remove(&queue->wait_ack_list, node);
-            
-            /* Free packet */
-            free_reliable_packet(queue, packet);
-            
-            return XGL_OK;
-        }
+    xgl_reliable_packet_t* packet =
+        xgl_reliable_find_packet_number(queue, packet_number, target_id);
+    if (packet != NULL) {
+        reliable_unindex_packet(queue, packet);
+        xgl_list_remove(&queue->wait_ack_list, &packet->node);
+        free_reliable_packet(queue, packet);
+        return XGL_OK;
     }
     
     return XGL_ERR_SEQUENCE_ERROR;  /* Packet not found */
@@ -294,6 +333,7 @@ uint32_t xgl_reliable_process_timeouts(xgl_reliable_queue_t* queue,
             if (packet->retry_count >= queue->max_retry_count) {
                 /* Remove from list */
                 xgl_list_remove(&queue->wait_ack_list, node);
+                reliable_unindex_packet(queue, packet);
                 
                 /* Return packet to caller for error handling */
                 if (retry_exhausted != NULL && *retry_exhausted == NULL) {
@@ -363,8 +403,11 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
     xgl_list_node_t* node;
     while ((node = xgl_list_remove_head(&queue->wait_ack_list)) != NULL) {
         xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+        reliable_unindex_packet(queue, packet);
         free_reliable_packet(queue, packet);
     }
+
+    memset(queue->index_buckets, 0, sizeof(queue->index_buckets));
 }
 
 xgl_reliable_packet_t* xgl_reliable_find_packet_number(const xgl_reliable_queue_t* queue,
@@ -374,14 +417,13 @@ xgl_reliable_packet_t* xgl_reliable_find_packet_number(const xgl_reliable_queue_
         return NULL;
     }
     
-    /* Search for packet with matching packet number and target ID */
-    xgl_list_node_t* node;
-    XGL_LIST_FOR_EACH(&queue->wait_ack_list, node) {
-        xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        
+    size_t bucket = reliable_index_bucket(target_id, packet_number);
+    xgl_reliable_packet_t* packet = queue->index_buckets[bucket];
+    while (packet != NULL) {
         if (packet->packet_number == packet_number && packet->target_id == target_id) {
             return packet;
         }
+        packet = packet->index_next;
     }
     
     return NULL;

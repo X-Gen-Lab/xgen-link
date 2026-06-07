@@ -22,12 +22,15 @@ extern "C" {
 /* Reliable Packet Structure                                                */
 /*---------------------------------------------------------------------------*/
 
+#define XGL_RELIABLE_INDEX_BUCKETS 32U
+
 /**
  * \brief           Reliable packet structure for wait-ACK queue
  * \note            Contains packet data and retransmission state
  */
-typedef struct {
+typedef struct xgl_reliable_packet_s {
     xgl_list_node_t node;           /**< List node for queue */
+    struct xgl_reliable_packet_s* index_next; /**< Hash bucket link */
     
     /* Packet data */
     uint8_t* data;                  /**< Packet data buffer */
@@ -71,6 +74,7 @@ typedef struct {
  */
 typedef struct {
     xgl_list_t wait_ack_list;       /**< List of packets waiting for ACK */
+    xgl_reliable_packet_t* index_buckets[XGL_RELIABLE_INDEX_BUCKETS]; /**< Packet lookup buckets */
     uint8_t max_retry_count;        /**< Maximum retry count */
     xgl_allocator_t* allocator;     /**< Memory allocator */
 } xgl_reliable_queue_t;
