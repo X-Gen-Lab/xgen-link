@@ -6,6 +6,7 @@
 
 #include "xgl/xgl_tiered_pool.h"
 #include "xgl/xgl_allocator.h"
+#include <stdint.h>
 #include <string.h>
 
 static bool tiered_pool_size_overflows(size_t count, size_t block_size) {
@@ -25,6 +26,25 @@ static int tiered_pool_init_one(xgl_mempool_t* mempool,
     }
 
     return xgl_mempool_init(mempool, buffer, count * block_size, block_size);
+}
+
+static bool tiered_pool_contains_block(const xgl_mempool_t* mempool,
+                                       const void* ptr) {
+    if (mempool == NULL || mempool->pool == NULL || ptr == NULL ||
+        mempool->block_size == 0U || mempool->block_count == 0U ||
+        tiered_pool_size_overflows(mempool->block_count,
+                                   mempool->block_size)) {
+        return false;
+    }
+
+    uintptr_t start = (uintptr_t)mempool->pool;
+    uintptr_t end = start + (mempool->block_count * mempool->block_size);
+    uintptr_t address = (uintptr_t)ptr;
+    if (address < start || address >= end) {
+        return false;
+    }
+
+    return ((address - start) % mempool->block_size) == 0U;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -243,16 +263,14 @@ void xgl_tiered_pool_free(xgl_tiered_pool_t* pool, void* ptr, size_t size) {
     if (pool == NULL || ptr == NULL || size == 0) {
         return;
     }
-    
-    /* Determine which pool the memory belongs to based on size */
-    if (size <= XGL_TIERED_POOL_SMALL_SIZE && pool->small_count > 0) {
+
+    if (tiered_pool_contains_block(&pool->small_pool, ptr)) {
         xgl_mempool_free(&pool->small_pool, ptr);
-    } else if (size <= XGL_TIERED_POOL_MEDIUM_SIZE && pool->medium_count > 0) {
+    } else if (tiered_pool_contains_block(&pool->medium_pool, ptr)) {
         xgl_mempool_free(&pool->medium_pool, ptr);
-    } else if (size <= XGL_TIERED_POOL_LARGE_SIZE && pool->large_count > 0) {
+    } else if (tiered_pool_contains_block(&pool->large_pool, ptr)) {
         xgl_mempool_free(&pool->large_pool, ptr);
     }
-    /* If size doesn't match any pool, ignore (shouldn't happen in normal use) */
 }
 
 /*---------------------------------------------------------------------------*/
