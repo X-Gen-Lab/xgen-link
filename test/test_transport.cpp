@@ -1148,6 +1148,74 @@ TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, ReliableFragmentTimeoutRetransmitsWithFragmentExtension) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.enable_fragmentation = true;
+    config.max_frame_size = 48;
+    config.window_size = 8;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+        'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+        'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+        'Y', 'Z', '0', '1', '2', '3', '4', '5',
+        '6', '7', '8', '9', 'a', 'b', 'c', 'd'
+    };
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+
+    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    ASSERT_GT(spy.sent_packets.size(), 2U);
+    ASSERT_FALSE(spy.sent_extensions[1].empty());
+    const std::vector<uint8_t> first_fragment_ext = spy.sent_extensions[1];
+    const std::vector<uint8_t> first_fragment_payload = spy.sent_payloads[1];
+    const uint32_t first_fragment_packet_number = spy.sent_packets[1].packet_number;
+
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    ASSERT_NE(peer, nullptr);
+    xgl_reliable_packet_t* queued =
+        xgl_reliable_find_packet_number(&peer->reliable_queue, first_fragment_packet_number, 2);
+    ASSERT_NE(queued, nullptr);
+    queued->send_timestamp = 100;
+
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 201), XGL_OK);
+    ASSERT_EQ(tx_retries, 1U);
+    ASSERT_FALSE(spy.sent_extensions.back().empty());
+
+    EXPECT_EQ(spy.sent_extensions.back(), first_fragment_ext);
+    EXPECT_EQ(spy.sent_payloads.back(), first_fragment_payload);
+    EXPECT_TRUE(spy.last_packet.fragment);
+    EXPECT_EQ(spy.last_packet.flags & XGL_WIRE_FLAG_HAS_EXTENSIONS,
+              XGL_WIRE_FLAG_HAS_EXTENSIONS);
+
+    xgl_wire_ext_cursor_t cursor = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
+                                       spy.sent_extensions.back().data(),
+                                       spy.sent_extensions.back().size()),
+              XGL_OK);
+    xgl_wire_ext_t ext = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+    EXPECT_EQ(ext.type, XGL_WIRE_EXT_FRAGMENT);
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
