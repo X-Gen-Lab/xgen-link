@@ -211,6 +211,27 @@ TEST_F(XglParserTest, FindMagic) {
     EXPECT_EQ(parser.cache_len, 1);
 }
 
+TEST_F(XglParserTest, ResyncsOverlappingMagicAfterNoisePrefix) {
+    std::vector<uint8_t> payload = {0x21, 0x22, 0x23};
+    std::vector<uint8_t> frame = create_valid_frame(payload);
+
+    xgl_parse_result_t result = xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 0);
+    ASSERT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
+
+    for (size_t i = 0; i < frame.size(); ++i) {
+        result = xgl_parser_feed_byte(&parser, frame[i], 0);
+    }
+
+    EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
+
+    uint8_t* frame_buffer = nullptr;
+    size_t frame_len = 0;
+    ASSERT_EQ(xgl_parser_get_frame(&parser, &frame_buffer, &frame_len), XGL_OK);
+    EXPECT_EQ(frame_len, frame.size());
+    EXPECT_EQ(frame_buffer[0], XGL_WIRE_MAGIC_0);
+    EXPECT_EQ(frame_buffer[1], XGL_WIRE_MAGIC_1);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Complete Frame Parsing Tests                                             */
 /*---------------------------------------------------------------------------*/
