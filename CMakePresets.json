@@ -16,6 +16,15 @@
       }
     },
     {
+      "name": "gcc-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
       "name": "debug",
       "displayName": "Debug",
       "description": "Debug build with all features enabled",
@@ -53,6 +62,31 @@
       }
     },
     {
+      "name": "gcc-debug",
+      "displayName": "GCC Debug",
+      "description": "Debug build using GCC on Windows or MinGW-like environments",
+      "inherits": "gcc-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "XGL_BUILD_TESTS": "ON",
+        "XGL_BUILD_EXAMPLES": "ON",
+        "XGL_BUILD_DOCS": "OFF"
+      }
+    },
+    {
+      "name": "gcc-test",
+      "displayName": "GCC Test",
+      "description": "Test build using GCC without MSVC runtime requirements",
+      "inherits": "gcc-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "XGL_BUILD_TESTS": "ON",
+        "XGL_BUILD_EXAMPLES": "ON",
+        "XGL_BUILD_DOCS": "OFF",
+        "XGL_ENABLE_COVERAGE": "OFF"
+      }
+    },
+    {
       "name": "ci",
       "displayName": "CI",
       "description": "Continuous integration build",
@@ -84,6 +118,18 @@
       "configurePreset": "test",
       "displayName": "Test Build",
       "description": "Build test configuration"
+    },
+    {
+      "name": "gcc-debug",
+      "configurePreset": "gcc-debug",
+      "displayName": "GCC Debug Build",
+      "description": "Build GCC debug configuration"
+    },
+    {
+      "name": "gcc-test",
+      "configurePreset": "gcc-test",
+      "displayName": "GCC Test Build",
+      "description": "Build GCC test configuration"
     }
   ],
   "testPresets": [
@@ -92,6 +138,15 @@
       "configurePreset": "test",
       "displayName": "Run Tests",
       "description": "Run all tests",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-test",
+      "configurePreset": "gcc-test",
+      "displayName": "Run GCC Tests",
+      "description": "Run all tests from the GCC test build",
       "output": {
         "outputOnFailure": true
       }

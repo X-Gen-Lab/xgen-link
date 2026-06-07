@@ -33,6 +33,20 @@ cmake --build build/debug
 ctest --preset test
 ```
 
+### Windows Toolchains
+
+The default presets use the compiler selected by CMake. If Clang selects the
+MSVC runtime, run CMake from a Visual Studio Developer PowerShell so
+`msvcrtd.lib` and `oldnames.lib` are available.
+
+For a MinGW/GCC toolchain on Windows, use the GCC presets:
+
+```bash
+cmake --preset gcc-test
+cmake --build --preset gcc-test
+ctest --preset gcc-test
+```
+
 ### Example Usage
 
 ```c

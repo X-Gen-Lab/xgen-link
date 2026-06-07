@@ -9,6 +9,14 @@ endif()
 set(install_prefix "${XGL_SMOKE_DIR}/install")
 set(consumer_src "${XGL_SMOKE_DIR}/consumer")
 set(consumer_build "${XGL_SMOKE_DIR}/consumer-build")
+set(consumer_configure_args
+    "${CMAKE_COMMAND}" -S "${consumer_src}" -B "${consumer_build}" -G Ninja
+    "-DCMAKE_PREFIX_PATH=${install_prefix}"
+)
+
+if(DEFINED XGL_C_COMPILER AND NOT XGL_C_COMPILER STREQUAL "")
+    list(APPEND consumer_configure_args "-DCMAKE_C_COMPILER=${XGL_C_COMPILER}")
+endif()
 
 file(REMOVE_RECURSE "${XGL_SMOKE_DIR}")
 file(MAKE_DIRECTORY "${consumer_src}")
@@ -43,8 +51,7 @@ int main(void) {
 ]=])
 
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" -S "${consumer_src}" -B "${consumer_build}" -G Ninja
-            "-DCMAKE_PREFIX_PATH=${install_prefix}"
+    COMMAND ${consumer_configure_args}
     RESULT_VARIABLE configure_result
 )
 
