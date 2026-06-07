@@ -30,6 +30,21 @@ if(NOT install_result EQUAL 0)
     message(FATAL_ERROR "xgl install failed with exit code ${install_result}")
 endif()
 
+set(forbidden_installed_headers
+    xgl_parser.h
+    xgl_reliable.h
+    xgl_window.h
+    xgl_fragment.h
+    xgl_wire.h
+    xgl_hashtable.h
+)
+
+foreach(header IN LISTS forbidden_installed_headers)
+    if(EXISTS "${install_prefix}/include/xgl/${header}")
+        message(FATAL_ERROR "internal xgl header was installed: ${header}")
+    endif()
+endforeach()
+
 file(WRITE "${consumer_src}/CMakeLists.txt" [=[
 cmake_minimum_required(VERSION 3.21)
 project(xgl_consumer_smoke C)
