@@ -14,6 +14,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include "xgl_error.h"
+#include "xgl_types.h"
 
 /*---------------------------------------------------------------------------*/
 /* Wire Header Constants                                                      */
@@ -197,6 +198,22 @@ xgl_error_t xgl_wire_decode_route_ext_value(const uint8_t* buffer,
                                             uint16_t* next_hop,
                                             uint32_t* route_epoch,
                                             uint16_t* metric);
+
+xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
+                                         size_t buffer_size,
+                                         size_t aad_len,
+                                         size_t payload_len,
+                                         uint32_t key_id,
+                                         const xgl_auth_provider_t* provider,
+                                         size_t* frame_len);
+
+xgl_error_t xgl_wire_verify_auth_trailer(const uint8_t* buffer,
+                                         size_t frame_len,
+                                         size_t aad_len,
+                                         size_t payload_len,
+                                         uint32_t key_id,
+                                         const xgl_auth_provider_t* provider,
+                                         bool* valid);
 
 #ifdef __cplusplus
 }

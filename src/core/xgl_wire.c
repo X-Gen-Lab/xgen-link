@@ -514,3 +514,71 @@ xgl_error_t xgl_wire_decode_route_ext_value(const uint8_t* buffer,
 
     return XGL_OK;
 }
+
+xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
+                                         size_t buffer_size,
+                                         size_t aad_len,
+                                         size_t payload_len,
+                                         uint32_t key_id,
+                                         const xgl_auth_provider_t* provider,
+                                         size_t* frame_len) {
+    if (buffer == NULL || provider == NULL || provider->sign == NULL ||
+        frame_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    size_t tag_offset = aad_len + payload_len;
+    if (tag_offset > buffer_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    size_t tag_len = 0U;
+    xgl_error_t err = provider->sign(key_id,
+                                     buffer,
+                                     aad_len,
+                                     &buffer[aad_len],
+                                     payload_len,
+                                     &buffer[tag_offset],
+                                     buffer_size - tag_offset,
+                                     &tag_len,
+                                     provider->user_data);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    if (tag_len == 0U || tag_offset + tag_len > buffer_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    *frame_len = tag_offset + tag_len;
+    return XGL_OK;
+}
+
+xgl_error_t xgl_wire_verify_auth_trailer(const uint8_t* buffer,
+                                         size_t frame_len,
+                                         size_t aad_len,
+                                         size_t payload_len,
+                                         uint32_t key_id,
+                                         const xgl_auth_provider_t* provider,
+                                         bool* valid) {
+    if (buffer == NULL || provider == NULL || provider->verify == NULL ||
+        valid == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    *valid = false;
+    size_t tag_offset = aad_len + payload_len;
+    if (tag_offset >= frame_len) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    return provider->verify(key_id,
+                            buffer,
+                            aad_len,
+                            &buffer[aad_len],
+                            payload_len,
+                            &buffer[tag_offset],
+                            frame_len - tag_offset,
+                            valid,
+                            provider->user_data);
+}
