@@ -12,6 +12,9 @@
 #include <xgl/xgl_transport.h>
 #include <xgl/xgl_route.h>
 #include <xgl/xgl_config.h>
+#include <xgl/xgl_wire.h>
+#include <xgl/xgl_crc.h>
+#include <xgl/xgl_serialize.h>
 #include <cstring>
 #include <cstdlib>
 #include <vector>
@@ -58,6 +61,61 @@ static void counting_free(void* ptr) {
         g_counting_allocator_state->free_count++;
     }
     std::free(ptr);
+}
+
+static xgl_error_t datalink_test_auth_sign(uint32_t key_id,
+                                           const uint8_t* aad,
+                                           size_t aad_len,
+                                           const uint8_t* payload,
+                                           size_t payload_len,
+                                           uint8_t* tag,
+                                           size_t tag_capacity,
+                                           size_t* tag_len,
+                                           void* user_data) {
+    (void)user_data;
+    if (tag == nullptr || tag_len == nullptr || tag_capacity < 4U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint32_t acc = key_id;
+    for (size_t i = 0; i < aad_len; ++i) {
+        acc = (acc * 33U) ^ aad[i];
+    }
+    for (size_t i = 0; i < payload_len; ++i) {
+        acc = (acc * 33U) ^ payload[i];
+    }
+
+    xgl_serialize_u32_le(tag, acc);
+    *tag_len = 4U;
+    return XGL_OK;
+}
+
+static xgl_error_t datalink_test_auth_verify(uint32_t key_id,
+                                             const uint8_t* aad,
+                                             size_t aad_len,
+                                             const uint8_t* payload,
+                                             size_t payload_len,
+                                             const uint8_t* tag,
+                                             size_t tag_len,
+                                             bool* valid,
+                                             void* user_data) {
+    (void)user_data;
+    uint8_t expected[4] = {};
+    size_t expected_len = 0;
+    xgl_error_t err = datalink_test_auth_sign(key_id,
+                                              aad,
+                                              aad_len,
+                                              payload,
+                                              payload_len,
+                                              expected,
+                                              sizeof(expected),
+                                              &expected_len,
+                                              nullptr);
+    if (err != XGL_OK) {
+        return err;
+    }
+    *valid = tag_len == expected_len && std::memcmp(tag, expected, expected_len) == 0;
+    return XGL_OK;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -276,6 +334,136 @@ TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     EXPECT_EQ(allocator_state.free_count, 1U);
 
     g_counting_allocator_state = nullptr;
+}
+
+TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
+    xgl_auth_provider_t provider = {
+        .sign = datalink_test_auth_sign,
+        .verify = datalink_test_auth_verify,
+        .user_data = nullptr
+    };
+    xgl_datalink_ctx_t auth_ctx;
+    uint8_t cache[512] = {};
+    xgl_layer_stats_t auth_stats = {};
+    uint64_t crc8 = 0;
+    uint64_t crc16 = 0;
+    xgl_datalink_config_t config = {
+        .rx_cache = cache,
+        .rx_cache_size = sizeof(cache),
+        .source_id = SOURCE_ID,
+        .stats = &auth_stats,
+        .rx_crc8_errors = &crc8,
+        .rx_crc16_errors = &crc16,
+        .upper_layer = nullptr,
+        .error_callback = nullptr,
+        .callback_user_data = nullptr,
+        .auth_required = true,
+        .auth_key_id = 7,
+        .auth_provider = &provider
+    };
+    ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
+
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x01, 0x02, 0x03};
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .seq_num = 0x10,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    EXPECT_CALL(mock_phy, tx(_, _, _))
+        .WillOnce([&provider](const uint8_t* data, size_t len, void*) {
+            xgl_wire_header_t header = {};
+            EXPECT_EQ(xgl_wire_decode_header(&header, data, len), XGL_OK);
+            EXPECT_NE(header.flags & XGL_WIRE_FLAG_AUTHENTICATED, 0);
+            EXPECT_GT(header.header_len, XGL_WIRE_BASE_HEADER_SIZE);
+
+            bool valid = false;
+            EXPECT_EQ(xgl_wire_verify_auth_trailer(data,
+                                                   len - XGL_CRC16_SIZE,
+                                                   header.header_len,
+                                                   header.payload_len,
+                                                   7,
+                                                   &provider,
+                                                   &valid),
+                      XGL_OK);
+            EXPECT_TRUE(valid);
+            return XGL_OK;
+        });
+
+    EXPECT_EQ(xgl_datalink_send(&auth_ctx, &phy_ops, &frame), XGL_OK);
+    EXPECT_EQ(auth_stats.tx_packets, 1U);
+}
+
+TEST_F(XglDatalinkTest, ProcessFrameRejectsTamperedAuthenticatedPayload) {
+    xgl_auth_provider_t provider = {
+        .sign = datalink_test_auth_sign,
+        .verify = datalink_test_auth_verify,
+        .user_data = nullptr
+    };
+    xgl_datalink_ctx_t auth_ctx;
+    uint8_t cache[512] = {};
+    xgl_layer_stats_t auth_stats = {};
+    uint64_t crc8 = 0;
+    uint64_t crc16 = 0;
+    xgl_datalink_config_t config = {
+        .rx_cache = cache,
+        .rx_cache_size = sizeof(cache),
+        .source_id = SOURCE_ID,
+        .stats = &auth_stats,
+        .rx_crc8_errors = &crc8,
+        .rx_crc16_errors = &crc16,
+        .upper_layer = nullptr,
+        .error_callback = nullptr,
+        .callback_user_data = nullptr,
+        .auth_required = true,
+        .auth_key_id = 7,
+        .auth_provider = &provider
+    };
+    ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
+
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x01, 0x02, 0x03};
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .seq_num = 0x10,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    uint8_t encoded[256] = {};
+    size_t encoded_len = 0;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded,
+                                                sizeof(encoded),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, encoded, encoded_len), XGL_OK);
+    encoded[header.header_len] ^= 0x01U;
+    uint16_t crc = xgl_crc16_modbus(encoded, encoded_len - XGL_CRC16_SIZE);
+    xgl_serialize_u16_le(&encoded[encoded_len - XGL_CRC16_SIZE], crc);
+
+    EXPECT_EQ(xgl_datalink_process_frame(&auth_ctx, encoded, encoded_len),
+              XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(auth_stats.rx_errors, 1U);
+    EXPECT_EQ(auth_stats.rx_packets, 0U);
 }
 
 /*---------------------------------------------------------------------------*/
