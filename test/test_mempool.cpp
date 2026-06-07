@@ -217,6 +217,49 @@ TEST_F(XglMempoolTest, FreeNullPointer) {
     xgl_mempool_free(&pool, nullptr);
 }
 
+TEST_F(XglMempoolTest, FreeRejectsForeignAndMisalignedPointers) {
+    xgl_mempool_init(&pool, buffer, BUFFER_SIZE, BLOCK_SIZE);
+
+    void* block = xgl_mempool_alloc(&pool);
+    ASSERT_NE(block, nullptr);
+
+    const size_t free_before = xgl_mempool_get_free_count(&pool);
+    uint8_t foreign[BLOCK_SIZE] = {};
+    xgl_mempool_free(&pool, foreign);
+    xgl_mempool_free(&pool, static_cast<uint8_t*>(block) + 1);
+
+    EXPECT_EQ(xgl_mempool_get_free_count(&pool), free_before);
+
+    xgl_mempool_free(&pool, block);
+}
+
+TEST_F(XglMempoolTest, FreeRejectsDoubleFree) {
+    xgl_mempool_init(&pool, buffer, BUFFER_SIZE, BLOCK_SIZE);
+
+    void* block = xgl_mempool_alloc(&pool);
+    ASSERT_NE(block, nullptr);
+
+    xgl_mempool_free(&pool, block);
+    xgl_mempool_free(&pool, block);
+
+    EXPECT_EQ(xgl_mempool_get_free_count(&pool), pool.block_count);
+
+    std::vector<void*> blocks;
+    for (size_t i = 0; i < pool.block_count; ++i) {
+        void* allocated = xgl_mempool_alloc(&pool);
+        ASSERT_NE(allocated, nullptr);
+        for (void* previous : blocks) {
+            EXPECT_NE(allocated, previous);
+        }
+        blocks.push_back(allocated);
+    }
+    EXPECT_EQ(xgl_mempool_alloc(&pool), nullptr);
+
+    for (void* allocated : blocks) {
+        xgl_mempool_free(&pool, allocated);
+    }
+}
+
 TEST_F(XglMempoolTest, AllocFreeRealloc) {
     xgl_mempool_init(&pool, buffer, BUFFER_SIZE, BLOCK_SIZE);
     
