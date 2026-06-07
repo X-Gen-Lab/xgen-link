@@ -280,6 +280,13 @@ endif()
 
 if(XGL_BUILD_EXAMPLES)
     add_subdirectory(examples)
+    if(TARGET xgl_release_validation)
+        foreach(XGL_EXAMPLE_TARGET echo_server file_transfer multi_node)
+            if(TARGET ${XGL_EXAMPLE_TARGET})
+                add_dependencies(xgl_release_validation ${XGL_EXAMPLE_TARGET})
+            endif()
+        endforeach()
+    endif()
 endif()
 
 #-----------------------------------------------------------------------------

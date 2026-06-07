@@ -83,6 +83,7 @@ nav:
           - 错误码: zh/reference/errors.md
           - 配置预设: zh/reference/config-presets.md
           - 发布验证: zh/reference/release-validation.md
+          - GitHub CI/CD: zh/reference/github-ci.md
           - 验证矩阵: zh/reference/validation-matrix.md
           - 静态分析: zh/reference/static-analysis.md
       - 贡献:
@@ -117,6 +118,7 @@ nav:
           - Errors: en/reference/errors.md
           - Config Presets: en/reference/config-presets.md
           - Release Validation: en/reference/release-validation.md
+          - GitHub CI/CD: en/reference/github-ci.md
           - Validation Matrix: en/reference/validation-matrix.md
           - Static Analysis: en/reference/static-analysis.md
       - Contributing:
