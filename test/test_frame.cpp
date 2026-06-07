@@ -363,7 +363,7 @@ TEST(XglFrameTest, SerializeFrameNullPointers) {
 /*---------------------------------------------------------------------------*/
 
 TEST(XglFrameTest, EncodeDecodeHeader) {
-    xgl_frame_header_t header_orig, header_decoded;
+    xgl_legacy_frame_header_t header_orig, header_decoded;
     uint8_t buffer[XGL_FRAME_HEADER_SIZE];
     
     /* Initialize header */

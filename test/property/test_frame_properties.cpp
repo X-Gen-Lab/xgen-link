@@ -71,7 +71,7 @@ TEST(XglFrameProperties, CrcErrorDetection) {
             corrupted[22] ^= 0x01;  /* Flip one bit in header CRC16 */
             
             /* Decode header and validate */
-            xgl_frame_header_t header;
+            xgl_legacy_frame_header_t header;
             xgl_frame_decode_header(&header, corrupted.data());
             
             /* Header CRC16 validation should fail */
@@ -110,7 +110,7 @@ TEST(XglFrameProperties, CrcErrorDetection) {
         /* Test that valid frame passes both CRC checks */
         {
             /* Decode header and validate header CRC16 */
-            xgl_frame_header_t header;
+            xgl_legacy_frame_header_t header;
             xgl_frame_decode_header(&header, buffer.data());
             bool valid_header_crc = xgl_frame_validate_header_crc(&header);
             EXPECT_TRUE(valid_header_crc)
@@ -215,7 +215,7 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
         ASSERT_EQ(parsed_len, bytes_written);
         
         /* Decode parsed header */
-        xgl_frame_header_t parsed_header;
+        xgl_legacy_frame_header_t parsed_header;
         xgl_frame_decode_header(&parsed_header, parsed_buffer);
         
         /* Verify all header fields match */
@@ -306,7 +306,7 @@ TEST(XglFrameProperties, FieldValidation) {
         ASSERT_EQ(err, XGL_OK);
         
         /* Decode and validate header fields are within valid ranges */
-        xgl_frame_header_t header;
+        xgl_legacy_frame_header_t header;
         xgl_frame_decode_header(&header, buffer.data());
         
         EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0)
