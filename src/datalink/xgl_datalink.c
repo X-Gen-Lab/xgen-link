@@ -15,6 +15,55 @@
 #include <xgl/xgl_wire.h>
 #include <string.h>
 
+static bool datalink_accept_replay(xgl_datalink_ctx_t* ctx,
+                                   uint16_t source_id,
+                                   uint32_t connection_id,
+                                   uint32_t session_epoch,
+                                   uint32_t packet_number) {
+    if (ctx == NULL) {
+        return false;
+    }
+
+    size_t free_index = XGL_DATALINK_REPLAY_WINDOW_COUNT;
+    for (size_t i = 0; i < XGL_DATALINK_REPLAY_WINDOW_COUNT; ++i) {
+        if (!ctx->replay_window_used[i]) {
+            if (free_index == XGL_DATALINK_REPLAY_WINDOW_COUNT) {
+                free_index = i;
+            }
+            continue;
+        }
+
+        xgl_replay_window_t* window = &ctx->replay_windows[i];
+        if (window->source_id == source_id &&
+            window->connection_id == connection_id &&
+            window->session_epoch == session_epoch) {
+            return xgl_replay_window_accept(window,
+                                            source_id,
+                                            connection_id,
+                                            session_epoch,
+                                            packet_number);
+        }
+    }
+
+    if (free_index == XGL_DATALINK_REPLAY_WINDOW_COUNT) {
+        return false;
+    }
+
+    if (xgl_replay_window_init(&ctx->replay_windows[free_index],
+                               source_id,
+                               connection_id,
+                               session_epoch,
+                               XGL_DATALINK_REPLAY_WINDOW_SIZE) != XGL_OK) {
+        return false;
+    }
+    ctx->replay_window_used[free_index] = true;
+    return xgl_replay_window_accept(&ctx->replay_windows[free_index],
+                                    source_id,
+                                    connection_id,
+                                    session_epoch,
+                                    packet_number);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Data Link Layer Initialization                                            */
 /*---------------------------------------------------------------------------*/
@@ -344,6 +393,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
 
     uint8_t auth_tag_len = 0U;
     bool has_security_ext = false;
+    uint32_t session_epoch = 0U;
     if (wire_header.header_len > XGL_WIRE_BASE_HEADER_SIZE) {
         xgl_wire_ext_cursor_t cursor;
         xgl_error_t ext_err = xgl_wire_ext_cursor_init(
@@ -385,6 +435,18 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
                 }
                 auth_tag_len = tag_len;
                 has_security_ext = true;
+            } else if (ext.type == XGL_WIRE_EXT_SESSION) {
+                uint64_t incarnation_id = 0;
+                if (xgl_wire_decode_session_ext_value(ext.value,
+                                                      ext.len,
+                                                      &session_epoch,
+                                                      &incarnation_id) != XGL_OK) {
+                    if (ctx->stats != NULL) {
+                        ctx->stats->rx_errors++;
+                    }
+                    return XGL_ERR_INVALID_FRAME;
+                }
+                (void)incarnation_id;
             }
         }
         if (ext_err != XGL_ERR_NOT_FOUND) {
@@ -469,6 +531,18 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
                                                             ctx->auth_provider,
                                                             &auth_valid);
         if (auth_err != XGL_OK || !auth_valid) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_errors++;
+                ctx->stats->rx_dropped++;
+            }
+            return XGL_ERR_INVALID_FRAME;
+        }
+
+        if (!datalink_accept_replay(ctx,
+                                    wire_header.source_id,
+                                    wire_header.connection_id,
+                                    session_epoch,
+                                    wire_header.packet_number)) {
             if (ctx->stats != NULL) {
                 ctx->stats->rx_errors++;
                 ctx->stats->rx_dropped++;

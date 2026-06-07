@@ -19,6 +19,10 @@ extern "C" {
 #include "xgl_frame.h"
 #include "xgl_parser.h"
 #include "xgl_layer_interface.h"
+#include "xgl_security.h"
+
+#define XGL_DATALINK_REPLAY_WINDOW_COUNT 16U
+#define XGL_DATALINK_REPLAY_WINDOW_SIZE  64U
 
 /*---------------------------------------------------------------------------*/
 /* Forward Declarations                                                      */
@@ -49,6 +53,8 @@ typedef struct xgl_datalink_ctx_s {
     bool auth_required;             /**< Require authenticated production frames */
     uint32_t auth_key_id;           /**< Active authentication key id */
     xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
+    xgl_replay_window_t replay_windows[XGL_DATALINK_REPLAY_WINDOW_COUNT]; /**< Anti-replay windows */
+    bool replay_window_used[XGL_DATALINK_REPLAY_WINDOW_COUNT]; /**< Replay window occupancy */
     
     /* Layer interface for decoupled communication */
     xgl_layer_interface_t* upper_layer; /**< Upper layer interface (network) */
