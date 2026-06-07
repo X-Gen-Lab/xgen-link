@@ -35,21 +35,22 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
         return XGL_ERR_INVALID_FRAME;
     }
     
-    /* Decode frame header */
-    xgl_frame_header_t header;
-    xgl_frame_decode_header(&header, frame_buf);
+    xgl_wire_header_t wire_header;
+    if (xgl_wire_decode_header(&wire_header, frame_buf, frame_len) != XGL_OK) {
+        return XGL_ERR_INVALID_FRAME;
+    }
     
     /* Extract addressing */
-    *source_id = header.source_id;
-    *target_id = header.target_id;
-    *data_type = xgl_frame_get_datatype(&header);
+    *source_id = wire_header.source_id;
+    *target_id = wire_header.target_id;
+    *data_type = wire_header.packet_type;
     
     /* Extract payload */
-    *payload = frame_buf + XGL_FRAME_HEADER_SIZE;
-    *payload_len = header.data_len;
+    *payload = frame_buf + wire_header.header_len;
+    *payload_len = wire_header.payload_len;
     
     /* Validate payload length */
-    if (frame_len < XGL_FRAME_HEADER_SIZE + *payload_len + XGL_CRC16_SIZE) {
+    if (frame_len < wire_header.header_len + *payload_len + XGL_CRC16_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
     
@@ -278,6 +279,10 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             /* Extract frame attributes and build packet structure */
             xgl_frame_header_t header;
             xgl_frame_decode_header(&header, frame_buf);
+            xgl_wire_header_t wire_header;
+            if (xgl_wire_decode_header(&wire_header, frame_buf, frame_len) != XGL_OK) {
+                return XGL_ERR_INVALID_FRAME;
+            }
             
             /* Build packet data structure for payload */
             xgl_packet_data_t packet_data = {
@@ -295,9 +300,16 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .seq_num = header.seq_num,
                 .ack_num = header.ack_num,
                 .session_id = (uint16_t)(header.attr_msb & XGL_ATTR_SESSION_MASK),
+                .connection_id = wire_header.connection_id,
+                .packet_number = wire_header.packet_number,
+                .session_epoch = (uint32_t)(header.attr_msb & XGL_ATTR_SESSION_MASK),
+                .packet_type = wire_header.packet_type,
+                .flags = wire_header.flags,
                 .reliable = header.attr_lsb & XGL_ATTR_RELIABLE_MASK,
                 .fragment = (header.attr_lsb & XGL_ATTR_FRAGMENT_MASK) >> XGL_ATTR_FRAGMENT_SHIFT,
                 .priority = (header.attr_lsb & XGL_ATTR_PRIORITY_MASK) >> XGL_ATTR_PRIORITY_SHIFT,
+                .ttl = wire_header.ttl,
+                .traffic_class = wire_header.traffic_class,
                 .data = &packet_data,
                 .phy = NULL    /* Not needed for receive path */
             };

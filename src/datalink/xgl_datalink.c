@@ -12,6 +12,7 @@
 #include <xgl/xgl_error.h>
 #include <xgl/xgl_config.h>
 #include <xgl/xgl_allocator.h>
+#include <xgl/xgl_wire.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -44,6 +45,9 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
     ctx->callback_user_data = config->callback_user_data;
     ctx->owner_handle = config->owner_handle;
     ctx->allocator = config->allocator;
+    ctx->auth_required = config->auth_required;
+    ctx->auth_key_id = config->auth_key_id;
+    ctx->auth_provider = config->auth_provider;
     
     /* Initialize parser */
     xgl_error_t err = xgl_parser_init(&ctx->parser, config->rx_cache, config->rx_cache_size);
@@ -74,6 +78,15 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
     
     /* Calculate required buffer size */
     size_t frame_size = xgl_frame_calculate_size(frame->payload_len);
+    if (ctx->auth_required) {
+        if (ctx->auth_provider == NULL || ctx->auth_provider->sign == NULL) {
+            if (ctx->stats != NULL) {
+                ctx->stats->tx_errors++;
+            }
+            return XGL_ERR_INVALID_PARAM;
+        }
+        frame_size += XGL_WIRE_EXT_HEADER_SIZE + 13U + 32U;
+    }
     
     /* Use stack buffer for small frames, heap for large frames */
     uint8_t stack_buffer[XGL_DATALINK_STACK_BUFFER_SIZE];
@@ -101,7 +114,17 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
     size_t bytes_written = 0;
     
     /* Serialize frame to buffer */
-    xgl_error_t err = xgl_frame_serialize(frame_buffer, frame_size, frame, &bytes_written);
+    xgl_error_t err;
+    if (ctx->auth_required) {
+        err = xgl_frame_serialize_authenticated(frame_buffer,
+                                                frame_size,
+                                                frame,
+                                                ctx->auth_key_id,
+                                                ctx->auth_provider,
+                                                &bytes_written);
+    } else {
+        err = xgl_frame_serialize(frame_buffer, frame_size, frame, &bytes_written);
+    }
     if (err != XGL_OK) {
         if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
@@ -299,10 +322,87 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
     
-    /* Verify SOF */
-    if (frame_buffer[0] != XGL_SOF) {
+    /* Verify production magic */
+    if (frame_buffer[0] != XGL_WIRE_MAGIC_0 ||
+        frame_buffer[1] != XGL_WIRE_MAGIC_1) {
         if (ctx->stats != NULL) {
             ctx->stats->rx_errors++;
+        }
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    xgl_wire_header_t wire_header;
+    if (xgl_wire_decode_header(&wire_header, frame_buffer, frame_len) != XGL_OK) {
+        if (ctx->stats != NULL) {
+            ctx->stats->rx_errors++;
+        }
+        if (ctx->rx_crc8_errors != NULL) {
+            (*ctx->rx_crc8_errors)++;
+        }
+        return XGL_ERR_CRC_FAILED;
+    }
+
+    uint8_t auth_tag_len = 0U;
+    bool has_security_ext = false;
+    if (wire_header.header_len > XGL_WIRE_BASE_HEADER_SIZE) {
+        xgl_wire_ext_cursor_t cursor;
+        xgl_error_t ext_err = xgl_wire_ext_cursor_init(
+            &cursor,
+            &frame_buffer[XGL_WIRE_BASE_HEADER_SIZE],
+            wire_header.header_len - XGL_WIRE_BASE_HEADER_SIZE
+        );
+        if (ext_err != XGL_OK) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_errors++;
+            }
+            return XGL_ERR_INVALID_FRAME;
+        }
+
+        xgl_wire_ext_t ext;
+        while ((ext_err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
+            if (ext.type == XGL_WIRE_EXT_SECURITY) {
+                uint32_t key_id = 0;
+                uint64_t nonce_id = 0;
+                uint8_t tag_len = 0;
+                if (xgl_wire_decode_security_ext_value(ext.value,
+                                                       ext.len,
+                                                       &key_id,
+                                                       &nonce_id,
+                                                       &tag_len) != XGL_OK ||
+                    tag_len == 0U) {
+                    if (ctx->stats != NULL) {
+                        ctx->stats->rx_errors++;
+                    }
+                    return XGL_ERR_INVALID_FRAME;
+                }
+                (void)nonce_id;
+                if (ctx->auth_required && key_id != ctx->auth_key_id) {
+                    if (ctx->stats != NULL) {
+                        ctx->stats->rx_errors++;
+                        ctx->stats->rx_dropped++;
+                    }
+                    return XGL_ERR_INVALID_FRAME;
+                }
+                auth_tag_len = tag_len;
+                has_security_ext = true;
+            }
+        }
+        if (ext_err != XGL_ERR_NOT_FOUND) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_errors++;
+            }
+            return XGL_ERR_INVALID_FRAME;
+        }
+    }
+
+    if (ctx->auth_required &&
+        ((wire_header.flags & XGL_WIRE_FLAG_AUTHENTICATED) == 0U ||
+         !has_security_ext ||
+         ctx->auth_provider == NULL ||
+         ctx->auth_provider->verify == NULL)) {
+        if (ctx->stats != NULL) {
+            ctx->stats->rx_errors++;
+            ctx->stats->rx_dropped++;
         }
         return XGL_ERR_INVALID_FRAME;
     }
@@ -347,14 +447,31 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_CRC_FAILED;
     }
     
-    size_t payload_len = header.data_len;
+    size_t payload_len = wire_header.payload_len;
+    size_t expected_frame_len = wire_header.header_len +
+                                payload_len +
+                                (size_t)auth_tag_len +
+                                XGL_CRC16_SIZE;
+    if (frame_len != expected_frame_len) {
+        if (ctx->stats != NULL) {
+            ctx->stats->rx_errors++;
+        }
+        return XGL_ERR_INVALID_FRAME;
+    }
     
-    if (payload_len > 0) {
-        /* Verify payload length matches frame size */
-        size_t expected_frame_len = XGL_FRAME_HEADER_SIZE + payload_len + XGL_CRC16_SIZE;
-        if (frame_len != expected_frame_len) {
+    if (ctx->auth_required) {
+        bool auth_valid = false;
+        xgl_error_t auth_err = xgl_wire_verify_auth_trailer(frame_buffer,
+                                                            frame_len - XGL_CRC16_SIZE,
+                                                            wire_header.header_len,
+                                                            payload_len,
+                                                            ctx->auth_key_id,
+                                                            ctx->auth_provider,
+                                                            &auth_valid);
+        if (auth_err != XGL_OK || !auth_valid) {
             if (ctx->stats != NULL) {
                 ctx->stats->rx_errors++;
+                ctx->stats->rx_dropped++;
             }
             return XGL_ERR_INVALID_FRAME;
         }

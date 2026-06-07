@@ -46,6 +46,9 @@ typedef struct xgl_datalink_ctx_s {
     xgl_handle_t owner_handle;      /**< Owning protocol instance handle */
     xgl_allocator_t* allocator;     /**< Allocator for large temporary TX buffers */
     uint16_t source_id;             /**< Local source ID */
+    bool auth_required;             /**< Require authenticated production frames */
+    uint32_t auth_key_id;           /**< Active authentication key id */
+    xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
     
     /* Layer interface for decoupled communication */
     xgl_layer_interface_t* upper_layer; /**< Upper layer interface (network) */
@@ -66,6 +69,9 @@ typedef struct {
     void* callback_user_data;       /**< User data for callbacks (can be NULL) */
     xgl_handle_t owner_handle;      /**< Owning protocol instance handle (can be NULL) */
     xgl_allocator_t* allocator;     /**< Allocator for large temporary TX buffers (NULL = default) */
+    bool auth_required;             /**< Require authenticated production frames */
+    uint32_t auth_key_id;           /**< Active authentication key id */
+    xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
 } xgl_datalink_config_t;
 
 /*---------------------------------------------------------------------------*/

@@ -186,7 +186,10 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .error_callback = handle->config.error_callback,
         .callback_user_data = handle->config.callback_user_data,
         .owner_handle = handle,
-        .allocator = handle->allocator
+        .allocator = handle->allocator,
+        .auth_required = handle->config.auth_required,
+        .auth_key_id = handle->config.auth_key_id,
+        .auth_provider = handle->config.auth_provider
     };
     err = xgl_datalink_init(&handle->layers.datalink_ctx, &datalink_config);
     if (err != XGL_OK) {
