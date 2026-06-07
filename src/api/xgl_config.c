@@ -178,6 +178,12 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
 
     if (config->auth_required) {
+        if (config->memory.allocator == NULL ||
+            config->memory.allocator->malloc == NULL ||
+            config->memory.allocator->free == NULL) {
+            return XGL_ERR_INVALID_PARAM;
+        }
+
         if (config->auth_provider == NULL ||
             config->auth_provider->sign == NULL ||
             config->auth_provider->verify == NULL) {

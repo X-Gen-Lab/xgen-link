@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_allocator.h>
 #include <xgl/xgl_network.h>
 #include <xgl/xgl_wire.h>
 #include <cstring>
@@ -477,6 +478,7 @@ TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
     config.auth_required = true;
     config.auth_key_id = 7;
     config.auth_provider = &provider;
+    config.memory.allocator = xgl_allocator_get_default();
 
     handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
