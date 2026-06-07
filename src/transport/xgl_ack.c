@@ -218,7 +218,7 @@ xgl_error_t xgl_ack_generate(uint8_t seq_num,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     
-    xgl_frame_header_t header;
+    xgl_legacy_frame_header_t header;
     memset(&header, 0, sizeof(header));
     header.sof = XGL_SOF;
     xgl_frame_set_version(&header, 1);

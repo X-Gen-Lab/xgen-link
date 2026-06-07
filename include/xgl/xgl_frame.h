@@ -23,6 +23,26 @@ extern "C" {
 /*---------------------------------------------------------------------------*/
 
 /**
+ * \brief           Legacy logical frame header adapter
+ * \note            This is not a production wire layout. It exists only for
+ *                  legacy helper APIs that mirror selected xgl_wire_header_t
+ *                  fields for older tests and utilities.
+ */
+typedef struct {
+    uint8_t sof;                    /**< Legacy start marker */
+    uint8_t version_datatype;       /**< Legacy version + data type mirror */
+    uint16_t source_id;             /**< Source node ID */
+    uint16_t target_id;             /**< Target node ID */
+    uint8_t attr_lsb;               /**< Legacy attributes LSB */
+    uint8_t attr_msb;               /**< Legacy attributes MSB */
+    uint16_t data_len;              /**< Payload length */
+    uint8_t seq_num;                /**< Legacy low 8 bits of packet number */
+    uint8_t ack_num;                /**< Legacy ACK mirror, not wire ACK range */
+    uint8_t reserved;               /**< Legacy TTL mirror */
+    uint8_t crc8;                   /**< Legacy CRC mirror, not wire header CRC */
+} xgl_legacy_frame_header_t;
+
+/**
  * \brief           Complete frame structure
  * \details         Represents a complete protocol frame with all components
  * \note            The header already contains SOF, so no separate SOF field
@@ -141,14 +161,14 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
  * \param[out]      buffer: Output buffer (must be at least 12 bytes)
  * \param[in]       header: Frame header structure
  */
-void xgl_frame_encode_header(uint8_t* buffer, const xgl_frame_header_t* header);
+void xgl_frame_encode_header(uint8_t* buffer, const xgl_legacy_frame_header_t* header);
 
 /**
  * \brief           Decode frame header from buffer
  * \param[out]      header: Frame header structure to populate
  * \param[in]       buffer: Input buffer (must be at least 12 bytes)
  */
-void xgl_frame_decode_header(xgl_frame_header_t* header, const uint8_t* buffer);
+void xgl_frame_decode_header(xgl_legacy_frame_header_t* header, const uint8_t* buffer);
 
 /*---------------------------------------------------------------------------*/
 /* Frame Validation Functions                                                */
@@ -159,7 +179,7 @@ void xgl_frame_decode_header(xgl_frame_header_t* header, const uint8_t* buffer);
  * \param[in]       header: Frame header structure
  * \return          true if CRC8 is valid, false otherwise
  */
-bool xgl_frame_validate_header_crc(const xgl_frame_header_t* header);
+bool xgl_frame_validate_header_crc(const xgl_legacy_frame_header_t* header);
 
 /**
  * \brief           Calculate frame size
@@ -179,7 +199,7 @@ static inline size_t xgl_frame_calculate_size(size_t payload_len) {
  * \param[in,out]   header: Frame header
  * \param[in]       version: Protocol version (0-15)
  */
-static inline void xgl_frame_set_version(xgl_frame_header_t* header, uint8_t version) {
+static inline void xgl_frame_set_version(xgl_legacy_frame_header_t* header, uint8_t version) {
     uint32_t version_field = ((uint32_t)version & 0x0FU) << 4;
     header->version_datatype = (uint8_t)(((uint32_t)header->version_datatype & 0x0FU) |
                                          version_field);
@@ -190,7 +210,7 @@ static inline void xgl_frame_set_version(xgl_frame_header_t* header, uint8_t ver
  * \param[in]       header: Frame header
  * \return          Protocol version (0-15)
  */
-static inline uint8_t xgl_frame_get_version(const xgl_frame_header_t* header) {
+static inline uint8_t xgl_frame_get_version(const xgl_legacy_frame_header_t* header) {
     return (header->version_datatype >> 4) & 0x0F;
 }
 
@@ -199,7 +219,7 @@ static inline uint8_t xgl_frame_get_version(const xgl_frame_header_t* header) {
  * \param[in,out]   header: Frame header
  * \param[in]       data_type: Data type (0-15)
  */
-static inline void xgl_frame_set_datatype(xgl_frame_header_t* header, uint8_t data_type) {
+static inline void xgl_frame_set_datatype(xgl_legacy_frame_header_t* header, uint8_t data_type) {
     header->version_datatype = (uint8_t)(((uint32_t)header->version_datatype & 0xF0U) |
                                          ((uint32_t)data_type & 0x0FU));
 }
@@ -209,7 +229,7 @@ static inline void xgl_frame_set_datatype(xgl_frame_header_t* header, uint8_t da
  * \param[in]       header: Frame header
  * \return          Data type (0-15)
  */
-static inline uint8_t xgl_frame_get_datatype(const xgl_frame_header_t* header) {
+static inline uint8_t xgl_frame_get_datatype(const xgl_legacy_frame_header_t* header) {
     return (uint8_t)(header->version_datatype & 0x0FU);
 }
 

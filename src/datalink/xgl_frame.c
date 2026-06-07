@@ -29,7 +29,7 @@
  * \brief           Encode frame header to buffer
  * \note            Header already contains SOF, so we encode the entire structure
  */
-void xgl_frame_encode_header(uint8_t* buffer, const xgl_frame_header_t* header) {
+void xgl_frame_encode_header(uint8_t* buffer, const xgl_legacy_frame_header_t* header) {
     if (buffer == NULL || header == NULL) {
         return;
     }
@@ -106,7 +106,7 @@ static xgl_error_t encode_frame_wire_header(uint8_t* buffer,
 /**
  * \brief           Decode frame header from buffer
  */
-void xgl_frame_decode_header(xgl_frame_header_t* header, const uint8_t* buffer) {
+void xgl_frame_decode_header(xgl_legacy_frame_header_t* header, const uint8_t* buffer) {
     if (header == NULL || buffer == NULL) {
         return;
     }
@@ -473,7 +473,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     size_t header_offset = data_offset - XGL_FRAME_HEADER_SIZE;
     
     /* Build header structure */
-    xgl_frame_header_t header;
+    xgl_legacy_frame_header_t header;
     memset(&header, 0, sizeof(header));
     header.sof = XGL_SOF;
     xgl_frame_set_version(&header, XGL_PROTOCOL_VERSION);
@@ -512,7 +512,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
 /**
  * \brief           Validate frame header CRC8
  */
-bool xgl_frame_validate_header_crc(const xgl_frame_header_t* header) {
+bool xgl_frame_validate_header_crc(const xgl_legacy_frame_header_t* header) {
     if (header == NULL) {
         return false;
     }

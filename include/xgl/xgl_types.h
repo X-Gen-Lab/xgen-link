@@ -66,26 +66,6 @@ typedef struct {
 #define XGL_CRC16_SIZE              2
 
 /**
- * \brief           Legacy logical frame header adapter
- * \note            This structure is not the production wire layout. Production
- *                  frames are encoded with the 24-byte xgl_wire_header_t format
- *                  and explicit offset-based serialization.
- */
-typedef struct {
-    uint8_t sof;                    /**< Legacy start marker */
-    uint8_t version_datatype;       /**< Legacy version + data type mirror */
-    uint16_t source_id;             /**< Source node ID */
-    uint16_t target_id;             /**< Target node ID */
-    uint8_t attr_lsb;               /**< Legacy attributes LSB */
-    uint8_t attr_msb;               /**< Legacy attributes MSB */
-    uint16_t data_len;              /**< Payload length */
-    uint8_t seq_num;                /**< Legacy low 8 bits of packet number */
-    uint8_t ack_num;                /**< Legacy ACK mirror, not wire ACK range */
-    uint8_t reserved;               /**< Legacy TTL mirror */
-    uint8_t crc8;                   /**< Legacy CRC mirror, not wire header CRC */
-} xgl_frame_header_t;
-
-/**
  * \brief           Production fixed wire header size in bytes
  */
 #define XGL_FRAME_HEADER_SIZE       24
