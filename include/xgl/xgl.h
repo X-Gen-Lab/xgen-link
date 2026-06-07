@@ -107,6 +107,9 @@
  *                  buffer and passed directly to the PHY. Reliable sends may
  *                  copy into the retransmission queue to preserve ACK/retry
  *                  semantics.
+ * \note            When auth_required is true, zero-copy requires
+ *                  auth_provider.tag_len to be non-zero and the payload must
+ *                  start after the base header plus SECURITY_EXT.
  * \code{.c}
  * // Allocate buffer with header space
  * uint8_t buffer[XGL_FRAME_HEADER_SIZE + 100];
@@ -481,6 +484,9 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
  * \note            Buffer must have XGL_FRAME_HEADER_SIZE bytes reserved at start
  * \note            Unreliable single-frame sends are framed in the caller buffer
  *                  and transmitted without an intermediate frame copy.
+ * \note            Authenticated zero-copy requires data_offset to equal
+ *                  XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13
+ *                  and requires config.auth_provider->tag_len to be set.
  * \note            Reliable sends keep retransmission semantics and may copy into
  *                  the reliable queue.
  *

@@ -271,7 +271,52 @@ xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
+    if (provider->tag_len > UINT8_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
     size_t header_len = 0;
+    if (provider->tag_len > 0U) {
+        xgl_error_t err = encode_authenticated_header(buffer,
+                                                      buffer_size,
+                                                      frame,
+                                                      key_id,
+                                                      (uint8_t)provider->tag_len,
+                                                      &header_len);
+        if (err != XGL_OK) {
+            return err;
+        }
+        if (buffer_size < header_len + frame->payload_len +
+                          provider->tag_len + XGL_CRC16_SIZE) {
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+        if (frame->payload != NULL && frame->payload_len > 0U) {
+            memcpy(&buffer[header_len], frame->payload, frame->payload_len);
+        }
+
+        size_t frame_len_without_crc = 0;
+        err = xgl_wire_append_auth_trailer(buffer,
+                                           buffer_size - XGL_CRC16_SIZE,
+                                           header_len,
+                                           frame->payload_len,
+                                           key_id,
+                                           provider,
+                                           &frame_len_without_crc);
+        if (err != XGL_OK) {
+            return err;
+        }
+        if (frame_len_without_crc != header_len + frame->payload_len +
+                                     provider->tag_len ||
+            frame_len_without_crc + XGL_CRC16_SIZE > buffer_size) {
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+
+        uint16_t crc16 = xgl_crc16_modbus(buffer, frame_len_without_crc);
+        xgl_serialize_u16_le(&buffer[frame_len_without_crc], crc16);
+        *bytes_written = frame_len_without_crc + XGL_CRC16_SIZE;
+        return XGL_OK;
+    }
+
     xgl_error_t err = encode_authenticated_header(buffer,
                                                   buffer_size,
                                                   frame,

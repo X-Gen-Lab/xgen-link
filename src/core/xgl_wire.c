@@ -546,6 +546,10 @@ xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
         return err;
     }
 
+    if (provider->tag_len != 0U && tag_len != provider->tag_len) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
     if (tag_len == 0U || tag_offset + tag_len > buffer_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }

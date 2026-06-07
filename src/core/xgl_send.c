@@ -13,6 +13,9 @@
 #include "xgl_instance_internal.h"
 #include <string.h>
 
+#define XGL_SEND_DEFAULT_TTL 8U
+#define XGL_SEND_SECURITY_EXT_LEN (XGL_WIRE_EXT_HEADER_SIZE + 13U)
+
 /*---------------------------------------------------------------------------*/
 /* Parameter Validation Helpers                                              */
 /*---------------------------------------------------------------------------*/
@@ -65,8 +68,8 @@ static xgl_error_t validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_da
         return XGL_ERR_INVALID_PARAM;
     }
     
-    /* Check data offset is correct (must be XGL_FRAME_HEADER_SIZE) */
-    if (tx_data->data_offset != XGL_FRAME_HEADER_SIZE) {
+    /* Check data offset reserves at least the fixed production header. */
+    if (tx_data->data_offset < XGL_FRAME_HEADER_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
     
@@ -171,9 +174,7 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
     }
 #endif
     
-    if (handle->config.auth_required) {
-        err = XGL_ERR_INVALID_PARAM;
-    } else if (tx_data->reliable) {
+    if (tx_data->reliable) {
         err = XGL_ERR_INVALID_PARAM;
     } else {
         xgl_route_item_t* route = xgl_route_table_lookup(&handle->route_table,
@@ -182,21 +183,63 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
             err = XGL_ERR_ROUTE_NOT_FOUND;
         } else if (route->phy == NULL || route->phy->tx == NULL) {
             err = XGL_ERR_INVALID_PARAM;
-        } else if (xgl_frame_calculate_size(tx_data->data_len) > route->max_frame_size) {
+        } else if (handle->config.auth_required &&
+                   (handle->config.auth_provider == NULL ||
+                    handle->config.auth_provider->sign == NULL ||
+                    handle->config.auth_provider->tag_len == 0U)) {
+            err = XGL_ERR_INVALID_PARAM;
+        } else if (!handle->config.auth_required &&
+                   xgl_frame_calculate_size(tx_data->data_len) > route->max_frame_size) {
+            err = XGL_ERR_BUFFER_TOO_SMALL;
+        } else if (handle->config.auth_required &&
+                   XGL_WIRE_BASE_HEADER_SIZE + XGL_SEND_SECURITY_EXT_LEN +
+                   tx_data->data_len + handle->config.auth_provider->tag_len +
+                   XGL_CRC16_SIZE > route->max_frame_size) {
             err = XGL_ERR_BUFFER_TOO_SMALL;
         } else {
             size_t frame_len = 0;
-            err = xgl_frame_build_zerocopy(tx_data->buffer,
-                                           tx_data->buffer_size,
-                                           tx_data->data_offset,
-                                           tx_data->data_len,
-                                           handle->config.source_id,
-                                           tx_data->target_id,
-                                           tx_data->data_type,
-                                           0,
-                                           false,
-                                           tx_data->priority,
-                                           &frame_len);
+            if (handle->config.auth_required) {
+                size_t auth_header_len = XGL_WIRE_BASE_HEADER_SIZE +
+                                         XGL_SEND_SECURITY_EXT_LEN;
+                if (tx_data->data_offset != auth_header_len) {
+                    err = XGL_ERR_INVALID_PARAM;
+                } else {
+                    xgl_frame_t frame;
+                    xgl_frame_params_t params = {
+                        .source_id = handle->config.source_id,
+                        .target_id = tx_data->target_id,
+                        .data_type = tx_data->data_type,
+                        .packet_type = XGL_PACKET_TYPE_DATA,
+                        .payload = &tx_data->buffer[tx_data->data_offset],
+                        .payload_len = tx_data->data_len,
+                        .reliable = false,
+                        .priority = tx_data->priority,
+                        .ttl = XGL_SEND_DEFAULT_TTL
+                    };
+
+                    err = xgl_frame_build(&frame, &params);
+                    if (err == XGL_OK) {
+                        err = xgl_frame_serialize_authenticated(tx_data->buffer,
+                                                                tx_data->buffer_size,
+                                                                &frame,
+                                                                handle->config.auth_key_id,
+                                                                handle->config.auth_provider,
+                                                                &frame_len);
+                    }
+                }
+            } else {
+                err = xgl_frame_build_zerocopy(tx_data->buffer,
+                                               tx_data->buffer_size,
+                                               tx_data->data_offset,
+                                               tx_data->data_len,
+                                               handle->config.source_id,
+                                               tx_data->target_id,
+                                               tx_data->data_type,
+                                               0,
+                                               false,
+                                               tx_data->priority,
+                                               &frame_len);
+            }
             if (err == XGL_OK) {
                 err = xgl_datalink_send_raw(&handle->layers.datalink_ctx,
                                             route->phy,
