@@ -168,6 +168,17 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
         case XGL_PARSE_HEADER:
             /* Store header byte */
             parser->cache[parser->cache_len++] = byte;
+
+            if (parser->cache_len == 2U && parser->cache[1] != XGL_WIRE_MAGIC_1) {
+                if (byte == XGL_WIRE_MAGIC_0) {
+                    parser->cache[0] = byte;
+                    parser->cache_len = 1U;
+                    parser->state = XGL_PARSE_HEADER;
+                } else {
+                    xgl_parser_reset(parser);
+                }
+                return XGL_PARSE_RESULT_INCOMPLETE;
+            }
             
             /* Check if we have complete production base header. */
             if (parser->cache_len >= XGL_WIRE_BASE_HEADER_SIZE) {
