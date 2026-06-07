@@ -69,6 +69,9 @@ typedef struct xgl_network_ctx_s {
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;       /**< User data for callbacks */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
+    bool auth_required;             /**< Require authenticated routed frames */
+    uint32_t auth_key_id;           /**< Active authentication key id */
+    xgl_auth_provider_t* auth_provider; /**< Authentication provider for forwarding */
 } xgl_network_ctx_t;
 
 /**
@@ -82,6 +85,9 @@ typedef struct {
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
     void* callback_user_data;       /**< User data for callbacks (can be NULL) */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer (can be NULL) */
+    bool auth_required;             /**< Require authenticated routed frames */
+    uint32_t auth_key_id;           /**< Active authentication key id */
+    xgl_auth_provider_t* auth_provider; /**< Authentication provider for forwarding */
 } xgl_network_config_t;
 
 /*---------------------------------------------------------------------------*/

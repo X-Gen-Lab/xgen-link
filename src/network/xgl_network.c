@@ -15,6 +15,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define XGL_NETWORK_AUTH_TAG_CAPACITY 32U
+
 /*---------------------------------------------------------------------------*/
 /* Private Helper Functions                                                  */
 /*---------------------------------------------------------------------------*/
@@ -57,6 +59,104 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
     return XGL_OK;
 }
 
+static xgl_error_t network_find_security_ext(const uint8_t* frame_buf,
+                                             const xgl_wire_header_t* header,
+                                             uint32_t* key_id,
+                                             uint8_t* tag_len) {
+    if (frame_buf == NULL || header == NULL || key_id == NULL || tag_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    *key_id = 0U;
+    *tag_len = 0U;
+    if (header->header_len <= XGL_WIRE_BASE_HEADER_SIZE) {
+        return XGL_ERR_NOT_FOUND;
+    }
+
+    xgl_wire_ext_cursor_t cursor;
+    xgl_error_t err = xgl_wire_ext_cursor_init(
+        &cursor,
+        &frame_buf[XGL_WIRE_BASE_HEADER_SIZE],
+        header->header_len - XGL_WIRE_BASE_HEADER_SIZE
+    );
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    xgl_wire_ext_t ext;
+    while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
+        if (ext.type != XGL_WIRE_EXT_SECURITY) {
+            continue;
+        }
+
+        uint64_t nonce_id = 0U;
+        return xgl_wire_decode_security_ext_value(ext.value,
+                                                  ext.len,
+                                                  key_id,
+                                                  &nonce_id,
+                                                  tag_len);
+    }
+
+    return err;
+}
+
+static xgl_error_t network_resign_forwarded_frame(xgl_network_ctx_t* ctx,
+                                                  uint8_t* frame_buf,
+                                                  size_t frame_len,
+                                                  const xgl_wire_header_t* header) {
+    if (ctx == NULL || frame_buf == NULL || header == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    bool authenticated = (header->flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U;
+    if (!authenticated) {
+        return ctx->auth_required ? XGL_ERR_INVALID_FRAME : XGL_OK;
+    }
+
+    if (ctx->auth_provider == NULL || ctx->auth_provider->sign == NULL) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    uint32_t key_id = 0U;
+    uint8_t tag_len = 0U;
+    xgl_error_t err = network_find_security_ext(frame_buf, header, &key_id, &tag_len);
+    if (err != XGL_OK || tag_len == 0U || tag_len > XGL_NETWORK_AUTH_TAG_CAPACITY) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    if (ctx->auth_required && key_id != ctx->auth_key_id) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    size_t tag_offset = (size_t)header->header_len + (size_t)header->payload_len;
+    if (frame_len < tag_offset + (size_t)tag_len + XGL_CRC16_SIZE ||
+        tag_offset + (size_t)tag_len != frame_len - XGL_CRC16_SIZE) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    uint8_t tag[XGL_NETWORK_AUTH_TAG_CAPACITY] = {0};
+    size_t produced_tag_len = 0U;
+    err = ctx->auth_provider->sign(key_id,
+                                   frame_buf,
+                                   header->header_len,
+                                   &frame_buf[header->header_len],
+                                   header->payload_len,
+                                   tag,
+                                   sizeof(tag),
+                                   &produced_tag_len,
+                                   ctx->auth_provider->user_data);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    if (produced_tag_len != tag_len) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    memcpy(&frame_buf[tag_offset], tag, produced_tag_len);
+    return XGL_OK;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Public API Implementation                                                 */
 /*---------------------------------------------------------------------------*/
@@ -83,6 +183,9 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     ctx->error_callback = config->error_callback;
     ctx->callback_user_data = config->callback_user_data;
     ctx->stats = config->stats;
+    ctx->auth_required = config->auth_required;
+    ctx->auth_key_id = config->auth_key_id;
+    ctx->auth_provider = config->auth_provider;
     
     return XGL_OK;
 }
@@ -411,6 +514,17 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             }
             return XGL_ERR_INVALID_FRAME;
         }
+
+        if (network_resign_forwarded_frame(ctx,
+                                           forward_buf,
+                                           frame_len,
+                                           &wire_header) != XGL_OK) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_dropped++;
+            }
+            return XGL_ERR_INVALID_FRAME;
+        }
+
         uint16_t forward_crc = xgl_crc16_modbus(forward_buf, frame_len - XGL_CRC16_SIZE);
         xgl_serialize_u16_le(&forward_buf[frame_len - XGL_CRC16_SIZE], forward_crc);
 

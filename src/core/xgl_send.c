@@ -171,7 +171,9 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
     }
 #endif
     
-    if (tx_data->reliable) {
+    if (handle->config.auth_required) {
+        err = XGL_ERR_INVALID_PARAM;
+    } else if (tx_data->reliable) {
         err = XGL_ERR_INVALID_PARAM;
     } else {
         xgl_route_item_t* route = xgl_route_table_lookup(&handle->route_table,

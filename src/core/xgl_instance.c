@@ -194,7 +194,10 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .lower_layer = NULL,  /* Will be set after creating datalink interface */
         .error_callback = handle->config.error_callback,
         .callback_user_data = handle->config.callback_user_data,
-        .stats = &handle->stats.network
+        .stats = &handle->stats.network,
+        .auth_required = handle->config.auth_required,
+        .auth_key_id = handle->config.auth_key_id,
+        .auth_provider = handle->config.auth_provider
     };
     err = xgl_network_init(&handle->layers.network_ctx, &network_config);
     if (err != XGL_OK) {
