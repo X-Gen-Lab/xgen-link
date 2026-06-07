@@ -1145,9 +1145,58 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     if (is_fragment && ctx->fragment_mgr) {
         uint8_t* complete_data = NULL;
         size_t complete_len = 0;
-        
-        err = xgl_fragment_process(ctx->fragment_mgr, source_id, data_type,
-                                   data, data_len, &complete_data, &complete_len, 0);
+        uint32_t message_id = 0U;
+        uint32_t fragment_offset = 0U;
+        uint32_t message_len = 0U;
+        bool has_fragment_ext = false;
+
+        if (packet->extensions != NULL && packet->extensions_len > 0U) {
+            xgl_wire_ext_cursor_t cursor;
+            err = xgl_wire_ext_cursor_init(&cursor,
+                                           packet->extensions,
+                                           packet->extensions_len);
+            if (err != XGL_OK) {
+                return err;
+            }
+
+            xgl_wire_ext_t ext;
+            while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
+                if (ext.type == XGL_WIRE_EXT_FRAGMENT) {
+                    err = xgl_wire_decode_fragment_ext_value(ext.value,
+                                                             ext.len,
+                                                             &message_id,
+                                                             &fragment_offset,
+                                                             &message_len);
+                    if (err != XGL_OK) {
+                        return err;
+                    }
+                    has_fragment_ext = true;
+                    break;
+                }
+            }
+            if (err != XGL_OK && err != XGL_ERR_NOT_FOUND) {
+                return err;
+            }
+        }
+
+        if (has_fragment_ext) {
+            err = xgl_fragment_process_ext(ctx->fragment_mgr,
+                                           source_id,
+                                           packet->connection_id,
+                                           packet->session_epoch,
+                                           data_type,
+                                           message_id,
+                                           fragment_offset,
+                                           message_len,
+                                           data,
+                                           data_len,
+                                           &complete_data,
+                                           &complete_len,
+                                           0);
+        } else {
+            err = xgl_fragment_process(ctx->fragment_mgr, source_id, data_type,
+                                       data, data_len, &complete_data, &complete_len, 0);
+        }
         
         if (err == XGL_OK) {
             /* Reassembly complete, deliver to application */
