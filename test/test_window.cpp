@@ -215,6 +215,33 @@ TEST_F(XglWindowTest, SequenceNumberWraparound) {
     EXPECT_FALSE(xgl_window_is_in_window(&window, 2));
 }
 
+TEST_F(XglWindowTest, PacketNumberApiDoesNotWrapAtEightBits) {
+    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
+
+    window.send_base_packet_number = 254;
+    window.next_packet_number = 254;
+
+    EXPECT_TRUE(xgl_window_can_send_packet_number(&window));
+    EXPECT_EQ(xgl_window_get_next_packet_number(&window), 254U);
+    xgl_window_advance_next_packet_number(&window);
+    EXPECT_EQ(xgl_window_get_next_packet_number(&window), 255U);
+    xgl_window_advance_next_packet_number(&window);
+    EXPECT_EQ(xgl_window_get_next_packet_number(&window), 256U);
+    xgl_window_advance_next_packet_number(&window);
+    EXPECT_EQ(xgl_window_get_next_packet_number(&window), 257U);
+
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 254));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 255));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 256));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 257));
+    EXPECT_FALSE(xgl_window_is_in_window_packet_number(&window, 258));
+
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 254), XGL_OK);
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 255), XGL_OK);
+    EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 2U);
+    EXPECT_EQ(window.send_base_packet_number, 256U);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Reset Tests                                                               */
 /*---------------------------------------------------------------------------*/
