@@ -1253,6 +1253,12 @@ TEST(XglTransportTest, ReliableFragmentTimeoutRetransmitsWithFragmentExtension) 
 
     xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
     ASSERT_NE(peer, nullptr);
+    xgl_list_node_t* node = nullptr;
+    XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+        xgl_reliable_packet_t* packet =
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+        packet->send_timestamp = 0;
+    }
     xgl_reliable_packet_t* queued =
         xgl_reliable_find_packet_number(&peer->reliable_queue, first_fragment_packet_number, 2);
     ASSERT_NE(queued, nullptr);
