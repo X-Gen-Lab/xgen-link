@@ -361,11 +361,17 @@ static uint32_t transport_process_retransmission_queue(xgl_transport_ctx_t* ctx,
             .seq_num = rel_packet->seq_num,
             .ack_num = 0,
             .session_id = rel_packet->session_id,
+            .connection_id = rel_packet->connection_id,
             .data_type = rel_packet->data_type,
+            .session_epoch = rel_packet->session_epoch,
+            .packet_type = rel_packet->packet_type,
+            .flags = rel_packet->flags,
             .reliable = true,
-            .fragment = false,
+            .fragment = rel_packet->fragment,
             .priority = rel_packet->priority,
             .data = &packet_data,
+            .extensions = rel_packet->extensions,
+            .extensions_len = rel_packet->extensions_len,
             .phy = rel_packet->phy
         };
 
@@ -820,6 +826,20 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 if (rel_packet != NULL) {
                     rel_packet->session_id = peer->session_id;
                     rel_packet->send_timestamp = xgl_time_ms();
+                    rel_packet->packet_type = XGL_PACKET_TYPE_DATA;
+                    rel_packet->flags = XGL_WIRE_FLAG_FRAGMENTED |
+                                        XGL_WIRE_FLAG_HAS_EXTENSIONS;
+                    rel_packet->fragment = true;
+                    err = xgl_reliable_set_packet_extensions(&peer->reliable_queue,
+                                                             rel_packet,
+                                                             fragment_ext,
+                                                             encoded_ext_len);
+                    if (err != XGL_OK) {
+                        (void)xgl_reliable_remove_packet_number(&peer->reliable_queue,
+                                                                packet_number,
+                                                                tx_data->target_id);
+                        return err;
+                    }
                 }
             }
             
@@ -951,6 +971,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             if (rel_packet != NULL) {
                 rel_packet->session_id = peer->session_id;
                 rel_packet->send_timestamp = xgl_time_ms();
+                rel_packet->packet_type = XGL_PACKET_TYPE_DATA;
+                rel_packet->fragment = false;
             }
         }
     }

@@ -39,10 +39,17 @@ typedef struct {
     uint32_t packet_number;         /**< 32-bit production packet number */
     uint8_t seq_num;                /**< Sequence number */
     uint16_t session_id;            /**< Transport session/epoch ID */
+    uint32_t connection_id;         /**< Production connection context ID */
+    uint32_t session_epoch;         /**< Production session epoch */
     uint8_t data_type;              /**< Data type */
     
     /* Attributes */
+    uint8_t packet_type;            /**< Production packet type */
+    uint8_t flags;                  /**< Production wire flags */
+    bool fragment;                  /**< Fragment flag */
     uint8_t priority;               /**< Priority level (0-7) */
+    uint8_t* extensions;            /**< Owned TLV extension bytes */
+    size_t extensions_len;          /**< Length of TLV extension bytes */
     
     /* Retransmission state */
     uint8_t retry_count;            /**< Current retry count */
@@ -125,6 +132,11 @@ xgl_error_t xgl_reliable_add_packet_number(xgl_reliable_queue_t* queue,
                                            uint8_t priority,
                                            int32_t timeout_ms,
                                            xgl_phy_ops_t* phy);
+
+xgl_error_t xgl_reliable_set_packet_extensions(xgl_reliable_queue_t* queue,
+                                               xgl_reliable_packet_t* packet,
+                                               const uint8_t* extensions,
+                                               size_t extensions_len);
 
 /**
  * \brief           Remove packet from wait-ACK queue by sequence number
