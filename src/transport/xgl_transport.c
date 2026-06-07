@@ -98,11 +98,11 @@ static xgl_transport_peer_state_t* transport_get_or_create_peer(xgl_transport_ct
 
     memset(peer, 0, sizeof(*peer));
     peer->peer_id = peer_id;
-    peer->session_id = (uint16_t)(ctx->next_session_id & XGL_ATTR_SESSION_MASK);
+    peer->session_id = (uint16_t)(ctx->next_session_id & XGL_SESSION_ID_MASK);
     if (peer->session_id == 0U) {
         peer->session_id = 1U;
     }
-    ctx->next_session_id = (uint16_t)((peer->session_id + 1U) & XGL_ATTR_SESSION_MASK);
+    ctx->next_session_id = (uint16_t)((peer->session_id + 1U) & XGL_SESSION_ID_MASK);
     if (ctx->next_session_id == 0U) {
         ctx->next_session_id = 1U;
     }
@@ -177,7 +177,7 @@ static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
         return;
     }
 
-    peer->session_id = (uint16_t)(session_id & XGL_ATTR_SESSION_MASK);
+    peer->session_id = (uint16_t)(session_id & XGL_SESSION_ID_MASK);
     peer->hello_sent = false;
     peer->session_established = true;
     xgl_reliable_clear(&peer->reliable_queue);
@@ -217,7 +217,7 @@ static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
         .data_type = control_type,
         .reliable = (control_type == XGL_TRANSPORT_CONTROL_NACK ||
                      control_type == XGL_TRANSPORT_CONTROL_SACK) ?
-                    XGL_ATTR_RELIABLE_ACK : XGL_ATTR_RELIABLE_NONE,
+                    XGL_RELIABILITY_ACK_ONLY : XGL_RELIABILITY_NONE,
         .fragment = false,
         .priority = 7,
         .data = &packet_data,
@@ -237,7 +237,7 @@ static xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    uint16_t session_id = (uint16_t)(packet->session_id & XGL_ATTR_SESSION_MASK);
+    uint16_t session_id = (uint16_t)(packet->session_id & XGL_SESSION_ID_MASK);
     if (session_id == 0U) {
         return XGL_ERR_INVALID_FRAME;
     }
@@ -320,7 +320,7 @@ static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
         .data_type = 0,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
         .fragment = false,
         .priority = 7,
         .data = &ack_packet_data,
@@ -982,7 +982,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->enable_fragmentation = config->enable_fragmentation;
     ctx->max_frame_size = config->max_frame_size;
     ctx->route_table = config->route_table;
-    ctx->next_session_id = (uint16_t)(config->local_id & XGL_ATTR_SESSION_MASK);
+    ctx->next_session_id = (uint16_t)(config->local_id & XGL_SESSION_ID_MASK);
     if (ctx->next_session_id == 0U) {
         ctx->next_session_id = 1U;
     }
@@ -1309,7 +1309,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     } else {
         /* Send without fragmentation */
         
-        /* Get sequence number */
+        /* Allocate packet number */
         uint32_t packet_number = 0;
         if (tx_data->reliable && peer != NULL) {
             packet_number = transport_allocate_packet_number(ctx, peer);
@@ -1433,7 +1433,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     }
     
     /* Check if this is an ACK packet */
-    if (reliable == XGL_ATTR_RELIABLE_ACK) {
+    if (reliable == XGL_RELIABILITY_ACK_ONLY) {
         xgl_transport_peer_state_t* peer = transport_find_peer(ctx, source_id);
         if (peer == NULL) {
             return XGL_ERR_SEQUENCE_ERROR;
@@ -1503,7 +1503,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     }
     
     /* Check for duplicate reliable packet */
-    if (reliable == XGL_ATTR_RELIABLE_TX) {
+    if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
         if (rx_peer == NULL) {
             rx_peer = transport_get_or_create_peer(ctx, source_id);
             if (rx_peer == NULL) {
@@ -1524,13 +1524,13 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         }
 
         if (packet_number > rx_peer->rx_next_packet_number) {
-            uint8_t expected_seq = (uint8_t)(rx_peer->rx_next_packet_number & 0xFFU);
+            uint32_t expected_packet_number = rx_peer->rx_next_packet_number;
             err = transport_cache_out_of_order_packet(ctx, rx_peer, packet, packet_number);
             (void)transport_send_control(ctx,
                                          handle,
                                          source_id,
                                          XGL_TRANSPORT_CONTROL_NACK,
-                                         expected_seq,
+                                         expected_packet_number,
                                          packet->session_id);
             if (err != XGL_OK && ctx->stats != NULL) {
                 ctx->stats->rx_dropped++;
@@ -1546,7 +1546,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         return err;
     }
 
-    if (reliable == XGL_ATTR_RELIABLE_TX && rx_peer != NULL) {
+    if (reliable == XGL_RELIABILITY_ACK_ELICITING && rx_peer != NULL) {
         uint32_t packet_number = transport_receive_packet_number(packet);
         rx_peer->rx_next_packet_number = packet_number + 1U;
         return transport_drain_rx_buffered(ctx, handle, rx_peer);

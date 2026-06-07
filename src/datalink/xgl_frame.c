@@ -70,23 +70,23 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     /* Initialize frame */
     memset(frame, 0, sizeof(xgl_frame_t));
     
-    uint8_t attr_lsb = 0;
-    if (params->reliable_type != XGL_ATTR_RELIABLE_NONE) {
-        xgl_frame_set_reliable_type(&attr_lsb, params->reliable_type);
+    uint8_t traffic_class_bits = 0;
+    if (params->reliability_class != XGL_RELIABILITY_NONE) {
+        xgl_frame_set_reliability_class(&traffic_class_bits, params->reliability_class);
     } else {
-        xgl_frame_set_reliable(&attr_lsb, params->reliable);
+        xgl_frame_set_reliability(&traffic_class_bits, params->reliable);
     }
-    xgl_frame_set_fragment(&attr_lsb, params->fragment);
-    xgl_frame_set_priority(&attr_lsb, params->priority);
+    xgl_frame_set_fragmented(&traffic_class_bits, params->fragment);
+    xgl_frame_set_priority(&traffic_class_bits, params->priority);
 
     uint8_t flags = params->flags;
-    uint8_t reliable = (uint8_t)(attr_lsb & XGL_ATTR_RELIABLE_MASK);
-    if (reliable == XGL_ATTR_RELIABLE_TX) {
+    uint8_t reliable = (uint8_t)(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK);
+    if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
         flags |= XGL_WIRE_FLAG_ACK_ELICITING;
-    } else if (reliable == XGL_ATTR_RELIABLE_ACK) {
+    } else if (reliable == XGL_RELIABILITY_ACK_ONLY) {
         flags |= XGL_WIRE_FLAG_CONTROL;
     }
-    if ((attr_lsb & XGL_ATTR_FRAGMENT_MASK) != 0U) {
+    if ((traffic_class_bits & XGL_TRAFFIC_FRAGMENTED_MASK) != 0U) {
         flags |= XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
     }
 
@@ -97,7 +97,7 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     if (packet_type == XGL_PACKET_TYPE_INVALID) {
         packet_type = XGL_PACKET_TYPE_DATA;
     }
-    if (reliable == XGL_ATTR_RELIABLE_ACK) {
+    if (reliable == XGL_RELIABILITY_ACK_ONLY) {
         packet_type = XGL_PACKET_TYPE_ACK;
     }
 
@@ -108,7 +108,7 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.ttl = params->ttl;
     frame->header.traffic_class = (params->traffic_class != 0U) ?
                                   params->traffic_class :
-                                  (uint8_t)(attr_lsb & XGL_ATTR_PRIORITY_MASK);
+                                  (uint8_t)(traffic_class_bits & XGL_TRAFFIC_PRIORITY_MASK);
     frame->header.source_id = params->source_id;
     frame->header.target_id = params->target_id;
     frame->header.connection_id = (params->connection_id != 0U) ?
@@ -386,7 +386,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
         .packet_type = packet_type,
         .flags = flags,
         .ttl = XGL_FRAME_DEFAULT_TTL,
-        .traffic_class = (uint8_t)(priority & XGL_ATTR_PRIORITY_MASK),
+        .traffic_class = (uint8_t)(priority & XGL_TRAFFIC_PRIORITY_MASK),
         .source_id = source_id,
         .target_id = target_id,
         .connection_id = 0,

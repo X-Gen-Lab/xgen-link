@@ -81,7 +81,7 @@ protected:
             .payload = reinterpret_cast<const uint8_t*>(payload),
             .payload_len = std::strlen(payload),
             .reliable = true,
-            .reliable_type = XGL_ATTR_RELIABLE_NONE,
+            .reliability_class = XGL_RELIABILITY_NONE,
             .fragment = false,
             .priority = 0,
             .session_id = 0,

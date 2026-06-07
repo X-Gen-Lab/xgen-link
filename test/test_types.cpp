@@ -18,6 +18,11 @@
 #error "xgl/xgl.h must not expose legacy 8-bit ACK manager in the production API"
 #endif
 
+#if defined(XGL_ATTR_RELIABLE_MASK) || defined(XGL_ATTR_FRAGMENT_MASK) || \
+    defined(XGL_ATTR_PRIORITY_MASK) || defined(XGL_ATTR_SESSION_MASK)
+#error "xgl/xgl.h must not expose v1 attribute-byte macros in the production API"
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Type Size Tests                                                           */
 /*---------------------------------------------------------------------------*/
@@ -191,54 +196,54 @@ TEST(XglTypesTest, TxDataZeroCopyStructure) {
 }
 
 /*---------------------------------------------------------------------------*/
-/* Attribute Bit Definitions Tests                                           */
+/* Traffic-Class Bit Definitions Tests                                       */
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Test attribute bit masks and shifts
+ * \brief           Test traffic-class bit masks and shifts
  */
-TEST(XglTypesTest, AttributeBitDefinitions) {
-    /* Test reliable attribute */
-    EXPECT_EQ(XGL_ATTR_RELIABLE_SHIFT, 6);
-    EXPECT_EQ(XGL_ATTR_RELIABLE_MASK, 0xC0);
-    EXPECT_EQ(XGL_ATTR_RELIABLE_NONE, 0x00);
-    EXPECT_EQ(XGL_ATTR_RELIABLE_TX, 0x40);
-    EXPECT_EQ(XGL_ATTR_RELIABLE_ACK, 0x80);
+TEST(XglTypesTest, TrafficClassBitDefinitions) {
+    /* Test reliability class */
+    EXPECT_EQ(XGL_RELIABILITY_CLASS_SHIFT, 6);
+    EXPECT_EQ(XGL_RELIABILITY_CLASS_MASK, 0xC0);
+    EXPECT_EQ(XGL_RELIABILITY_NONE, 0x00);
+    EXPECT_EQ(XGL_RELIABILITY_ACK_ELICITING, 0x40);
+    EXPECT_EQ(XGL_RELIABILITY_ACK_ONLY, 0x80);
     
-    /* Test fragment attribute */
-    EXPECT_EQ(XGL_ATTR_FRAGMENT_SHIFT, 5);
-    EXPECT_EQ(XGL_ATTR_FRAGMENT_MASK, 0x20);
+    /* Test fragmentation bit */
+    EXPECT_EQ(XGL_TRAFFIC_FRAGMENTED_SHIFT, 5);
+    EXPECT_EQ(XGL_TRAFFIC_FRAGMENTED_MASK, 0x20);
     
-    /* Test encrypt attribute */
-    EXPECT_EQ(XGL_ATTR_ENCRYPT_SHIFT, 3);
-    EXPECT_EQ(XGL_ATTR_ENCRYPT_MASK, 0x18);
+    /* Test encryption class */
+    EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_SHIFT, 3);
+    EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_MASK, 0x18);
     
-    /* Test priority attribute */
-    EXPECT_EQ(XGL_ATTR_PRIORITY_SHIFT, 0);
-    EXPECT_EQ(XGL_ATTR_PRIORITY_MASK, 0x07);
+    /* Test priority class */
+    EXPECT_EQ(XGL_TRAFFIC_PRIORITY_SHIFT, 0);
+    EXPECT_EQ(XGL_TRAFFIC_PRIORITY_MASK, 0x07);
     
-    /* Test compress attribute */
-    EXPECT_EQ(XGL_ATTR_COMPRESS_SHIFT, 6);
-    EXPECT_EQ(XGL_ATTR_COMPRESS_MASK, 0xC0);
+    /* Test compression class */
+    EXPECT_EQ(XGL_COMPRESSION_SHIFT, 6);
+    EXPECT_EQ(XGL_COMPRESSION_MASK, 0xC0);
 }
 
 /**
- * \brief           Test attribute encoding
+ * \brief           Test traffic-class encoding
  */
-TEST(XglTypesTest, AttributeEncoding) {
-    uint8_t attr_lsb = 0;
+TEST(XglTypesTest, TrafficClassEncoding) {
+    uint8_t traffic_class_bits = 0;
     
-    /* Set reliable TX */
-    attr_lsb |= XGL_ATTR_RELIABLE_TX;
-    EXPECT_EQ(attr_lsb & XGL_ATTR_RELIABLE_MASK, XGL_ATTR_RELIABLE_TX);
+    /* Set ACK-eliciting reliability */
+    traffic_class_bits |= XGL_RELIABILITY_ACK_ELICITING;
+    EXPECT_EQ(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK, XGL_RELIABILITY_ACK_ELICITING);
     
     /* Set fragment */
-    attr_lsb |= XGL_ATTR_FRAGMENT_MASK;
-    EXPECT_NE(attr_lsb & XGL_ATTR_FRAGMENT_MASK, 0);
+    traffic_class_bits |= XGL_TRAFFIC_FRAGMENTED_MASK;
+    EXPECT_NE(traffic_class_bits & XGL_TRAFFIC_FRAGMENTED_MASK, 0);
     
     /* Set priority 5 */
-    attr_lsb |= (5 << XGL_ATTR_PRIORITY_SHIFT);
-    EXPECT_EQ(attr_lsb & XGL_ATTR_PRIORITY_MASK, 5);
+    traffic_class_bits |= (5 << XGL_TRAFFIC_PRIORITY_SHIFT);
+    EXPECT_EQ(traffic_class_bits & XGL_TRAFFIC_PRIORITY_MASK, 5);
 }
 
 /*---------------------------------------------------------------------------*/

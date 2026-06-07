@@ -59,11 +59,11 @@ typedef struct {
     const uint8_t* payload;     /**< Payload data */
     size_t payload_len;         /**< Payload length */
     bool reliable;              /**< Reliable transmission flag */
-    uint8_t reliable_type;      /**< Raw reliable attribute type, 0 uses reliable flag */
+    uint8_t reliability_class;  /**< Raw reliability class, 0 uses reliable flag */
     bool fragment;              /**< Fragment flag */
     uint8_t priority;           /**< Priority level (0-7) */
-    uint16_t session_id;        /**< Transport epoch/session ID, encoded in attr_msb low bits */
-    uint8_t ttl;                /**< Hop limit stored in reserved header byte */
+    uint16_t session_id;        /**< Short transport session ID fallback for connection_id */
+    uint8_t ttl;                /**< Hop limit */
 } xgl_frame_params_t;
 
 /**
@@ -142,70 +142,78 @@ static inline size_t xgl_frame_calculate_size(size_t payload_len) {
 }
 
 /*---------------------------------------------------------------------------*/
-/* Attribute Helper Functions                                                */
+/* Traffic-Class Helper Functions                                            */
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Set reliable attribute in attributes LSB
- * \param[in,out]   attr_lsb: Attributes LSB byte
+ * \brief           Set reliability class in traffic-class bits
+ * \param[in,out]   traffic_class: Traffic-class byte
  * \param[in]       reliable: Reliable transmission flag
  */
-static inline void xgl_frame_set_reliable(uint8_t* attr_lsb, bool reliable) {
-    uint8_t reliable_bits = reliable ? XGL_ATTR_RELIABLE_TX : XGL_ATTR_RELIABLE_NONE;
-    *attr_lsb = (uint8_t)(((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_RELIABLE_MASK)) |
-                          (uint32_t)reliable_bits);
+static inline void xgl_frame_set_reliability(uint8_t* traffic_class, bool reliable) {
+    uint8_t reliable_bits = reliable ? XGL_RELIABILITY_ACK_ELICITING : XGL_RELIABILITY_NONE;
+    *traffic_class = (uint8_t)(((uint32_t)*traffic_class &
+                                ~((uint32_t)XGL_RELIABILITY_CLASS_MASK)) |
+                               (uint32_t)reliable_bits);
 }
 
 /**
- * \brief           Set reliable attribute type in attributes LSB
- * \param[in,out]   attr_lsb: Attributes LSB byte
- * \param[in]       reliable_type: Raw reliable type bits
+ * \brief           Set raw reliability class in traffic-class bits
+ * \param[in,out]   traffic_class: Traffic-class byte
+ * \param[in]       reliability_class: Raw reliability class bits
  */
-static inline void xgl_frame_set_reliable_type(uint8_t* attr_lsb, uint8_t reliable_type) {
-    *attr_lsb = (uint8_t)(((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_RELIABLE_MASK)) |
-                          ((uint32_t)reliable_type & (uint32_t)XGL_ATTR_RELIABLE_MASK));
+static inline void xgl_frame_set_reliability_class(uint8_t* traffic_class,
+                                                   uint8_t reliability_class) {
+    *traffic_class = (uint8_t)(((uint32_t)*traffic_class &
+                                ~((uint32_t)XGL_RELIABILITY_CLASS_MASK)) |
+                               ((uint32_t)reliability_class &
+                                (uint32_t)XGL_RELIABILITY_CLASS_MASK));
 }
 
 /**
- * \brief           Set fragment attribute in attributes LSB
- * \param[in,out]   attr_lsb: Attributes LSB byte
+ * \brief           Set fragmented bit in traffic-class bits
+ * \param[in,out]   traffic_class: Traffic-class byte
  * \param[in]       fragment: Fragment flag
  */
-static inline void xgl_frame_set_fragment(uint8_t* attr_lsb, bool fragment) {
+static inline void xgl_frame_set_fragmented(uint8_t* traffic_class, bool fragment) {
     if (fragment) {
-        *attr_lsb = (uint8_t)((uint32_t)*attr_lsb | (uint32_t)XGL_ATTR_FRAGMENT_MASK);
+        *traffic_class = (uint8_t)((uint32_t)*traffic_class |
+                                   (uint32_t)XGL_TRAFFIC_FRAGMENTED_MASK);
     } else {
-        *attr_lsb = (uint8_t)((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_FRAGMENT_MASK));
+        *traffic_class = (uint8_t)((uint32_t)*traffic_class &
+                                   ~((uint32_t)XGL_TRAFFIC_FRAGMENTED_MASK));
     }
 }
 
 /**
- * \brief           Set priority attribute in attributes LSB
- * \param[in,out]   attr_lsb: Attributes LSB byte
+ * \brief           Set priority in traffic-class bits
+ * \param[in,out]   traffic_class: Traffic-class byte
  * \param[in]       priority: Priority level (0-7)
  */
-static inline void xgl_frame_set_priority(uint8_t* attr_lsb, uint8_t priority) {
-    *attr_lsb = (uint8_t)(((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_PRIORITY_MASK)) |
-                          ((uint32_t)priority & (uint32_t)XGL_ATTR_PRIORITY_MASK));
+static inline void xgl_frame_set_priority(uint8_t* traffic_class, uint8_t priority) {
+    *traffic_class = (uint8_t)(((uint32_t)*traffic_class &
+                                ~((uint32_t)XGL_TRAFFIC_PRIORITY_MASK)) |
+                               ((uint32_t)priority & (uint32_t)XGL_TRAFFIC_PRIORITY_MASK));
 }
 
 /**
- * \brief           Get reliable attribute from attributes LSB
- * \param[in]       attr_lsb: Attributes LSB byte
+ * \brief           Get reliability class from traffic-class bits
+ * \param[in]       traffic_class: Traffic-class byte
  * \return          Reliable transmission type
  */
-static inline uint8_t xgl_frame_get_reliable(uint8_t attr_lsb) {
-    return (uint8_t)(((uint32_t)attr_lsb & (uint32_t)XGL_ATTR_RELIABLE_MASK) >>
-                     XGL_ATTR_RELIABLE_SHIFT);
+static inline uint8_t xgl_frame_get_reliability(uint8_t traffic_class) {
+    return (uint8_t)(((uint32_t)traffic_class &
+                      (uint32_t)XGL_RELIABILITY_CLASS_MASK) >>
+                     XGL_RELIABILITY_CLASS_SHIFT);
 }
 
 /**
- * \brief           Get priority attribute from attributes LSB
- * \param[in]       attr_lsb: Attributes LSB byte
+ * \brief           Get priority from traffic-class bits
+ * \param[in]       traffic_class: Traffic-class byte
  * \return          Priority level (0-7)
  */
-static inline uint8_t xgl_frame_get_priority(uint8_t attr_lsb) {
-    return (uint8_t)(attr_lsb & XGL_ATTR_PRIORITY_MASK);
+static inline uint8_t xgl_frame_get_priority(uint8_t traffic_class) {
+    return (uint8_t)(traffic_class & XGL_TRAFFIC_PRIORITY_MASK);
 }
 
 #ifdef __cplusplus

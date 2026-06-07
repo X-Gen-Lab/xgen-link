@@ -236,7 +236,7 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
         EXPECT_EQ(parsed_header.flags & XGL_WIRE_FLAG_ACK_ELICITING, expected_reliable)
             << "Reliable flag mismatch at iteration " << iteration;
         
-        EXPECT_EQ(parsed_header.traffic_class & XGL_ATTR_PRIORITY_MASK, priority)
+        EXPECT_EQ(parsed_header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK, priority)
             << "Priority mismatch at iteration " << iteration;
         
         /* Verify payload data */
@@ -314,7 +314,7 @@ TEST(XglFrameProperties, FieldValidation) {
         EXPECT_EQ(header.packet_type, data_type)
             << "Data type mismatch at iteration " << iteration;
         
-        uint8_t parsed_priority = (uint8_t)(header.traffic_class & XGL_ATTR_PRIORITY_MASK);
+        uint8_t parsed_priority = (uint8_t)(header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK);
         EXPECT_LE(parsed_priority, 0x07)
             << "Priority out of range at iteration " << iteration;
         EXPECT_EQ(parsed_priority, priority)

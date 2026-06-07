@@ -27,7 +27,7 @@ extern "C" {
 /**
  * \brief           Protocol version
  */
-#define XGL_PROTOCOL_VERSION        1
+#define XGL_PROTOCOL_VERSION        2
 
 /**
  * \brief           Broadcast address
@@ -36,7 +36,6 @@ extern "C" {
 
 /**
  * \brief           Default hop limit for routed packets
- * \note            Stored in the frame reserved byte for protocol v1.
  */
 #ifndef XGL_DEFAULT_TTL
 #define XGL_DEFAULT_TTL             8
@@ -102,13 +101,13 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
  * \brief           Send packet through network layer
  * \param[in]       ctx: Network layer context
  * \param[in]       packet: Packet to send
- * \param[in]       assign_seq: Assign sequence number flag
+ * \param[in]       assign_packet_number: Packet-number assignment flag
  * \return          XGL_OK on success, error code otherwise
  * \note            This function performs routing and forwards packet to data link layer
  */
 xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
                              xgl_packet_t* packet,
-                             bool assign_seq);
+                             bool assign_packet_number);
 
 /**
  * \brief           Receive and process packet from data link layer

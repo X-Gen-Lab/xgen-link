@@ -200,7 +200,7 @@ xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
         return XGL_ERR_NULL_POINTER;
     }
     
-    /* Find packet with matching sequence number and target ID */
+    /* Find packet with matching packet number and target ID */
     xgl_list_node_t* node;
     XGL_LIST_FOR_EACH(&queue->wait_ack_list, node) {
         xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
@@ -385,7 +385,7 @@ xgl_reliable_packet_t* xgl_reliable_find_packet_number(const xgl_reliable_queue_
         return NULL;
     }
     
-    /* Search for packet with matching sequence number and target ID */
+    /* Search for packet with matching packet number and target ID */
     xgl_list_node_t* node;
     XGL_LIST_FOR_EACH(&queue->wait_ack_list, node) {
         xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);

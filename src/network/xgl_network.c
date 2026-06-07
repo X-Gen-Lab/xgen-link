@@ -94,7 +94,7 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
 static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
                                                 xgl_handle_t handle,
                                                 xgl_packet_t* packet,
-                                                bool assign_seq) {
+                                                bool assign_packet_number) {
     if (ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -138,10 +138,8 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
     /* Set protocol version */
     packet->version = XGL_PROTOCOL_VERSION;
     
-    /* Assign sequence number if requested */
     /* Packet number assignment is handled by transport layer. */
-    /* This is just a placeholder for network layer forwarding */
-    (void)assign_seq;  /* Unused in this layer */
+    (void)assign_packet_number;  /* Unused in this layer */
     
     /* Update statistics */
     if (ctx->stats != NULL) {
@@ -153,11 +151,11 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
     
     /* Build frame from packet for datalink transmission */
     xgl_frame_t frame;
-    uint8_t reliable_type = XGL_ATTR_RELIABLE_NONE;
-    if (packet->reliable == XGL_ATTR_RELIABLE_ACK) {
-        reliable_type = XGL_ATTR_RELIABLE_ACK;
+    uint8_t reliability_class = XGL_RELIABILITY_NONE;
+    if (packet->reliable == XGL_RELIABILITY_ACK_ONLY) {
+        reliability_class = XGL_RELIABILITY_ACK_ONLY;
     } else if (packet->reliable != 0U) {
-        reliable_type = XGL_ATTR_RELIABLE_TX;
+        reliability_class = XGL_RELIABILITY_ACK_ELICITING;
     }
 
     xgl_frame_params_t params = {
@@ -177,7 +175,7 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         .payload = packet->data->data,
         .payload_len = packet->data->data_len,
         .reliable = packet->reliable,
-        .reliable_type = reliable_type,
+        .reliability_class = reliability_class,
         .fragment = packet->fragment,
         .priority = packet->priority,
         .session_id = packet->session_id,
@@ -229,8 +227,8 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
 
 xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx,
                              xgl_packet_t* packet,
-                             bool assign_seq) {
-    return xgl_network_send_with_handle(ctx, NULL, packet, assign_seq);
+                             bool assign_packet_number) {
+    return xgl_network_send_with_handle(ctx, NULL, packet, assign_packet_number);
 }
 
 /**
@@ -288,12 +286,12 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             if (xgl_wire_decode_header(&wire_header, frame_buf, frame_len) != XGL_OK) {
                 return XGL_ERR_INVALID_FRAME;
             }
-            uint8_t reliable = XGL_ATTR_RELIABLE_NONE;
+            uint8_t reliable = XGL_RELIABILITY_NONE;
             if ((wire_header.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
-                reliable = XGL_ATTR_RELIABLE_TX;
+                reliable = XGL_RELIABILITY_ACK_ELICITING;
             } else if (wire_header.packet_type == XGL_PACKET_TYPE_ACK ||
                        (wire_header.flags & XGL_WIRE_FLAG_CONTROL) != 0U) {
-                reliable = XGL_ATTR_RELIABLE_ACK;
+                reliable = XGL_RELIABILITY_ACK_ONLY;
             }
             
             /* Build packet data structure for payload */
@@ -324,7 +322,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .data_type = data_type,
                 .reliable = reliable,
                 .fragment = ((wire_header.flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U) ? 1U : 0U,
-                .priority = (wire_header.traffic_class & XGL_ATTR_PRIORITY_MASK) >> XGL_ATTR_PRIORITY_SHIFT,
+                .priority = (wire_header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK) >> XGL_TRAFFIC_PRIORITY_SHIFT,
                 .ttl = wire_header.ttl,
                 .traffic_class = wire_header.traffic_class,
                 .data = &packet_data,

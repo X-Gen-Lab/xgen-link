@@ -184,7 +184,7 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
         .data_type = 0,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
         .data = &ack_data
     };
@@ -264,7 +264,7 @@ TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
         .data_type = 0,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
         .data = &ack_ext_data
     };
@@ -342,7 +342,7 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
         .data_type = 0,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
         .data = &sack_ext_data
     };
@@ -413,7 +413,7 @@ TEST(XglTransportTest, ProductionAckWithUnknownExtensionDoesNotUseLegacyAckNumbe
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
         .data_type = 0,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
         .data = &ack_ext_data
     };
@@ -518,7 +518,7 @@ TEST(XglTransportTest, AckFromUnexpectedSourceIsRejected) {
         .source_id = 3,
         .target_id = 1,
         .data_type = 0,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
         .data = &ack_data
     };
@@ -645,7 +645,7 @@ TEST(XglTransportTest, AckWithWrongSessionIsRejected) {
         .target_id = 1,
         .session_id = wrong_session,
         .data_type = 0,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
         .data = &ack_data
     };
@@ -683,7 +683,7 @@ TEST(XglTransportTest, HelloSetsPeerSessionWithoutDeliveringToApplication) {
         .target_id = 1,
         .session_id = 9,
         .data_type = kTransportControlHello,
-        .reliable = XGL_ATTR_RELIABLE_NONE,
+        .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
         .data = &packet_data
     };
@@ -735,7 +735,7 @@ TEST(XglTransportTest, ResetUpdatesSessionAndClearsPeerReliableState) {
         .target_id = 1,
         .session_id = 11,
         .data_type = kTransportControlReset,
-        .reliable = XGL_ATTR_RELIABLE_NONE,
+        .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
         .data = &reset_data
     };
@@ -777,7 +777,7 @@ TEST(XglTransportTest, ReliableDataWithStaleSessionIsRejectedBeforeAckOrDelivery
         .target_id = 1,
         .session_id = 5,
         .data_type = kTransportControlHello,
-        .reliable = XGL_ATTR_RELIABLE_NONE,
+        .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
         .data = &control_data
     };
@@ -795,7 +795,7 @@ TEST(XglTransportTest, ReliableDataWithStaleSessionIsRejectedBeforeAckOrDelivery
         .target_id = 1,
         .session_id = 4,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_TX,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
         .priority = 0,
         .data = &packet_data
     };
@@ -834,7 +834,7 @@ TEST(XglTransportTest, FirstReliableDataWithSessionCreatesPeerState) {
         .target_id = 1,
         .session_id = 13,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_TX,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
         .priority = 0,
         .data = &packet_data
     };
@@ -896,7 +896,7 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
         .target_id = 1,
         .session_id = 5,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_NONE,
+        .reliable = XGL_RELIABILITY_NONE,
         .fragment = true,
         .priority = 0,
         .data = &first_data,
@@ -919,7 +919,7 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
         .target_id = 1,
         .session_id = 6,
         .data_type = kTransportControlReset,
-        .reliable = XGL_ATTR_RELIABLE_NONE,
+        .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
         .data = &reset_data
     };
@@ -976,7 +976,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
         .session_id = 5,
         .packet_number = 2,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_TX,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
         .priority = 0,
         .data = &packet_data
     };
@@ -985,7 +985,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
     EXPECT_EQ(rx_tracker.receive_count, 0);
     ASSERT_EQ(spy.send_count, 1);
     EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
-    EXPECT_EQ(spy.last_packet.reliable, XGL_ATTR_RELIABLE_ACK);
+    EXPECT_EQ(spy.last_packet.reliable, XGL_RELIABILITY_ACK_ONLY);
     EXPECT_EQ(spy.last_packet.packet_number, 0U);
     EXPECT_EQ(spy.last_packet.session_id, 5U);
 
@@ -1021,7 +1021,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
         .session_id = 5,
         .packet_number = 0,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_TX,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
         .priority = 0,
         .data = &data0
     };
@@ -1079,7 +1079,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
         .session_id = 5,
         .packet_number = 0,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_TX,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
         .priority = 0,
         .data = &packet_data
     };
@@ -1150,7 +1150,7 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
         .session_id = 5,
         .packet_number = 0,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_TX,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
         .priority = 0,
         .data = &packet_data
     };
@@ -1635,7 +1635,7 @@ TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
         .source_id = 2,
         .target_id = 1,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_NONE,
+        .reliable = XGL_RELIABILITY_NONE,
         .priority = 0,
         .data = &packet_data
     };
@@ -1673,7 +1673,7 @@ TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
         .source_id = 2,
         .target_id = 1,
         .data_type = 1,
-        .reliable = XGL_ATTR_RELIABLE_TX,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
         .priority = 0,
         .data = &packet_data
     };

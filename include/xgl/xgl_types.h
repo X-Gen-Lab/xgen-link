@@ -71,41 +71,41 @@ typedef struct {
 #define XGL_FRAME_HEADER_SIZE       24
 
 /*---------------------------------------------------------------------------*/
-/* Attribute Bit Definitions                                                 */
+/* Production Traffic-Class Bit Definitions                                  */
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Attributes LSB bit definitions
+ * \brief           Traffic-class reliability bits
  */
-#define XGL_ATTR_RELIABLE_SHIFT     6
-#define XGL_ATTR_RELIABLE_MASK      0xC0
-#define XGL_ATTR_RELIABLE_NONE      0x00
-#define XGL_ATTR_RELIABLE_TX        0x40
-#define XGL_ATTR_RELIABLE_ACK       0x80
+#define XGL_RELIABILITY_CLASS_SHIFT     6
+#define XGL_RELIABILITY_CLASS_MASK      0xC0
+#define XGL_RELIABILITY_NONE            0x00
+#define XGL_RELIABILITY_ACK_ELICITING   0x40
+#define XGL_RELIABILITY_ACK_ONLY        0x80
 
-#define XGL_ATTR_FRAGMENT_SHIFT     5
-#define XGL_ATTR_FRAGMENT_MASK      0x20
+#define XGL_TRAFFIC_FRAGMENTED_SHIFT    5
+#define XGL_TRAFFIC_FRAGMENTED_MASK     0x20
 
-#define XGL_ATTR_ENCRYPT_SHIFT      3
-#define XGL_ATTR_ENCRYPT_MASK       0x18
-#define XGL_ATTR_ENCRYPT_NONE       0x00
-#define XGL_ATTR_ENCRYPT_AES128     0x08
-#define XGL_ATTR_ENCRYPT_CHACHA20   0x10
+#define XGL_TRAFFIC_ENCRYPTION_SHIFT    3
+#define XGL_TRAFFIC_ENCRYPTION_MASK     0x18
+#define XGL_TRAFFIC_ENCRYPTION_NONE     0x00
+#define XGL_TRAFFIC_ENCRYPTION_AES128   0x08
+#define XGL_TRAFFIC_ENCRYPTION_CHACHA20 0x10
 
-#define XGL_ATTR_PRIORITY_SHIFT     0
-#define XGL_ATTR_PRIORITY_MASK      0x07
+#define XGL_TRAFFIC_PRIORITY_SHIFT      0
+#define XGL_TRAFFIC_PRIORITY_MASK       0x07
 
 /**
- * \brief           Attributes MSB bit definitions
+ * \brief           Compression-class bits for negotiated payload handling
  */
-#define XGL_ATTR_COMPRESS_SHIFT     6
-#define XGL_ATTR_COMPRESS_MASK      0xC0
-#define XGL_ATTR_COMPRESS_NONE      0x00
-#define XGL_ATTR_COMPRESS_RLE       0x40
-#define XGL_ATTR_COMPRESS_LZ77      0x80
-#define XGL_ATTR_COMPRESS_ZLIB      0xC0
+#define XGL_COMPRESSION_SHIFT           6
+#define XGL_COMPRESSION_MASK            0xC0
+#define XGL_COMPRESSION_NONE            0x00
+#define XGL_COMPRESSION_RLE             0x40
+#define XGL_COMPRESSION_LZ77            0x80
+#define XGL_COMPRESSION_ZLIB            0xC0
 
-#define XGL_ATTR_SESSION_MASK       0x3F
+#define XGL_SESSION_ID_MASK             0x3F
 
 /*---------------------------------------------------------------------------*/
 /* Packet Data Structure                                                     */

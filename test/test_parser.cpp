@@ -398,7 +398,7 @@ TEST_F(XglParserTest, ParseCompleteFrameLargePayload) {
 /* Error Handling Tests                                                      */
 /*---------------------------------------------------------------------------*/
 
-TEST_F(XglParserTest, InvalidCRC8) {
+TEST_F(XglParserTest, InvalidHeaderCRC16) {
     /* Create valid frame */
     std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
     std::vector<uint8_t> frame = create_valid_frame(payload);
@@ -412,7 +412,7 @@ TEST_F(XglParserTest, InvalidCRC8) {
     for (size_t i = 0; i < frame.size(); ++i) {
         result = xgl_parser_feed_byte(&parser, frame[i], 0);
         
-        /* Parser validates CRC8 when header is complete (after byte 11) */
+        /* Parser validates header CRC16 when the fixed header is complete. */
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
             EXPECT_EQ(i, XGL_FRAME_HEADER_SIZE - 1U);

@@ -102,7 +102,7 @@ TEST(XglFrameTest, BuildBasicFrame) {
     EXPECT_EQ(frame.payload_len, sizeof(payload));
     
     EXPECT_NE(frame.header.flags & XGL_WIRE_FLAG_ACK_ELICITING, 0);
-    EXPECT_EQ(frame.header.traffic_class & XGL_ATTR_PRIORITY_MASK, 3);
+    EXPECT_EQ(frame.header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK, 3);
 }
 
 TEST(XglFrameTest, BuildFrameNullPointer) {
@@ -426,7 +426,7 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0x01, 0x02};
     
-    /* Build frame (CRC8 is calculated automatically) */
+    /* Build frame (header CRC16 is calculated automatically) */
     xgl_frame_params_t params = {
         .source_id = 0x10,
         .target_id = 0x20,
@@ -476,24 +476,24 @@ TEST(XglFrameTest, InvalidHeaderCRC) {
 }
 
 /*---------------------------------------------------------------------------*/
-/* Attribute Helper Tests                                                    */
+/* Traffic-Class Helper Tests                                                */
 /*---------------------------------------------------------------------------*/
 
-TEST(XglFrameTest, AttributeHelpers) {
-    uint8_t attr_lsb = 0;
+TEST(XglFrameTest, TrafficClassHelpers) {
+    uint8_t traffic_class_bits = 0;
     
-    /* Set reliable */
-    xgl_frame_set_reliable(&attr_lsb, true);
-    EXPECT_EQ(xgl_frame_get_reliable(attr_lsb), 
-              XGL_ATTR_RELIABLE_TX >> XGL_ATTR_RELIABLE_SHIFT);
+    /* Set reliability */
+    xgl_frame_set_reliability(&traffic_class_bits, true);
+    EXPECT_EQ(xgl_frame_get_reliability(traffic_class_bits),
+              XGL_RELIABILITY_ACK_ELICITING >> XGL_RELIABILITY_CLASS_SHIFT);
     
     /* Set priority */
-    xgl_frame_set_priority(&attr_lsb, 5);
-    EXPECT_EQ(xgl_frame_get_priority(attr_lsb), 5);
+    xgl_frame_set_priority(&traffic_class_bits, 5);
+    EXPECT_EQ(xgl_frame_get_priority(traffic_class_bits), 5);
     
     /* Verify reliable is still set */
-    EXPECT_EQ(xgl_frame_get_reliable(attr_lsb),
-              XGL_ATTR_RELIABLE_TX >> XGL_ATTR_RELIABLE_SHIFT);
+    EXPECT_EQ(xgl_frame_get_reliability(traffic_class_bits),
+              XGL_RELIABILITY_ACK_ELICITING >> XGL_RELIABILITY_CLASS_SHIFT);
 }
 
 TEST(XglFrameTest, FrameSizeCalculation) {
