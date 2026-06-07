@@ -37,7 +37,6 @@ typedef struct {
     uint16_t source_id;             /**< Source node ID */
     uint16_t target_id;             /**< Target node ID */
     uint32_t packet_number;         /**< 32-bit production packet number */
-    uint8_t seq_num;                /**< Sequence number */
     uint16_t session_id;            /**< Transport session/epoch ID */
     uint32_t connection_id;         /**< Production connection context ID */
     uint32_t session_epoch;         /**< Production session epoch */
@@ -97,31 +96,6 @@ xgl_error_t xgl_reliable_init(xgl_reliable_queue_t* queue,
  */
 void xgl_reliable_destroy(xgl_reliable_queue_t* queue);
 
-/**
- * \brief           Add packet to wait-ACK queue
- * \param[in,out]   queue: Reliable queue structure
- * \param[in]       data: Packet data buffer
- * \param[in]       data_len: Data length in bytes
- * \param[in]       source_id: Source node ID
- * \param[in]       target_id: Target node ID
- * \param[in]       seq_num: Sequence number
- * \param[in]       data_type: Data type
- * \param[in]       priority: Priority level (0-7)
- * \param[in]       timeout_ms: Initial timeout in milliseconds
- * \param[in]       phy: Physical layer operations
- * \return          XGL_OK on success, error code otherwise
- */
-xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
-                                    const uint8_t* data,
-                                    size_t data_len,
-                                    uint16_t source_id,
-                                    uint16_t target_id,
-                                    uint8_t seq_num,
-                                    uint8_t data_type,
-                                    uint8_t priority,
-                                    int32_t timeout_ms,
-                                    xgl_phy_ops_t* phy);
-
 xgl_error_t xgl_reliable_add_packet_number(xgl_reliable_queue_t* queue,
                                            const uint8_t* data,
                                            size_t data_len,
@@ -137,17 +111,6 @@ xgl_error_t xgl_reliable_set_packet_extensions(xgl_reliable_queue_t* queue,
                                                xgl_reliable_packet_t* packet,
                                                const uint8_t* extensions,
                                                size_t extensions_len);
-
-/**
- * \brief           Remove packet from wait-ACK queue by sequence number
- * \param[in,out]   queue: Reliable queue structure
- * \param[in]       seq_num: Sequence number to remove
- * \param[in]       target_id: Target node ID
- * \return          XGL_OK on success, XGL_ERR_NOT_FOUND if not found
- */
-xgl_error_t xgl_reliable_remove_packet(xgl_reliable_queue_t* queue,
-                                       uint8_t seq_num,
-                                       uint16_t target_id);
 
 xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
                                               uint32_t packet_number,
@@ -200,17 +163,6 @@ bool xgl_reliable_is_empty(const xgl_reliable_queue_t* queue);
  * \param[in,out]   queue: Reliable queue structure
  */
 void xgl_reliable_clear(xgl_reliable_queue_t* queue);
-
-/**
- * \brief           Find packet by sequence number
- * \param[in]       queue: Reliable queue structure
- * \param[in]       seq_num: Sequence number to find
- * \param[in]       target_id: Target node ID
- * \return          Pointer to packet, NULL if not found
- */
-xgl_reliable_packet_t* xgl_reliable_find_packet(const xgl_reliable_queue_t* queue,
-                                                uint8_t seq_num,
-                                                uint16_t target_id);
 
 xgl_reliable_packet_t* xgl_reliable_find_packet_number(const xgl_reliable_queue_t* queue,
                                                        uint32_t packet_number,

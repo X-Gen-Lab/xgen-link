@@ -357,7 +357,7 @@ static xgl_error_t transport_retransmit_reliable_packet(xgl_transport_ctx_t* ctx
     xgl_packet_t packet = {
         .source_id = rel_packet->source_id,
         .target_id = rel_packet->target_id,
-        .seq_num = rel_packet->seq_num,
+        .seq_num = (uint8_t)(rel_packet->packet_number & 0xFFU),
         .ack_num = 0,
         .session_id = rel_packet->session_id,
         .connection_id = rel_packet->connection_id,

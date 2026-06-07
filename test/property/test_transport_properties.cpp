@@ -653,7 +653,7 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuing) {
         int32_t timeout_ms = 100 + (gen.random_uint32() % 5000);
         
         /* Add packet to queue */
-        err = xgl_reliable_add_packet(&queue, data.data(), data_len,
+        err = xgl_reliable_add_packet_number(&queue, data.data(), data_len,
                                      source_id, target_id, seq_num,
                                      data_type, priority, timeout_ms, &phy);
         
@@ -668,12 +668,12 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuing) {
             << "Queue count should be 1 after adding one packet";
         
         /* Verify packet can be found in queue */
-        xgl_reliable_packet_t* found = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        xgl_reliable_packet_t* found = xgl_reliable_find_packet_number(&queue, seq_num, target_id);
         ASSERT_NE(found, nullptr)
             << "Packet should be findable in queue";
         
         /* Verify packet data matches */
-        EXPECT_EQ(found->seq_num, seq_num);
+        EXPECT_EQ(found->packet_number, seq_num);
         EXPECT_EQ(found->target_id, target_id);
         EXPECT_EQ(found->source_id, source_id);
         EXPECT_EQ(found->data_type, data_type);
@@ -714,7 +714,7 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuingMultiple) {
         for (int i = 0; i < num_packets; ++i) {
             std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 100));
             
-            err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+            err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                          gen.random_uint8(), gen.random_uint8(),
                                          (uint8_t)i, gen.random_uint8(),
                                          gen.random_uint8() % 8, 1000, &phy);
@@ -779,12 +779,12 @@ TEST(XglTransportProperties, Property14_RetransmissionOnTimeout) {
         int32_t timeout_ms = 100 + (gen.random_uint32() % 500);
         
         /* Add packet to queue */
-        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+        err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                      1, target_id, seq_num, 0, 0, timeout_ms, &phy);
         ASSERT_EQ(err, XGL_OK);
         
         /* Set initial send timestamp */
-        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, seq_num, target_id);
         ASSERT_NE(packet, nullptr);
         packet->send_timestamp = 1000;  /* Start time */
         
@@ -811,7 +811,7 @@ TEST(XglTransportProperties, Property14_RetransmissionOnTimeout) {
             << "Packet should remain in queue after retransmission";
         
         /* Verify retry count incremented */
-        packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        packet = xgl_reliable_find_packet_number(&queue, seq_num, target_id);
         ASSERT_NE(packet, nullptr);
         EXPECT_EQ(packet->retry_count, 1)
             << "Retry count should be incremented after retransmission";
@@ -849,12 +849,12 @@ TEST(XglTransportProperties, Property14_RetransmissionMultiple) {
     
     /* Add packet */
     std::vector<uint8_t> data = gen.random_bytes(20);
-    err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+    err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                  1, 2, 10, 0, 0, 100, &phy);
     ASSERT_EQ(err, XGL_OK);
     
     /* Set initial timestamp */
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
     packet->send_timestamp = 1000;
     
@@ -868,7 +868,7 @@ TEST(XglTransportProperties, Property14_RetransmissionMultiple) {
         EXPECT_EQ(retx, 1) << "Should retransmit on timeout " << i;
         
         /* Verify retry count */
-        packet = xgl_reliable_find_packet(&queue, 10, 2);
+        packet = xgl_reliable_find_packet_number(&queue, 10, 2);
         ASSERT_NE(packet, nullptr);
         EXPECT_EQ(packet->retry_count, (uint8_t)(i + 1));
     }
@@ -914,12 +914,12 @@ TEST(XglTransportProperties, Property15_RetryExhaustionHandling) {
         uint8_t seq_num = gen.random_uint8();
         uint8_t target_id = gen.random_uint8();
         
-        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+        err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                      1, target_id, seq_num, 0, 0, 100, &phy);
         ASSERT_EQ(err, XGL_OK);
         
         /* Set initial timestamp */
-        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, seq_num, target_id);
         ASSERT_NE(packet, nullptr);
         packet->send_timestamp = 1000;
         
@@ -933,7 +933,7 @@ TEST(XglTransportProperties, Property15_RetryExhaustionHandling) {
             EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
                 << "Packet should remain in queue until max retries exceeded";
             
-            packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+            packet = xgl_reliable_find_packet_number(&queue, seq_num, target_id);
             ASSERT_NE(packet, nullptr);
         }
         
@@ -953,7 +953,7 @@ TEST(XglTransportProperties, Property15_RetryExhaustionHandling) {
         ASSERT_NE(exhausted, nullptr)
             << "Exhausted packet should be returned to caller";
         
-        EXPECT_EQ(exhausted->seq_num, seq_num);
+        EXPECT_EQ(exhausted->packet_number, seq_num);
         EXPECT_EQ(exhausted->target_id, target_id);
         EXPECT_EQ(exhausted->retry_count, max_retry);
         
@@ -989,13 +989,13 @@ TEST(XglTransportProperties, Property15_RetryExhaustionMultiplePackets) {
     /* Add 3 packets - only set timestamp for first one */
     for (int i = 0; i < 3; ++i) {
         std::vector<uint8_t> data = gen.random_bytes(20);
-        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+        err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                      1, 2, (uint8_t)i, 0, 0, 100, &phy);
         ASSERT_EQ(err, XGL_OK);
     }
     
     /* Only set timestamp for first packet - others have timestamp=0 (not sent yet) */
-    xgl_reliable_packet_t* packet0 = xgl_reliable_find_packet(&queue, 0, 2);
+    xgl_reliable_packet_t* packet0 = xgl_reliable_find_packet_number(&queue, 0, 2);
     ASSERT_NE(packet0, nullptr);
     packet0->send_timestamp = 1000;
     
@@ -1023,7 +1023,7 @@ TEST(XglTransportProperties, Property15_RetryExhaustionMultiplePackets) {
                 << "No packet should be exhausted yet (retry " << retry << ")";
             
             /* Update packet pointer after processing */
-            packet0 = xgl_reliable_find_packet(&queue, 0, 2);
+            packet0 = xgl_reliable_find_packet_number(&queue, 0, 2);
             ASSERT_NE(packet0, nullptr)
                 << "Packet 0 should still exist after retry " << retry;
         } else {
@@ -1032,7 +1032,7 @@ TEST(XglTransportProperties, Property15_RetryExhaustionMultiplePackets) {
                 << "Packet should be exhausted after max retries";
             
             if (exhausted != nullptr) {
-                EXPECT_EQ(exhausted->seq_num, 0)
+                EXPECT_EQ(exhausted->packet_number, 0)
                     << "First packet should be exhausted";
                 free(exhausted->data);
                 free(exhausted);
@@ -1044,11 +1044,11 @@ TEST(XglTransportProperties, Property15_RetryExhaustionMultiplePackets) {
     EXPECT_EQ(xgl_reliable_get_count(&queue), 2)
         << "Only exhausted packet should be removed";
     
-    EXPECT_EQ(xgl_reliable_find_packet(&queue, 0, 2), nullptr)
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 0, 2), nullptr)
         << "Packet 0 should be removed";
-    EXPECT_NE(xgl_reliable_find_packet(&queue, 1, 2), nullptr)
+    EXPECT_NE(xgl_reliable_find_packet_number(&queue, 1, 2), nullptr)
         << "Packet 1 should still exist (never sent)";
-    EXPECT_NE(xgl_reliable_find_packet(&queue, 2, 2), nullptr)
+    EXPECT_NE(xgl_reliable_find_packet_number(&queue, 2, 2), nullptr)
         << "Packet 2 should still exist (never sent)";
     
     xgl_reliable_destroy(&queue);
@@ -1131,12 +1131,12 @@ TEST(XglTransportProperties, Property20_ExponentialBackoffInQueue) {
         
         /* Add packet */
         std::vector<uint8_t> data = gen.random_bytes(20);
-        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+        err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                      1, 2, 10, 0, 0, initial_timeout, &phy);
         ASSERT_EQ(err, XGL_OK);
         
         /* Set initial timestamp */
-        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
         ASSERT_NE(packet, nullptr);
         packet->send_timestamp = 1000;
         
@@ -1150,7 +1150,7 @@ TEST(XglTransportProperties, Property20_ExponentialBackoffInQueue) {
             current_time += packet->timeout_ms;
             xgl_reliable_process_timeouts(&queue, current_time, nullptr);
             
-            packet = xgl_reliable_find_packet(&queue, 10, 2);
+            packet = xgl_reliable_find_packet_number(&queue, 10, 2);
             ASSERT_NE(packet, nullptr);
             
             timeouts.push_back(packet->timeout_ms);
@@ -1237,7 +1237,7 @@ TEST(XglTransportProperties, Property16_ACKProcessing) {
         std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
         
         /* Add packet to queue */
-        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+        err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                      source_id, target_id, seq_num,
                                      0, 0, 1000, &phy);
         ASSERT_EQ(err, XGL_OK) << "Failed to add packet to queue";
@@ -1246,12 +1246,12 @@ TEST(XglTransportProperties, Property16_ACKProcessing) {
         EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
             << "Queue should contain one packet";
         
-        xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, seq_num, target_id);
         ASSERT_NE(packet, nullptr)
             << "Packet should be findable in queue";
         
         /* Process ACK with matching sequence number and target ID */
-        xgl_error_t remove_err = xgl_reliable_remove_packet(&queue, seq_num, target_id);
+        xgl_error_t remove_err = xgl_reliable_remove_packet_number(&queue, seq_num, target_id);
         
         EXPECT_EQ(remove_err, XGL_OK)
             << "ACK processing should remove matching packet from queue"
@@ -1266,7 +1266,7 @@ TEST(XglTransportProperties, Property16_ACKProcessing) {
             << "Queue should be empty after ACK removes packet";
         
         /* Verify packet is no longer findable */
-        packet = xgl_reliable_find_packet(&queue, seq_num, target_id);
+        packet = xgl_reliable_find_packet_number(&queue, seq_num, target_id);
         EXPECT_EQ(packet, nullptr)
             << "Packet should not be findable after ACK processing";
         
@@ -1300,7 +1300,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingMultiplePackets) {
         
         for (int i = 0; i < num_packets; ++i) {
             std::vector<uint8_t> data = gen.random_bytes(20);
-            err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+            err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                          1, target_id, (uint8_t)i,
                                          0, 0, 1000, &phy);
             ASSERT_EQ(err, XGL_OK);
@@ -1309,7 +1309,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingMultiplePackets) {
         EXPECT_EQ(xgl_reliable_get_count(&queue), (size_t)num_packets);
         
         /* ACK middle packet (seq_num = 2) */
-        xgl_error_t remove_err = xgl_reliable_remove_packet(&queue, 2, target_id);
+        xgl_error_t remove_err = xgl_reliable_remove_packet_number(&queue, 2, target_id);
         EXPECT_EQ(remove_err, XGL_OK);
         
         /* Verify only that packet was removed */
@@ -1317,11 +1317,11 @@ TEST(XglTransportProperties, Property16_ACKProcessingMultiplePackets) {
             << "Only ACKed packet should be removed";
         
         /* Verify other packets still exist */
-        EXPECT_NE(xgl_reliable_find_packet(&queue, 0, target_id), nullptr);
-        EXPECT_NE(xgl_reliable_find_packet(&queue, 1, target_id), nullptr);
-        EXPECT_EQ(xgl_reliable_find_packet(&queue, 2, target_id), nullptr);  /* Removed */
-        EXPECT_NE(xgl_reliable_find_packet(&queue, 3, target_id), nullptr);
-        EXPECT_NE(xgl_reliable_find_packet(&queue, 4, target_id), nullptr);
+        EXPECT_NE(xgl_reliable_find_packet_number(&queue, 0, target_id), nullptr);
+        EXPECT_NE(xgl_reliable_find_packet_number(&queue, 1, target_id), nullptr);
+        EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 2, target_id), nullptr);  /* Removed */
+        EXPECT_NE(xgl_reliable_find_packet_number(&queue, 3, target_id), nullptr);
+        EXPECT_NE(xgl_reliable_find_packet_number(&queue, 4, target_id), nullptr);
         
         xgl_reliable_destroy(&queue);
     }
@@ -1352,13 +1352,13 @@ TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
         uint8_t target_id = gen.random_uint8();
         std::vector<uint8_t> data = gen.random_bytes(20);
         
-        err = xgl_reliable_add_packet(&queue, data.data(), data.size(),
+        err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                      1, target_id, seq_num, 0, 0, 1000, &phy);
         ASSERT_EQ(err, XGL_OK);
         
         /* Try to ACK with different sequence number */
         uint8_t wrong_seq = (uint8_t)(seq_num + 1);
-        xgl_error_t remove_err = xgl_reliable_remove_packet(&queue, wrong_seq, target_id);
+        xgl_error_t remove_err = xgl_reliable_remove_packet_number(&queue, wrong_seq, target_id);
         
         EXPECT_NE(remove_err, XGL_OK)
             << "ACK with non-matching sequence number should not remove packet";
@@ -1367,7 +1367,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
         EXPECT_EQ(xgl_reliable_get_count(&queue), 1)
             << "Packet should remain in queue";
         
-        EXPECT_NE(xgl_reliable_find_packet(&queue, seq_num, target_id), nullptr)
+        EXPECT_NE(xgl_reliable_find_packet_number(&queue, seq_num, target_id), nullptr)
             << "Original packet should still be findable";
         
         xgl_reliable_destroy(&queue);

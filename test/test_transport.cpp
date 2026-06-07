@@ -1399,7 +1399,7 @@ TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
 
     ASSERT_NE(find_peer(&ctx, 2), nullptr);
     xgl_reliable_packet_t* queued =
-        xgl_reliable_find_packet(&find_peer(&ctx, 2)->reliable_queue, 0, 2);
+        xgl_reliable_find_packet_number(&find_peer(&ctx, 2)->reliable_queue, 0, 2);
     ASSERT_NE(queued, nullptr);
     queued->send_timestamp = 100;
 
@@ -1407,7 +1407,7 @@ TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
     EXPECT_EQ(spy.send_count, 3);
     EXPECT_EQ(tx_retries, 1);
 
-    queued = xgl_reliable_find_packet(&find_peer(&ctx, 2)->reliable_queue, 0, 2);
+    queued = xgl_reliable_find_packet_number(&find_peer(&ctx, 2)->reliable_queue, 0, 2);
     ASSERT_NE(queued, nullptr);
     EXPECT_EQ(queued->retry_count, 1);
     EXPECT_EQ(queued->send_timestamp, 201U);

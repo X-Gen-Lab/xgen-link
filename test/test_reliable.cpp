@@ -95,7 +95,7 @@ TEST_F(XglReliableTest, InitializeWithNullPointer) {
 TEST_F(XglReliableTest, AddPacketToQueue) {
     uint8_t data[] = {0x01, 0x02, 0x03, 0x04};
     
-    xgl_error_t err = xgl_reliable_add_packet(
+    xgl_error_t err = xgl_reliable_add_packet_number(
         &queue,
         data, sizeof(data),
         1,      /* source_id */
@@ -117,15 +117,15 @@ TEST_F(XglReliableTest, AddMultiplePackets) {
     uint8_t data2[] = {0x03, 0x04};
     uint8_t data3[] = {0x05, 0x06};
     
-    xgl_reliable_add_packet(&queue, data1, sizeof(data1), 1, 2, 10, 5, 3, 1000, &phy_ops);
-    xgl_reliable_add_packet(&queue, data2, sizeof(data2), 1, 2, 11, 5, 3, 1000, &phy_ops);
-    xgl_reliable_add_packet(&queue, data3, sizeof(data3), 1, 2, 12, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data1, sizeof(data1), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data2, sizeof(data2), 1, 2, 11, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data3, sizeof(data3), 1, 2, 12, 5, 3, 1000, &phy_ops);
     
     EXPECT_EQ(xgl_reliable_get_count(&queue), 3);
 }
 
 TEST_F(XglReliableTest, AddPacketWithNullData) {
-    xgl_error_t err = xgl_reliable_add_packet(
+    xgl_error_t err = xgl_reliable_add_packet_number(
         &queue,
         nullptr, 10,
         1, 2, 10, 5, 3, 1000, &phy_ops
@@ -137,7 +137,7 @@ TEST_F(XglReliableTest, AddPacketWithNullData) {
 TEST_F(XglReliableTest, AddPacketWithZeroLength) {
     uint8_t data[] = {0x01};
     
-    xgl_error_t err = xgl_reliable_add_packet(
+    xgl_error_t err = xgl_reliable_add_packet_number(
         &queue,
         data, 0,
         1, 2, 10, 5, 3, 1000, &phy_ops
@@ -149,7 +149,7 @@ TEST_F(XglReliableTest, AddPacketWithZeroLength) {
 TEST_F(XglReliableTest, AddPacketWithNullPhyAllowed) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_error_t err = xgl_reliable_add_packet(
+    xgl_error_t err = xgl_reliable_add_packet_number(
         &queue,
         data, sizeof(data),
         1, 2, 10, 5, 3, 1000, nullptr
@@ -166,10 +166,10 @@ TEST_F(XglReliableTest, AddPacketWithNullPhyAllowed) {
 TEST_F(XglReliableTest, RemovePacketBySeqNum) {
     uint8_t data[] = {0x01, 0x02, 0x03};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
     
-    xgl_error_t err = xgl_reliable_remove_packet(&queue, 10, 2);
+    xgl_error_t err = xgl_reliable_remove_packet_number(&queue, 10, 2);
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 0);
 }
@@ -177,9 +177,9 @@ TEST_F(XglReliableTest, RemovePacketBySeqNum) {
 TEST_F(XglReliableTest, RemoveNonExistentPacket) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
-    xgl_error_t err = xgl_reliable_remove_packet(&queue, 99, 2);
+    xgl_error_t err = xgl_reliable_remove_packet_number(&queue, 99, 2);
     EXPECT_EQ(err, XGL_ERR_SEQUENCE_ERROR);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
 }
@@ -187,9 +187,9 @@ TEST_F(XglReliableTest, RemoveNonExistentPacket) {
 TEST_F(XglReliableTest, RemovePacketWithWrongTargetId) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
-    xgl_error_t err = xgl_reliable_remove_packet(&queue, 10, 99);
+    xgl_error_t err = xgl_reliable_remove_packet_number(&queue, 10, 99);
     EXPECT_EQ(err, XGL_ERR_SEQUENCE_ERROR);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
 }
@@ -201,11 +201,11 @@ TEST_F(XglReliableTest, RemovePacketWithWrongTargetId) {
 TEST_F(XglReliableTest, FindPacketBySeqNum) {
     uint8_t data[] = {0x01, 0x02, 0x03};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
-    EXPECT_EQ(packet->seq_num, 10);
+    EXPECT_EQ(packet->packet_number, 10);
     EXPECT_EQ(packet->target_id, 2);
     EXPECT_EQ(packet->data_len, sizeof(data));
 }
@@ -213,9 +213,9 @@ TEST_F(XglReliableTest, FindPacketBySeqNum) {
 TEST_F(XglReliableTest, FindNonExistentPacket) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 99, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 99, 2);
     EXPECT_EQ(packet, nullptr);
 }
 
@@ -333,10 +333,10 @@ TEST_F(XglReliableTest, ProcessTimeoutWithNoPackets) {
 TEST_F(XglReliableTest, ProcessTimeoutBeforeExpiry) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
     /* Find packet and set send timestamp */
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
     packet->send_timestamp = 100;
     
@@ -352,10 +352,10 @@ TEST_F(XglReliableTest, ProcessTimeoutBeforeExpiry) {
 TEST_F(XglReliableTest, ProcessTimeoutAfterExpiry) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
     /* Find packet and set send timestamp */
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
     packet->send_timestamp = 100;
     
@@ -376,10 +376,10 @@ TEST_F(XglReliableTest, ProcessTimeoutAfterExpiry) {
 TEST_F(XglReliableTest, ProcessTimeoutRetryExhaustion) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
     /* Find packet and set it to max retries */
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
     packet->send_timestamp = 100;
     packet->retry_count = 3;  /* Max retry count */
@@ -402,9 +402,9 @@ TEST_F(XglReliableTest, ProcessTimeoutRetryExhaustion) {
 TEST_F(XglReliableTest, ProcessTimeoutMultipleRetries) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
     packet->send_timestamp = 100;
     
@@ -483,8 +483,8 @@ TEST_F(XglReliableTest, ClearQueueWithPackets) {
     uint8_t data1[] = {0x01, 0x02};
     uint8_t data2[] = {0x03, 0x04};
     
-    xgl_reliable_add_packet(&queue, data1, sizeof(data1), 1, 2, 10, 5, 3, 1000, &phy_ops);
-    xgl_reliable_add_packet(&queue, data2, sizeof(data2), 1, 2, 11, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data1, sizeof(data1), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data2, sizeof(data2), 1, 2, 11, 5, 3, 1000, &phy_ops);
     
     EXPECT_EQ(xgl_reliable_get_count(&queue), 2);
     
@@ -501,7 +501,7 @@ TEST_F(XglReliableTest, ClearQueueWithPackets) {
 TEST_F(XglReliableTest, ProcessTimeoutWithUnsentPacket) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_reliable_add_packet(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
+    xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, &phy_ops);
     
     /* Packet has send_timestamp = 0 (not sent yet) */
     xgl_reliable_packet_t* exhausted = nullptr;
@@ -515,7 +515,7 @@ TEST_F(XglReliableTest, ProcessTimeoutWithUnsentPacket) {
 TEST_F(XglReliableTest, AddPacketWithMaxPriority) {
     uint8_t data[] = {0x01, 0x02};
     
-    xgl_error_t err = xgl_reliable_add_packet(
+    xgl_error_t err = xgl_reliable_add_packet_number(
         &queue,
         data, sizeof(data),
         1, 2, 10, 5,
@@ -525,7 +525,7 @@ TEST_F(XglReliableTest, AddPacketWithMaxPriority) {
     
     EXPECT_EQ(err, XGL_OK);
     
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
     EXPECT_EQ(packet->priority, 7);
 }
@@ -536,7 +536,7 @@ TEST_F(XglReliableTest, AddPacketWithLargeData) {
         data[i] = (uint8_t)(i & 0xFF);
     }
     
-    xgl_error_t err = xgl_reliable_add_packet(
+    xgl_error_t err = xgl_reliable_add_packet_number(
         &queue,
         data, sizeof(data),
         1, 2, 10, 5, 3, 1000, &phy_ops
@@ -544,7 +544,7 @@ TEST_F(XglReliableTest, AddPacketWithLargeData) {
     
     EXPECT_EQ(err, XGL_OK);
     
-    xgl_reliable_packet_t* packet = xgl_reliable_find_packet(&queue, 10, 2);
+    xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(&queue, 10, 2);
     ASSERT_NE(packet, nullptr);
     EXPECT_EQ(packet->data_len, sizeof(data));
     EXPECT_EQ(memcmp(packet->data, data, sizeof(data)), 0);
