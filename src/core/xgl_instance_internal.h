@@ -68,11 +68,6 @@ struct xgl_instance {
     /*-----------------------------------------------------------------------*/
     xgl_route_table_t route_table;  /**< Route table */
     
-    /*-----------------------------------------------------------------------*/
-    /* Sequence Numbers (per route)                                          */
-    /*-----------------------------------------------------------------------*/
-    uint8_t* seq_numbers;           /**< Sequence numbers array */
-    size_t seq_numbers_count;       /**< Number of sequence numbers */
     uint32_t* route_last_read_ms;   /**< Last RX polling timestamp per configured route */
     size_t route_last_read_count;   /**< Number of route polling timestamps */
     

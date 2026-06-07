@@ -141,16 +141,6 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         }
     }
     
-    /* Allocate sequence numbers array (one per possible target ID) */
-    handle->seq_numbers_count = 256;  /* 8-bit ID space */
-    handle->seq_numbers = (uint8_t*)xgl_alloc(handle->allocator, 
-                                              handle->seq_numbers_count);
-    if (handle->seq_numbers == NULL) {
-        err = XGL_ERR_NO_MEMORY;
-        goto cleanup_route_table;
-    }
-    memset(handle->seq_numbers, 0, handle->seq_numbers_count);
-
     if (handle->config.route_table_len > 0) {
         handle->route_last_read_count = handle->config.route_table_len;
         handle->route_last_read_ms = (uint32_t*)xgl_alloc(
@@ -159,7 +149,7 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         );
         if (handle->route_last_read_ms == NULL) {
             err = XGL_ERR_NO_MEMORY;
-            goto cleanup_seq_numbers;
+            goto cleanup_route_table;
         }
         memset(handle->route_last_read_ms,
                0,
@@ -270,10 +260,6 @@ cleanup_route_read_times:
     handle->route_last_read_ms = NULL;
     handle->route_last_read_count = 0;
     
-cleanup_seq_numbers:
-    xgl_free(handle->allocator, handle->seq_numbers);
-    handle->seq_numbers = NULL;
-    
 cleanup_route_table:
     xgl_route_table_destroy(&handle->route_table);
     
@@ -318,12 +304,6 @@ void xgl_destroy(xgl_handle_t handle) {
     
     /* Network and datalink layers don't need explicit destroy */
     
-    /* Free sequence numbers */
-    if (handle->seq_numbers != NULL) {
-        xgl_free(handle->allocator, handle->seq_numbers);
-        handle->seq_numbers = NULL;
-    }
-
     if (handle->route_last_read_ms != NULL) {
         xgl_free(handle->allocator, handle->route_last_read_ms);
         handle->route_last_read_ms = NULL;
