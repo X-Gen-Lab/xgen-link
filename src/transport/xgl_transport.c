@@ -227,19 +227,48 @@ static xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
  * \brief           Send ACK packet for received data
  * \param[in]       ctx: Transport context
  * \param[in]       handle: Protocol instance handle
- * \param[in]       seq_num: Sequence number to acknowledge
+ * \param[in]       packet_number: Packet number to acknowledge
  * \param[in]       source_id: Source node ID
  * \return          XGL_OK on success, error code otherwise
  */
 static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,
-                                     uint8_t seq_num,
+                                     uint32_t packet_number,
                                      uint16_t source_id,
                                      uint16_t session_id) {
+    uint8_t ack_value[16] = {0};
+    size_t ack_value_len = 0;
+    const xgl_wire_ack_range_t ranges[] = {
+        {.gap = 0, .length = 1}
+    };
+
+    xgl_error_t err = xgl_wire_encode_ack_range_ext_value(ack_value,
+                                                          sizeof(ack_value),
+                                                          packet_number,
+                                                          0,
+                                                          ranges,
+                                                          1,
+                                                          &ack_value_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    uint8_t ack_ext[32] = {0};
+    size_t ack_ext_len = 0;
+    err = xgl_wire_encode_ext(ack_ext,
+                              sizeof(ack_ext),
+                              XGL_WIRE_EXT_ACK_RANGE,
+                              ack_value,
+                              ack_value_len,
+                              &ack_ext_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
     xgl_packet_data_t ack_packet_data = {
         .ref_count = 1,
-        .data_len = 0,
-        .data = NULL,
+        .data_len = ack_ext_len,
+        .data = ack_ext,
         .owned_data = NULL
     };
     
@@ -248,8 +277,10 @@ static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
         .target_id = source_id,
         .data_type = 0,
         .seq_num = 0,
-        .ack_num = seq_num,
+        .ack_num = (uint8_t)(packet_number & 0xFFU),
         .session_id = session_id,
+        .packet_type = XGL_PACKET_TYPE_ACK,
+        .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
             .reliable = XGL_ATTR_RELIABLE_ACK,
         .fragment = false,
         .priority = 7,
@@ -1057,7 +1088,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     if (reliable == XGL_ATTR_RELIABLE_TX) {
         if (xgl_ack_is_duplicate_from(&ctx->ack_handler, source_id, seq_num)) {
             /* Sender may have missed our previous ACK. */
-            transport_send_ack(ctx, handle, seq_num, source_id, packet->session_id);
+            transport_send_ack(ctx, handle, packet->packet_number, source_id, packet->session_id);
             return XGL_OK;
         }
 
@@ -1086,7 +1117,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             return err;
         }
 
-        transport_send_ack(ctx, handle, seq_num, source_id, packet->session_id);
+        transport_send_ack(ctx, handle, packet->packet_number, source_id, packet->session_id);
     }
     
     /* Check if packet has fragment flag */
