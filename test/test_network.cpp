@@ -448,6 +448,19 @@ TEST_F(XglNetworkTest, ForwardingDropsExpiredTtl) {
     EXPECT_EQ(stats.rx_dropped, 1);
 }
 
+TEST_F(XglNetworkTest, ForwardingRejectsRouteMtuOverflow) {
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 32, 100, 1), XGL_OK);
+
+    std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID, XGL_DEFAULT_TTL,
+                                                "payload-larger-than-route-mtu");
+    ASSERT_GT(frame_buf.size(), 32U);
+
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size()),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(phy_tx_count, 0);
+    EXPECT_EQ(stats.rx_dropped, 1);
+}
+
 TEST_F(XglNetworkTest, ForwardingResignsAuthenticatedFrameAfterTtlDecrement) {
     xgl_auth_provider_t provider = {
         .sign = network_test_auth_sign,
