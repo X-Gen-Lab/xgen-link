@@ -56,13 +56,11 @@ set(TEST_SOURCES
     # Network tests
     test_route.cpp
     test_network.cpp
-    test_sequence.cpp
     
     # Transport tests
     test_rtt.cpp
     test_window.cpp
     test_reliable.cpp
-    test_ack.cpp
     test_fragment.cpp
     test_transport.cpp
     test_timeout_control.cpp

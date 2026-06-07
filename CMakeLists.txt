@@ -111,13 +111,11 @@ set(XGL_SOURCES
     # Network Layer
     src/network/xgl_route.c
     src/network/xgl_network.c
-    src/network/xgl_sequence.c
 
     # Transport Layer
     src/transport/xgl_rtt.c
     src/transport/xgl_window.c
     src/transport/xgl_reliable.c
-    src/transport/xgl_ack.c
     src/transport/xgl_fragment.c
     src/transport/xgl_transport.c
 
