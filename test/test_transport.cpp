@@ -1122,6 +1122,65 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, ReliableReceiveIsolatesPacketNumbersByConnectionScope) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    RxTracker rx_tracker;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &rx_tracker;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload_a[] = {'c', '1'};
+    const uint8_t payload_b[] = {'c', '2'};
+    xgl_packet_data_t data_a = {
+        .ref_count = 1,
+        .data_len = sizeof(payload_a),
+        .data = payload_a,
+        .owned_data = nullptr
+    };
+    xgl_packet_data_t data_b = {
+        .ref_count = 1,
+        .data_len = sizeof(payload_b),
+        .data = payload_b,
+        .owned_data = nullptr
+    };
+
+    xgl_packet_t packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .connection_id = 11,
+        .packet_number = 0,
+        .session_epoch = 100,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .data_type = 1,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
+        .priority = 0,
+        .data = &data_a
+    };
+
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+
+    packet.connection_id = 22;
+    packet.session_epoch = 200;
+    packet.data = &data_b;
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+
+    ASSERT_EQ(rx_tracker.receive_count, 2);
+    ASSERT_EQ(rx_tracker.payloads.size(), 2U);
+    EXPECT_EQ(rx_tracker.payloads[0], std::vector<uint8_t>({'c', '1'}));
+    EXPECT_EQ(rx_tracker.payloads[1], std::vector<uint8_t>({'c', '2'}));
+    EXPECT_EQ(spy.send_count, 2);
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
