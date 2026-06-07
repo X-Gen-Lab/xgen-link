@@ -466,6 +466,65 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsTamperedAuthenticatedPayload) {
     EXPECT_EQ(auth_stats.rx_packets, 0U);
 }
 
+TEST_F(XglDatalinkTest, ProcessFrameRejectsAuthenticatedReplay) {
+    xgl_auth_provider_t provider = {
+        .sign = datalink_test_auth_sign,
+        .verify = datalink_test_auth_verify,
+        .user_data = nullptr
+    };
+    xgl_datalink_ctx_t auth_ctx;
+    uint8_t cache[512] = {};
+    xgl_layer_stats_t auth_stats = {};
+    uint64_t crc8 = 0;
+    uint64_t crc16 = 0;
+    xgl_datalink_config_t config = {
+        .rx_cache = cache,
+        .rx_cache_size = sizeof(cache),
+        .source_id = SOURCE_ID,
+        .stats = &auth_stats,
+        .rx_crc8_errors = &crc8,
+        .rx_crc16_errors = &crc16,
+        .upper_layer = nullptr,
+        .error_callback = nullptr,
+        .callback_user_data = nullptr,
+        .auth_required = true,
+        .auth_key_id = 7,
+        .auth_provider = &provider
+    };
+    ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
+
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x01, 0x02, 0x03};
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .seq_num = 0x10,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    uint8_t encoded[256] = {};
+    size_t encoded_len = 0;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded,
+                                                sizeof(encoded),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+
+    EXPECT_EQ(xgl_datalink_process_frame(&auth_ctx, encoded, encoded_len), XGL_OK);
+    EXPECT_EQ(xgl_datalink_process_frame(&auth_ctx, encoded, encoded_len),
+              XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(auth_stats.rx_packets, 1U);
+    EXPECT_EQ(auth_stats.rx_dropped, 1U);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Statistics Tests                                                          */
 /*---------------------------------------------------------------------------*/
