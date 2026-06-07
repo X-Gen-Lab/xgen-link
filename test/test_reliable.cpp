@@ -42,6 +42,21 @@ static xgl_error_t mock_phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
     return XGL_OK;
 }
 
+template <typename T>
+concept HasReliablePacketIndex = requires(T value) {
+    value.index_buckets;
+};
+
+template <typename T>
+concept HasReliablePacketIndexNode = requires(T value) {
+    value.index_next;
+};
+
+static_assert(HasReliablePacketIndex<xgl_reliable_queue_t>,
+              "reliable queue must index packet_number lookups for multi-node ACK/SACK");
+static_assert(HasReliablePacketIndexNode<xgl_reliable_packet_t>,
+              "reliable packets must carry an index link for O(1)-bucket lookup");
+
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */
 /*---------------------------------------------------------------------------*/
