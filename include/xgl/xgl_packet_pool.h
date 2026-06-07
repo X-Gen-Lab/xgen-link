@@ -100,7 +100,7 @@ typedef struct {
  * \brief           Initialize packet object pool
  * \param[in,out]   pool: Pointer to packet pool structure
  * \param[in]       count: Number of packets to pre-allocate
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
  * \return          0 on success, -1 on error
  */
 int xgl_packet_pool_init(xgl_packet_pool_t* pool, size_t count,
@@ -143,7 +143,7 @@ void xgl_packet_data_ref(xgl_packet_data_t* data);
 /**
  * \brief           Decrement packet data reference count and free if zero
  * \param[in,out]   data: Pointer to packet data
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
  */
 void xgl_packet_data_unref(xgl_packet_data_t* data, 
                            xgl_allocator_t* allocator);
@@ -152,7 +152,7 @@ void xgl_packet_data_unref(xgl_packet_data_t* data,
  * \brief           Create packet data with reference count
  * \param[in]       data: Pointer to data buffer
  * \param[in]       len: Data length in bytes
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
  * \return          Pointer to packet data, NULL on allocation failure
  */
 xgl_packet_data_t* xgl_packet_data_create(const uint8_t* data, size_t len,

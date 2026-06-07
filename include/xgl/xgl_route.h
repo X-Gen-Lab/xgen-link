@@ -60,7 +60,7 @@ typedef struct {
  * \brief           Initialize route table
  * \param[in,out]   table: Route table structure
  * \param[in]       initial_capacity: Initial capacity for routes
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_route_table_init(xgl_route_table_t* table,

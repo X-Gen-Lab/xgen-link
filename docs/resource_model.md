@@ -29,7 +29,8 @@ These allocations are acceptable for the host and general SDK profile. They are 
 ### Host Profile
 
 - Default development and CI profile.
-- Runtime allocation is allowed when routed through the configured allocator or the default allocator.
+- Runtime allocation is allowed when routed through the configured allocator.
+- When `XGL_ALLOW_FALLBACK_MALLOC=ON`, NULL allocator uses the default malloc/free wrapper for host tests and examples.
 - Used for Windows mock, examples, property tests, and install package validation.
 
 ### FreeRTOS Profile
@@ -43,6 +44,7 @@ These allocations are acceptable for the host and general SDK profile. They are 
 
 - Target production profile for small MCUs.
 - All protocol storage is supplied by static buffers or init-time pools.
+- Build with `XGL_ALLOW_FALLBACK_MALLOC=OFF` so NULL allocator fails instead of silently using heap.
 - After `xgl_init`, normal acceptance traffic must not call allocator functions.
 - Unsupported features must fail configuration validation instead of allocating unexpectedly.
 
@@ -64,6 +66,7 @@ The tracking allocator exposes these phases through `xgl_tracking_allocator_set_
 ## Design Rules
 
 - Public APIs must document buffer ownership and lifetime.
+- Production builds that require deterministic memory must provide an explicit allocator or compile with `XGL_ALLOW_FALLBACK_MALLOC=OFF`.
 - Reliable TX may copy data because retransmission needs stable storage.
 - Single-frame unreliable zero-copy TX frames data in the caller buffer and passes that buffer directly to PHY.
 - Compression and encryption must declare maximum output expansion before they are allowed in production traffic.

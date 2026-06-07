@@ -5,9 +5,9 @@
  */
 
 #include <xgl/xgl_fragment.h>
+#include <xgl/xgl_allocator.h>
 #include <xgl/xgl_time.h>
 #include <xgl/xgl_serialize.h>
-#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -16,28 +16,17 @@
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Allocate memory using allocator or malloc
+ * \brief           Allocate memory using the configured allocator policy
  */
 static void* fragment_malloc(xgl_allocator_t* allocator, size_t size) {
-    if (allocator != NULL && allocator->malloc != NULL) {
-        return allocator->malloc(size);
-    }
-    return malloc(size);
+    return xgl_alloc(allocator, size);
 }
 
 /**
- * \brief           Free memory using allocator or free
+ * \brief           Free memory using the configured allocator policy
  */
 static void fragment_free(xgl_allocator_t* allocator, void* ptr) {
-    if (ptr == NULL) {
-        return;
-    }
-    
-    if (allocator != NULL && allocator->free != NULL) {
-        allocator->free(ptr);
-    } else {
-        free(ptr);
-    }
+    xgl_free(allocator, ptr);
 }
 
 /**

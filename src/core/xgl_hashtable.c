@@ -5,9 +5,9 @@
  */
 
 #include <xgl/xgl_hashtable.h>
+#include <xgl/xgl_allocator.h>
 #include <xgl/xgl_error.h>
 #include <string.h>
-#include <stdlib.h>
 
 /*---------------------------------------------------------------------------*/
 /* Private Helper Functions                                                  */
@@ -29,24 +29,17 @@ static inline bool xgl_is_power_of_2(size_t n) {
 }
 
 /**
- * \brief           Allocate memory using table's allocator
+ * \brief           Allocate memory using table's allocator policy
  */
 static void* xgl_hashtable_alloc(xgl_hashtable_t* table, size_t size) {
-    if (table->allocator && table->allocator->malloc) {
-        return table->allocator->malloc(size);
-    }
-    return malloc(size);
+    return xgl_alloc(table != NULL ? table->allocator : NULL, size);
 }
 
 /**
- * \brief           Free memory using table's allocator
+ * \brief           Free memory using table's allocator policy
  */
 static void xgl_hashtable_free(xgl_hashtable_t* table, void* ptr) {
-    if (table->allocator && table->allocator->free) {
-        table->allocator->free(ptr);
-    } else {
-        free(ptr);
-    }
+    xgl_free(table != NULL ? table->allocator : NULL, ptr);
 }
 
 /*---------------------------------------------------------------------------*/

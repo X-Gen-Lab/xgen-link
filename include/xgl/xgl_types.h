@@ -173,7 +173,7 @@ typedef void (*xgl_error_callback_t)(xgl_handle_t handle,
 typedef struct {
     size_t tx_pool_size;            /**< TX memory pool size in bytes */
     size_t rx_buffer_size;          /**< RX buffer size in bytes */
-    xgl_allocator_t* allocator;     /**< Custom allocator (NULL = malloc/free) */
+    xgl_allocator_t* allocator;     /**< Custom allocator; NULL fallback is build-policy controlled */
 } xgl_memory_config_t;
 
 /**

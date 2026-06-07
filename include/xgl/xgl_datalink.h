@@ -74,7 +74,7 @@ typedef struct {
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
     void* callback_user_data;       /**< User data for callbacks (can be NULL) */
     xgl_handle_t owner_handle;      /**< Owning protocol instance handle (can be NULL) */
-    xgl_allocator_t* allocator;     /**< Allocator for large temporary TX buffers (NULL = default) */
+    xgl_allocator_t* allocator;     /**< Allocator for large temporary TX buffers; NULL fallback is build-policy controlled */
     bool auth_required;             /**< Require authenticated production frames */
     uint32_t auth_key_id;           /**< Active authentication key id */
     xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */

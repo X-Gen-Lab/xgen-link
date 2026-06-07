@@ -104,7 +104,7 @@ typedef struct {
  * \param[in,out]   manager: Fragmentation manager structure
  * \param[in]       max_reassembly_buffers: Maximum concurrent reassembly buffers
  * \param[in]       reassembly_timeout_ms: Reassembly timeout in milliseconds
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,

@@ -49,7 +49,7 @@ xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size);
  * \brief           Initialize sliding window with an explicit allocator
  * \param[in,out]   window: Sliding window structure
  * \param[in]       window_size: Maximum window size
- * \param[in]       allocator: Allocator for ACK bitmap (NULL = default)
+ * \param[in]       allocator: Allocator for ACK bitmap; NULL fallback is build-policy controlled
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_window_init_with_allocator(xgl_sliding_window_t* window,

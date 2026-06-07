@@ -121,7 +121,7 @@ typedef struct {
     void* callback_user_data;       /**< User data for callbacks (can be NULL) */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* tx_retries;           /**< Retransmission counter pointer (can be NULL) */
-    xgl_allocator_t* allocator;     /**< Memory allocator (NULL = malloc/free) */
+    xgl_allocator_t* allocator;     /**< Memory allocator; NULL fallback is build-policy controlled */
 } xgl_transport_config_t;
 
 /*---------------------------------------------------------------------------*/

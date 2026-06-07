@@ -7,7 +7,7 @@
 #include "xgl/xgl_packet_pool.h"
 #include "xgl/xgl_list.h"
 #include "xgl/xgl_error.h"
-#include <stdlib.h>
+#include "xgl/xgl_allocator.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -15,24 +15,17 @@
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Allocate memory using allocator or malloc
+ * \brief           Allocate memory using the configured allocator policy
  */
 static void* alloc_mem(xgl_allocator_t* allocator, size_t size) {
-    if (allocator && allocator->malloc) {
-        return allocator->malloc(size);
-    }
-    return malloc(size);
+    return xgl_alloc(allocator, size);
 }
 
 /**
- * \brief           Free memory using allocator or free
+ * \brief           Free memory using the configured allocator policy
  */
 static void free_mem(xgl_allocator_t* allocator, void* ptr) {
-    if (allocator && allocator->free) {
-        allocator->free(ptr);
-    } else {
-        free(ptr);
-    }
+    xgl_free(allocator, ptr);
 }
 
 /*---------------------------------------------------------------------------*/

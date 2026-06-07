@@ -244,7 +244,10 @@ uint32_t xgl_version_int(void);
  * \return          Instance handle on success, NULL on failure
  * \note            The configuration is copied internally
  * \note            Use xgl_init() to initialize the instance after creation
- * \note            Memory is allocated using the provided allocator or malloc
+ * \note            Memory is allocated through config.memory.allocator. When
+ *                  XGL_ALLOW_FALLBACK_MALLOC is enabled, NULL allocator uses
+ *                  the default malloc/free wrapper; strict embedded builds can
+ *                  disable that fallback.
  * \warning         Must call xgl_destroy() to free resources
  *
  * \par Example

@@ -83,7 +83,7 @@ typedef struct {
  * \brief           Initialize reliable transmission queue
  * \param[in,out]   queue: Reliable queue structure
  * \param[in]       max_retry_count: Maximum retry count
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_reliable_init(xgl_reliable_queue_t* queue,

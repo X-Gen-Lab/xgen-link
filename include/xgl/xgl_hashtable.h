@@ -66,7 +66,7 @@ typedef struct {
  * \brief           Initialize hash table
  * \param[in,out]   table: Hash table structure
  * \param[in]       size: Initial size (must be power of 2)
- * \param[in]       allocator: Memory allocator (NULL = malloc/free)
+ * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_hashtable_init(xgl_hashtable_t* table,

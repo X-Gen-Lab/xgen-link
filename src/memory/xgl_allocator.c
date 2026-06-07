@@ -53,7 +53,8 @@ xgl_allocator_t* xgl_allocator_get_default(void) {
 
 /**
  * \brief           Allocate memory using provided allocator
- * \details         If allocator is NULL, uses default malloc/free
+ * \details         If allocator is NULL, uses default malloc/free only when
+ *                  XGL_ALLOW_FALLBACK_MALLOC is enabled.
  */
 void* xgl_alloc(xgl_allocator_t* allocator, size_t size) {
     /* Validate size */
@@ -63,7 +64,11 @@ void* xgl_alloc(xgl_allocator_t* allocator, size_t size) {
     
     /* Use default allocator if none provided */
     if (allocator == NULL) {
+#if XGL_ALLOW_FALLBACK_MALLOC
         allocator = &default_allocator;
+#else
+        return NULL;
+#endif
     }
     
     /* Validate allocator has malloc function */
@@ -81,7 +86,8 @@ void* xgl_alloc(xgl_allocator_t* allocator, size_t size) {
 
 /**
  * \brief           Free memory using provided allocator
- * \details         If allocator is NULL, uses default malloc/free
+ * \details         If allocator is NULL, uses default malloc/free only when
+ *                  XGL_ALLOW_FALLBACK_MALLOC is enabled.
  */
 void xgl_free(xgl_allocator_t* allocator, void* ptr) {
     /* Nothing to free */
@@ -91,7 +97,11 @@ void xgl_free(xgl_allocator_t* allocator, void* ptr) {
     
     /* Use default allocator if none provided */
     if (allocator == NULL) {
+#if XGL_ALLOW_FALLBACK_MALLOC
         allocator = &default_allocator;
+#else
+        return;
+#endif
     }
     
     /* Validate allocator has free function */
@@ -261,9 +271,12 @@ int xgl_tracking_allocator_init(xgl_tracking_allocator_t* tracker,
         return -1;
     }
     
-    /* Use default allocator if none provided */
     if (underlying == NULL) {
+#if XGL_ALLOW_FALLBACK_MALLOC
         underlying = &default_allocator;
+#else
+        return -1;
+#endif
     }
     
     /* Initialize tracker structure */

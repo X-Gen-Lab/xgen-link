@@ -5,7 +5,7 @@
  */
 
 #include <xgl/xgl_reliable.h>
-#include <stdlib.h>
+#include <xgl/xgl_allocator.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -13,28 +13,17 @@
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Allocate memory using allocator or malloc
+ * \brief           Allocate memory using the configured allocator policy
  */
 static void* reliable_malloc(xgl_allocator_t* allocator, size_t size) {
-    if (allocator != NULL && allocator->malloc != NULL) {
-        return allocator->malloc(size);
-    }
-    return malloc(size);
+    return xgl_alloc(allocator, size);
 }
 
 /**
- * \brief           Free memory using allocator or free
+ * \brief           Free memory using the configured allocator policy
  */
 static void reliable_free(xgl_allocator_t* allocator, void* ptr) {
-    if (ptr == NULL) {
-        return;
-    }
-    
-    if (allocator != NULL && allocator->free != NULL) {
-        allocator->free(ptr);
-    } else {
-        free(ptr);
-    }
+    xgl_free(allocator, ptr);
 }
 
 /**

@@ -39,6 +39,8 @@ option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ON)
 option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" ON)
 option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" ON)
 option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" ON)
+option(XGL_ALLOW_FALLBACK_MALLOC "Allow NULL allocator to fall back to malloc/free" ON)
+option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" ON)
 
 #-----------------------------------------------------------------------------
 # Compiler Warnings
@@ -141,6 +143,11 @@ set(XGL_SOURCES
 add_library(xgl STATIC ${XGL_SOURCES})
 
 target_compile_options(xgl PRIVATE ${XGL_C_WARNINGS})
+if(XGL_ALLOW_FALLBACK_MALLOC)
+    target_compile_definitions(xgl PUBLIC XGL_ALLOW_FALLBACK_MALLOC=1)
+else()
+    target_compile_definitions(xgl PUBLIC XGL_ALLOW_FALLBACK_MALLOC=0)
+endif()
 
 target_include_directories(xgl
     PUBLIC
@@ -149,6 +156,22 @@ target_include_directories(xgl
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+if(XGL_BUILD_NOHEAP_SMOKE)
+    add_library(xgl_noheap STATIC ${XGL_SOURCES})
+    target_compile_options(xgl_noheap PRIVATE ${XGL_C_WARNINGS})
+    target_compile_definitions(xgl_noheap PUBLIC XGL_ALLOW_FALLBACK_MALLOC=0)
+    target_include_directories(xgl_noheap
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:include>
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    add_executable(xgl_noheap_smoke tools/noheap_smoke.c)
+    target_link_libraries(xgl_noheap_smoke PRIVATE xgl_noheap)
+endif()
 
 if(XGL_BUILD_FOOTPRINT_REPORT)
     set(XGL_FOOTPRINT_REPORT ${CMAKE_CURRENT_BINARY_DIR}/footprint/xgl-footprint.txt)
@@ -219,6 +242,10 @@ if(XGL_BUILD_TESTS)
         )
         set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES TIMEOUT 60)
     endif()
+    if(XGL_BUILD_NOHEAP_SMOKE)
+        add_test(NAME xgl_noheap_smoke COMMAND xgl_noheap_smoke)
+        set_tests_properties(xgl_noheap_smoke PROPERTIES TIMEOUT 30)
+    endif()
 endif()
 
 if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
@@ -234,6 +261,9 @@ if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
     endif()
     if(XGL_BUILD_SDK_CONSUMER_SMOKE)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_sdk_consumer_smoke)
+    endif()
+    if(XGL_BUILD_NOHEAP_SMOKE)
+        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_noheap_smoke)
     endif()
 
     add_custom_target(xgl_release_validation

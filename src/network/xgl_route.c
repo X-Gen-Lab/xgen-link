@@ -5,34 +5,27 @@
  */
 
 #include <xgl/xgl_route.h>
+#include <xgl/xgl_allocator.h>
 #include <xgl/xgl_error.h>
 #include <xgl/xgl_hashtable.h>
 #include <string.h>
-#include <stdlib.h>
 
 /*---------------------------------------------------------------------------*/
 /* Private Helper Functions                                                  */
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Allocate memory using table's allocator
+ * \brief           Allocate memory using table's allocator policy
  */
 static void* xgl_route_alloc(xgl_route_table_t* table, size_t size) {
-    if (table->allocator && table->allocator->malloc) {
-        return table->allocator->malloc(size);
-    }
-    return malloc(size);
+    return xgl_alloc(table != NULL ? table->allocator : NULL, size);
 }
 
 /**
- * \brief           Free memory using table's allocator
+ * \brief           Free memory using table's allocator policy
  */
 static void xgl_route_free(xgl_route_table_t* table, void* ptr) {
-    if (table->allocator && table->allocator->free) {
-        table->allocator->free(ptr);
-    } else {
-        free(ptr);
-    }
+    xgl_free(table != NULL ? table->allocator : NULL, ptr);
 }
 
 /**

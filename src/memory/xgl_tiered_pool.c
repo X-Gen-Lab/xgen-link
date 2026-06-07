@@ -5,7 +5,7 @@
  */
 
 #include "xgl/xgl_tiered_pool.h"
-#include <stdlib.h>
+#include "xgl/xgl_allocator.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -32,7 +32,7 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
     /* Allocate small pool buffer */
     if (small_count > 0) {
         size_t small_buffer_size = small_count * XGL_TIERED_POOL_SMALL_SIZE;
-        pool->small_buffer = (uint8_t*)malloc(small_buffer_size);
+        pool->small_buffer = (uint8_t*)xgl_alloc(NULL, small_buffer_size);
         if (pool->small_buffer == NULL) {
             goto error_cleanup;
         }
@@ -47,7 +47,7 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
     /* Allocate medium pool buffer */
     if (medium_count > 0) {
         size_t medium_buffer_size = medium_count * XGL_TIERED_POOL_MEDIUM_SIZE;
-        pool->medium_buffer = (uint8_t*)malloc(medium_buffer_size);
+        pool->medium_buffer = (uint8_t*)xgl_alloc(NULL, medium_buffer_size);
         if (pool->medium_buffer == NULL) {
             goto error_cleanup;
         }
@@ -62,7 +62,7 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
     /* Allocate large pool buffer */
     if (large_count > 0) {
         size_t large_buffer_size = large_count * XGL_TIERED_POOL_LARGE_SIZE;
-        pool->large_buffer = (uint8_t*)malloc(large_buffer_size);
+        pool->large_buffer = (uint8_t*)xgl_alloc(NULL, large_buffer_size);
         if (pool->large_buffer == NULL) {
             goto error_cleanup;
         }
@@ -103,15 +103,15 @@ void xgl_tiered_pool_destroy(xgl_tiered_pool_t* pool) {
     
     /* Free buffers */
     if (pool->small_buffer != NULL) {
-        free(pool->small_buffer);
+        xgl_free(NULL, pool->small_buffer);
         pool->small_buffer = NULL;
     }
     if (pool->medium_buffer != NULL) {
-        free(pool->medium_buffer);
+        xgl_free(NULL, pool->medium_buffer);
         pool->medium_buffer = NULL;
     }
     if (pool->large_buffer != NULL) {
-        free(pool->large_buffer);
+        xgl_free(NULL, pool->large_buffer);
         pool->large_buffer = NULL;
     }
     

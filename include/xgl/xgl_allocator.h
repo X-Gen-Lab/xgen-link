@@ -15,6 +15,10 @@ extern "C" {
 #include <stdint.h>
 #include "xgl_types.h"
 
+#ifndef XGL_ALLOW_FALLBACK_MALLOC
+#define XGL_ALLOW_FALLBACK_MALLOC 1
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Default Allocator                                                         */
 /*---------------------------------------------------------------------------*/
@@ -32,7 +36,8 @@ xgl_allocator_t* xgl_allocator_get_default(void);
 
 /**
  * \brief           Allocate memory using provided allocator
- * \param[in]       allocator: Pointer to allocator structure (NULL = default)
+ * \param[in]       allocator: Pointer to allocator structure
+ *                  (NULL = default when XGL_ALLOW_FALLBACK_MALLOC is 1)
  * \param[in]       size: Size in bytes to allocate
  * \return          Pointer to allocated memory, NULL on failure
  */
@@ -40,7 +45,8 @@ void* xgl_alloc(xgl_allocator_t* allocator, size_t size);
 
 /**
  * \brief           Free memory using provided allocator
- * \param[in]       allocator: Pointer to allocator structure (NULL = default)
+ * \param[in]       allocator: Pointer to allocator structure
+ *                  (NULL = default when XGL_ALLOW_FALLBACK_MALLOC is 1)
  * \param[in]       ptr: Pointer to memory to free
  */
 void xgl_free(xgl_allocator_t* allocator, void* ptr);
@@ -94,7 +100,8 @@ typedef struct {
 /**
  * \brief           Initialize tracking allocator
  * \param[in,out]   tracker: Pointer to tracking allocator structure
- * \param[in]       underlying: Underlying allocator (NULL = default)
+ * \param[in]       underlying: Underlying allocator
+ *                  (NULL = default when XGL_ALLOW_FALLBACK_MALLOC is 1)
  * \return          0 on success, -1 on error
  */
 int xgl_tracking_allocator_init(xgl_tracking_allocator_t* tracker,
