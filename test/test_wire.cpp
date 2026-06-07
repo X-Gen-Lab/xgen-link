@@ -218,6 +218,89 @@ TEST(XglWireTest, EncodesAndDecodesFragmentExtension) {
     EXPECT_EQ(message_len, 0x00004000U);
 }
 
+TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
+    uint8_t session[16] = {};
+    size_t session_len = 0;
+    ASSERT_EQ(xgl_wire_encode_session_ext_value(session,
+                                                sizeof(session),
+                                                0x01020304U,
+                                                0x1020304050607080ULL,
+                                                &session_len),
+              XGL_OK);
+    EXPECT_EQ(session_len, 12U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&session[0]), 0x01020304U);
+    EXPECT_EQ(session[4], 0x80U);
+    EXPECT_EQ(session[11], 0x10U);
+
+    uint32_t session_epoch = 0;
+    uint64_t incarnation_id = 0;
+    ASSERT_EQ(xgl_wire_decode_session_ext_value(session,
+                                                session_len,
+                                                &session_epoch,
+                                                &incarnation_id),
+              XGL_OK);
+    EXPECT_EQ(session_epoch, 0x01020304U);
+    EXPECT_EQ(incarnation_id, 0x1020304050607080ULL);
+
+    uint8_t security[16] = {};
+    size_t security_len = 0;
+    ASSERT_EQ(xgl_wire_encode_security_ext_value(security,
+                                                 sizeof(security),
+                                                 0xA0B0C0D0U,
+                                                 0x0102030405060708ULL,
+                                                 16,
+                                                 &security_len),
+              XGL_OK);
+    EXPECT_EQ(security_len, 13U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&security[0]), 0xA0B0C0D0U);
+    EXPECT_EQ(security[12], 16U);
+
+    uint32_t key_id = 0;
+    uint64_t nonce_id = 0;
+    uint8_t tag_len = 0;
+    ASSERT_EQ(xgl_wire_decode_security_ext_value(security,
+                                                 security_len,
+                                                 &key_id,
+                                                 &nonce_id,
+                                                 &tag_len),
+              XGL_OK);
+    EXPECT_EQ(key_id, 0xA0B0C0D0U);
+    EXPECT_EQ(nonce_id, 0x0102030405060708ULL);
+    EXPECT_EQ(tag_len, 16U);
+
+    uint8_t route[16] = {};
+    size_t route_len = 0;
+    ASSERT_EQ(xgl_wire_encode_route_ext_value(route,
+                                              sizeof(route),
+                                              0x1234,
+                                              0x5678,
+                                              0xCAFEBABEU,
+                                              9,
+                                              &route_len),
+              XGL_OK);
+    EXPECT_EQ(route_len, 10U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&route[0]), 0x1234U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&route[2]), 0x5678U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&route[4]), 0xCAFEBABEU);
+    EXPECT_EQ(xgl_deserialize_u16_le(&route[8]), 9U);
+
+    uint16_t previous_hop = 0;
+    uint16_t next_hop = 0;
+    uint32_t route_epoch = 0;
+    uint16_t metric = 0;
+    ASSERT_EQ(xgl_wire_decode_route_ext_value(route,
+                                              route_len,
+                                              &previous_hop,
+                                              &next_hop,
+                                              &route_epoch,
+                                              &metric),
+              XGL_OK);
+    EXPECT_EQ(previous_hop, 0x1234U);
+    EXPECT_EQ(next_hop, 0x5678U);
+    EXPECT_EQ(route_epoch, 0xCAFEBABEU);
+    EXPECT_EQ(metric, 9U);
+}
+
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
     uint8_t invalid[] = {
         XGL_WIRE_EXT_ACK_RANGE,
