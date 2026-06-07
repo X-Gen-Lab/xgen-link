@@ -567,10 +567,8 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
     /* Target ID can be broadcast or specific node */
     /* Zero is reserved but we allow it for special cases */
     
-    /* Prevent self-addressing (source == target) unless broadcast */
     if (source_id == target_id && target_id != XGL_BROADCAST_ID) {
-        /* Allow loopback for testing purposes */
-        /* In production, this might be disallowed */
+        return false;
     }
     
     return true;
