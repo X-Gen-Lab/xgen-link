@@ -213,6 +213,25 @@ TEST_F(XglTieredPoolTest, AllocExhaustSmall) {
     xgl_tiered_pool_free(&pool, ptr2, 32);
 }
 
+TEST_F(XglTieredPoolTest, FreesFallbackAllocationToOwningPool) {
+    ASSERT_EQ(xgl_tiered_pool_init(&pool, 1, 1, 0), 0);
+
+    void* small = xgl_tiered_pool_alloc(&pool, 32);
+    void* fallback_medium = xgl_tiered_pool_alloc(&pool, 32);
+    ASSERT_NE(small, nullptr);
+    ASSERT_NE(fallback_medium, nullptr);
+
+    EXPECT_EQ(xgl_mempool_get_used_count(&pool.small_pool), 1U);
+    EXPECT_EQ(xgl_mempool_get_used_count(&pool.medium_pool), 1U);
+
+    xgl_tiered_pool_free(&pool, fallback_medium, 32);
+
+    EXPECT_EQ(xgl_mempool_get_used_count(&pool.small_pool), 1U);
+    EXPECT_EQ(xgl_mempool_get_used_count(&pool.medium_pool), 0U);
+
+    xgl_tiered_pool_free(&pool, small, 32);
+}
+
 TEST_F(XglTieredPoolTest, SmartAllocationSelectsSmallest) {
     xgl_tiered_pool_init(&pool, 10, 5, 2);
     
