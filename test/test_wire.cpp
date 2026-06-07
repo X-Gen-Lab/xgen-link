@@ -361,6 +361,35 @@ TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
     EXPECT_EQ(metric, 9U);
 }
 
+TEST(XglWireTest, RejectsZeroLengthSecurityTag) {
+    uint8_t security[16] = {};
+    size_t security_len = 0;
+
+    EXPECT_EQ(xgl_wire_encode_security_ext_value(security,
+                                                 sizeof(security),
+                                                 0xA0B0C0D0U,
+                                                 0x0102030405060708ULL,
+                                                 0,
+                                                 &security_len),
+              XGL_ERR_INVALID_PARAM);
+
+    const uint8_t encoded_zero_tag[] = {
+        0xD0, 0xC0, 0xB0, 0xA0,
+        0x08, 0x07, 0x06, 0x05,
+        0x04, 0x03, 0x02, 0x01,
+        0x00
+    };
+    uint32_t key_id = 0;
+    uint64_t nonce_id = 0;
+    uint8_t tag_len = 0;
+    EXPECT_EQ(xgl_wire_decode_security_ext_value(encoded_zero_tag,
+                                                 sizeof(encoded_zero_tag),
+                                                 &key_id,
+                                                 &nonce_id,
+                                                 &tag_len),
+              XGL_ERR_INVALID_FRAME);
+}
+
 TEST(XglWireTest, AppendsAndVerifiesAuthenticationTrailer) {
     xgl_auth_provider_t provider = {
         .sign = wire_test_auth_sign,
