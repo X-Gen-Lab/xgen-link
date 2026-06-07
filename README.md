@@ -5,18 +5,29 @@ Modern, robust, and highly configurable communication protocol stack for resourc
 ## Features
 
 - **Multi-instance architecture**: Support multiple independent protocol stacks
-- **MVP communication loop**: Single-link point-to-point send/receive, optional ACK-based reliable send, timeout retransmission, and RX callback
+- **Production v2 wire format**: 24-byte base header, TLV extensions, 16-bit node IDs, and 32-bit packet numbers
+- **Multi-node reliability**: Routed unicast, ACK ranges, SACK, adaptive retransmission, and connection-scoped peer state
+- **Authenticated transport**: Production preset requires an auth provider; zero-copy send preserves authentication requirements
+- **Low-power runtime API**: `xgl_next_deadline_ms()` lets bare-metal and RTOS applications sleep until the next protocol deadline
 - **Compile-time configuration**: Eliminate unused code through Kconfig
 - **Thread safety**: Optional mutex protection for RTOS environments
 - **Bare-metal support**: Run without RTOS dependencies
 - **Minimal footprint**: 32KB RAM, 50KB Flash for basic configuration
 - **Industrial quality**: Comprehensive testing, documentation, and CI/CD
 
-## MVP Scope
+## Production Scope
 
-The current acceptance baseline focuses on a single physical link with point-to-point communication. Unreliable send, reliable send, ACK handling, timeout retransmission, and receive callbacks are implemented and covered by tests.
+The current acceptance baseline targets a production-grade embedded multi-node
+protocol stack: v2 wire encoding, route-aware forwarding, reliable and
+unreliable delivery, ACK range/SACK handling, authenticated frame paths,
+fragment reassembly budgets, and receive callbacks are implemented and covered
+by unit, property, integration, SDK consumer, and footprint tests.
 
-Compression and encryption are optional codec-module capabilities and are not part of the base MVP link path. `xgl_send_zerocopy` has a true zero-copy acceptance path for single-frame unreliable transmission; reliable zero-copy requests preserve retransmission semantics and may copy into the reliable queue.
+Compression and encryption are reserved codec capabilities and are rejected
+until the payload expansion and security model are wired into the production
+path. `xgl_send_zerocopy` supports single-frame sends while preserving the
+authentication model; reliable zero-copy requests may copy into the reliable
+queue to keep retransmission semantics.
 
 ## Quick Start
 
@@ -63,7 +74,8 @@ int main(void) {
     /* Initialize */
     xgl_init(handle);
     
-    /* Use the protocol... */
+    /* Use the protocol. In low-power loops, sleep until
+       xgl_next_deadline_ms(handle) or PHY RX activity wakes the task. */
     
     /* Cleanup */
     xgl_destroy(handle);

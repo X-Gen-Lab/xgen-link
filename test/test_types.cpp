@@ -89,7 +89,7 @@ TEST(XglTypesTest, ConfigPresets) {
     /* Test tiny preset */
     xgl_config_t tiny = XGL_CONFIG_PRESET_TINY;
     EXPECT_EQ(tiny.memory.tx_pool_size, 1024);
-    EXPECT_EQ(tiny.memory.rx_buffer_size, 160);  /* 12 header + 128 payload + 2 CRC + padding */
+    EXPECT_EQ(tiny.memory.rx_buffer_size, 160);  /* v2 header + 128 payload + CRC + padding */
     EXPECT_EQ(tiny.protocol.window_size, 2);
     EXPECT_EQ(tiny.protocol.max_frame_size, 128);
     EXPECT_FALSE(tiny.features.enable_fragmentation);
@@ -97,7 +97,7 @@ TEST(XglTypesTest, ConfigPresets) {
     /* Test small preset */
     xgl_config_t small = XGL_CONFIG_PRESET_SMALL;
     EXPECT_EQ(small.memory.tx_pool_size, 2048);
-    EXPECT_EQ(small.memory.rx_buffer_size, 288);  /* 12 header + 256 payload + 2 CRC + padding */
+    EXPECT_EQ(small.memory.rx_buffer_size, 288);  /* v2 header + 256 payload + CRC + padding */
     EXPECT_EQ(small.protocol.window_size, 4);
     EXPECT_EQ(small.protocol.max_frame_size, 256);
     EXPECT_TRUE(small.features.enable_fragmentation);
@@ -105,7 +105,7 @@ TEST(XglTypesTest, ConfigPresets) {
     /* Test medium preset */
     xgl_config_t medium = XGL_CONFIG_PRESET_MEDIUM;
     EXPECT_EQ(medium.memory.tx_pool_size, 4096);
-    EXPECT_EQ(medium.memory.rx_buffer_size, 544);  /* 12 header + 512 payload + 2 CRC + padding */
+    EXPECT_EQ(medium.memory.rx_buffer_size, 544);  /* v2 header + 512 payload + CRC + padding */
     EXPECT_EQ(medium.protocol.window_size, 8);
     EXPECT_EQ(medium.protocol.max_frame_size, 512);
     EXPECT_TRUE(medium.features.enable_fragmentation);
@@ -114,7 +114,7 @@ TEST(XglTypesTest, ConfigPresets) {
     /* Test large preset */
     xgl_config_t large = XGL_CONFIG_PRESET_LARGE;
     EXPECT_EQ(large.memory.tx_pool_size, 8192);
-    EXPECT_EQ(large.memory.rx_buffer_size, 1056);  /* 12 header + 1024 payload + 2 CRC + padding */
+    EXPECT_EQ(large.memory.rx_buffer_size, 1056);  /* v2 header + 1024 payload + CRC + padding */
     EXPECT_EQ(large.protocol.window_size, 16);
     EXPECT_EQ(large.protocol.max_frame_size, 1024);
     EXPECT_TRUE(large.features.enable_fragmentation);

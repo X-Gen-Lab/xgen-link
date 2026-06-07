@@ -94,7 +94,7 @@ Use **backslash style** for all Doxygen comments:
  * \file            xgl_transport.h
  * \brief           Transport layer interface
  * \author          Nexus Team
- * \version         1.0.0
+ * \version         2.0.0
  * \date            2026-01-XX
  *
  * \copyright       Copyright (c) 2026 Nexus Team

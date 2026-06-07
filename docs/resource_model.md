@@ -6,11 +6,11 @@ xgen-link is intended for bounded embedded systems. This document separates curr
 
 The SDK tracks memory in five phases:
 
-- Init phase: `xgl_create` and `xgl_init` allocate instance, route, RX cache, sequence, ACK, reliable, fragment, and pool resources.
+- Init phase: `xgl_create` and `xgl_init` allocate instance, route, RX cache, reliable, fragment, replay-window, and pool resources.
 - Runtime TX phase: normal non-fragmented unreliable transmit traffic should avoid allocation.
 - Runtime RX phase: normal non-fragmented receive traffic should avoid allocation.
 - Reliable phase: reliable TX currently stores retransmission data and may allocate queue nodes and packet copies.
-- Fragment phase: fragmentation and reassembly currently allocate fragment arrays, fragment data, reassembly buffers, and bitmaps.
+- Fragment phase: fragmentation and reassembly currently allocate fragment arrays, fragment data, reassembly buffers, assembled data, and received-range metadata.
 
 ## Current Runtime Allocation Sites
 
@@ -19,8 +19,8 @@ The current implementation still has runtime allocation in some protocol paths:
 - datalink TX uses a stack buffer for small frames and heap allocation for larger serialized frames
 - reliable send allocates retransmission queue nodes and payload copies
 - fragmentation allocates fragment arrays and fragment buffers
-- reassembly allocates buffer metadata, received bitmap, and assembled data
-- route, sequence, hash table, packet pool, tiered pool, and ACK structures allocate during init
+- reassembly allocates buffer metadata, received ranges, and assembled data
+- route, hash table, packet pool, tiered pool, replay-window, and ACK-range structures allocate during init
 
 These allocations are acceptable for the host and general SDK profile. They are not yet acceptable for a strict no-runtime-heap MCU profile.
 
