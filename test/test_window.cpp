@@ -3,8 +3,10 @@
  * \brief           Unit tests for production packet-number sliding window
  */
 
+#include <cstdlib>
 #include <cstring>
 #include <gtest/gtest.h>
+#include "xgl/xgl_allocator.h"
 #include "xgl/xgl_window.h"
 
 template <typename T>
@@ -30,6 +32,34 @@ protected:
     }
 };
 
+namespace {
+struct WindowAllocProbe {
+    size_t alloc_count;
+    size_t free_count;
+    void* last_ptr;
+};
+
+static WindowAllocProbe* g_window_alloc_probe = nullptr;
+
+static void* window_probe_malloc(size_t size) {
+    if (g_window_alloc_probe != nullptr) {
+        g_window_alloc_probe->alloc_count++;
+    }
+    void* ptr = std::malloc(size);
+    if (g_window_alloc_probe != nullptr) {
+        g_window_alloc_probe->last_ptr = ptr;
+    }
+    return ptr;
+}
+
+static void window_probe_free(void* ptr) {
+    if (g_window_alloc_probe != nullptr) {
+        g_window_alloc_probe->free_count++;
+    }
+    std::free(ptr);
+}
+}
+
 TEST_F(XglWindowTest, InitSuccess) {
     ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
 
@@ -37,6 +67,24 @@ TEST_F(XglWindowTest, InitSuccess) {
     EXPECT_EQ(window.send_base_packet_number, 0U);
     EXPECT_EQ(window.next_packet_number, 0U);
     EXPECT_NE(window.ack_received, nullptr);
+}
+
+TEST_F(XglWindowTest, InitUsesProvidedAllocator) {
+    WindowAllocProbe probe = {};
+    g_window_alloc_probe = &probe;
+    xgl_allocator_t allocator = {
+        .malloc = window_probe_malloc,
+        .free = window_probe_free,
+        .user_data = nullptr
+    };
+
+    ASSERT_EQ(xgl_window_init_with_allocator(&window, 8, &allocator), XGL_OK);
+    EXPECT_EQ(probe.alloc_count, 1U);
+    EXPECT_EQ(window.ack_received, probe.last_ptr);
+
+    xgl_window_destroy(&window);
+    EXPECT_EQ(probe.free_count, 1U);
+    g_window_alloc_probe = nullptr;
 }
 
 TEST_F(XglWindowTest, InitRejectsInvalidParams) {
