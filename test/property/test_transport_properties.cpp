@@ -418,352 +418,192 @@ TEST(XglTransportProperties, RTTNullPointerHandling) {
 
 /**
  * \brief           Feature: x-gen-link, Property 23: Sliding Window Maintenance
- * \details         For any protocol instance, the sliding window state 
- *                  (send_base, next_seq_num) should satisfy: 
- *                  0 <= (next_seq_num - send_base) <= window_size.
+ * \details         The production sliding window is maintained by 32-bit packet
+ *                  numbers and must never depend on 8-bit sequence wraparound.
  * \note            Validates: Requirements 7.5
  */
 TEST(XglTransportProperties, Property23_SlidingWindowMaintenance) {
     PropertyTestGenerator gen;
-    
-    /* Test with 100+ random window configurations and operations */
+
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
-        /* Generate random window size (1-128) */
         uint8_t window_size = 1 + (gen.random_uint8() % 128);
-        
+
         xgl_sliding_window_t window;
         xgl_error_t err = xgl_window_init(&window, window_size);
         ASSERT_EQ(err, XGL_OK) << "Window initialization failed";
-        
-        /* Initial state should satisfy invariant */
-        uint8_t usage = xgl_window_get_usage(&window);
-        EXPECT_LE(usage, window_size)
-            << "Initial window usage should be <= window_size"
-            << "\n  send_base: " << (int)window.send_base
-            << "\n  next_seq_num: " << (int)window.next_seq_num
-            << "\n  window_size: " << (int)window_size
-            << "\n  usage: " << (int)usage;
-        
-        /* Perform random sequence of operations */
+
         int num_operations = 10 + (gen.random_uint8() % 50);
-        
         for (int op = 0; op < num_operations; ++op) {
-            /* Randomly choose operation: send (70%) or ack (30%) */
             bool do_send = (gen.random_uint8() % 100) < 70;
-            
-            if (do_send && xgl_window_can_send(&window)) {
-                /* Send operation: advance next_seq_num */
-                uint8_t seq_before = xgl_window_get_next_seq(&window);
-                xgl_window_advance_next_seq(&window);
-                uint8_t seq_after = xgl_window_get_next_seq(&window);
-                
-                /* Verify sequence number advanced by 1 (with wraparound) */
-                EXPECT_EQ((uint8_t)(seq_before + 1), seq_after)
-                    << "Sequence number should advance by 1";
-                
-            } else if (!do_send) {
-                /* ACK operation: mark random sequence in window as ACKed */
-                uint8_t base = window.send_base;
-                uint8_t next = window.next_seq_num;
-                
-                /* Only ACK if there are outstanding packets */
-                if (base != next) {
-                    /* Generate random sequence number within window */
-                    uint8_t diff = (uint8_t)(next - base);
-                    uint8_t offset = gen.random_uint8() % diff;
-                    uint8_t seq_to_ack = (uint8_t)(base + offset);
-                    
-                    /* Mark ACK */
-                    err = xgl_window_mark_ack(&window, seq_to_ack);
-                    EXPECT_EQ(err, XGL_OK)
-                        << "Marking ACK should succeed for in-window sequence";
-                    
-                    /* Advance base if possible */
-                    xgl_window_advance_base(&window);
-                }
+
+            if (do_send && xgl_window_can_send_packet_number(&window)) {
+                uint32_t before = xgl_window_get_next_packet_number(&window);
+                xgl_window_advance_next_packet_number(&window);
+                EXPECT_EQ(xgl_window_get_next_packet_number(&window), before + 1U)
+                    << "Packet number should advance monotonically";
+            } else if (!do_send && xgl_window_get_usage(&window) > 0U) {
+                uint32_t outstanding = window.next_packet_number -
+                                       window.send_base_packet_number;
+                uint32_t offset = gen.random_uint32() % outstanding;
+                uint32_t packet_to_ack = window.send_base_packet_number + offset;
+
+                err = xgl_window_mark_ack_packet_number(&window, packet_to_ack);
+                EXPECT_EQ(err, XGL_OK)
+                    << "Marking ACK should succeed for in-window packet";
+                (void)xgl_window_advance_base_packet_number(&window);
             }
-            
-            /* After each operation, verify invariant holds */
-            uint8_t current_usage = xgl_window_get_usage(&window);
-            EXPECT_LE(current_usage, window_size)
+
+            uint32_t usage = window.next_packet_number - window.send_base_packet_number;
+            EXPECT_LE(usage, window_size)
                 << "Window invariant violated after operation " << op
-                << "\n  send_base: " << (int)window.send_base
-                << "\n  next_seq_num: " << (int)window.next_seq_num
+                << "\n  send_base_packet_number: " << window.send_base_packet_number
+                << "\n  next_packet_number: " << window.next_packet_number
                 << "\n  window_size: " << (int)window_size
-                << "\n  usage: " << (int)current_usage;
-            
-            /* Verify can_send is consistent with usage */
-            bool can_send = xgl_window_can_send(&window);
-            EXPECT_EQ(can_send, current_usage < window_size)
-                << "can_send should be true iff usage < window_size";
+                << "\n  usage: " << usage;
+
+            EXPECT_EQ(xgl_window_can_send(&window), usage < window_size)
+                << "can_send should be true iff packet-number usage < window_size";
         }
-        
-        /* Clean up */
+
         xgl_window_destroy(&window);
     }
 }
 
-/**
- * \brief           Test sliding window with maximum window size
- * \details         Verifies invariant holds with largest possible window
- */
 TEST(XglTransportProperties, Property23_SlidingWindowMaxSize) {
     xgl_sliding_window_t window;
     xgl_error_t err = xgl_window_init(&window, 128);
     ASSERT_EQ(err, XGL_OK);
-    
-    /* Fill entire window */
+
     for (int i = 0; i < 128; ++i) {
-        EXPECT_TRUE(xgl_window_can_send(&window))
-            << "Should be able to send until window is full";
-        xgl_window_advance_next_seq(&window);
+        EXPECT_TRUE(xgl_window_can_send(&window));
+        xgl_window_advance_next_packet_number(&window);
     }
-    
-    /* Window should now be full */
-    EXPECT_FALSE(xgl_window_can_send(&window))
-        << "Window should be full after 128 sends";
-    
-    uint8_t usage = xgl_window_get_usage(&window);
-    EXPECT_EQ(usage, 128)
-        << "Usage should equal window_size when full";
-    
-    /* Verify invariant */
-    EXPECT_LE(usage, 128)
-        << "Invariant should hold even when window is full";
-    
+
+    EXPECT_FALSE(xgl_window_can_send(&window));
+    EXPECT_EQ(xgl_window_get_usage(&window), 128);
+
     xgl_window_destroy(&window);
 }
 
-/**
- * \brief           Test sliding window with sequence number wraparound
- * \details         Verifies invariant holds across sequence number wraparound
- */
-TEST(XglTransportProperties, Property23_SlidingWindowWraparound) {
-    PropertyTestGenerator gen;
-    
+TEST(XglTransportProperties, Property23_SlidingWindowDoesNotWrapAtEightBits) {
     xgl_sliding_window_t window;
     uint8_t window_size = 16;
     xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
-    
-    /* Advance to near wraparound point (250) */
-    window.send_base = 250;
-    window.next_seq_num = 250;
-    
-    /* Send packets across wraparound boundary */
-    for (int i = 0; i < 20; ++i) {
-        if (xgl_window_can_send(&window)) {
-            xgl_window_advance_next_seq(&window);
-            
-            /* Verify invariant after each send */
-            uint8_t usage = xgl_window_get_usage(&window);
-            EXPECT_LE(usage, window_size)
-                << "Invariant should hold across wraparound"
-                << "\n  send_base: " << (int)window.send_base
-                << "\n  next_seq_num: " << (int)window.next_seq_num
-                << "\n  usage: " << (int)usage;
-        }
-        
-        /* Randomly ACK some packets */
-        if ((gen.random_uint8() % 2) == 0) {
-            uint8_t base = window.send_base;
-            uint8_t next = window.next_seq_num;
-            
-            if (base != next) {
-                /* ACK the base packet to advance window */
-                xgl_window_mark_ack(&window, base);
-                xgl_window_advance_base(&window);
-            }
-        }
+
+    window.send_base_packet_number = 250U;
+    window.next_packet_number = 250U;
+
+    for (int i = 0; i < window_size; ++i) {
+        ASSERT_TRUE(xgl_window_can_send_packet_number(&window));
+        xgl_window_advance_next_packet_number(&window);
     }
-    
-    /* Final invariant check */
-    uint8_t final_usage = xgl_window_get_usage(&window);
-    EXPECT_LE(final_usage, window_size)
-        << "Invariant should hold after wraparound operations";
-    
+
+    EXPECT_EQ(window.next_packet_number, 266U);
+    EXPECT_FALSE(xgl_window_can_send_packet_number(&window));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 250U));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 265U));
+    EXPECT_FALSE(xgl_window_is_in_window_packet_number(&window, 266U));
+
     xgl_window_destroy(&window);
 }
 
-/**
- * \brief           Test sliding window with all packets ACKed
- * \details         Verifies window advances correctly when all packets are ACKed
- */
 TEST(XglTransportProperties, Property23_SlidingWindowAllAcked) {
     xgl_sliding_window_t window;
     uint8_t window_size = 8;
     xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
-    
-    /* Send full window */
+
     for (int i = 0; i < window_size; ++i) {
-        EXPECT_TRUE(xgl_window_can_send(&window));
-        xgl_window_advance_next_seq(&window);
+        xgl_window_advance_next_packet_number(&window);
     }
-    
-    /* Window should be full */
-    EXPECT_FALSE(xgl_window_can_send(&window));
-    EXPECT_EQ(xgl_window_get_usage(&window), window_size);
-    
-    /* ACK all packets in order */
-    for (int i = 0; i < window_size; ++i) {
-        uint8_t seq = (uint8_t)(window.send_base + i);
-        err = xgl_window_mark_ack(&window, seq);
+
+    for (uint32_t packet_number = 0; packet_number < window_size; ++packet_number) {
+        err = xgl_window_mark_ack_packet_number(&window, packet_number);
         EXPECT_EQ(err, XGL_OK);
     }
-    
-    /* Advance base - should advance by window_size */
-    uint8_t advanced = xgl_window_advance_base(&window);
-    EXPECT_EQ(advanced, window_size)
-        << "Should advance by full window size when all ACKed";
-    
-    /* Window should now be empty */
-    EXPECT_EQ(xgl_window_get_usage(&window), 0)
-        << "Window should be empty after all ACKs processed";
-    
-    /* Verify invariant */
-    EXPECT_LE(xgl_window_get_usage(&window), window_size);
-    
-    /* Should be able to send again */
+
+    EXPECT_EQ(xgl_window_advance_base_packet_number(&window), window_size);
+    EXPECT_EQ(xgl_window_get_usage(&window), 0);
     EXPECT_TRUE(xgl_window_can_send(&window));
-    
+
     xgl_window_destroy(&window);
 }
 
-/**
- * \brief           Test sliding window with out-of-order ACKs
- * \details         Verifies window handles out-of-order ACKs correctly
- */
 TEST(XglTransportProperties, Property23_SlidingWindowOutOfOrderAcks) {
     xgl_sliding_window_t window;
     uint8_t window_size = 8;
     xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
-    
-    /* Record initial base */
-    uint8_t initial_base = window.send_base;
-    
-    /* Send full window */
+
     for (int i = 0; i < window_size; ++i) {
-        xgl_window_advance_next_seq(&window);
+        xgl_window_advance_next_packet_number(&window);
     }
-    
-    /* ACK packets out of order: 2, 4, 6, 0, 1, 3, 5, 7 */
-    /* Use initial_base to calculate absolute sequence numbers */
-    uint8_t ack_order[] = {2, 4, 6, 0, 1, 3, 5, 7};
-    
-    for (int i = 0; i < window_size; ++i) {
-        uint8_t seq = (uint8_t)(initial_base + ack_order[i]);
-        err = xgl_window_mark_ack(&window, seq);
-        EXPECT_EQ(err, XGL_OK)
-            << "Failed to mark ACK for sequence " << (int)seq;
-        
-        /* Try to advance base */
-        uint8_t prev_base = window.send_base;
-        xgl_window_advance_base(&window);
-        
-        /* Verify invariant after each ACK */
-        uint8_t usage = xgl_window_get_usage(&window);
-        EXPECT_LE(usage, window_size)
-            << "Invariant should hold with out-of-order ACKs"
-            << "\n  ACK index: " << i
-            << "\n  ACK seq: " << (int)seq
-            << "\n  prev_base: " << (int)prev_base
-            << "\n  send_base: " << (int)window.send_base
-            << "\n  next_seq_num: " << (int)window.next_seq_num
-            << "\n  usage: " << (int)usage;
+
+    const uint32_t ack_order[] = {2, 4, 6, 0, 1, 3, 5, 7};
+    for (uint32_t packet_number : ack_order) {
+        err = xgl_window_mark_ack_packet_number(&window, packet_number);
+        EXPECT_EQ(err, XGL_OK);
+        (void)xgl_window_advance_base_packet_number(&window);
+
+        uint32_t usage = window.next_packet_number - window.send_base_packet_number;
+        EXPECT_LE(usage, window_size);
     }
-    
-    /* After all ACKs, window should be empty */
-    EXPECT_EQ(xgl_window_get_usage(&window), 0)
-        << "Window should be empty after all ACKs processed"
-        << "\n  send_base: " << (int)window.send_base
-        << "\n  next_seq_num: " << (int)window.next_seq_num;
-    
+
+    EXPECT_EQ(xgl_window_get_usage(&window), 0);
+
     xgl_window_destroy(&window);
 }
 
-/**
- * \brief           Test sliding window reset
- * \details         Verifies reset restores window to initial state
- */
 TEST(XglTransportProperties, Property23_SlidingWindowReset) {
     PropertyTestGenerator gen;
-    
+
     xgl_sliding_window_t window;
     uint8_t window_size = 16;
     xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
-    
-    /* Perform random operations */
+
     for (int i = 0; i < 50; ++i) {
-        if (xgl_window_can_send(&window)) {
-            xgl_window_advance_next_seq(&window);
+        if (xgl_window_can_send_packet_number(&window)) {
+            xgl_window_advance_next_packet_number(&window);
         }
-        
-        if ((gen.random_uint8() % 3) == 0) {
-            uint8_t base = window.send_base;
-            uint8_t next = window.next_seq_num;
-            if (base != next) {
-                uint8_t seq = (uint8_t)(base + (gen.random_uint8() % (next - base)));
-                xgl_window_mark_ack(&window, seq);
-                xgl_window_advance_base(&window);
-            }
+
+        if ((gen.random_uint8() % 3) == 0 && xgl_window_get_usage(&window) > 0U) {
+            uint32_t outstanding = window.next_packet_number -
+                                   window.send_base_packet_number;
+            uint32_t packet_number =
+                window.send_base_packet_number + (gen.random_uint32() % outstanding);
+            (void)xgl_window_mark_ack_packet_number(&window, packet_number);
+            (void)xgl_window_advance_base_packet_number(&window);
         }
     }
-    
-    /* Reset window */
+
     xgl_window_reset(&window);
-    
-    /* Verify reset to initial state */
-    EXPECT_EQ(window.send_base, 0);
-    EXPECT_EQ(window.next_seq_num, 0);
+
+    EXPECT_EQ(window.send_base_packet_number, 0U);
+    EXPECT_EQ(window.next_packet_number, 0U);
     EXPECT_EQ(xgl_window_get_usage(&window), 0);
     EXPECT_TRUE(xgl_window_can_send(&window));
-    
-    /* Verify invariant after reset */
-    EXPECT_LE(xgl_window_get_usage(&window), window_size);
-    
+
     xgl_window_destroy(&window);
 }
 
-/**
- * \brief           Test sliding window with minimum size
- * \details         Verifies invariant holds with smallest possible window
- */
 TEST(XglTransportProperties, Property23_SlidingWindowMinSize) {
     xgl_sliding_window_t window;
     xgl_error_t err = xgl_window_init(&window, 1);
     ASSERT_EQ(err, XGL_OK);
-    
-    /* With window size 1, can only send one packet at a time */
+
     EXPECT_TRUE(xgl_window_can_send(&window));
-    EXPECT_EQ(xgl_window_get_usage(&window), 0);
-    
-    /* Send one packet */
-    xgl_window_advance_next_seq(&window);
-    
-    /* Window should be full */
+    xgl_window_advance_next_packet_number(&window);
     EXPECT_FALSE(xgl_window_can_send(&window));
     EXPECT_EQ(xgl_window_get_usage(&window), 1);
-    
-    /* Verify invariant */
-    EXPECT_LE(xgl_window_get_usage(&window), 1);
-    
-    /* ACK the packet */
-    err = xgl_window_mark_ack(&window, window.send_base);
+
+    err = xgl_window_mark_ack_packet_number(&window, 0U);
     EXPECT_EQ(err, XGL_OK);
-    
-    uint8_t advanced = xgl_window_advance_base(&window);
-    EXPECT_EQ(advanced, 1);
-    
-    /* Window should be empty again */
+    EXPECT_EQ(xgl_window_advance_base(&window), 1);
     EXPECT_TRUE(xgl_window_can_send(&window));
     EXPECT_EQ(xgl_window_get_usage(&window), 0);
-    
-    /* Verify invariant */
-    EXPECT_LE(xgl_window_get_usage(&window), 1);
-    
+
     xgl_window_destroy(&window);
 }
 

@@ -179,11 +179,11 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
                               uint32_t current_time_ms);
 
 /**
- * \brief           Get next sequence number for target
+ * \brief           Get next packet number for target
  * \param[in]       ctx: Transport layer context
- * \return          Next sequence number
+ * \return          Next packet number
  */
-uint8_t xgl_transport_get_next_seq(xgl_transport_ctx_t* ctx);
+uint32_t xgl_transport_get_next_packet_number(xgl_transport_ctx_t* ctx);
 
 /**
  * \brief           Check if transport layer can send (window not full)

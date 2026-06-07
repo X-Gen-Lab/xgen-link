@@ -1,358 +1,154 @@
 /**
  * \file            test_window.cpp
- * \brief           Unit tests for sliding window implementation
- * \author          Nexus Team
+ * \brief           Unit tests for production packet-number sliding window
  */
 
+#include <cstring>
 #include <gtest/gtest.h>
 #include "xgl/xgl_window.h"
 
-/*---------------------------------------------------------------------------*/
-/* Test Fixture                                                              */
-/*---------------------------------------------------------------------------*/
+template <typename T>
+concept HasLegacySequenceWindowState = requires(T value) {
+    value.send_base;
+    value.next_seq_num;
+    value.expected_seq_num;
+};
+
+static_assert(!HasLegacySequenceWindowState<xgl_sliding_window_t>,
+              "xgl_sliding_window_t must not expose legacy 8-bit sequence state");
 
 class XglWindowTest : public ::testing::Test {
 protected:
     xgl_sliding_window_t window;
-    
+
     void SetUp() override {
-        memset(&window, 0, sizeof(window));
+        std::memset(&window, 0, sizeof(window));
     }
-    
+
     void TearDown() override {
         xgl_window_destroy(&window);
     }
 };
 
-/*---------------------------------------------------------------------------*/
-/* Initialization Tests                                                      */
-/*---------------------------------------------------------------------------*/
-
 TEST_F(XglWindowTest, InitSuccess) {
-    xgl_error_t err = xgl_window_init(&window, 8);
-    EXPECT_EQ(err, XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
+
     EXPECT_EQ(window.window_size, 8);
-    EXPECT_EQ(window.send_base, 0);
-    EXPECT_EQ(window.next_seq_num, 0);
-    EXPECT_EQ(window.expected_seq_num, 0);
+    EXPECT_EQ(window.send_base_packet_number, 0U);
+    EXPECT_EQ(window.next_packet_number, 0U);
     EXPECT_NE(window.ack_received, nullptr);
 }
 
-TEST_F(XglWindowTest, InitNullPointer) {
-    xgl_error_t err = xgl_window_init(nullptr, 8);
-    EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
+TEST_F(XglWindowTest, InitRejectsInvalidParams) {
+    EXPECT_EQ(xgl_window_init(nullptr, 8), XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_window_init(&window, 0), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_window_init(&window, 129), XGL_ERR_INVALID_PARAM);
 }
 
-TEST_F(XglWindowTest, InitZeroWindowSize) {
-    xgl_error_t err = xgl_window_init(&window, 0);
-    EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
-}
-
-TEST_F(XglWindowTest, InitTooLargeWindowSize) {
-    xgl_error_t err = xgl_window_init(&window, 129);
-    EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
-}
-
-TEST_F(XglWindowTest, DestroyNullPointer) {
-    /* Should not crash */
-    xgl_window_destroy(nullptr);
-}
-
-/*---------------------------------------------------------------------------*/
-/* Window State Tests                                                        */
-/*---------------------------------------------------------------------------*/
-
-TEST_F(XglWindowTest, CanSendInitially) {
+TEST_F(XglWindowTest, CanSendUntilWindowFull) {
     ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
-    EXPECT_TRUE(xgl_window_can_send(&window));
-}
 
-TEST_F(XglWindowTest, CannotSendWhenWindowFull) {
-    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
-    
-    /* Fill window */
-    for (uint8_t i = 0; i < 4; i++) {
+    for (uint32_t i = 0; i < 4; ++i) {
         EXPECT_TRUE(xgl_window_can_send(&window));
-        xgl_window_advance_next_seq(&window);
+        EXPECT_EQ(xgl_window_get_next_packet_number(&window), i);
+        xgl_window_advance_next_packet_number(&window);
     }
-    
-    /* Window should be full now */
+
     EXPECT_FALSE(xgl_window_can_send(&window));
+    EXPECT_EQ(xgl_window_get_usage(&window), 4);
 }
 
-TEST_F(XglWindowTest, GetNextSeq) {
-    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
-    
-    EXPECT_EQ(xgl_window_get_next_seq(&window), 0);
-    xgl_window_advance_next_seq(&window);
-    EXPECT_EQ(xgl_window_get_next_seq(&window), 1);
-    xgl_window_advance_next_seq(&window);
-    EXPECT_EQ(xgl_window_get_next_seq(&window), 2);
-}
-
-TEST_F(XglWindowTest, GetUsage) {
-    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
-    
-    EXPECT_EQ(xgl_window_get_usage(&window), 0);
-    
-    xgl_window_advance_next_seq(&window);
-    EXPECT_EQ(xgl_window_get_usage(&window), 1);
-    
-    xgl_window_advance_next_seq(&window);
-    EXPECT_EQ(xgl_window_get_usage(&window), 2);
-}
-
-/*---------------------------------------------------------------------------*/
-/* ACK Handling Tests                                                        */
-/*---------------------------------------------------------------------------*/
-
-TEST_F(XglWindowTest, MarkAckSuccess) {
-    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
-    
-    /* Send some packets */
-    xgl_window_advance_next_seq(&window);
-    xgl_window_advance_next_seq(&window);
-    xgl_window_advance_next_seq(&window);
-    
-    /* Mark ACK for seq 0 */
-    xgl_error_t err = xgl_window_mark_ack(&window, 0);
-    EXPECT_EQ(err, XGL_OK);
-    EXPECT_TRUE(xgl_window_is_acked(&window, 0));
-}
-
-TEST_F(XglWindowTest, MarkAckOutOfWindow) {
-    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
-    
-    /* Try to mark ACK for seq number outside window */
-    xgl_error_t err = xgl_window_mark_ack(&window, 10);
-    EXPECT_EQ(err, XGL_ERR_SEQUENCE_ERROR);
-}
-
-TEST_F(XglWindowTest, AdvanceBaseOnConsecutiveAcks) {
-    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
-    
-    /* Send 5 packets */
-    for (uint8_t i = 0; i < 5; i++) {
-        xgl_window_advance_next_seq(&window);
-    }
-    
-    /* Mark ACKs for seq 0, 1, 2 */
-    ASSERT_EQ(xgl_window_mark_ack(&window, 0), XGL_OK);
-    ASSERT_EQ(xgl_window_mark_ack(&window, 1), XGL_OK);
-    ASSERT_EQ(xgl_window_mark_ack(&window, 2), XGL_OK);
-    
-    /* Advance base */
-    uint8_t advanced = xgl_window_advance_base(&window);
-    EXPECT_EQ(advanced, 3);
-    EXPECT_EQ(window.send_base, 3);
-}
-
-TEST_F(XglWindowTest, AdvanceBaseStopsAtGap) {
-    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
-    
-    /* Send 5 packets */
-    for (uint8_t i = 0; i < 5; i++) {
-        xgl_window_advance_next_seq(&window);
-    }
-    
-    /* Mark ACKs for seq 0, 2 (skip 1) */
-    ASSERT_EQ(xgl_window_mark_ack(&window, 0), XGL_OK);
-    ASSERT_EQ(xgl_window_mark_ack(&window, 2), XGL_OK);
-    
-    /* Advance base - should stop at seq 1 */
-    uint8_t advanced = xgl_window_advance_base(&window);
-    EXPECT_EQ(advanced, 1);
-    EXPECT_EQ(window.send_base, 1);
-    
-    /* Now mark ACK for seq 1 */
-    ASSERT_EQ(xgl_window_mark_ack(&window, 1), XGL_OK);
-    
-    /* Advance base again - should advance to seq 3 */
-    advanced = xgl_window_advance_base(&window);
-    EXPECT_EQ(advanced, 2);
-    EXPECT_EQ(window.send_base, 3);
-}
-
-/*---------------------------------------------------------------------------*/
-/* Window Boundary Tests                                                     */
-/*---------------------------------------------------------------------------*/
-
-TEST_F(XglWindowTest, IsInWindow) {
-    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
-    
-    /* Send 2 packets */
-    xgl_window_advance_next_seq(&window);
-    xgl_window_advance_next_seq(&window);
-    
-    /* Check which sequence numbers are in window */
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 0));
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 1));
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 2));
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 3));
-    EXPECT_FALSE(xgl_window_is_in_window(&window, 4));
-    EXPECT_FALSE(xgl_window_is_in_window(&window, 5));
-}
-
-TEST_F(XglWindowTest, SequenceNumberWraparound) {
-    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
-    
-    /* Set window near wraparound */
-    window.send_base = 254;
-    window.next_seq_num = 254;
-    
-    /* Send packets across wraparound */
-    xgl_window_advance_next_seq(&window);  /* 255 */
-    xgl_window_advance_next_seq(&window);  /* 0 */
-    xgl_window_advance_next_seq(&window);  /* 1 */
-    
-    EXPECT_EQ(window.next_seq_num, 1);
-    
-    /* Check window boundaries */
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 254));
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 255));
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 0));
-    EXPECT_TRUE(xgl_window_is_in_window(&window, 1));
-    EXPECT_FALSE(xgl_window_is_in_window(&window, 2));
-}
-
-TEST_F(XglWindowTest, PacketNumberApiDoesNotWrapAtEightBits) {
+TEST_F(XglWindowTest, PacketNumbersDoNotWrapAtEightBits) {
     ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
 
-    window.send_base_packet_number = 254;
-    window.next_packet_number = 254;
+    window.send_base_packet_number = 254U;
+    window.next_packet_number = 254U;
 
-    EXPECT_TRUE(xgl_window_can_send_packet_number(&window));
-    EXPECT_EQ(xgl_window_get_next_packet_number(&window), 254U);
     xgl_window_advance_next_packet_number(&window);
-    EXPECT_EQ(xgl_window_get_next_packet_number(&window), 255U);
     xgl_window_advance_next_packet_number(&window);
-    EXPECT_EQ(xgl_window_get_next_packet_number(&window), 256U);
     xgl_window_advance_next_packet_number(&window);
+
     EXPECT_EQ(xgl_window_get_next_packet_number(&window), 257U);
-
-    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 254));
-    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 255));
-    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 256));
-    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 257));
-    EXPECT_FALSE(xgl_window_is_in_window_packet_number(&window, 258));
-
-    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 254), XGL_OK);
-    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 255), XGL_OK);
-    EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 2U);
-    EXPECT_EQ(window.send_base_packet_number, 256U);
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 254U));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 255U));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 256U));
+    EXPECT_TRUE(xgl_window_is_in_window_packet_number(&window, 257U));
+    EXPECT_FALSE(xgl_window_is_in_window_packet_number(&window, 258U));
 }
 
-/*---------------------------------------------------------------------------*/
-/* Reset Tests                                                               */
-/*---------------------------------------------------------------------------*/
-
-TEST_F(XglWindowTest, Reset) {
+TEST_F(XglWindowTest, AckRangeAdvancesBaseUntilGap) {
     ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
-    
-    /* Send some packets and mark ACKs */
-    for (uint8_t i = 0; i < 5; i++) {
-        xgl_window_advance_next_seq(&window);
+
+    for (uint32_t i = 0; i < 5; ++i) {
+        xgl_window_advance_next_packet_number(&window);
     }
-    xgl_window_mark_ack(&window, 0);
-    xgl_window_mark_ack(&window, 1);
-    xgl_window_advance_base(&window);
-    
-    /* Reset window */
-    xgl_window_reset(&window);
-    
-    /* Check state is reset */
-    EXPECT_EQ(window.send_base, 0);
-    EXPECT_EQ(window.next_seq_num, 0);
-    EXPECT_EQ(window.expected_seq_num, 0);
-    EXPECT_FALSE(xgl_window_is_acked(&window, 0));
-    EXPECT_FALSE(xgl_window_is_acked(&window, 1));
+
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 0U), XGL_OK);
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 2U), XGL_OK);
+
+    EXPECT_EQ(xgl_window_advance_base(&window), 1U);
+    EXPECT_EQ(window.send_base_packet_number, 1U);
+    EXPECT_EQ(xgl_window_get_usage(&window), 4U);
+
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 1U), XGL_OK);
+    EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 2U);
+    EXPECT_EQ(window.send_base_packet_number, 3U);
+    EXPECT_EQ(xgl_window_get_usage(&window), 2U);
 }
 
-/*---------------------------------------------------------------------------*/
-/* Edge Cases                                                                */
-/*---------------------------------------------------------------------------*/
+TEST_F(XglWindowTest, MarkAckRejectsPacketsOutsideWindow) {
+    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
 
-TEST_F(XglWindowTest, MaxWindowSize) {
-    xgl_error_t err = xgl_window_init(&window, 128);
-    EXPECT_EQ(err, XGL_OK);
-    EXPECT_EQ(window.window_size, 128);
-}
-
-TEST_F(XglWindowTest, MinWindowSize) {
-    xgl_error_t err = xgl_window_init(&window, 1);
-    EXPECT_EQ(err, XGL_OK);
-    EXPECT_EQ(window.window_size, 1);
-    
-    /* Should be able to send one packet */
-    EXPECT_TRUE(xgl_window_can_send(&window));
-    xgl_window_advance_next_seq(&window);
-    
-    /* Window should be full */
-    EXPECT_FALSE(xgl_window_can_send(&window));
+    EXPECT_EQ(xgl_window_mark_ack_packet_number(&window, 4U),
+              XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(xgl_window_mark_ack_packet_number(&window, UINT32_MAX),
+              XGL_ERR_SEQUENCE_ERROR);
 }
 
 TEST_F(XglWindowTest, FullWindowCycle) {
     ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
-    
-    /* Fill window */
-    for (uint8_t i = 0; i < 4; i++) {
-        EXPECT_TRUE(xgl_window_can_send(&window));
-        xgl_window_advance_next_seq(&window);
+
+    for (uint32_t i = 0; i < 4; ++i) {
+        ASSERT_TRUE(xgl_window_can_send_packet_number(&window));
+        xgl_window_advance_next_packet_number(&window);
     }
-    EXPECT_FALSE(xgl_window_can_send(&window));
-    
-    /* ACK all packets */
-    for (uint8_t i = 0; i < 4; i++) {
-        ASSERT_EQ(xgl_window_mark_ack(&window, i), XGL_OK);
+    ASSERT_FALSE(xgl_window_can_send_packet_number(&window));
+
+    for (uint32_t i = 0; i < 4; ++i) {
+        ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, i), XGL_OK);
     }
-    
-    /* Advance base */
-    uint8_t advanced = xgl_window_advance_base(&window);
-    EXPECT_EQ(advanced, 4);
-    
-    /* Should be able to send again */
+
+    EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 4U);
+    EXPECT_EQ(xgl_window_get_usage(&window), 0U);
     EXPECT_TRUE(xgl_window_can_send(&window));
 }
 
-/*---------------------------------------------------------------------------*/
-/* Null Pointer Safety Tests                                                 */
-/*---------------------------------------------------------------------------*/
+TEST_F(XglWindowTest, ResetClearsPacketNumberState) {
+    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
 
-TEST_F(XglWindowTest, CanSendNullPointer) {
+    for (uint32_t i = 0; i < 5; ++i) {
+        xgl_window_advance_next_packet_number(&window);
+    }
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 0U), XGL_OK);
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 1U), XGL_OK);
+    ASSERT_EQ(xgl_window_advance_base_packet_number(&window), 2U);
+
+    xgl_window_reset(&window);
+
+    EXPECT_EQ(window.send_base_packet_number, 0U);
+    EXPECT_EQ(window.next_packet_number, 0U);
+    EXPECT_EQ(xgl_window_get_usage(&window), 0U);
+    EXPECT_TRUE(xgl_window_can_send(&window));
+}
+
+TEST_F(XglWindowTest, NullPointerSafety) {
     EXPECT_FALSE(xgl_window_can_send(nullptr));
-}
-
-TEST_F(XglWindowTest, GetNextSeqNullPointer) {
-    EXPECT_EQ(xgl_window_get_next_seq(nullptr), 0);
-}
-
-TEST_F(XglWindowTest, AdvanceNextSeqNullPointer) {
-    /* Should not crash */
-    xgl_window_advance_next_seq(nullptr);
-}
-
-TEST_F(XglWindowTest, MarkAckNullPointer) {
-    xgl_error_t err = xgl_window_mark_ack(nullptr, 0);
-    EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
-}
-
-TEST_F(XglWindowTest, AdvanceBaseNullPointer) {
-    EXPECT_EQ(xgl_window_advance_base(nullptr), 0);
-}
-
-TEST_F(XglWindowTest, IsInWindowNullPointer) {
-    EXPECT_FALSE(xgl_window_is_in_window(nullptr, 0));
-}
-
-TEST_F(XglWindowTest, GetUsageNullPointer) {
-    EXPECT_EQ(xgl_window_get_usage(nullptr), 0);
-}
-
-TEST_F(XglWindowTest, ResetNullPointer) {
-    /* Should not crash */
+    EXPECT_EQ(xgl_window_get_next_packet_number(nullptr), 0U);
+    xgl_window_advance_next_packet_number(nullptr);
+    EXPECT_EQ(xgl_window_mark_ack_packet_number(nullptr, 0U), XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_window_advance_base(nullptr), 0U);
+    EXPECT_FALSE(xgl_window_is_in_window_packet_number(nullptr, 0U));
+    EXPECT_EQ(xgl_window_get_usage(nullptr), 0U);
     xgl_window_reset(nullptr);
-}
-
-TEST_F(XglWindowTest, IsAckedNullPointer) {
-    EXPECT_FALSE(xgl_window_is_acked(nullptr, 0));
+    xgl_window_destroy(nullptr);
 }

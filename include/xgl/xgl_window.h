@@ -26,11 +26,8 @@ extern "C" {
  */
 typedef struct {
     uint8_t window_size;            /**< Maximum window size */
-    uint8_t send_base;              /**< Base of sending window */
-    uint8_t next_seq_num;           /**< Next sequence number to send */
-    uint8_t expected_seq_num;       /**< Expected sequence number for receive */
-    uint32_t send_base_packet_number; /**< Base production packet number */
-    uint32_t next_packet_number;    /**< Next production packet number */
+    uint32_t send_base_packet_number; /**< Base packet number of sending window */
+    uint32_t next_packet_number;    /**< Next packet number to send */
     bool* ack_received;             /**< ACK bitmap (dynamically allocated) */
 } xgl_sliding_window_t;
 
@@ -60,40 +57,11 @@ void xgl_window_destroy(xgl_sliding_window_t* window);
 bool xgl_window_can_send(const xgl_sliding_window_t* window);
 
 /**
- * \brief           Get next sequence number to send
- * \param[in]       window: Sliding window structure
- * \return          Next sequence number
- */
-uint8_t xgl_window_get_next_seq(const xgl_sliding_window_t* window);
-
-/**
- * \brief           Advance next sequence number after sending
- * \param[in,out]   window: Sliding window structure
- */
-void xgl_window_advance_next_seq(xgl_sliding_window_t* window);
-
-/**
- * \brief           Mark ACK as received for a sequence number
- * \param[in,out]   window: Sliding window structure
- * \param[in]       seq_num: Sequence number that was acknowledged
- * \return          XGL_OK on success, error code otherwise
- */
-xgl_error_t xgl_window_mark_ack(xgl_sliding_window_t* window, uint8_t seq_num);
-
-/**
  * \brief           Advance window base on ACK reception
  * \param[in,out]   window: Sliding window structure
  * \return          Number of positions advanced
  */
 uint8_t xgl_window_advance_base(xgl_sliding_window_t* window);
-
-/**
- * \brief           Check if sequence number is within window
- * \param[in]       window: Sliding window structure
- * \param[in]       seq_num: Sequence number to check
- * \return          true if within window, false otherwise
- */
-bool xgl_window_is_in_window(const xgl_sliding_window_t* window, uint8_t seq_num);
 
 /**
  * \brief           Get current window usage
@@ -107,14 +75,6 @@ uint8_t xgl_window_get_usage(const xgl_sliding_window_t* window);
  * \param[in,out]   window: Sliding window structure
  */
 void xgl_window_reset(xgl_sliding_window_t* window);
-
-/**
- * \brief           Check if ACK was received for a sequence number
- * \param[in]       window: Sliding window structure
- * \param[in]       seq_num: Sequence number to check
- * \return          true if ACK received, false otherwise
- */
-bool xgl_window_is_acked(const xgl_sliding_window_t* window, uint8_t seq_num);
 
 bool xgl_window_can_send_packet_number(const xgl_sliding_window_t* window);
 

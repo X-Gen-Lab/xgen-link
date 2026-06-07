@@ -157,23 +157,12 @@ static uint32_t transport_allocate_packet_number(xgl_transport_ctx_t* ctx,
     xgl_window_advance_next_packet_number(&peer->tx_window);
     transport_advance_packet_window_if_possible(ctx);
 
-    peer->tx_window.next_seq_num =
-        (uint8_t)(xgl_window_get_next_packet_number(&peer->tx_window) & 0xFFU);
-    if (ctx != NULL) {
-        ctx->window.next_seq_num =
-            (uint8_t)(xgl_window_get_next_packet_number(&ctx->window) & 0xFFU);
-    }
-
     return packet_number;
 }
 
 static uint32_t transport_receive_packet_number(const xgl_packet_t* packet) {
     if (packet == NULL) {
         return 0U;
-    }
-
-    if (packet->packet_number == 0U && packet->seq_num != 0U) {
-        return packet->seq_num;
     }
 
     return packet->packet_number;
@@ -1536,8 +1525,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
 
         uint32_t packet_number = transport_receive_packet_number(packet);
         if (!rx_peer->rx_has_packet_number_state) {
-            rx_peer->rx_next_packet_number =
-                (packet->packet_number != 0U) ? packet_number : 0U;
+            rx_peer->rx_next_packet_number = 0U;
             rx_peer->rx_has_packet_number_state = true;
         }
 
@@ -1625,13 +1613,13 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Get next sequence number for target
+ * \brief           Get next packet number for target
  */
-uint8_t xgl_transport_get_next_seq(xgl_transport_ctx_t* ctx) {
+uint32_t xgl_transport_get_next_packet_number(xgl_transport_ctx_t* ctx) {
     if (!ctx) {
         return 0;
     }
-    return xgl_window_get_next_seq(&ctx->window);
+    return xgl_window_get_next_packet_number(&ctx->window);
 }
 
 /**

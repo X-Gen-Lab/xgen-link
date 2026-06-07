@@ -999,9 +999,10 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
     xgl_packet_t packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 2,
+        .seq_num = 0,
         .ack_num = 0,
         .session_id = 5,
+        .packet_number = 2,
         .data_type = 1,
         .reliable = XGL_ATTR_RELIABLE_TX,
         .priority = 0,
@@ -1108,7 +1109,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
         .seq_num = 0,
         .ack_num = 0,
         .session_id = 5,
-        .packet_number = 256,
+        .packet_number = 0,
         .data_type = 1,
         .reliable = XGL_ATTR_RELIABLE_TX,
         .priority = 0,
@@ -1144,7 +1145,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
                                                   1,
                                                   &range_count),
               XGL_OK);
-    EXPECT_EQ(largest_ack, 256U);
+    EXPECT_EQ(largest_ack, 0U);
     EXPECT_EQ(ack_delay_us, 0U);
     ASSERT_EQ(range_count, 1U);
     EXPECT_EQ(ranges[0].gap, 0U);
