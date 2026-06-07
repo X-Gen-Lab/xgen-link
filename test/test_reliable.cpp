@@ -218,6 +218,53 @@ TEST_F(XglReliableTest, FindNonExistentPacket) {
     EXPECT_EQ(packet, nullptr);
 }
 
+TEST_F(XglReliableTest, FindAndRemovePacketBy32BitPacketNumber) {
+    uint8_t data[] = {0x01, 0x02, 0x03};
+    const uint32_t first_packet_number = 0x01020304U;
+    const uint32_t second_packet_number = 0x02020304U;
+
+    ASSERT_EQ(xgl_reliable_add_packet_number(&queue,
+                                             data,
+                                             sizeof(data),
+                                             0x1234,
+                                             0x2345,
+                                             first_packet_number,
+                                             5,
+                                             3,
+                                             1000,
+                                             &phy_ops),
+              XGL_OK);
+    ASSERT_EQ(xgl_reliable_add_packet_number(&queue,
+                                             data,
+                                             sizeof(data),
+                                             0x1234,
+                                             0x2345,
+                                             second_packet_number,
+                                             5,
+                                             3,
+                                             1000,
+                                             &phy_ops),
+              XGL_OK);
+
+    xgl_reliable_packet_t* first =
+        xgl_reliable_find_packet_number(&queue, first_packet_number, 0x2345);
+    xgl_reliable_packet_t* second =
+        xgl_reliable_find_packet_number(&queue, second_packet_number, 0x2345);
+
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(first->packet_number, first_packet_number);
+    EXPECT_EQ(second->packet_number, second_packet_number);
+
+    EXPECT_EQ(xgl_reliable_remove_packet_number(&queue, first_packet_number, 0x2345),
+              XGL_OK);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, first_packet_number, 0x2345),
+              nullptr);
+    EXPECT_NE(xgl_reliable_find_packet_number(&queue, second_packet_number, 0x2345),
+              nullptr);
+    EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Timeout Processing Tests                                                  */
 /*---------------------------------------------------------------------------*/
