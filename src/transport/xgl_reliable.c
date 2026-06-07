@@ -105,6 +105,28 @@ xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
                                     uint8_t priority,
                                     int32_t timeout_ms,
                                     xgl_phy_ops_t* phy) {
+    return xgl_reliable_add_packet_number(queue,
+                                          data,
+                                          data_len,
+                                          source_id,
+                                          target_id,
+                                          seq_num,
+                                          data_type,
+                                          priority,
+                                          timeout_ms,
+                                          phy);
+}
+
+xgl_error_t xgl_reliable_add_packet_number(xgl_reliable_queue_t* queue,
+                                           const uint8_t* data,
+                                           size_t data_len,
+                                           uint16_t source_id,
+                                           uint16_t target_id,
+                                           uint32_t packet_number,
+                                           uint8_t data_type,
+                                           uint8_t priority,
+                                           int32_t timeout_ms,
+                                           xgl_phy_ops_t* phy) {
     if (queue == NULL || data == NULL || data_len == 0) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -133,7 +155,8 @@ xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
     /* Set addressing */
     packet->source_id = source_id;
     packet->target_id = target_id;
-    packet->seq_num = seq_num;
+    packet->packet_number = packet_number;
+    packet->seq_num = (uint8_t)(packet_number & 0xFFU);
     packet->data_type = data_type;
     
     /* Set attributes */
@@ -163,6 +186,12 @@ xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
 xgl_error_t xgl_reliable_remove_packet(xgl_reliable_queue_t* queue,
                                        uint8_t seq_num,
                                        uint16_t target_id) {
+    return xgl_reliable_remove_packet_number(queue, seq_num, target_id);
+}
+
+xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
+                                              uint32_t packet_number,
+                                              uint16_t target_id) {
     if (queue == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -172,7 +201,7 @@ xgl_error_t xgl_reliable_remove_packet(xgl_reliable_queue_t* queue,
     XGL_LIST_FOR_EACH(&queue->wait_ack_list, node) {
         xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         
-        if (packet->seq_num == seq_num && packet->target_id == target_id) {
+        if (packet->packet_number == packet_number && packet->target_id == target_id) {
             /* Remove from list */
             xgl_list_remove(&queue->wait_ack_list, node);
             
@@ -302,6 +331,12 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
 xgl_reliable_packet_t* xgl_reliable_find_packet(const xgl_reliable_queue_t* queue,
                                                 uint8_t seq_num,
                                                 uint16_t target_id) {
+    return xgl_reliable_find_packet_number(queue, seq_num, target_id);
+}
+
+xgl_reliable_packet_t* xgl_reliable_find_packet_number(const xgl_reliable_queue_t* queue,
+                                                       uint32_t packet_number,
+                                                       uint16_t target_id) {
     if (queue == NULL) {
         return NULL;
     }
@@ -311,7 +346,7 @@ xgl_reliable_packet_t* xgl_reliable_find_packet(const xgl_reliable_queue_t* queu
     XGL_LIST_FOR_EACH(&queue->wait_ack_list, node) {
         xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         
-        if (packet->seq_num == seq_num && packet->target_id == target_id) {
+        if (packet->packet_number == packet_number && packet->target_id == target_id) {
             return packet;
         }
     }

@@ -35,6 +35,7 @@ typedef struct {
     /* Addressing */
     uint16_t source_id;             /**< Source node ID */
     uint16_t target_id;             /**< Target node ID */
+    uint32_t packet_number;         /**< 32-bit production packet number */
     uint8_t seq_num;                /**< Sequence number */
     uint16_t session_id;            /**< Transport session/epoch ID */
     uint8_t data_type;              /**< Data type */
@@ -113,6 +114,17 @@ xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
                                     int32_t timeout_ms,
                                     xgl_phy_ops_t* phy);
 
+xgl_error_t xgl_reliable_add_packet_number(xgl_reliable_queue_t* queue,
+                                           const uint8_t* data,
+                                           size_t data_len,
+                                           uint16_t source_id,
+                                           uint16_t target_id,
+                                           uint32_t packet_number,
+                                           uint8_t data_type,
+                                           uint8_t priority,
+                                           int32_t timeout_ms,
+                                           xgl_phy_ops_t* phy);
+
 /**
  * \brief           Remove packet from wait-ACK queue by sequence number
  * \param[in,out]   queue: Reliable queue structure
@@ -123,6 +135,10 @@ xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
 xgl_error_t xgl_reliable_remove_packet(xgl_reliable_queue_t* queue,
                                        uint8_t seq_num,
                                        uint16_t target_id);
+
+xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
+                                              uint32_t packet_number,
+                                              uint16_t target_id);
 
 /**
  * \brief           Process timeouts and retransmit packets
@@ -165,6 +181,10 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue);
 xgl_reliable_packet_t* xgl_reliable_find_packet(const xgl_reliable_queue_t* queue,
                                                 uint8_t seq_num,
                                                 uint16_t target_id);
+
+xgl_reliable_packet_t* xgl_reliable_find_packet_number(const xgl_reliable_queue_t* queue,
+                                                       uint32_t packet_number,
+                                                       uint16_t target_id);
 
 /**
  * \brief           Calculate exponential backoff timeout
