@@ -8,6 +8,7 @@
 #include <cstring>
 #include "xgl/xgl.h"
 #include "xgl/xgl_types.h"
+#include "xgl/xgl_wire.h"
 
 /*---------------------------------------------------------------------------*/
 /* Type Size Tests                                                           */
@@ -17,9 +18,8 @@
  * \brief           Test frame header size
  */
 TEST(XglTypesTest, FrameHeaderSize) {
-    /* Frame header should be exactly 12 bytes */
-    EXPECT_EQ(sizeof(xgl_frame_header_t), 12);
-    EXPECT_EQ(XGL_FRAME_HEADER_SIZE, 12);
+    EXPECT_EQ(XGL_FRAME_HEADER_SIZE, XGL_WIRE_BASE_HEADER_SIZE);
+    EXPECT_EQ(XGL_FRAME_HEADER_SIZE, 24);
 }
 
 /**
@@ -43,7 +43,7 @@ TEST(XglTypesTest, ConfigStructure) {
     
     /* Set basic fields */
     config.name = "test";
-    config.source_id = 1;
+    config.source_id = 0x1234;
     config.memory.tx_pool_size = 1024;
     config.memory.rx_buffer_size = 256;
     config.protocol.ack_timeout_ms = 1000;
@@ -53,7 +53,7 @@ TEST(XglTypesTest, ConfigStructure) {
     
     /* Verify fields */
     EXPECT_STREQ(config.name, "test");
-    EXPECT_EQ(config.source_id, 1);
+    EXPECT_EQ(config.source_id, 0x1234);
     EXPECT_EQ(config.memory.tx_pool_size, 1024);
     EXPECT_EQ(config.memory.rx_buffer_size, 256);
     EXPECT_EQ(config.protocol.ack_timeout_ms, 1000);
@@ -139,7 +139,7 @@ TEST(XglTypesTest, TxDataStructure) {
     uint8_t data[] = {1, 2, 3, 4, 5};
     
     xgl_tx_data_t tx_data;
-    tx_data.target_id = 2;
+    tx_data.target_id = 0x1234;
     tx_data.data_type = 1;
     tx_data.data = data;
     tx_data.data_len = sizeof(data);
@@ -147,7 +147,7 @@ TEST(XglTypesTest, TxDataStructure) {
     tx_data.priority = 3;
     
     /* Verify fields */
-    EXPECT_EQ(tx_data.target_id, 2);
+    EXPECT_EQ(tx_data.target_id, 0x1234);
     EXPECT_EQ(tx_data.data_type, 1);
     EXPECT_EQ(tx_data.data, data);
     EXPECT_EQ(tx_data.data_len, 5);
@@ -166,7 +166,7 @@ TEST(XglTypesTest, TxDataZeroCopyStructure) {
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = XGL_FRAME_HEADER_SIZE;
     tx_data.data_len = 100;
-    tx_data.target_id = 3;
+    tx_data.target_id = 0x2345;
     tx_data.data_type = 2;
     tx_data.reliable = false;
     tx_data.priority = 5;
@@ -174,9 +174,9 @@ TEST(XglTypesTest, TxDataZeroCopyStructure) {
     /* Verify fields */
     EXPECT_EQ(tx_data.buffer, buffer);
     EXPECT_EQ(tx_data.buffer_size, 256);
-    EXPECT_EQ(tx_data.data_offset, 12);
+    EXPECT_EQ(tx_data.data_offset, XGL_WIRE_BASE_HEADER_SIZE);
     EXPECT_EQ(tx_data.data_len, 100);
-    EXPECT_EQ(tx_data.target_id, 3);
+    EXPECT_EQ(tx_data.target_id, 0x2345);
     EXPECT_EQ(tx_data.data_type, 2);
     EXPECT_FALSE(tx_data.reliable);
     EXPECT_EQ(tx_data.priority, 5);
@@ -244,14 +244,14 @@ TEST(XglTypesTest, RouteTableEntry) {
     xgl_phy_ops_t phy_ops;
     
     xgl_route_item_t route;
-    route.target_id = 5;
+    route.target_id = 0x3456;
     route.phy = &phy_ops;
     route.max_frame_size = 512;
     route.read_freq_hz = 1000;
     route.metric = 10;
     
     /* Verify fields */
-    EXPECT_EQ(route.target_id, 5);
+    EXPECT_EQ(route.target_id, 0x3456);
     EXPECT_EQ(route.phy, &phy_ops);
     EXPECT_EQ(route.max_frame_size, 512);
     EXPECT_EQ(route.read_freq_hz, 1000);
@@ -279,6 +279,30 @@ TEST(XglTypesTest, PacketDataStructure) {
     EXPECT_EQ(packet_data.data, data);
 }
 
+TEST(XglTypesTest, PacketUsesProductionAddressAndPacketNumberFields) {
+    xgl_packet_t packet = {};
+
+    packet.source_id = 0x4567;
+    packet.target_id = 0x5678;
+    packet.connection_id = 0x01020304;
+    packet.packet_number = 0xA0B0C0D0;
+    packet.session_epoch = 0x11223344;
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
+    packet.flags = XGL_WIRE_FLAG_ACK_ELICITING;
+    packet.ttl = 8;
+    packet.traffic_class = 3;
+
+    EXPECT_EQ(packet.source_id, 0x4567);
+    EXPECT_EQ(packet.target_id, 0x5678);
+    EXPECT_EQ(packet.connection_id, 0x01020304U);
+    EXPECT_EQ(packet.packet_number, 0xA0B0C0D0U);
+    EXPECT_EQ(packet.session_epoch, 0x11223344U);
+    EXPECT_EQ(packet.packet_type, XGL_PACKET_TYPE_DATA);
+    EXPECT_EQ(packet.flags, XGL_WIRE_FLAG_ACK_ELICITING);
+    EXPECT_EQ(packet.ttl, 8U);
+    EXPECT_EQ(packet.traffic_class, 3U);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Constants Tests                                                           */
 /*---------------------------------------------------------------------------*/
@@ -289,5 +313,5 @@ TEST(XglTypesTest, PacketDataStructure) {
 TEST(XglTypesTest, ProtocolConstants) {
     EXPECT_EQ(XGL_SOF, 0x55);
     EXPECT_EQ(XGL_CRC16_SIZE, 2);
-    EXPECT_EQ(XGL_FRAME_HEADER_SIZE, 12);
+    EXPECT_EQ(XGL_FRAME_HEADER_SIZE, XGL_WIRE_BASE_HEADER_SIZE);
 }
