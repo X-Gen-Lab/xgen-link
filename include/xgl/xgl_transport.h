@@ -18,7 +18,6 @@ extern "C" {
 #include "xgl_rtt.h"
 #include "xgl_window.h"
 #include "xgl_reliable.h"
-#include "xgl_ack.h"
 #include "xgl_fragment.h"
 #include "xgl_layer_interface.h"
 #include "xgl_packet_pool.h"
@@ -82,7 +81,6 @@ typedef struct xgl_transport_ctx_s {
     xgl_rtt_estimator_t rtt_est;    /**< RTT estimator */
     xgl_sliding_window_t window;    /**< Sliding window */
     xgl_reliable_queue_t reliable_queue; /**< Reliable transmission queue */
-    xgl_ack_handler_t ack_handler;  /**< ACK handler */
     xgl_fragment_manager_t* fragment_mgr; /**< Fragmentation manager (optional) */
     xgl_transport_peer_state_t* peers; /**< Peer-specific reliable transport state */
     

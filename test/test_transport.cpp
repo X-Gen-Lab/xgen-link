@@ -147,10 +147,34 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
     EXPECT_EQ(xgl_reliable_get_count(&find_peer(&ctx, 2)->reliable_queue), 1);
     EXPECT_FALSE(xgl_transport_can_send(&ctx));
 
+    uint8_t ack_value[16] = {};
+    size_t ack_value_len = 0;
+    const xgl_wire_ack_range_t ranges[] = {
+        {.gap = 0, .length = 1}
+    };
+    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(ack_value,
+                                                  sizeof(ack_value),
+                                                  0,
+                                                  0,
+                                                  ranges,
+                                                  1,
+                                                  &ack_value_len),
+              XGL_OK);
+
+    uint8_t ack_ext[32] = {};
+    size_t ack_ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(ack_ext,
+                                  sizeof(ack_ext),
+                                  XGL_WIRE_EXT_ACK_RANGE,
+                                  ack_value,
+                                  ack_value_len,
+                                  &ack_ext_len),
+              XGL_OK);
+
     xgl_packet_data_t ack_data = {
         .ref_count = 1,
-        .data_len = 0,
-        .data = nullptr,
+        .data_len = ack_ext_len,
+        .data = ack_ext,
         .owned_data = nullptr
     };
     xgl_packet_t ack_packet = {
@@ -158,6 +182,9 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
         .target_id = 1,
         .seq_num = 0,
         .ack_num = 0,
+        .session_id = find_peer(&ctx, 2)->session_id,
+        .packet_type = XGL_PACKET_TYPE_ACK,
+        .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
         .data_type = 0,
         .reliable = XGL_ATTR_RELIABLE_ACK,
         .priority = 7,
@@ -735,44 +762,6 @@ TEST(XglTransportTest, ResetUpdatesSessionAndClearsPeerReliableState) {
     EXPECT_EQ(xgl_reliable_get_count(&find_peer(&ctx, 2)->reliable_queue), 0U);
     EXPECT_TRUE(xgl_window_can_send(&find_peer(&ctx, 2)->tx_window));
     EXPECT_TRUE(xgl_transport_can_send(&ctx));
-
-    xgl_transport_destroy(&ctx);
-}
-
-TEST(XglTransportTest, ResetDoesNotGloballyClearAckHandlerState) {
-    LowerLayerSpy spy;
-    xgl_layer_interface_t lower_layer = {};
-    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
-
-    xgl_layer_stats_t stats = {};
-    uint64_t tx_retries = 0;
-    xgl_transport_ctx_t ctx;
-    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
-
-    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
-    ctx.ack_handler.expected_seq_num = 42;
-
-    const uint8_t dummy = 0;
-    xgl_packet_data_t reset_data = {
-        .ref_count = 1,
-        .data_len = 0,
-        .data = &dummy,
-        .owned_data = nullptr
-    };
-    xgl_packet_t reset_packet = {
-        .source_id = 2,
-        .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
-        .session_id = 11,
-        .data_type = kTransportControlReset,
-        .reliable = XGL_ATTR_RELIABLE_NONE,
-        .priority = 7,
-        .data = &reset_data
-    };
-
-    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &reset_packet), XGL_OK);
-    EXPECT_EQ(ctx.ack_handler.expected_seq_num, 42U);
 
     xgl_transport_destroy(&ctx);
 }

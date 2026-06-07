@@ -1026,20 +1026,11 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
         return err;
     }
     
-    /* Initialize ACK handler */
-    err = xgl_ack_init(&ctx->ack_handler, config->allocator);
-    if (err != XGL_OK) {
-        xgl_reliable_destroy(&ctx->reliable_queue);
-        xgl_window_destroy(&ctx->window);
-        return err;
-    }
-    
     /* Initialize fragmentation manager if enabled */
     if (config->enable_fragmentation) {
         ctx->fragment_mgr = (xgl_fragment_manager_t*)transport_malloc(config->allocator, 
                                                                        sizeof(xgl_fragment_manager_t));
         if (!ctx->fragment_mgr) {
-            xgl_ack_destroy(&ctx->ack_handler);
             xgl_reliable_destroy(&ctx->reliable_queue);
             xgl_window_destroy(&ctx->window);
             return XGL_ERR_NO_MEMORY;
@@ -1049,7 +1040,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
         if (err != XGL_OK) {
             transport_free(config->allocator, ctx->fragment_mgr);
             ctx->fragment_mgr = NULL;
-            xgl_ack_destroy(&ctx->ack_handler);
             xgl_reliable_destroy(&ctx->reliable_queue);
             xgl_window_destroy(&ctx->window);
             return err;
@@ -1073,9 +1063,6 @@ void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
         transport_free(ctx->allocator, ctx->fragment_mgr);
         ctx->fragment_mgr = NULL;
     }
-    
-    /* Destroy ACK handler */
-    xgl_ack_destroy(&ctx->ack_handler);
     
     /* Destroy reliable transmission queue */
     xgl_reliable_destroy(&ctx->reliable_queue);
@@ -1453,7 +1440,6 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     
     /* Extract packet fields */
     uint16_t source_id = packet->source_id;
-    uint8_t ack_num = packet->ack_num;
     uint8_t data_type = packet->data_type;
     uint8_t reliable = packet->reliable;
 
@@ -1481,94 +1467,40 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             return XGL_ERR_SEQUENCE_ERROR;
         }
 
-        if ((packet->flags & XGL_WIRE_FLAG_HAS_EXTENSIONS) != 0U) {
-            bool handled_ack_range = false;
-            err = transport_try_process_ack_range_ext(ctx,
-                                                      peer,
-                                                      source_id,
-                                                      data,
-                                                      data_len,
-                                                      &handled_ack_range);
-            if (err != XGL_OK) {
-                return err;
-            }
-            if (handled_ack_range) {
-                return XGL_OK;
-            }
-
-            bool handled_sack = false;
-            err = transport_try_process_sack_ext(ctx,
-                                                 handle,
-                                                 peer,
-                                                 source_id,
-                                                 data,
-                                                 data_len,
-                                                 &handled_sack);
-            if (err != XGL_OK) {
-                return err;
-            }
-            if (handled_sack) {
-                return XGL_OK;
-            }
-
-            if (packet->packet_type == XGL_PACKET_TYPE_ACK ||
-                (packet->flags & XGL_WIRE_FLAG_HAS_EXTENSIONS) != 0U) {
-                return XGL_ERR_INVALID_FRAME;
-            }
+        if ((packet->flags & XGL_WIRE_FLAG_HAS_EXTENSIONS) == 0U) {
+            return XGL_ERR_INVALID_FRAME;
         }
 
-        /* Process ACK */
-        bool is_valid = false;
-        err = xgl_ack_process(&ctx->ack_handler, ack_num, source_id, &is_valid);
-        if (err != XGL_OK || !is_valid) {
+        bool handled_ack_range = false;
+        err = transport_try_process_ack_range_ext(ctx,
+                                                  peer,
+                                                  source_id,
+                                                  data,
+                                                  data_len,
+                                                  &handled_ack_range);
+        if (err != XGL_OK) {
             return err;
         }
-
-        xgl_reliable_packet_t* rel_packet =
-            xgl_reliable_find_packet_number(&peer->reliable_queue,
-                                            (uint32_t)ack_num,
-                                            source_id);
-        if (rel_packet == NULL) {
-            return XGL_ERR_SEQUENCE_ERROR;
+        if (handled_ack_range) {
+            return XGL_OK;
         }
 
-        uint32_t measured_rtt_ms = 0;
-        bool has_rtt_sample = false;
-        if (rel_packet->send_timestamp != 0U) {
-            measured_rtt_ms = xgl_time_ms() - rel_packet->send_timestamp;
-            has_rtt_sample = true;
-        }
-        uint32_t acked_packet_number = rel_packet->packet_number;
-        
-        /* Remove packet from reliable queue */
-        err = xgl_reliable_remove_packet_number(&peer->reliable_queue,
-                                                acked_packet_number,
-                                                source_id);
-        if (err == XGL_OK) {
-            /* Update RTT estimate */
-            if (has_rtt_sample) {
-                xgl_rtt_update(&peer->rtt_est, (int32_t)measured_rtt_ms);
-            }
-            
-            /* Advance peer-specific sliding window */
-            err = xgl_window_mark_ack_packet_number(&peer->tx_window,
-                                                    acked_packet_number);
-            if (err != XGL_OK) {
-                return err;
-            }
-            xgl_window_advance_base_packet_number(&peer->tx_window);
-
-            if (xgl_window_is_in_window_packet_number(&ctx->window,
-                                                      acked_packet_number)) {
-                (void)xgl_window_mark_ack_packet_number(&ctx->window,
-                                                        acked_packet_number);
-                (void)xgl_window_advance_base_packet_number(&ctx->window);
-            }
-        } else {
+        bool handled_sack = false;
+        err = transport_try_process_sack_ext(ctx,
+                                             handle,
+                                             peer,
+                                             source_id,
+                                             data,
+                                             data_len,
+                                             &handled_sack);
+        if (err != XGL_OK) {
             return err;
         }
-        
-        return XGL_OK;
+        if (handled_sack) {
+            return XGL_OK;
+        }
+
+        return XGL_ERR_INVALID_FRAME;
     }
     
     /* Validate data pointer for non-ACK packets */
