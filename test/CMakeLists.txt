@@ -48,6 +48,7 @@ set(TEST_SOURCES
     
     # Data link tests
     test_frame.cpp
+    test_wire.cpp
     test_parser.cpp
     test_datalink.cpp
     
