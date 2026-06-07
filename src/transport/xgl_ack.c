@@ -21,6 +21,13 @@
  */
 #define XGL_ACK_BITMAP_SIZE         32
 
+struct xgl_ack_peer_state {
+    struct xgl_ack_peer_state* next;
+    uint8_t source_id;
+    uint8_t* received_seq_bitmap;
+    uint8_t expected_seq_num;
+};
+
 /*---------------------------------------------------------------------------*/
 /* Helper Functions                                                          */
 /*---------------------------------------------------------------------------*/
@@ -68,6 +75,70 @@ static bool get_bit(const uint8_t* bitmap, uint8_t bit_index) {
     return (bitmap[byte_index] & (uint8_t)(1U << bit_offset)) != 0;
 }
 
+static xgl_ack_peer_state_t* find_peer_state(const xgl_ack_handler_t* handler,
+                                             uint8_t source_id) {
+    if (handler == NULL) {
+        return NULL;
+    }
+
+    xgl_ack_peer_state_t* peer = handler->peers;
+    while (peer != NULL) {
+        if (peer->source_id == source_id) {
+            return peer;
+        }
+        peer = peer->next;
+    }
+
+    return NULL;
+}
+
+static xgl_ack_peer_state_t* get_or_create_peer_state(xgl_ack_handler_t* handler,
+                                                      uint8_t source_id) {
+    xgl_ack_peer_state_t* peer = find_peer_state(handler, source_id);
+    if (peer != NULL) {
+        return peer;
+    }
+
+    peer = (xgl_ack_peer_state_t*)ack_malloc(handler->allocator,
+                                             sizeof(xgl_ack_peer_state_t));
+    if (peer == NULL) {
+        return NULL;
+    }
+
+    peer->received_seq_bitmap = (uint8_t*)ack_malloc(handler->allocator,
+                                                     XGL_ACK_BITMAP_SIZE);
+    if (peer->received_seq_bitmap == NULL) {
+        ack_free(handler->allocator, peer);
+        return NULL;
+    }
+
+    memset(peer->received_seq_bitmap, 0, XGL_ACK_BITMAP_SIZE);
+    peer->expected_seq_num = 0;
+    peer->source_id = source_id;
+    peer->next = handler->peers;
+    handler->peers = peer;
+
+    return peer;
+}
+
+static bool is_out_of_order_for_expected(uint8_t expected_seq_num,
+                                         uint8_t seq_num) {
+    if (seq_num == expected_seq_num) {
+        return false;
+    }
+
+    int16_t diff = xgl_sequence_diff(seq_num, expected_seq_num);
+    if (diff > 0 && diff < 128) {
+        return true;
+    }
+
+    if (diff < 0 && diff > -128) {
+        return true;
+    }
+
+    return false;
+}
+
 /*---------------------------------------------------------------------------*/
 /* ACK Handler Functions                                                     */
 /*---------------------------------------------------------------------------*/
@@ -80,9 +151,12 @@ xgl_error_t xgl_ack_init(xgl_ack_handler_t* handler,
     if (handler == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
+
+    memset(handler, 0, sizeof(xgl_ack_handler_t));
     
     /* Allocate bitmap for tracking received sequence numbers */
     handler->bitmap_size = XGL_ACK_BITMAP_SIZE;
+    handler->allocator = allocator;
     handler->received_seq_bitmap = (uint8_t*)ack_malloc(allocator, handler->bitmap_size);
     
     if (handler->received_seq_bitmap == NULL) {
@@ -94,9 +168,6 @@ xgl_error_t xgl_ack_init(xgl_ack_handler_t* handler,
     
     /* Initialize expected sequence number */
     handler->expected_seq_num = 0;
-    
-    /* Store allocator */
-    handler->allocator = allocator;
     
     return XGL_OK;
 }
@@ -114,6 +185,15 @@ void xgl_ack_destroy(xgl_ack_handler_t* handler) {
         ack_free(handler->allocator, handler->received_seq_bitmap);
         handler->received_seq_bitmap = NULL;
     }
+
+    xgl_ack_peer_state_t* peer = handler->peers;
+    while (peer != NULL) {
+        xgl_ack_peer_state_t* next = peer->next;
+        ack_free(handler->allocator, peer->received_seq_bitmap);
+        ack_free(handler->allocator, peer);
+        peer = next;
+    }
+    handler->peers = NULL;
     
     handler->bitmap_size = 0;
 }
@@ -192,19 +272,15 @@ xgl_error_t xgl_ack_process(xgl_ack_handler_t* handler,
         return XGL_ERR_NULL_POINTER;
     }
     
-    /* Suppress unused parameter warnings */
     (void)ack_num;
     (void)source_id;
-    
-    /* Assume valid by default */
+
+    if (handler->received_seq_bitmap == NULL) {
+        *is_valid = false;
+        return XGL_ERR_NOT_INITIALIZED;
+    }
+
     *is_valid = true;
-    
-    /* ACK processing is primarily handled by reliable transmission queue */
-    /* This function validates the ACK is within acceptable range */
-    
-    /* Check if ACK is for a sequence number we might have sent */
-    /* Since sequence numbers wrap around, we accept any ACK */
-    /* The reliable queue will determine if it matches a pending packet */
     
     return XGL_OK;
 }
@@ -220,6 +296,17 @@ bool xgl_ack_is_duplicate(const xgl_ack_handler_t* handler,
     
     /* Check if this sequence number has been received before */
     return get_bit(handler->received_seq_bitmap, seq_num);
+}
+
+bool xgl_ack_is_duplicate_from(const xgl_ack_handler_t* handler,
+                               uint8_t source_id,
+                               uint8_t seq_num) {
+    xgl_ack_peer_state_t* peer = find_peer_state(handler, source_id);
+    if (peer == NULL || peer->received_seq_bitmap == NULL) {
+        return false;
+    }
+
+    return get_bit(peer->received_seq_bitmap, seq_num);
 }
 
 /**
@@ -241,6 +328,27 @@ xgl_error_t xgl_ack_mark_received(xgl_ack_handler_t* handler,
     return XGL_OK;
 }
 
+xgl_error_t xgl_ack_mark_received_from(xgl_ack_handler_t* handler,
+                                       uint8_t source_id,
+                                       uint8_t seq_num) {
+    if (handler == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (handler->received_seq_bitmap == NULL) {
+        return XGL_ERR_NOT_INITIALIZED;
+    }
+
+    xgl_ack_peer_state_t* peer = get_or_create_peer_state(handler, source_id);
+    if (peer == NULL || peer->received_seq_bitmap == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+
+    set_bit(peer->received_seq_bitmap, seq_num);
+
+    return XGL_OK;
+}
+
 /**
  * \brief           Check if packet is out-of-order
  */
@@ -249,27 +357,21 @@ bool xgl_ack_is_out_of_order(const xgl_ack_handler_t* handler,
     if (handler == NULL) {
         return false;
     }
-    
-    /* If seq_num equals expected, it's in order */
-    if (seq_num == handler->expected_seq_num) {
+
+    return is_out_of_order_for_expected(handler->expected_seq_num, seq_num);
+}
+
+bool xgl_ack_is_out_of_order_from(const xgl_ack_handler_t* handler,
+                                  uint8_t source_id,
+                                  uint8_t seq_num) {
+    if (handler == NULL) {
         return false;
     }
-    
-    /* Use sequence number comparison that handles wraparound */
-    int16_t diff = xgl_sequence_diff(seq_num, handler->expected_seq_num);
-    
-    /* If seq_num is ahead of expected (positive diff), it's out-of-order */
-    if (diff > 0 && diff < 128) {
-        return true;  /* Future packet within reasonable window */
-    }
-    
-    /* If seq_num is behind expected (negative diff), it's out-of-order */
-    if (diff < 0 && diff > -128) {
-        return true;  /* Late packet within reasonable window */
-    }
-    
-    /* Otherwise, it's too far away (likely from different cycle) */
-    return false;
+
+    xgl_ack_peer_state_t* peer = find_peer_state(handler, source_id);
+    uint8_t expected_seq_num = (peer != NULL) ? peer->expected_seq_num : 0;
+
+    return is_out_of_order_for_expected(expected_seq_num, seq_num);
 }
 
 /**
@@ -282,7 +384,38 @@ void xgl_ack_update_expected(xgl_ack_handler_t* handler,
     }
     
     /* Update expected sequence number to next value */
-    handler->expected_seq_num = seq_num + 1;
+    handler->expected_seq_num = (uint8_t)(seq_num + 1U);
+}
+
+xgl_error_t xgl_ack_update_expected_from(xgl_ack_handler_t* handler,
+                                         uint8_t source_id,
+                                         uint8_t seq_num) {
+    if (handler == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (handler->received_seq_bitmap == NULL) {
+        return XGL_ERR_NOT_INITIALIZED;
+    }
+
+    xgl_ack_peer_state_t* peer = get_or_create_peer_state(handler, source_id);
+    if (peer == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+
+    peer->expected_seq_num = (uint8_t)(seq_num + 1U);
+
+    return XGL_OK;
+}
+
+uint8_t xgl_ack_get_expected_from(const xgl_ack_handler_t* handler,
+                                  uint8_t source_id) {
+    if (handler == NULL) {
+        return 0;
+    }
+
+    xgl_ack_peer_state_t* peer = find_peer_state(handler, source_id);
+    return (peer != NULL) ? peer->expected_seq_num : 0;
 }
 
 /**
@@ -296,6 +429,15 @@ void xgl_ack_reset(xgl_ack_handler_t* handler) {
     /* Clear bitmap */
     if (handler->received_seq_bitmap != NULL) {
         memset(handler->received_seq_bitmap, 0, handler->bitmap_size);
+    }
+
+    xgl_ack_peer_state_t* peer = handler->peers;
+    while (peer != NULL) {
+        if (peer->received_seq_bitmap != NULL) {
+            memset(peer->received_seq_bitmap, 0, XGL_ACK_BITMAP_SIZE);
+        }
+        peer->expected_seq_num = 0;
+        peer = peer->next;
     }
     
     /* Reset expected sequence number */

@@ -21,10 +21,33 @@ extern "C" {
 #include "xgl_ack.h"
 #include "xgl_fragment.h"
 #include "xgl_layer_interface.h"
+#include "xgl_route.h"
+
+/**
+ * \brief           Reserved transport control data types
+ * \details         Frame data_type is 4-bit wide. Values 0x0E and 0x0F are
+ *                  reserved for transport session lifecycle control.
+ */
+#define XGL_TRANSPORT_CONTROL_HELLO 0x0E
+#define XGL_TRANSPORT_CONTROL_RESET 0x0F
+#define XGL_TRANSPORT_CONTROL_NACK  0x0D
+#define XGL_TRANSPORT_CONTROL_SACK  0x0C
 
 /*---------------------------------------------------------------------------*/
 /* Transport Layer Context                                                   */
 /*---------------------------------------------------------------------------*/
+
+typedef struct xgl_transport_peer_state_s {
+    struct xgl_transport_peer_state_s* next; /**< Linked-list node */
+    uint8_t peer_id;                         /**< Remote node ID */
+    uint16_t session_id;                     /**< Peer transport session/epoch */
+    bool hello_sent;                         /**< HELLO has been sent for this session */
+    bool session_established;                /**< Peer session is known locally */
+    xgl_sliding_window_t tx_window;          /**< Peer-specific TX window */
+    xgl_reliable_queue_t reliable_queue;     /**< Peer-specific wait-ACK queue */
+    xgl_rtt_estimator_t rtt_est;             /**< Peer-specific RTT estimator */
+    uint32_t last_active_ms;                 /**< Last activity timestamp */
+} xgl_transport_peer_state_t;
 
 /**
  * \brief           Transport layer context structure
@@ -37,6 +60,8 @@ typedef struct xgl_transport_ctx_s {
     uint32_t default_timeout_ms;    /**< Default timeout in milliseconds */
     bool enable_fragmentation;      /**< Enable fragmentation support */
     uint16_t max_frame_size;        /**< Maximum frame size */
+    xgl_route_table_t* route_table; /**< Optional route table for route MTU lookup */
+    uint16_t next_session_id;       /**< Next local session/epoch ID */
     
     /* Transport components */
     xgl_rtt_estimator_t rtt_est;    /**< RTT estimator */
@@ -44,6 +69,7 @@ typedef struct xgl_transport_ctx_s {
     xgl_reliable_queue_t reliable_queue; /**< Reliable transmission queue */
     xgl_ack_handler_t ack_handler;  /**< ACK handler */
     xgl_fragment_manager_t* fragment_mgr; /**< Fragmentation manager (optional) */
+    xgl_transport_peer_state_t* peers; /**< Peer-specific reliable transport state */
     
     /* Layer interface for decoupled communication */
     xgl_layer_interface_t* lower_layer; /**< Lower layer interface (network) */
@@ -72,6 +98,7 @@ typedef struct {
     uint8_t window_size;            /**< Sliding window size */
     bool enable_fragmentation;      /**< Enable fragmentation support */
     uint16_t max_frame_size;        /**< Maximum frame size */
+    xgl_route_table_t* route_table; /**< Optional route table for route MTU lookup */
     xgl_layer_interface_t* lower_layer; /**< Lower layer interface (network) */
     xgl_rx_callback_t rx_callback;  /**< Receive callback (can be NULL) */
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */

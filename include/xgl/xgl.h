@@ -346,7 +346,7 @@ void xgl_destroy(xgl_handle_t handle);
  * // Customize as needed
  * config.source_id = 1;
  * config.max_retry_count = 3;
- * config.thread_safe = true;
+ * config.thread_safe = true;  // Requires XGL_THREAD_SAFE at build time
  * \endcode
  */
 void xgl_config_get_default(xgl_config_t* config);
@@ -362,7 +362,7 @@ void xgl_config_get_default(xgl_config_t* config);
  * \code{.c}
  * xgl_config_t config;
  * xgl_config_get_preset_tiny(&config);
- * config.source_id = 1;  // Must set source ID
+ * config.source_id = 1;  // Customize local node ID as needed
  * \endcode
  */
 void xgl_config_get_preset_tiny(xgl_config_t* config);
@@ -606,6 +606,7 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
 /**
  * \par Thread Safety
  *      When thread_safe is enabled in configuration:
+ *      - The library must be built with XGL_THREAD_SAFE
  *      - All API functions are thread-safe
  *      - Multiple threads can call xgl_send() concurrently
  *      - xgl_run() can be called from a different thread than xgl_send()

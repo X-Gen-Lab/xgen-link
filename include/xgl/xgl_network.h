@@ -34,6 +34,14 @@ extern "C" {
  */
 #define XGL_BROADCAST_ID            0xFF
 
+/**
+ * \brief           Default hop limit for routed packets
+ * \note            Stored in the frame reserved byte for protocol v1.
+ */
+#ifndef XGL_DEFAULT_TTL
+#define XGL_DEFAULT_TTL             8
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Forward Declarations                                                      */
 /*---------------------------------------------------------------------------*/

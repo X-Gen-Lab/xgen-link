@@ -8,6 +8,7 @@
 #include <gmock/gmock.h>
 #include <xgl/xgl.h>
 #include <cstring>
+#include <vector>
 
 /*---------------------------------------------------------------------------*/
 /* Mock Physical Layer                                                       */
@@ -210,6 +211,36 @@ TEST_F(XglSendTest, BasicSendSuccess) {
     EXPECT_EQ(err, XGL_OK);
 }
 
+TEST_F(XglSendTest, SendFragmentsByRouteMaxFrameSize) {
+    config.features.enable_fragmentation = true;
+    ASSERT_LT(route.max_frame_size, config.protocol.max_frame_size);
+
+    std::vector<uint8_t> data(300, 0x5A);
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = data.data(),
+        .data_len = data.size(),
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 0
+    };
+
+    std::vector<size_t> frame_lengths;
+    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_))
+        .Times(testing::AtLeast(2))
+        .WillRepeatedly(testing::Invoke([&](const uint8_t* /*bytes*/, size_t len, void* /*user_data*/) {
+            frame_lengths.push_back(len);
+            return XGL_OK;
+        }));
+
+    EXPECT_EQ(xgl_send(handle, &tx_data), XGL_OK);
+    ASSERT_GT(frame_lengths.size(), 1U);
+    for (size_t len : frame_lengths) {
+        EXPECT_LE(len, route.max_frame_size);
+    }
+}
+
 /**
  * \brief           Test send to non-existent route
  */
@@ -335,4 +366,80 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
     EXPECT_EQ(buffer[0], XGL_SOF);
     EXPECT_EQ(std::memcmp(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U), 0);
+}
+
+TEST_F(XglSendTest, ZeroCopyReliableIsRejectedInsteadOfImplicitCopyFallback) {
+    uint8_t buffer[64] = {};
+    const char payload[] = "reliable";
+    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+
+    xgl_tx_data_zerocopy_t tx_data = {
+        .buffer = buffer,
+        .buffer_size = sizeof(buffer),
+        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_len = sizeof(payload) - 1U,
+        .target_id = 2,
+        .data_type = 1,
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 0
+    };
+
+    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
+    EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_ERR_INVALID_PARAM);
+}
+
+TEST_F(XglSendTest, ZeroCopyUnreliableRejectsPayloadExceedingRouteMtu) {
+    xgl_destroy(handle);
+    handle = nullptr;
+    route.max_frame_size = 64;
+    handle = xgl_create(&config);
+    ASSERT_NE(handle, nullptr);
+    ASSERT_EQ(xgl_init(handle), XGL_OK);
+
+    uint8_t buffer[128] = {};
+    memset(buffer + XGL_FRAME_HEADER_SIZE, 0xAB, 60);
+    xgl_tx_data_zerocopy_t tx_data = {
+        .buffer = buffer,
+        .buffer_size = sizeof(buffer),
+        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_len = 60,
+        .target_id = 2,
+        .data_type = 1,
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 0
+    };
+
+    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
+    EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_ERR_BUFFER_TOO_SMALL);
+}
+
+TEST_F(XglSendTest, ZeroCopyUnreliableWritesDefaultTtlAndEmptySession) {
+    uint8_t buffer[64] = {};
+    const char payload[] = "zcopy";
+    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+
+    xgl_tx_data_zerocopy_t tx_data = {
+        .buffer = buffer,
+        .buffer_size = sizeof(buffer),
+        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_len = sizeof(payload) - 1U,
+        .target_id = 2,
+        .data_type = 1,
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 0
+    };
+
+    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_))
+        .Times(1)
+        .WillOnce(testing::Return(XGL_OK));
+
+    ASSERT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
+
+    xgl_frame_header_t header = {};
+    xgl_frame_decode_header(&header, buffer);
+    EXPECT_EQ(header.reserved, XGL_DEFAULT_TTL);
+    EXPECT_EQ(header.attr_msb & XGL_ATTR_SESSION_MASK, 0U);
 }

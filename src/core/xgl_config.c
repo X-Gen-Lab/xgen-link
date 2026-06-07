@@ -119,6 +119,10 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
     
     /* Validate memory configuration */
+    if (config->source_id == 0 || config->source_id == XGL_BROADCAST_ID) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
     if (config->memory.tx_pool_size < XGL_MIN_TX_POOL_SIZE || 
         config->memory.tx_pool_size > XGL_MAX_TX_POOL_SIZE) {
         return XGL_ERR_INVALID_PARAM;
@@ -155,12 +159,21 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
         return XGL_ERR_INVALID_PARAM;
     }
     
-    /* Validate RX buffer is large enough for max frame 
-     * RX buffer needs to hold: SOF + Header + Payload + CRC16
-     * max_frame_size is the payload size, so total frame is:
-     * XGL_FRAME_HEADER_SIZE + max_frame_size + XGL_CRC16_SIZE
+    if (config->features.enable_compression || config->features.enable_encryption) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+#ifndef XGL_THREAD_SAFE
+    if (config->features.thread_safe) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#endif
+
+    /* Validate RX buffer is large enough for the configured full frame.
+     * max_frame_size includes header, payload, and CRC16.
      */
-    if (config->memory.rx_buffer_size < config->protocol.max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
+    size_t required_rx_buffer_size = (size_t)config->protocol.max_frame_size;
+    if (config->memory.rx_buffer_size < required_rx_buffer_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     

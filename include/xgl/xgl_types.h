@@ -127,6 +127,8 @@ typedef struct {
 #define XGL_ATTR_COMPRESS_LZ77      0x80
 #define XGL_ATTR_COMPRESS_ZLIB      0xC0
 
+#define XGL_ATTR_SESSION_MASK       0x3F
+
 /*---------------------------------------------------------------------------*/
 /* Packet Data Structure                                                     */
 /*---------------------------------------------------------------------------*/
@@ -216,9 +218,9 @@ typedef struct {
  */
 typedef struct {
     bool enable_fragmentation;      /**< Enable packet fragmentation */
-    bool enable_compression;        /**< Enable data compression */
-    bool enable_encryption;         /**< Enable data encryption */
-    bool thread_safe;               /**< Enable thread safety */
+    bool enable_compression;        /**< Reserved; rejected until codec path is wired */
+    bool enable_encryption;         /**< Reserved; rejected until codec path is wired */
+    bool thread_safe;               /**< Enable thread safety when built with XGL_THREAD_SAFE */
 } xgl_feature_config_t;
 
 /**
@@ -357,7 +359,7 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_TINY { \
     .name = "tiny", \
-    .source_id = 0, \
+    .source_id = 1, \
     .memory = { \
         .tx_pool_size = 1024, \
         .rx_buffer_size = 160, \
@@ -387,7 +389,7 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_SMALL { \
     .name = "small", \
-    .source_id = 0, \
+    .source_id = 1, \
     .memory = { \
         .tx_pool_size = 2048, \
         .rx_buffer_size = 288, \
@@ -417,7 +419,7 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_MEDIUM { \
     .name = "medium", \
-    .source_id = 0, \
+    .source_id = 1, \
     .memory = { \
         .tx_pool_size = 4096, \
         .rx_buffer_size = 544, \
@@ -447,7 +449,7 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_LARGE { \
     .name = "large", \
-    .source_id = 0, \
+    .source_id = 1, \
     .memory = { \
         .tx_pool_size = 8192, \
         .rx_buffer_size = 1056, \

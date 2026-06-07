@@ -38,6 +38,175 @@ static void transport_free(xgl_allocator_t* allocator, void* ptr) {
     }
 }
 
+static xgl_transport_peer_state_t* transport_find_peer(xgl_transport_ctx_t* ctx,
+                                                       uint8_t peer_id) {
+    if (ctx == NULL) {
+        return NULL;
+    }
+
+    xgl_transport_peer_state_t* peer = ctx->peers;
+    while (peer != NULL) {
+        if (peer->peer_id == peer_id) {
+            return peer;
+        }
+        peer = peer->next;
+    }
+
+    return NULL;
+}
+
+static xgl_transport_peer_state_t* transport_get_or_create_peer(xgl_transport_ctx_t* ctx,
+                                                                uint8_t peer_id) {
+    xgl_transport_peer_state_t* peer = transport_find_peer(ctx, peer_id);
+    if (peer != NULL) {
+        return peer;
+    }
+
+    peer = (xgl_transport_peer_state_t*)transport_malloc(ctx->allocator,
+                                                         sizeof(xgl_transport_peer_state_t));
+    if (peer == NULL) {
+        return NULL;
+    }
+
+    memset(peer, 0, sizeof(*peer));
+    peer->peer_id = peer_id;
+    peer->session_id = (uint16_t)(ctx->next_session_id & XGL_ATTR_SESSION_MASK);
+    if (peer->session_id == 0U) {
+        peer->session_id = 1U;
+    }
+    ctx->next_session_id = (uint16_t)((peer->session_id + 1U) & XGL_ATTR_SESSION_MASK);
+    if (ctx->next_session_id == 0U) {
+        ctx->next_session_id = 1U;
+    }
+    xgl_rtt_init(&peer->rtt_est);
+
+    xgl_error_t err = xgl_window_init(&peer->tx_window, ctx->window.window_size);
+    if (err != XGL_OK) {
+        transport_free(ctx->allocator, peer);
+        return NULL;
+    }
+
+    err = xgl_reliable_init(&peer->reliable_queue,
+                            ctx->max_retry_count,
+                            ctx->allocator);
+    if (err != XGL_OK) {
+        xgl_window_destroy(&peer->tx_window);
+        transport_free(ctx->allocator, peer);
+        return NULL;
+    }
+
+    peer->next = ctx->peers;
+    ctx->peers = peer;
+    return peer;
+}
+
+static void transport_destroy_peers(xgl_transport_ctx_t* ctx) {
+    if (ctx == NULL) {
+        return;
+    }
+
+    xgl_transport_peer_state_t* peer = ctx->peers;
+    while (peer != NULL) {
+        xgl_transport_peer_state_t* next = peer->next;
+        xgl_reliable_destroy(&peer->reliable_queue);
+        xgl_window_destroy(&peer->tx_window);
+        transport_free(ctx->allocator, peer);
+        peer = next;
+    }
+    ctx->peers = NULL;
+}
+
+static void transport_advance_legacy_window_if_possible(xgl_transport_ctx_t* ctx) {
+    if (ctx != NULL && xgl_window_can_send(&ctx->window)) {
+        xgl_window_advance_next_seq(&ctx->window);
+    }
+}
+
+static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
+                                       xgl_transport_peer_state_t* peer,
+                                       uint16_t session_id) {
+    if (ctx == NULL || peer == NULL) {
+        return;
+    }
+
+    peer->session_id = (uint16_t)(session_id & XGL_ATTR_SESSION_MASK);
+    peer->hello_sent = false;
+    peer->session_established = true;
+    xgl_reliable_clear(&peer->reliable_queue);
+    xgl_window_reset(&peer->tx_window);
+    xgl_window_reset(&ctx->window);
+    xgl_ack_reset(&ctx->ack_handler);
+    if (ctx->fragment_mgr != NULL) {
+        xgl_fragment_clear_reassembly(ctx->fragment_mgr);
+    }
+    xgl_rtt_init(&peer->rtt_est);
+    peer->last_active_ms = xgl_time_ms();
+}
+
+static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
+                                          xgl_handle_t handle,
+                                          uint8_t target_id,
+                                          uint8_t control_type,
+                                          uint8_t ack_num,
+                                          uint16_t session_id) {
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = 0,
+        .data = NULL,
+        .owned_data = NULL
+    };
+
+    xgl_packet_t packet = {
+        .source_id = ctx->local_id,
+        .target_id = target_id,
+        .data_type = control_type,
+        .seq_num = 0,
+        .ack_num = ack_num,
+        .session_id = session_id,
+        .reliable = (control_type == XGL_TRANSPORT_CONTROL_NACK ||
+                     control_type == XGL_TRANSPORT_CONTROL_SACK) ?
+                    XGL_ATTR_RELIABLE_ACK : XGL_ATTR_RELIABLE_NONE,
+        .fragment = false,
+        .priority = 7,
+        .data = &packet_data,
+        .phy = NULL
+    };
+
+    if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    return xgl_layer_send(ctx->lower_layer, handle, &packet);
+}
+
+static xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
+                                                    const xgl_packet_t* packet) {
+    if (ctx == NULL || packet == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    uint16_t session_id = (uint16_t)(packet->session_id & XGL_ATTR_SESSION_MASK);
+    if (session_id == 0U) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    xgl_transport_peer_state_t* peer =
+        transport_get_or_create_peer(ctx, packet->source_id);
+    if (peer == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+
+    if (packet->data_type == XGL_TRANSPORT_CONTROL_RESET ||
+        peer->session_id != session_id) {
+        transport_reset_peer_state(ctx, peer, session_id);
+    } else {
+        peer->session_established = true;
+        peer->last_active_ms = xgl_time_ms();
+    }
+
+    return XGL_OK;
+}
+
 /**
  * \brief           Send ACK packet for received data
  * \param[in]       ctx: Transport context
@@ -49,7 +218,8 @@ static void transport_free(xgl_allocator_t* allocator, void* ptr) {
 static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,
                                      uint8_t seq_num,
-                                     uint8_t source_id) {
+                                     uint8_t source_id,
+                                     uint16_t session_id) {
     xgl_packet_data_t ack_packet_data = {
         .ref_count = 1,
         .data_len = 0,
@@ -58,12 +228,13 @@ static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
     };
     
     xgl_packet_t ack_packet = {
-        .source_id = ctx->local_id,
+            .source_id = ctx->local_id,
         .target_id = source_id,
         .data_type = 0,
         .seq_num = 0,
         .ack_num = seq_num,
-        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .session_id = session_id,
+            .reliable = XGL_ATTR_RELIABLE_ACK,
         .fragment = false,
         .priority = 7,
         .data = &ack_packet_data,
@@ -77,14 +248,15 @@ static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
     return XGL_ERR_INVALID_PARAM;
 }
 
-static uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
-                                                  xgl_handle_t handle,
-                                                  uint32_t current_time_ms) {
+static uint32_t transport_process_retransmission_queue(xgl_transport_ctx_t* ctx,
+                                                       xgl_reliable_queue_t* queue,
+                                                       xgl_handle_t handle,
+                                                       uint32_t current_time_ms) {
     uint32_t retransmit_count = 0;
     xgl_list_node_t* node;
     xgl_list_node_t* tmp;
 
-    XGL_LIST_FOR_EACH_SAFE(&ctx->reliable_queue.wait_ack_list, node, tmp) {
+    XGL_LIST_FOR_EACH_SAFE(&queue->wait_ack_list, node, tmp) {
         xgl_reliable_packet_t* rel_packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
 
         if (rel_packet->send_timestamp == 0U) {
@@ -96,11 +268,11 @@ static uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
             continue;
         }
 
-        if (rel_packet->retry_count >= ctx->reliable_queue.max_retry_count) {
+        if (rel_packet->retry_count >= queue->max_retry_count) {
             uint8_t seq_num = rel_packet->seq_num;
             uint8_t target_id = rel_packet->target_id;
 
-            (void)xgl_reliable_remove_packet(&ctx->reliable_queue, seq_num, target_id);
+            (void)xgl_reliable_remove_packet(queue, seq_num, target_id);
             if (ctx->error_callback != NULL) {
                 ctx->error_callback(handle, XGL_ERR_ACK_TIMEOUT,
                                   "Packet retry count exhausted",
@@ -124,6 +296,7 @@ static uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
             .target_id = rel_packet->target_id,
             .seq_num = rel_packet->seq_num,
             .ack_num = 0,
+            .session_id = rel_packet->session_id,
             .data_type = rel_packet->data_type,
             .reliable = true,
             .fragment = false,
@@ -144,6 +317,23 @@ static uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
         } else if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
+    }
+
+    return retransmit_count;
+}
+
+static uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
+                                                  xgl_handle_t handle,
+                                                  uint32_t current_time_ms) {
+    uint32_t retransmit_count = 0;
+
+    for (xgl_transport_peer_state_t* peer = ctx->peers;
+         peer != NULL;
+         peer = peer->next) {
+        retransmit_count += transport_process_retransmission_queue(ctx,
+                                                                   &peer->reliable_queue,
+                                                                   handle,
+                                                                   current_time_ms);
     }
 
     return retransmit_count;
@@ -175,6 +365,11 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->default_timeout_ms = config->default_timeout_ms;
     ctx->enable_fragmentation = config->enable_fragmentation;
     ctx->max_frame_size = config->max_frame_size;
+    ctx->route_table = config->route_table;
+    ctx->next_session_id = (uint16_t)(config->local_id & XGL_ATTR_SESSION_MASK);
+    if (ctx->next_session_id == 0U) {
+        ctx->next_session_id = 1U;
+    }
     ctx->lower_layer = config->lower_layer;
     ctx->rx_callback = config->rx_callback;
     ctx->error_callback = config->error_callback;
@@ -255,6 +450,8 @@ void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
     
     /* Destroy sliding window */
     xgl_window_destroy(&ctx->window);
+
+    transport_destroy_peers(ctx);
     
     /* Clear context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));
@@ -292,14 +489,43 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         return XGL_ERR_INVALID_PARAM;
     }
     
-    /* Check if window allows sending for reliable transmission */
-    if (tx_data->reliable && !xgl_window_can_send(&ctx->window)) {
-        return XGL_ERR_WINDOW_FULL;
+    xgl_transport_peer_state_t* peer = NULL;
+    if (tx_data->reliable) {
+        peer = transport_get_or_create_peer(ctx, tx_data->target_id);
+        if (peer == NULL) {
+            return XGL_ERR_NO_MEMORY;
+        }
+
+        if (!xgl_window_can_send(&peer->tx_window)) {
+            return XGL_ERR_WINDOW_FULL;
+        }
+
+        if (!peer->hello_sent) {
+            err = transport_send_control(ctx,
+                                         handle,
+                                         tx_data->target_id,
+                                         XGL_TRANSPORT_CONTROL_HELLO,
+                                         0,
+                                         peer->session_id);
+            if (err != XGL_OK) {
+                return err;
+            }
+            peer->hello_sent = true;
+        }
     }
     
+    uint16_t effective_max_frame_size = ctx->max_frame_size;
+    if (ctx->route_table != NULL) {
+        xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
+                                                         tx_data->target_id);
+        if (route != NULL && route->max_frame_size < effective_max_frame_size) {
+            effective_max_frame_size = route->max_frame_size;
+        }
+    }
+
     /* Validate frame size before calculating payload size */
     size_t min_frame_size = XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
-    if (ctx->max_frame_size < min_frame_size) {
+    if (effective_max_frame_size < min_frame_size) {
         if (ctx->stats) {
             ctx->stats->tx_errors++;
         }
@@ -312,8 +538,17 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     }
     
     /* Determine if fragmentation is needed */
-    size_t max_payload_size = ctx->max_frame_size - XGL_FRAME_HEADER_SIZE - XGL_CRC16_SIZE;
+    size_t max_payload_size = (size_t)effective_max_frame_size -
+                              XGL_FRAME_HEADER_SIZE -
+                              XGL_CRC16_SIZE;
     bool needs_fragmentation = (tx_data->data_len > max_payload_size) && ctx->enable_fragmentation;
+
+    if (tx_data->data_len > max_payload_size && !ctx->enable_fragmentation) {
+        if (ctx->stats) {
+            ctx->stats->tx_errors++;
+        }
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
     
     if (needs_fragmentation) {
         /* Fragment and send */
@@ -351,15 +586,27 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         /* Send each fragment */
         for (size_t i = 0; i < fragment_count; i++) {
             /* Get sequence number */
-            uint8_t seq_num = xgl_window_get_next_seq(&ctx->window);
-            xgl_window_advance_next_seq(&ctx->window);
+            if (tx_data->reliable && peer != NULL && !xgl_window_can_send(&peer->tx_window)) {
+                xgl_fragment_free_fragments(ctx->fragment_mgr, fragments, fragment_count);
+                transport_free(ctx->allocator, fragments);
+                transport_free(ctx->allocator, fragment_lens);
+                return XGL_ERR_WINDOW_FULL;
+            }
+
+            uint8_t seq_num = 0;
+            if (tx_data->reliable && peer != NULL) {
+                seq_num = xgl_window_get_next_seq(&peer->tx_window);
+                xgl_window_advance_next_seq(&peer->tx_window);
+                transport_advance_legacy_window_if_possible(ctx);
+            }
             
             /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
             int32_t timeout_ms;
             if (tx_data->timeout_ms > 0) {
                 timeout_ms = (int32_t)tx_data->timeout_ms;
             } else {
-                timeout_ms = xgl_rtt_get_rto(&ctx->rtt_est);
+                timeout_ms = (peer != NULL) ? xgl_rtt_get_rto(&peer->rtt_est) :
+                                              xgl_rtt_get_rto(&ctx->rtt_est);
                 if (timeout_ms == 0) {
                     timeout_ms = (int32_t)ctx->default_timeout_ms;
                 }
@@ -371,7 +618,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             
             /* Add to reliable queue if needed */
             if (tx_data->reliable) {
-                err = xgl_reliable_add_packet(&ctx->reliable_queue,
+                err = xgl_reliable_add_packet(&peer->reliable_queue,
                                              fragments[i], fragment_lens[i],
                                              ctx->local_id, tx_data->target_id,
                                              seq_num, tx_data->data_type,
@@ -384,8 +631,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 }
 
                 xgl_reliable_packet_t* rel_packet =
-                    xgl_reliable_find_packet(&ctx->reliable_queue, seq_num, tx_data->target_id);
+                    xgl_reliable_find_packet(&peer->reliable_queue, seq_num, tx_data->target_id);
                 if (rel_packet != NULL) {
+                    rel_packet->session_id = peer->session_id;
                     rel_packet->send_timestamp = xgl_time_ms();
                 }
             }
@@ -404,6 +652,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 .data_type = tx_data->data_type,
                 .seq_num = seq_num,
                 .ack_num = 0,  /* ACK number is 0 for data packets */
+                .session_id = (peer != NULL) ? peer->session_id : 0,
                 .reliable = tx_data->reliable,
                 .fragment = true,  /* Mark as fragment */
                 .priority = tx_data->priority,
@@ -447,9 +696,10 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         
         /* Get sequence number */
         uint8_t seq_num = 0;
-        if (tx_data->reliable) {
-            seq_num = xgl_window_get_next_seq(&ctx->window);
-            xgl_window_advance_next_seq(&ctx->window);
+        if (tx_data->reliable && peer != NULL) {
+            seq_num = xgl_window_get_next_seq(&peer->tx_window);
+            xgl_window_advance_next_seq(&peer->tx_window);
+            transport_advance_legacy_window_if_possible(ctx);
         }
         
         /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
@@ -457,7 +707,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         if (tx_data->timeout_ms > 0) {
             timeout_ms = (int32_t)tx_data->timeout_ms;
         } else {
-            timeout_ms = xgl_rtt_get_rto(&ctx->rtt_est);
+            timeout_ms = (peer != NULL) ? xgl_rtt_get_rto(&peer->rtt_est) :
+                                          xgl_rtt_get_rto(&ctx->rtt_est);
                 if (timeout_ms == 0) {
                     timeout_ms = (int32_t)ctx->default_timeout_ms;
                 }
@@ -477,6 +728,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             .data_type = tx_data->data_type,
             .seq_num = seq_num,
             .ack_num = 0,  /* ACK number is 0 for data packets */
+            .session_id = (peer != NULL) ? peer->session_id : 0,
             .reliable = tx_data->reliable,
             .fragment = false,  /* Not a fragment */
             .priority = tx_data->priority,
@@ -505,7 +757,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         
         /* Add to reliable queue if needed */
         if (tx_data->reliable) {
-            err = xgl_reliable_add_packet(&ctx->reliable_queue,
+            err = xgl_reliable_add_packet(&peer->reliable_queue,
                                          tx_data->data, tx_data->data_len,
                                          ctx->local_id, tx_data->target_id,
                                          seq_num, tx_data->data_type,
@@ -515,8 +767,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             }
 
             xgl_reliable_packet_t* rel_packet =
-                xgl_reliable_find_packet(&ctx->reliable_queue, seq_num, tx_data->target_id);
+                xgl_reliable_find_packet(&peer->reliable_queue, seq_num, tx_data->target_id);
             if (rel_packet != NULL) {
+                rel_packet->session_id = peer->session_id;
                 rel_packet->send_timestamp = xgl_time_ms();
             }
         }
@@ -551,6 +804,11 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     uint8_t ack_num = packet->ack_num;
     uint8_t data_type = packet->data_type;
     uint8_t reliable = packet->reliable;
+
+    if (data_type == XGL_TRANSPORT_CONTROL_HELLO ||
+        data_type == XGL_TRANSPORT_CONTROL_RESET) {
+        return transport_process_control_packet(ctx, packet);
+    }
     
     /* Extract payload data from packet */
     const uint8_t* data = NULL;
@@ -569,26 +827,49 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             return err;
         }
 
-        xgl_reliable_packet_t* rel_packet = xgl_reliable_find_packet(&ctx->reliable_queue,
+        xgl_transport_peer_state_t* peer = transport_find_peer(ctx, source_id);
+        if (peer == NULL) {
+            return XGL_ERR_SEQUENCE_ERROR;
+        }
+
+        if (packet->session_id != 0U && packet->session_id != peer->session_id) {
+            return XGL_ERR_SEQUENCE_ERROR;
+        }
+
+        xgl_reliable_packet_t* rel_packet = xgl_reliable_find_packet(&peer->reliable_queue,
                                                                       ack_num, source_id);
+        if (rel_packet == NULL) {
+            return XGL_ERR_SEQUENCE_ERROR;
+        }
+
         uint32_t measured_rtt_ms = 0;
         bool has_rtt_sample = false;
-        if (rel_packet != NULL && rel_packet->send_timestamp != 0U) {
+        if (rel_packet->send_timestamp != 0U) {
             measured_rtt_ms = xgl_time_ms() - rel_packet->send_timestamp;
             has_rtt_sample = true;
         }
         
         /* Remove packet from reliable queue */
-        err = xgl_reliable_remove_packet(&ctx->reliable_queue, ack_num, source_id);
+        err = xgl_reliable_remove_packet(&peer->reliable_queue, ack_num, source_id);
         if (err == XGL_OK) {
             /* Update RTT estimate */
             if (has_rtt_sample) {
-                xgl_rtt_update(&ctx->rtt_est, (int32_t)measured_rtt_ms);
+                xgl_rtt_update(&peer->rtt_est, (int32_t)measured_rtt_ms);
             }
             
-            /* Advance sliding window */
-            xgl_window_mark_ack(&ctx->window, ack_num);
-            xgl_window_advance_base(&ctx->window);
+            /* Advance peer-specific sliding window */
+            err = xgl_window_mark_ack(&peer->tx_window, ack_num);
+            if (err != XGL_OK) {
+                return err;
+            }
+            xgl_window_advance_base(&peer->tx_window);
+
+            if (xgl_window_is_in_window(&ctx->window, ack_num)) {
+                (void)xgl_window_mark_ack(&ctx->window, ack_num);
+                (void)xgl_window_advance_base(&ctx->window);
+            }
+        } else {
+            return err;
         }
         
         return XGL_OK;
@@ -598,19 +879,54 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     if (data == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
+
+    if (packet->session_id != 0U) {
+        xgl_transport_peer_state_t* peer = transport_find_peer(ctx, source_id);
+        if (peer == NULL) {
+        peer = transport_get_or_create_peer(ctx, source_id);
+            if (peer == NULL) {
+                return XGL_ERR_NO_MEMORY;
+            }
+            transport_reset_peer_state(ctx, peer, packet->session_id);
+        } else if (packet->session_id != peer->session_id) {
+            return XGL_ERR_SEQUENCE_ERROR;
+        }
+    }
     
     /* Check for duplicate reliable packet */
     if (reliable == XGL_ATTR_RELIABLE_TX) {
-        if (xgl_ack_is_duplicate(&ctx->ack_handler, seq_num)) {
+        if (xgl_ack_is_duplicate_from(&ctx->ack_handler, source_id, seq_num)) {
             /* Sender may have missed our previous ACK. */
-            transport_send_ack(ctx, handle, seq_num, source_id);
+            transport_send_ack(ctx, handle, seq_num, source_id, packet->session_id);
             return XGL_OK;
         }
 
+        if (xgl_ack_is_out_of_order_from(&ctx->ack_handler, source_id, seq_num)) {
+            uint8_t expected_seq = xgl_ack_get_expected_from(&ctx->ack_handler, source_id);
+            (void)transport_send_control(ctx,
+                                         handle,
+                                         source_id,
+                                         XGL_TRANSPORT_CONTROL_NACK,
+                                         expected_seq,
+                                         packet->session_id);
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_dropped++;
+            }
+            return XGL_ERR_SEQUENCE_ERROR;
+        }
+
         /* Mark sequence number as received and ACK it. */
-        xgl_ack_mark_received(&ctx->ack_handler, seq_num);
-        xgl_ack_update_expected(&ctx->ack_handler, seq_num);
-        transport_send_ack(ctx, handle, seq_num, source_id);
+        err = xgl_ack_mark_received_from(&ctx->ack_handler, source_id, seq_num);
+        if (err != XGL_OK) {
+            return err;
+        }
+
+        err = xgl_ack_update_expected_from(&ctx->ack_handler, source_id, seq_num);
+        if (err != XGL_OK) {
+            return err;
+        }
+
+        transport_send_ack(ctx, handle, seq_num, source_id, packet->session_id);
     }
     
     /* Check if packet has fragment flag */

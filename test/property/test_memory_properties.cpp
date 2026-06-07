@@ -16,6 +16,10 @@ using ::testing::Return;
 using ::testing::Invoke;
 using ::testing::AtLeast;
 
+static uint8_t random_valid_source_id(PropertyTestGenerator& gen) {
+    return static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+}
+
 /* Feature: x-gen-link, Property 7: Custom Allocator Usage */
 TEST(XglMemoryProperties, CustomAllocatorUsage) {
     PropertyTestGenerator gen;
@@ -40,7 +44,7 @@ TEST(XglMemoryProperties, CustomAllocatorUsage) {
         /* Create configuration with custom allocator */
         xgl_config_t config;
         xgl_config_get_default(&config);
-        config.source_id = gen.random_uint8();
+        config.source_id = random_valid_source_id(gen);
         config.memory.allocator = mock_alloc.get_allocator();
         
         /* Track allocations before instance creation */
@@ -107,13 +111,12 @@ TEST(XglMemoryProperties, MemoryLeakPrevention) {
         /* Generate random configuration */
         xgl_config_t config;
         xgl_config_get_default(&config);
-        config.source_id = gen.random_uint8();
+        config.source_id = random_valid_source_id(gen);
         config.memory.tx_pool_size = 512 + (gen.random_uint16() % 4096);
         config.protocol.max_retry_count = 1 + (gen.random_uint8() % 10);
         config.protocol.window_size = 1 + (gen.random_uint8() % 16);
         config.protocol.max_frame_size = 64 + (gen.random_uint16() % 960);
-        /* RX buffer must be large enough: max_frame_size + header + CRC16 */
-        config.memory.rx_buffer_size = config.protocol.max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
+        config.memory.rx_buffer_size = config.protocol.max_frame_size;
         config.memory.allocator = mock_alloc.get_allocator();
         
         /* Create instance */
@@ -185,7 +188,7 @@ TEST(XglMemoryProperties, AllocationFailureHandling) {
         /* Create configuration */
         xgl_config_t config;
         xgl_config_get_default(&config);
-        config.source_id = gen.random_uint8();
+        config.source_id = random_valid_source_id(gen);
         config.memory.allocator = mock_alloc.get_allocator();
         
         /* Track memory before operation */
@@ -266,10 +269,9 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
         /* Create configuration with very small memory pool */
         xgl_config_t config;
         xgl_config_get_preset_tiny(&config);  /* Use tiny preset for minimal pool */
-        config.source_id = gen.random_uint8();
+        config.source_id = random_valid_source_id(gen);
         config.protocol.max_frame_size = 64;
-        /* RX buffer must be large enough: max_frame_size + header + CRC16 */
-        config.memory.rx_buffer_size = config.protocol.max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
+        config.memory.rx_buffer_size = config.protocol.max_frame_size;
         config.route_table = &route;
         config.route_table_len = 1;
         

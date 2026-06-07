@@ -36,6 +36,7 @@ static const struct {
     {XGL_ERR_TX_FAILED, "Transmission failed"},
     {XGL_ERR_TIMEOUT, "Operation timeout"},
     {XGL_ERR_ACK_TIMEOUT, "ACK timeout"},
+    {XGL_ERR_TTL_EXPIRED, "TTL expired"},
     
     /* Protocol errors (300-399) */
     {XGL_ERR_INVALID_FRAME, "Invalid frame"},

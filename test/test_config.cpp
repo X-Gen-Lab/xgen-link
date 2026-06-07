@@ -31,7 +31,7 @@ TEST_F(XglConfigTest, GetDefaultConfig) {
     
     /* Verify default values (medium preset) */
     EXPECT_STREQ(config.name, "medium");
-    EXPECT_EQ(config.source_id, 0);
+    EXPECT_EQ(config.source_id, 1);
     EXPECT_EQ(config.memory.tx_pool_size, 4096);
     EXPECT_EQ(config.memory.rx_buffer_size, 544);
     EXPECT_EQ(config.protocol.ack_timeout_ms, 1000);
@@ -122,6 +122,30 @@ TEST_F(XglConfigTest, ValidateValidConfig) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 }
 
+TEST_F(XglConfigTest, ValidateRejectsReservedSourceId) {
+    xgl_config_get_default(&config);
+    config.source_id = 0;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+}
+
+TEST_F(XglConfigTest, ValidateRejectsReservedCodecFeatureFlags) {
+    xgl_config_get_default(&config);
+    config.features.enable_compression = true;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+
+    xgl_config_get_default(&config);
+    config.features.enable_encryption = true;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+}
+
+#ifndef XGL_THREAD_SAFE
+TEST_F(XglConfigTest, ValidateRejectsRuntimeThreadSafeWithoutBuildSupport) {
+    xgl_config_get_default(&config);
+    config.features.thread_safe = true;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+}
+#endif
+
 TEST_F(XglConfigTest, ValidateTxPoolSizeTooSmall) {
     xgl_config_get_default(&config);
     config.memory.tx_pool_size = 256;  /* Below minimum of 512 */
@@ -203,7 +227,7 @@ TEST_F(XglConfigTest, ValidateFrameSizeSmallerThanHeader) {
 TEST_F(XglConfigTest, ValidateRxBufferTooSmallForFrame) {
     xgl_config_get_default(&config);
     config.protocol.max_frame_size = 512;
-    config.memory.rx_buffer_size = 256;  /* Too small for max frame */
+    config.memory.rx_buffer_size = 256;  /* Too small for full frame */
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_BUFFER_TOO_SMALL);
 }
 

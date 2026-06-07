@@ -36,6 +36,7 @@ typedef struct {
     uint8_t source_id;              /**< Source node ID */
     uint8_t target_id;              /**< Target node ID */
     uint8_t seq_num;                /**< Sequence number */
+    uint16_t session_id;            /**< Transport session/epoch ID */
     uint8_t data_type;              /**< Data type */
     
     /* Attributes */

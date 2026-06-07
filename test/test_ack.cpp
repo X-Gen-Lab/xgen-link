@@ -152,6 +152,17 @@ TEST_F(XglAckTest, DuplicateDetectionWraparound) {
     EXPECT_TRUE(xgl_ack_is_duplicate(&handler, 255));
 }
 
+TEST_F(XglAckTest, DuplicateDetectionIsScopedBySource) {
+    ASSERT_EQ(xgl_ack_mark_received_from(&handler, 0x10, 42), XGL_OK);
+
+    EXPECT_TRUE(xgl_ack_is_duplicate_from(&handler, 0x10, 42));
+    EXPECT_FALSE(xgl_ack_is_duplicate_from(&handler, 0x11, 42));
+
+    ASSERT_EQ(xgl_ack_mark_received_from(&handler, 0x11, 42), XGL_OK);
+    EXPECT_TRUE(xgl_ack_is_duplicate_from(&handler, 0x10, 42));
+    EXPECT_TRUE(xgl_ack_is_duplicate_from(&handler, 0x11, 42));
+}
+
 /*---------------------------------------------------------------------------*/
 /* Out-of-Order Detection Tests                                             */
 /*---------------------------------------------------------------------------*/
@@ -216,6 +227,16 @@ TEST_F(XglAckTest, UpdateExpectedWraparound) {
     /* Update to 0 (wraparound) */
     xgl_ack_update_expected(&handler, 255);
     EXPECT_FALSE(xgl_ack_is_out_of_order(&handler, 0));
+}
+
+TEST_F(XglAckTest, ExpectedSequenceIsScopedBySource) {
+    ASSERT_EQ(xgl_ack_update_expected_from(&handler, 0x10, 9), XGL_OK);
+
+    EXPECT_FALSE(xgl_ack_is_out_of_order_from(&handler, 0x10, 10));
+    EXPECT_TRUE(xgl_ack_is_out_of_order_from(&handler, 0x10, 9));
+
+    EXPECT_FALSE(xgl_ack_is_out_of_order_from(&handler, 0x11, 0));
+    EXPECT_TRUE(xgl_ack_is_out_of_order_from(&handler, 0x11, 10));
 }
 
 /*---------------------------------------------------------------------------*/

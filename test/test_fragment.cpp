@@ -79,6 +79,51 @@ TEST_F(XglFragmentTest, FragmentSmallData) {
     xgl_fragment_free_fragments(&manager, fragments, fragment_count);
 }
 
+TEST_F(XglFragmentTest, FragmentHeaderUsesExplicitWireFormat) {
+    std::vector<uint8_t> data(300);
+    for (size_t i = 0; i < data.size(); i++) {
+        data[i] = static_cast<uint8_t>(i & 0xFFU);
+    }
+
+    uint8_t* fragments[8] = {};
+    size_t fragment_lens[8] = {};
+    size_t fragment_count = 8;
+    uint8_t fragment_id = 0;
+
+    ASSERT_EQ(xgl_fragment_data(&manager,
+                                data.data(),
+                                data.size(),
+                                80,
+                                fragments,
+                                fragment_lens,
+                                &fragment_count,
+                                &fragment_id),
+              XGL_OK);
+    ASSERT_GT(fragment_count, 1U);
+    ASSERT_GE(fragment_lens[0], static_cast<size_t>(XGL_FRAGMENT_HEADER_SIZE));
+
+    EXPECT_EQ(XGL_FRAGMENT_HEADER_SIZE, 5U);
+    EXPECT_EQ(fragments[0][0], fragment_id);
+    EXPECT_EQ(fragments[0][1], 0U);
+    EXPECT_EQ(fragments[0][2], static_cast<uint8_t>(fragment_count));
+    EXPECT_EQ(fragments[0][3], 0U);
+    EXPECT_EQ(fragments[0][4], 0U);
+
+    const size_t first_payload_size = fragment_lens[0] - XGL_FRAGMENT_HEADER_SIZE;
+    ASSERT_GT(first_payload_size, 0U);
+    EXPECT_EQ(std::memcmp(fragments[0] + XGL_FRAGMENT_HEADER_SIZE,
+                          data.data(),
+                          first_payload_size),
+              0);
+
+    const size_t second_offset = first_payload_size;
+    EXPECT_EQ(fragments[1][1], 1U);
+    EXPECT_EQ(fragments[1][3], static_cast<uint8_t>(second_offset & 0xFFU));
+    EXPECT_EQ(fragments[1][4], static_cast<uint8_t>((second_offset >> 8U) & 0xFFU));
+
+    xgl_fragment_free_fragments(&manager, fragments, fragment_count);
+}
+
 TEST_F(XglFragmentTest, ReassembleFragments) {
     /* Create test data */
     const size_t data_len = 300;
@@ -146,6 +191,101 @@ TEST_F(XglFragmentTest, ReassembleFragments) {
     if (complete_data != nullptr) {
         xgl_fragment_free_data(&manager, complete_data);
     }
+}
+
+TEST_F(XglFragmentTest, RejectsFragmentOffsetThatDoesNotMatchIndexOrder) {
+    uint8_t first_fragment[] = {
+        7, 0, 3, 0, 0,
+        'a', 'b', 'c', 'd'
+    };
+    uint8_t invalid_second_fragment[] = {
+        7, 1, 3, 100, 0,
+        'e', 'f', 'g', 'h'
+    };
+
+    uint8_t* complete_data = nullptr;
+    size_t complete_len = 0;
+
+    EXPECT_EQ(xgl_fragment_process(&manager,
+                                   1,
+                                   2,
+                                   first_fragment,
+                                   sizeof(first_fragment),
+                                   &complete_data,
+                                   &complete_len,
+                                   1000),
+              XGL_ERR_BUSY);
+
+    EXPECT_EQ(xgl_fragment_process(&manager,
+                                   1,
+                                   2,
+                                   invalid_second_fragment,
+                                   sizeof(invalid_second_fragment),
+                                   &complete_data,
+                                   &complete_len,
+                                   1001),
+              XGL_ERR_INVALID_FRAME);
+}
+
+TEST_F(XglFragmentTest, RejectsReassemblyExceedingMaxMessageSize) {
+    ASSERT_EQ(xgl_fragment_set_limits(&manager, 12, 0), XGL_OK);
+
+    uint8_t first_fragment[] = {
+        9, 0, 3, 0, 0,
+        'a', 'b', 'c', 'd', 'e', 'f'
+    };
+
+    uint8_t* complete_data = nullptr;
+    size_t complete_len = 0;
+
+    EXPECT_EQ(xgl_fragment_process(&manager,
+                                   1,
+                                   2,
+                                   first_fragment,
+                                   sizeof(first_fragment),
+                                   &complete_data,
+                                   &complete_len,
+                                   1000),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
+}
+
+TEST_F(XglFragmentTest, EnforcesAggregateReassemblyByteBudget) {
+    ASSERT_EQ(xgl_fragment_set_limits(&manager, 0, 16), XGL_OK);
+
+    uint8_t first_message[] = {
+        11, 0, 2, 0, 0,
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'
+    };
+    uint8_t second_message[] = {
+        12, 0, 2, 0, 0,
+        'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'
+    };
+
+    uint8_t* complete_data = nullptr;
+    size_t complete_len = 0;
+
+    EXPECT_EQ(xgl_fragment_process(&manager,
+                                   1,
+                                   2,
+                                   first_message,
+                                   sizeof(first_message),
+                                   &complete_data,
+                                   &complete_len,
+                                   1000),
+              XGL_ERR_BUSY);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 1U);
+
+    EXPECT_EQ(xgl_fragment_process(&manager,
+                                   2,
+                                   2,
+                                   second_message,
+                                   sizeof(second_message),
+                                   &complete_data,
+                                   &complete_len,
+                                   1001),
+              XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 1U);
 }
 
 TEST_F(XglFragmentTest, LargeData) {

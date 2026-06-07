@@ -11,7 +11,10 @@
 #include <xgl/xgl_network.h>
 #include <xgl/xgl_transport.h>
 #include <xgl/xgl_route.h>
+#include <xgl/xgl_config.h>
 #include <cstring>
+#include <cstdlib>
+#include <vector>
 
 using ::testing::_;
 using ::testing::Return;
@@ -34,6 +37,27 @@ static xgl_error_t mock_phy_tx(const uint8_t* data, size_t len, void* user_data)
 
 static xgl_error_t mock_phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
     return g_mock_phy->rx(buffer, len, user_data);
+}
+
+struct CountingAllocatorState {
+    size_t alloc_count = 0;
+    size_t free_count = 0;
+};
+
+static CountingAllocatorState* g_counting_allocator_state = nullptr;
+
+static void* counting_malloc(size_t size) {
+    if (g_counting_allocator_state != nullptr) {
+        g_counting_allocator_state->alloc_count++;
+    }
+    return std::malloc(size);
+}
+
+static void counting_free(void* ptr) {
+    if (ptr != nullptr && g_counting_allocator_state != nullptr) {
+        g_counting_allocator_state->free_count++;
+    }
+    std::free(ptr);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -199,6 +223,59 @@ TEST_F(XglDatalinkTest, SendFramePhyError) {
     err = xgl_datalink_send(&ctx, &phy_ops, &frame);
     EXPECT_EQ(err, XGL_ERR_TX_FAILED);
     EXPECT_EQ(stats.tx_errors, 1);
+}
+
+TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
+    CountingAllocatorState allocator_state;
+    g_counting_allocator_state = &allocator_state;
+    xgl_allocator_t allocator = {
+        .malloc = counting_malloc,
+        .free = counting_free,
+        .user_data = &allocator_state
+    };
+
+    xgl_datalink_ctx_t large_ctx;
+    uint8_t cache[1024];
+    xgl_layer_stats_t large_stats = {};
+    uint64_t crc8 = 0;
+    uint64_t crc16 = 0;
+    xgl_datalink_config_t config = {
+        .rx_cache = cache,
+        .rx_cache_size = sizeof(cache),
+        .source_id = SOURCE_ID,
+        .stats = &large_stats,
+        .rx_crc8_errors = &crc8,
+        .rx_crc16_errors = &crc16,
+        .upper_layer = nullptr,
+        .error_callback = nullptr,
+        .callback_user_data = nullptr,
+        .allocator = &allocator
+    };
+    ASSERT_EQ(xgl_datalink_init(&large_ctx, &config), XGL_OK);
+
+    std::vector<uint8_t> payload(XGL_DATALINK_STACK_BUFFER_SIZE, 0xA5);
+    xgl_frame_t frame;
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .data_type = 0x01,
+        .seq_num = 0x00,
+        .ack_num = 0x00,
+        .payload = payload.data(),
+        .payload_len = payload.size(),
+        .reliable = false,
+        .priority = 0
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    EXPECT_CALL(mock_phy, tx(_, _, _))
+        .WillOnce(Return(XGL_OK));
+
+    EXPECT_EQ(xgl_datalink_send(&large_ctx, &phy_ops, &frame), XGL_OK);
+    EXPECT_EQ(allocator_state.alloc_count, 1U);
+    EXPECT_EQ(allocator_state.free_count, 1U);
+
+    g_counting_allocator_state = nullptr;
 }
 
 /*---------------------------------------------------------------------------*/

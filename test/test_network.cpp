@@ -328,7 +328,7 @@ TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
     frame_buf[7] = 0;
     frame_buf[8] = 0;
     frame_buf[9] = 0;
-    frame_buf[10] = 0;
+    frame_buf[10] = XGL_DEFAULT_TTL;
     frame_buf[11] = 0;
     
     memcpy(&frame_buf[12], "hello", 5);
@@ -372,7 +372,7 @@ TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
     frame_buf[7] = 0;
     frame_buf[8] = 0;
     frame_buf[9] = 0;
-    frame_buf[10] = 0;
+    frame_buf[10] = XGL_DEFAULT_TTL;
     frame_buf[11] = 0;
     memcpy(&frame_buf[12], "hello", 5);
     frame_buf[17] = 0;
@@ -382,6 +382,33 @@ TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
     EXPECT_EQ(first_phy_count, 0);
     EXPECT_EQ(second_phy_count, 1);
     EXPECT_EQ(stats.tx_packets, 1);
+}
+
+TEST_F(XglNetworkTest, ForwardingDropsExpiredTtl) {
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1), XGL_OK);
+
+    uint8_t frame_buf[64];
+    memset(frame_buf, 0, sizeof(frame_buf));
+
+    frame_buf[0] = XGL_SOF;
+    frame_buf[1] = (1 << 4) | 1;
+    frame_buf[2] = REMOTE_ID;
+    frame_buf[3] = FORWARD_ID;
+    frame_buf[4] = 0x40;
+    frame_buf[5] = 0;
+    frame_buf[6] = 5;
+    frame_buf[7] = 0;
+    frame_buf[8] = 0;
+    frame_buf[9] = 0;
+    frame_buf[10] = 0;
+    frame_buf[11] = 0;
+    memcpy(&frame_buf[12], "hello", 5);
+    frame_buf[17] = 0;
+    frame_buf[18] = 0;
+
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf, 19), XGL_ERR_TTL_EXPIRED);
+    EXPECT_EQ(phy_tx_count, 0);
+    EXPECT_EQ(stats.rx_dropped, 1);
 }
 
 TEST_F(XglNetworkTest, ReceivePacketNoRouteForForwarding) {
@@ -399,7 +426,7 @@ TEST_F(XglNetworkTest, ReceivePacketNoRouteForForwarding) {
     frame_buf[7] = 0;
     frame_buf[8] = 0;
     frame_buf[9] = 0;
-    frame_buf[10] = 0;
+    frame_buf[10] = XGL_DEFAULT_TTL;
     frame_buf[11] = 0;
     
     memcpy(&frame_buf[12], "hello", 5);

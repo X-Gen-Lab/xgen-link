@@ -20,6 +20,8 @@ extern "C" {
 /* ACK Handler Structure                                                     */
 /*---------------------------------------------------------------------------*/
 
+typedef struct xgl_ack_peer_state xgl_ack_peer_state_t;
+
 /**
  * \brief           ACK handler structure
  * \note            Manages duplicate detection and out-of-order handling
@@ -29,6 +31,7 @@ typedef struct {
     size_t bitmap_size;             /**< Size of bitmap in bytes */
     uint8_t expected_seq_num;       /**< Expected next sequence number */
     xgl_allocator_t* allocator;     /**< Memory allocator */
+    xgl_ack_peer_state_t* peers;    /**< Source-specific receive state list */
 } xgl_ack_handler_t;
 
 /*---------------------------------------------------------------------------*/
@@ -74,6 +77,8 @@ xgl_error_t xgl_ack_generate(uint8_t seq_num,
  * \param[in]       source_id: Source node ID of ACK
  * \param[out]      is_valid: Set to true if ACK is valid
  * \return          XGL_OK on success, error code otherwise
+ * \note            Performs ACK field validation only. Queue matching is
+ *                  handled by the reliable transmission queue.
  */
 xgl_error_t xgl_ack_process(xgl_ack_handler_t* handler,
                             uint8_t ack_num,
@@ -90,6 +95,17 @@ bool xgl_ack_is_duplicate(const xgl_ack_handler_t* handler,
                           uint8_t seq_num);
 
 /**
+ * \brief           Check if packet is duplicate for a source node
+ * \param[in]       handler: ACK handler structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       seq_num: Sequence number to check
+ * \return          true if duplicate, false otherwise
+ */
+bool xgl_ack_is_duplicate_from(const xgl_ack_handler_t* handler,
+                               uint8_t source_id,
+                               uint8_t seq_num);
+
+/**
  * \brief           Mark sequence number as received
  * \param[in,out]   handler: ACK handler structure
  * \param[in]       seq_num: Sequence number to mark
@@ -97,6 +113,17 @@ bool xgl_ack_is_duplicate(const xgl_ack_handler_t* handler,
  */
 xgl_error_t xgl_ack_mark_received(xgl_ack_handler_t* handler,
                                   uint8_t seq_num);
+
+/**
+ * \brief           Mark sequence number as received for a source node
+ * \param[in,out]   handler: ACK handler structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       seq_num: Sequence number to mark
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_ack_mark_received_from(xgl_ack_handler_t* handler,
+                                       uint8_t source_id,
+                                       uint8_t seq_num);
 
 /**
  * \brief           Check if packet is out-of-order
@@ -108,12 +135,43 @@ bool xgl_ack_is_out_of_order(const xgl_ack_handler_t* handler,
                               uint8_t seq_num);
 
 /**
+ * \brief           Check if packet is out-of-order for a source node
+ * \param[in]       handler: ACK handler structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       seq_num: Sequence number to check
+ * \return          true if out-of-order, false otherwise
+ */
+bool xgl_ack_is_out_of_order_from(const xgl_ack_handler_t* handler,
+                                  uint8_t source_id,
+                                  uint8_t seq_num);
+
+/**
  * \brief           Update expected sequence number
  * \param[in,out]   handler: ACK handler structure
  * \param[in]       seq_num: New expected sequence number
  */
 void xgl_ack_update_expected(xgl_ack_handler_t* handler,
                              uint8_t seq_num);
+
+/**
+ * \brief           Update expected sequence number for a source node
+ * \param[in,out]   handler: ACK handler structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       seq_num: Last in-order sequence number
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_ack_update_expected_from(xgl_ack_handler_t* handler,
+                                         uint8_t source_id,
+                                         uint8_t seq_num);
+
+/**
+ * \brief           Get expected sequence number for a source node
+ * \param[in]       handler: ACK handler structure
+ * \param[in]       source_id: Source node ID
+ * \return          Expected sequence number, or 0 if no source state exists
+ */
+uint8_t xgl_ack_get_expected_from(const xgl_ack_handler_t* handler,
+                                  uint8_t source_id);
 
 /**
  * \brief           Reset ACK handler state

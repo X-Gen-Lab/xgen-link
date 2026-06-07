@@ -53,6 +53,8 @@ typedef struct {
     uint8_t reliable_type;      /**< Raw reliable attribute type, 0 uses reliable flag */
     bool fragment;              /**< Fragment flag */
     uint8_t priority;           /**< Priority level (0-7) */
+    uint16_t session_id;        /**< Transport epoch/session ID, encoded in attr_msb low bits */
+    uint8_t ttl;                /**< Hop limit stored in reserved header byte */
 } xgl_frame_params_t;
 
 /**
@@ -170,7 +172,8 @@ static inline uint8_t xgl_frame_get_version(const xgl_frame_header_t* header) {
  * \param[in]       data_type: Data type (0-15)
  */
 static inline void xgl_frame_set_datatype(xgl_frame_header_t* header, uint8_t data_type) {
-    header->version_datatype = (header->version_datatype & 0xF0) | (data_type & 0x0F);
+    header->version_datatype = (uint8_t)(((uint32_t)header->version_datatype & 0xF0U) |
+                                         ((uint32_t)data_type & 0x0FU));
 }
 
 /**
@@ -179,7 +182,7 @@ static inline void xgl_frame_set_datatype(xgl_frame_header_t* header, uint8_t da
  * \return          Data type (0-15)
  */
 static inline uint8_t xgl_frame_get_datatype(const xgl_frame_header_t* header) {
-    return header->version_datatype & 0x0F;
+    return (uint8_t)(header->version_datatype & 0x0FU);
 }
 
 /**
@@ -188,8 +191,9 @@ static inline uint8_t xgl_frame_get_datatype(const xgl_frame_header_t* header) {
  * \param[in]       reliable: Reliable transmission flag
  */
 static inline void xgl_frame_set_reliable(uint8_t* attr_lsb, bool reliable) {
-    *attr_lsb = (*attr_lsb & ~XGL_ATTR_RELIABLE_MASK) | 
-                (reliable ? XGL_ATTR_RELIABLE_TX : XGL_ATTR_RELIABLE_NONE);
+    uint8_t reliable_bits = reliable ? XGL_ATTR_RELIABLE_TX : XGL_ATTR_RELIABLE_NONE;
+    *attr_lsb = (uint8_t)(((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_RELIABLE_MASK)) |
+                          (uint32_t)reliable_bits);
 }
 
 /**
@@ -198,8 +202,8 @@ static inline void xgl_frame_set_reliable(uint8_t* attr_lsb, bool reliable) {
  * \param[in]       reliable_type: Raw reliable type bits
  */
 static inline void xgl_frame_set_reliable_type(uint8_t* attr_lsb, uint8_t reliable_type) {
-    *attr_lsb = (*attr_lsb & (uint8_t)~XGL_ATTR_RELIABLE_MASK) |
-                (reliable_type & XGL_ATTR_RELIABLE_MASK);
+    *attr_lsb = (uint8_t)(((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_RELIABLE_MASK)) |
+                          ((uint32_t)reliable_type & (uint32_t)XGL_ATTR_RELIABLE_MASK));
 }
 
 /**
@@ -209,9 +213,9 @@ static inline void xgl_frame_set_reliable_type(uint8_t* attr_lsb, uint8_t reliab
  */
 static inline void xgl_frame_set_fragment(uint8_t* attr_lsb, bool fragment) {
     if (fragment) {
-        *attr_lsb |= XGL_ATTR_FRAGMENT_MASK;
+        *attr_lsb = (uint8_t)((uint32_t)*attr_lsb | (uint32_t)XGL_ATTR_FRAGMENT_MASK);
     } else {
-        *attr_lsb &= ~XGL_ATTR_FRAGMENT_MASK;
+        *attr_lsb = (uint8_t)((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_FRAGMENT_MASK));
     }
 }
 
@@ -221,8 +225,8 @@ static inline void xgl_frame_set_fragment(uint8_t* attr_lsb, bool fragment) {
  * \param[in]       priority: Priority level (0-7)
  */
 static inline void xgl_frame_set_priority(uint8_t* attr_lsb, uint8_t priority) {
-    *attr_lsb = (*attr_lsb & ~XGL_ATTR_PRIORITY_MASK) | 
-                (priority & XGL_ATTR_PRIORITY_MASK);
+    *attr_lsb = (uint8_t)(((uint32_t)*attr_lsb & ~((uint32_t)XGL_ATTR_PRIORITY_MASK)) |
+                          ((uint32_t)priority & (uint32_t)XGL_ATTR_PRIORITY_MASK));
 }
 
 /**
@@ -231,7 +235,8 @@ static inline void xgl_frame_set_priority(uint8_t* attr_lsb, uint8_t priority) {
  * \return          Reliable transmission type
  */
 static inline uint8_t xgl_frame_get_reliable(uint8_t attr_lsb) {
-    return (attr_lsb & XGL_ATTR_RELIABLE_MASK) >> XGL_ATTR_RELIABLE_SHIFT;
+    return (uint8_t)(((uint32_t)attr_lsb & (uint32_t)XGL_ATTR_RELIABLE_MASK) >>
+                     XGL_ATTR_RELIABLE_SHIFT);
 }
 
 /**
@@ -240,7 +245,7 @@ static inline uint8_t xgl_frame_get_reliable(uint8_t attr_lsb) {
  * \return          Priority level (0-7)
  */
 static inline uint8_t xgl_frame_get_priority(uint8_t attr_lsb) {
-    return attr_lsb & XGL_ATTR_PRIORITY_MASK;
+    return (uint8_t)(attr_lsb & XGL_ATTR_PRIORITY_MASK);
 }
 
 #ifdef __cplusplus

@@ -41,6 +41,7 @@ typedef enum {
     XGL_ERR_TX_FAILED = 201,        /**< Transmission failed */
     XGL_ERR_TIMEOUT = 202,          /**< Operation timeout */
     XGL_ERR_ACK_TIMEOUT = 203,      /**< ACK timeout */
+    XGL_ERR_TTL_EXPIRED = 204,      /**< Packet TTL expired */
     
     /*-----------------------------------------------------------------------*/
     /* Protocol errors (300-399)                                             */

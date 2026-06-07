@@ -96,6 +96,24 @@ TEST(XglFrameTest, BuildFrameEmptyPayload) {
     EXPECT_EQ(frame.header.data_len, 0);
 }
 
+TEST(XglFrameTest, BuildFrameRejectsPayloadLargerThanWireLength) {
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x01};
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = 0x05,
+        .seq_num = 0x42,
+        .ack_num = 0x00,
+        .payload = payload,
+        .payload_len = 65536,
+        .reliable = false,
+        .priority = 0
+    };
+
+    EXPECT_EQ(xgl_frame_build(&frame, &params), XGL_ERR_BUFFER_TOO_SMALL);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Frame Serialization Tests                                                 */
 /*---------------------------------------------------------------------------*/

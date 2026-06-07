@@ -31,6 +31,13 @@ extern "C" {
  */
 #define XGL_FRAGMENT_TIMEOUT_MS     5000
 
+/**
+ * \brief           Serialized fragment control header size
+ * \details         Wire layout: fragment_id, fragment_index,
+ *                  total_fragments, fragment_offset_lsb, fragment_offset_msb.
+ */
+#define XGL_FRAGMENT_HEADER_SIZE    5
+
 /*---------------------------------------------------------------------------*/
 /* Fragment Structure                                                        */
 /*---------------------------------------------------------------------------*/
@@ -71,6 +78,8 @@ typedef struct {
     uint8_t* data;                  /**< Reassembly data buffer */
     size_t data_len;                /**< Total data length */
     size_t buffer_size;             /**< Allocated buffer size */
+    size_t expected_payload_size;   /**< Standard payload size for non-final fragments */
+    size_t reserved_size;           /**< Bytes reserved against manager budget */
     
     /* Timeout tracking */
     uint32_t first_fragment_time;   /**< Timestamp of first fragment */
@@ -99,6 +108,9 @@ typedef struct {
     
     /* Configuration */
     uint32_t reassembly_timeout_ms; /**< Reassembly timeout */
+    size_t max_message_size;        /**< Maximum reassembled message bytes (0 = unlimited) */
+    size_t max_reassembly_bytes;    /**< Maximum aggregate reserved bytes (0 = unlimited) */
+    size_t current_reassembly_bytes;/**< Current aggregate reserved bytes */
     
 } xgl_fragment_manager_t;
 
@@ -118,6 +130,17 @@ xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
                               size_t max_reassembly_buffers,
                               uint32_t reassembly_timeout_ms,
                               xgl_allocator_t* allocator);
+
+/**
+ * \brief           Configure reassembly memory limits
+ * \param[in,out]   manager: Fragmentation manager structure
+ * \param[in]       max_message_size: Maximum complete message bytes (0 = unlimited)
+ * \param[in]       max_reassembly_bytes: Aggregate in-flight bytes (0 = unlimited)
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_fragment_set_limits(xgl_fragment_manager_t* manager,
+                                    size_t max_message_size,
+                                    size_t max_reassembly_bytes);
 
 /**
  * \brief           Destroy fragmentation manager

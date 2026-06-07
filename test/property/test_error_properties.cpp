@@ -19,6 +19,10 @@ using ::testing::Return;
 using ::testing::Invoke;
 using ::testing::AtLeast;
 
+static uint8_t random_valid_source_id(PropertyTestGenerator& gen) {
+    return static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Mock Error Callback                                                       */
 /*---------------------------------------------------------------------------*/
@@ -84,7 +88,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
         {
             xgl_config_t config;
             xgl_config_get_default(&config);
-            config.source_id = gen.random_uint8();
+            config.source_id = random_valid_source_id(gen);
             
             /* Invalid window size (0) */
             config.protocol.window_size = 0;
@@ -106,7 +110,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
         {
             xgl_config_t config;
             xgl_config_get_default(&config);
-            config.source_id = gen.random_uint8();
+            config.source_id = random_valid_source_id(gen);
             
             /* Create instance but don't initialize */
             xgl_handle_t handle = xgl_create(&config);
@@ -151,7 +155,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
             xgl_config_get_default(&config);
             config.source_id = 1;
             config.protocol.max_frame_size = 256;
-            config.memory.rx_buffer_size = config.protocol.max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
+            config.memory.rx_buffer_size = config.protocol.max_frame_size;
             config.route_table = &route;
             config.route_table_len = 1;
             
@@ -183,9 +187,9 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
         {
             xgl_config_t config;
             xgl_config_get_default(&config);
-            config.source_id = gen.random_uint8();
+            config.source_id = random_valid_source_id(gen);
             config.protocol.max_frame_size = 256;
-            /* RX buffer too small (less than max_frame_size + header + CRC) */
+            /* RX buffer too small (less than full max_frame_size) */
             config.memory.rx_buffer_size = 100;  /* Too small */
             
             xgl_error_t err = xgl_config_validate(&config);
@@ -280,7 +284,7 @@ TEST(XglErrorProperties, ErrorCallbackInvocation) {
         xgl_config_get_default(&config);
         config.source_id = 1;
         config.protocol.max_frame_size = 256;
-        config.memory.rx_buffer_size = config.protocol.max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
+        config.memory.rx_buffer_size = config.protocol.max_frame_size;
         config.route_table = &route;
         config.route_table_len = 1;
         config.error_callback = MockErrorCallback::get_callback();
@@ -402,7 +406,7 @@ TEST(XglErrorProperties, ErrorStatistics) {
         xgl_config_get_default(&config);
         config.source_id = 1;
         config.protocol.max_frame_size = 256;
-        config.memory.rx_buffer_size = config.protocol.max_frame_size + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
+        config.memory.rx_buffer_size = config.protocol.max_frame_size;
         config.route_table = &route;
         config.route_table_len = 1;
         

@@ -32,6 +32,7 @@ typedef struct xgl_packet {
     uint8_t target_id;              /**< Target node ID */
     uint8_t seq_num;                /**< Sequence number */
     uint8_t ack_num;                /**< Acknowledgment number */
+    uint16_t session_id;            /**< Transport session/epoch ID */
     
     /*-----------------------------------------------------------------------*/
     /* Attributes                                                            */

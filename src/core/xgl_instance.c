@@ -150,13 +150,28 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         goto cleanup_route_table;
     }
     memset(handle->seq_numbers, 0, handle->seq_numbers_count);
+
+    if (handle->config.route_table_len > 0) {
+        handle->route_last_read_count = handle->config.route_table_len;
+        handle->route_last_read_ms = (uint32_t*)xgl_alloc(
+            handle->allocator,
+            handle->route_last_read_count * sizeof(uint32_t)
+        );
+        if (handle->route_last_read_ms == NULL) {
+            err = XGL_ERR_NO_MEMORY;
+            goto cleanup_seq_numbers;
+        }
+        memset(handle->route_last_read_ms,
+               0,
+               handle->route_last_read_count * sizeof(uint32_t));
+    }
     
     /* Allocate RX buffer for datalink layer */
     size_t rx_buffer_size = handle->config.memory.rx_buffer_size;
     uint8_t* rx_buffer = (uint8_t*)xgl_alloc(handle->allocator, rx_buffer_size);
     if (rx_buffer == NULL) {
         err = XGL_ERR_NO_MEMORY;
-        goto cleanup_seq_numbers;
+        goto cleanup_route_read_times;
     }
     
     /* Initialize data link layer */
@@ -169,7 +184,9 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .rx_crc16_errors = &handle->stats.rx_crc16_errors,
         .upper_layer = NULL,  /* Will be set after network layer init */
         .error_callback = handle->config.error_callback,
-        .callback_user_data = handle->config.callback_user_data
+        .callback_user_data = handle->config.callback_user_data,
+        .owner_handle = handle,
+        .allocator = handle->allocator
     };
     err = xgl_datalink_init(&handle->layers.datalink_ctx, &datalink_config);
     if (err != XGL_OK) {
@@ -199,6 +216,7 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .window_size = handle->config.protocol.window_size,
         .enable_fragmentation = handle->config.features.enable_fragmentation,
         .max_frame_size = handle->config.protocol.max_frame_size,
+        .route_table = &handle->route_table,
         .lower_layer = NULL,  /* Will be set after creating network interface */
         .rx_callback = handle->config.rx_callback,
         .error_callback = handle->config.error_callback,
@@ -235,9 +253,6 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     handle->layers.network_ctx.upper_layer = &handle->layers.transport_iface;
     handle->layers.transport_ctx.lower_layer = &handle->layers.network_iface;
     
-    /* Pass handle for callbacks */
-    handle->layers.datalink_ctx.callback_user_data = handle;
-    
     /* Mark as initialized */
     handle->initialized = true;
     
@@ -246,6 +261,11 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     /* Cleanup on error */
 cleanup_rx_buffer:
     xgl_free(handle->allocator, rx_buffer);
+
+cleanup_route_read_times:
+    xgl_free(handle->allocator, handle->route_last_read_ms);
+    handle->route_last_read_ms = NULL;
+    handle->route_last_read_count = 0;
     
 cleanup_seq_numbers:
     xgl_free(handle->allocator, handle->seq_numbers);
@@ -299,6 +319,12 @@ void xgl_destroy(xgl_handle_t handle) {
     if (handle->seq_numbers != NULL) {
         xgl_free(handle->allocator, handle->seq_numbers);
         handle->seq_numbers = NULL;
+    }
+
+    if (handle->route_last_read_ms != NULL) {
+        xgl_free(handle->allocator, handle->route_last_read_ms);
+        handle->route_last_read_ms = NULL;
+        handle->route_last_read_count = 0;
     }
     
     /* Destroy route table */
@@ -360,9 +386,6 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
         return;
     }
     
-    /* Suppress unused parameter warning */
-    (void)freq_hz;
-    
     /* Get current time */
     current_time_ms = xgl_time_ms();
     
@@ -377,6 +400,29 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
     for (i = 0; i < handle->config.route_table_len; i++) {
         xgl_route_item_t* route = &handle->config.route_table[i];
         if (route->phy != NULL && route->phy->rx != NULL) {
+            uint32_t route_freq_hz = route->read_freq_hz;
+            bool should_read = true;
+
+            if (route_freq_hz > 0U && freq_hz > 0U && route_freq_hz < freq_hz &&
+                handle->route_last_read_ms != NULL && i < handle->route_last_read_count) {
+                uint32_t interval_ms = 1000U / route_freq_hz;
+                if (interval_ms == 0U) {
+                    interval_ms = 1U;
+                }
+                if (handle->route_last_read_ms[i] != 0U &&
+                    current_time_ms - handle->route_last_read_ms[i] < interval_ms) {
+                    should_read = false;
+                }
+            }
+
+            if (!should_read) {
+                continue;
+            }
+
+            if (handle->route_last_read_ms != NULL && i < handle->route_last_read_count) {
+                handle->route_last_read_ms[i] = current_time_ms;
+            }
+
             /* Receive and parse frames from this PHY through data link layer */
             xgl_datalink_receive(&handle->layers.datalink_ctx, 
                                 route->phy, 

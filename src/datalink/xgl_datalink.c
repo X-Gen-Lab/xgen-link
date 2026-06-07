@@ -11,8 +11,8 @@
 #include <xgl/xgl_serialize.h>
 #include <xgl/xgl_error.h>
 #include <xgl/xgl_config.h>
+#include <xgl/xgl_allocator.h>
 #include <string.h>
-#include <stdlib.h>
 
 /*---------------------------------------------------------------------------*/
 /* Data Link Layer Initialization                                            */
@@ -42,6 +42,8 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
     ctx->upper_layer = config->upper_layer;
     ctx->error_callback = config->error_callback;
     ctx->callback_user_data = config->callback_user_data;
+    ctx->owner_handle = config->owner_handle;
+    ctx->allocator = config->allocator;
     
     /* Initialize parser */
     xgl_error_t err = xgl_parser_init(&ctx->parser, config->rx_cache, config->rx_cache_size);
@@ -82,13 +84,13 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
         frame_buffer = stack_buffer;
     } else {
         /* Allocate from heap for large frames */
-        frame_buffer = (uint8_t*)malloc(frame_size);
+        frame_buffer = (uint8_t*)xgl_alloc(ctx->allocator, frame_size);
         if (frame_buffer == NULL) {
             if (ctx->stats != NULL) {
                 ctx->stats->tx_errors++;
             }
             if (ctx->error_callback != NULL) {
-                ctx->error_callback(NULL, XGL_ERR_NO_MEMORY, 
+                ctx->error_callback(ctx->owner_handle, XGL_ERR_NO_MEMORY,
                               "Failed to allocate frame buffer", ctx->callback_user_data);
             }
             return XGL_ERR_NO_MEMORY;
@@ -105,10 +107,10 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
             ctx->stats->tx_errors++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(NULL, err, "Frame serialization failed", ctx->callback_user_data);
+            ctx->error_callback(ctx->owner_handle, err, "Frame serialization failed", ctx->callback_user_data);
         }
         if (use_heap) {
-            free(frame_buffer);
+            xgl_free(ctx->allocator, frame_buffer);
         }
         return err;
     }
@@ -120,10 +122,10 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
             ctx->stats->tx_errors++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(NULL, err, "Physical layer transmission failed", ctx->callback_user_data);
+            ctx->error_callback(ctx->owner_handle, err, "Physical layer transmission failed", ctx->callback_user_data);
         }
         if (use_heap) {
-            free(frame_buffer);
+            xgl_free(ctx->allocator, frame_buffer);
         }
         return err;
     }
@@ -136,7 +138,7 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
     
     /* Free heap buffer if used */
     if (use_heap) {
-        free(frame_buffer);
+        xgl_free(ctx->allocator, frame_buffer);
     }
     
     return XGL_OK;
@@ -168,7 +170,7 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx,
             ctx->stats->tx_errors++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(NULL, err, "Physical layer transmission failed", ctx->callback_user_data);
+            ctx->error_callback(ctx->owner_handle, err, "Physical layer transmission failed", ctx->callback_user_data);
         }
         return err;
     }
@@ -209,7 +211,7 @@ xgl_error_t xgl_datalink_receive(xgl_datalink_ctx_t* ctx,
             ctx->stats->rx_errors++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(NULL, XGL_ERR_TIMEOUT, 
+            ctx->error_callback(ctx->owner_handle, XGL_ERR_TIMEOUT,
                               "Parser timeout", ctx->callback_user_data);
         }
     }
@@ -290,7 +292,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
             ctx->stats->rx_errors++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(NULL, XGL_ERR_INVALID_FRAME,
+            ctx->error_callback(ctx->owner_handle, XGL_ERR_INVALID_FRAME,
                               "Frame size exceeds maximum allowed",
                               ctx->callback_user_data);
         }
@@ -318,7 +320,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
             (*ctx->rx_crc8_errors)++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(NULL, XGL_ERR_CRC_FAILED, 
+            ctx->error_callback(ctx->owner_handle, XGL_ERR_CRC_FAILED,
                               "Header CRC8 validation failed", 
                               ctx->callback_user_data);
         }
@@ -338,7 +340,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
             (*ctx->rx_crc16_errors)++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(NULL, XGL_ERR_CRC_FAILED, 
+            ctx->error_callback(ctx->owner_handle, XGL_ERR_CRC_FAILED,
                               "Frame CRC16 validation failed", 
                               ctx->callback_user_data);
         }
@@ -381,7 +383,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         
         xgl_error_t err = ctx->upper_layer->receive(
             ctx->upper_layer->ctx,
-            (xgl_handle_t)ctx->callback_user_data,
+            ctx->owner_handle,
             &frame_data
         );
         

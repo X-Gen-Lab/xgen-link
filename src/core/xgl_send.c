@@ -8,6 +8,7 @@
 #include <xgl/xgl_frame.h>
 #include <xgl/xgl_datalink.h>
 #include <xgl/xgl_route.h>
+#include <xgl/xgl_network.h>
 #include <xgl/xgl_crc.h>
 #include "xgl_instance_internal.h"
 #include <string.h>
@@ -171,16 +172,7 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
 #endif
     
     if (tx_data->reliable) {
-        xgl_tx_data_t standard_tx_data = {
-            .target_id = tx_data->target_id,
-            .data_type = tx_data->data_type,
-            .data = tx_data->buffer + tx_data->data_offset,
-            .data_len = tx_data->data_len,
-            .reliable = tx_data->reliable,
-            .priority = tx_data->priority,
-            .timeout_ms = tx_data->timeout_ms
-        };
-        err = xgl_transport_send(&handle->layers.transport_ctx, handle, &standard_tx_data);
+        err = XGL_ERR_INVALID_PARAM;
     } else {
         xgl_route_item_t* route = xgl_route_table_lookup(&handle->route_table,
                                                          tx_data->target_id);
@@ -188,6 +180,8 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
             err = XGL_ERR_ROUTE_NOT_FOUND;
         } else if (route->phy == NULL || route->phy->tx == NULL) {
             err = XGL_ERR_INVALID_PARAM;
+        } else if (xgl_frame_calculate_size(tx_data->data_len) > route->max_frame_size) {
+            err = XGL_ERR_BUFFER_TOO_SMALL;
         } else {
             size_t frame_len = 0;
             err = xgl_frame_build_zerocopy(tx_data->buffer,
@@ -202,6 +196,16 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
                                            false,
                                            tx_data->priority,
                                            &frame_len);
+            if (err == XGL_OK) {
+                tx_data->buffer[10] = XGL_DEFAULT_TTL;
+                tx_data->buffer[11] = xgl_crc8_maxim(tx_data->buffer, 11);
+                uint16_t crc16 = xgl_crc16_modbus(tx_data->buffer,
+                                                  XGL_FRAME_HEADER_SIZE + tx_data->data_len);
+                tx_data->buffer[XGL_FRAME_HEADER_SIZE + tx_data->data_len] =
+                    (uint8_t)(crc16 & 0xFFU);
+                tx_data->buffer[XGL_FRAME_HEADER_SIZE + tx_data->data_len + 1U] =
+                    (uint8_t)((crc16 >> 8U) & 0xFFU);
+            }
             if (err == XGL_OK) {
                 err = xgl_datalink_send_raw(&handle->layers.datalink_ctx,
                                             route->phy,

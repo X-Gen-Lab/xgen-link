@@ -6,8 +6,10 @@
 
 #include <xgl/xgl_fragment.h>
 #include <xgl/xgl_time.h>
+#include <xgl/xgl_serialize.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 /*---------------------------------------------------------------------------*/
 /* Helper Functions                                                          */
@@ -46,6 +48,10 @@ static void free_reassembly_buffer(xgl_fragment_manager_t* manager,
     if (buffer == NULL) {
         return;
     }
+
+    if (manager != NULL && buffer->reserved_size <= manager->current_reassembly_bytes) {
+        manager->current_reassembly_bytes -= buffer->reserved_size;
+    }
     
     /* Free data buffer */
     if (buffer->data != NULL) {
@@ -81,7 +87,7 @@ static xgl_reassembly_buffer_t* find_reassembly_buffer(
         xgl_reassembly_buffer_t* buffer = 
             XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
         
-        if (buffer->fragment_id == fragment_id && 
+        if (buffer->fragment_id == fragment_id &&
             buffer->source_id == source_id) {
             return buffer;
         }
@@ -122,6 +128,22 @@ static void mark_fragment_received(xgl_reassembly_buffer_t* buffer,
     buffer->received_bitmap[byte_index] |= bit_mask;
 }
 
+static void encode_fragment_info(uint8_t* buffer,
+                                 const xgl_fragment_info_t* info) {
+    buffer[0] = info->fragment_id;
+    buffer[1] = info->fragment_index;
+    buffer[2] = info->total_fragments;
+    xgl_serialize_u16_le(&buffer[3], info->fragment_offset);
+}
+
+static void decode_fragment_info(xgl_fragment_info_t* info,
+                                 const uint8_t* buffer) {
+    info->fragment_id = buffer[0];
+    info->fragment_index = buffer[1];
+    info->total_fragments = buffer[2];
+    info->fragment_offset = xgl_deserialize_u16_le(&buffer[3]);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Fragmentation Manager Functions                                           */
 /*---------------------------------------------------------------------------*/
@@ -147,7 +169,27 @@ xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
     manager->max_reassembly_buffers = max_reassembly_buffers;
     manager->reassembly_timeout_ms = reassembly_timeout_ms;
     manager->allocator = allocator;
+    manager->max_message_size = 0;
+    manager->max_reassembly_bytes = 0;
+    manager->current_reassembly_bytes = 0;
     
+    return XGL_OK;
+}
+
+xgl_error_t xgl_fragment_set_limits(xgl_fragment_manager_t* manager,
+                                    size_t max_message_size,
+                                    size_t max_reassembly_bytes) {
+    if (manager == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (max_reassembly_bytes != 0U && max_message_size > max_reassembly_bytes) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    manager->max_message_size = max_message_size;
+    manager->max_reassembly_bytes = max_reassembly_bytes;
+
     return XGL_OK;
 }
 
@@ -190,7 +232,7 @@ xgl_error_t xgl_fragment_data(xgl_fragment_manager_t* manager,
     }
     
     /* Calculate fragment header size */
-    size_t header_size = sizeof(xgl_fragment_info_t);
+    size_t header_size = XGL_FRAGMENT_HEADER_SIZE;
     
     /* Check if fragmentation is needed */
     if (data_len <= max_fragment_size) {
@@ -239,13 +281,21 @@ xgl_error_t xgl_fragment_data(xgl_fragment_manager_t* manager,
         }
         
         /* Fill fragment header */
+        if (offset > UINT16_MAX) {
+            for (size_t j = 0; j < i; j++) {
+                fragment_free(manager->allocator, fragments[j]);
+                fragments[j] = NULL;
+            }
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+
         xgl_fragment_info_t frag_info = {
             .fragment_id = *fragment_id,
             .fragment_index = (uint8_t)i,
             .total_fragments = (uint8_t)num_fragments,
             .fragment_offset = (uint16_t)offset
         };
-        memcpy(fragment, &frag_info, sizeof(frag_info));
+        encode_fragment_info(fragment, &frag_info);
         
         /* Copy payload data */
         memcpy(fragment + header_size, data + offset, payload_size);
@@ -282,12 +332,12 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
     }
     
     /* Parse fragment header */
-    if (fragment_len < sizeof(xgl_fragment_info_t)) {
+    if (fragment_len < XGL_FRAGMENT_HEADER_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
     
     xgl_fragment_info_t frag_info_storage;
-    memcpy(&frag_info_storage, fragment_data, sizeof(frag_info_storage));
+    decode_fragment_info(&frag_info_storage, fragment_data);
     const xgl_fragment_info_t* frag_info = &frag_info_storage;
     
     /* Validate fragment info */
@@ -300,8 +350,12 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
     }
     
     /* Calculate payload size */
-    size_t payload_size = fragment_len - sizeof(xgl_fragment_info_t);
-    const uint8_t* payload = fragment_data + sizeof(xgl_fragment_info_t);
+    size_t payload_size = fragment_len - XGL_FRAGMENT_HEADER_SIZE;
+    const uint8_t* payload = fragment_data + XGL_FRAGMENT_HEADER_SIZE;
+
+    if (frag_info->fragment_index == 0U && frag_info->fragment_offset != 0U) {
+        return XGL_ERR_INVALID_FRAME;
+    }
     
     /* Find or create reassembly buffer */
     xgl_reassembly_buffer_t* buffer = find_reassembly_buffer(
@@ -332,9 +386,38 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
         buffer->received_count = 0;
         buffer->timeout_ms = manager->reassembly_timeout_ms;
         buffer->first_fragment_time = 0;  /* Will be set below */
+
+        if (frag_info->fragment_index == 0U) {
+            buffer->expected_payload_size = payload_size;
+        } else {
+            if (frag_info->fragment_offset == 0U ||
+                (frag_info->fragment_offset % frag_info->fragment_index) != 0U) {
+                fragment_free(manager->allocator, buffer);
+                return XGL_ERR_INVALID_FRAME;
+            }
+            buffer->expected_payload_size =
+                frag_info->fragment_offset / frag_info->fragment_index;
+            if (buffer->expected_payload_size == 0U) {
+                fragment_free(manager->allocator, buffer);
+                return XGL_ERR_INVALID_FRAME;
+            }
+        }
         
+        size_t reserved_size = buffer->expected_payload_size *
+                               (size_t)frag_info->total_fragments;
+        if (manager->max_message_size != 0U &&
+            reserved_size > manager->max_message_size) {
+            fragment_free(manager->allocator, buffer);
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+        if (manager->max_reassembly_bytes != 0U &&
+            reserved_size > manager->max_reassembly_bytes - manager->current_reassembly_bytes) {
+            fragment_free(manager->allocator, buffer);
+            return XGL_ERR_NO_MEMORY;
+        }
+
         /* Allocate received bitmap */
-        size_t bitmap_size = (frag_info->total_fragments + 7) / 8;
+        size_t bitmap_size = ((size_t)frag_info->total_fragments + 7U) / 8U;
         buffer->received_bitmap = (uint8_t*)fragment_malloc(
             manager->allocator, bitmap_size);
         
@@ -345,8 +428,9 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
         
         memset(buffer->received_bitmap, 0, bitmap_size);
         
-        /* Estimate total data size (will be adjusted as fragments arrive) */
-        buffer->buffer_size = payload_size * frag_info->total_fragments;
+        /* Reserve the estimated full message size up front. */
+        buffer->reserved_size = reserved_size;
+        buffer->buffer_size = reserved_size;
         buffer->data = (uint8_t*)fragment_malloc(manager->allocator, 
                                                  buffer->buffer_size);
         
@@ -355,12 +439,38 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
             fragment_free(manager->allocator, buffer);
             return XGL_ERR_NO_MEMORY;
         }
+
+        manager->current_reassembly_bytes += buffer->reserved_size;
         
         buffer->data_len = 0;
         
         /* Initialize list node and add to list */
         xgl_list_node_init(&buffer->node);
         xgl_list_insert_tail(&manager->reassembly_list, &buffer->node);
+    }
+
+    if (buffer->data_type != data_type ||
+        buffer->total_fragments != frag_info->total_fragments) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    if (buffer->expected_payload_size == 0U) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    size_t expected_offset = (size_t)frag_info->fragment_index *
+                             buffer->expected_payload_size;
+    if (frag_info->fragment_offset != expected_offset) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    if (frag_info->fragment_index + 1U < frag_info->total_fragments &&
+        payload_size != buffer->expected_payload_size) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    if (payload_size > buffer->expected_payload_size) {
+        return XGL_ERR_INVALID_FRAME;
     }
     
     /* Check if fragment already received */
@@ -422,6 +532,9 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
         /* Free bitmap and buffer structure (but not data) */
         if (buffer->received_bitmap != NULL) {
             fragment_free(manager->allocator, buffer->received_bitmap);
+        }
+        if (buffer->reserved_size <= manager->current_reassembly_bytes) {
+            manager->current_reassembly_bytes -= buffer->reserved_size;
         }
         fragment_free(manager->allocator, buffer);
         

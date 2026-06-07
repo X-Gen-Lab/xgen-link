@@ -78,6 +78,10 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     if (frame == NULL || params == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
+
+    if (params->payload_len > UINT16_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
     
     /* Initialize frame */
     memset(frame, 0, sizeof(xgl_frame_t));
@@ -91,11 +95,11 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.data_len = (uint16_t)params->payload_len;
     frame->header.seq_num = params->seq_num;
     frame->header.ack_num = params->ack_num;
-    frame->header.reserved = 0;
+    frame->header.reserved = params->ttl;
     
     /* Set attributes */
     frame->header.attr_lsb = 0;
-    frame->header.attr_msb = 0;
+    frame->header.attr_msb = (uint8_t)(params->session_id & XGL_ATTR_SESSION_MASK);
     if (params->reliable_type != XGL_ATTR_RELIABLE_NONE) {
         xgl_frame_set_reliable_type(&frame->header.attr_lsb, params->reliable_type);
     } else {
