@@ -7,6 +7,43 @@
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
 
+static xgl_error_t mock_auth_sign(uint32_t /*key_id*/,
+                                  const uint8_t* /*aad*/,
+                                  size_t /*aad_len*/,
+                                  const uint8_t* /*payload*/,
+                                  size_t /*payload_len*/,
+                                  uint8_t* tag,
+                                  size_t tag_capacity,
+                                  size_t* tag_len,
+                                  void* /*user_data*/) {
+    if (tag == nullptr || tag_len == nullptr || tag_capacity < 4U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    tag[0] = 0xA5;
+    tag[1] = 0x5A;
+    tag[2] = 0xC3;
+    tag[3] = 0x3C;
+    *tag_len = 4U;
+    return XGL_OK;
+}
+
+static xgl_error_t mock_auth_verify(uint32_t /*key_id*/,
+                                    const uint8_t* /*aad*/,
+                                    size_t /*aad_len*/,
+                                    const uint8_t* /*payload*/,
+                                    size_t /*payload_len*/,
+                                    const uint8_t* tag,
+                                    size_t tag_len,
+                                    bool* valid,
+                                    void* /*user_data*/) {
+    if (tag == nullptr || valid == nullptr) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *valid = (tag_len == 4U && tag[0] == 0xA5 && tag[1] == 0x5A &&
+              tag[2] == 0xC3 && tag[3] == 0x3C);
+    return XGL_OK;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */
 /*---------------------------------------------------------------------------*/
@@ -136,6 +173,22 @@ TEST_F(XglConfigTest, ValidateRejectsReservedCodecFeatureFlags) {
     xgl_config_get_default(&config);
     config.features.enable_encryption = true;
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+}
+
+TEST_F(XglConfigTest, ValidateAuthRequiredNeedsProvider) {
+    xgl_config_get_default(&config);
+    config.auth_required = true;
+    config.auth_key_id = 7;
+    config.auth_provider = nullptr;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+
+    xgl_auth_provider_t provider = {
+        .sign = mock_auth_sign,
+        .verify = mock_auth_verify,
+        .user_data = nullptr
+    };
+    config.auth_provider = &provider;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 }
 
 #ifndef XGL_THREAD_SAFE
