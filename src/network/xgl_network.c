@@ -504,6 +504,13 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             return XGL_ERR_BUFFER_TOO_SMALL;
         }
 
+        if (frame_len > route->max_frame_size) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_dropped++;
+            }
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+
         uint8_t forward_buf[XGL_DATALINK_MAX_FRAME_SIZE];
         memcpy(forward_buf, frame_buf, frame_len);
         xgl_wire_header_t wire_header = incoming_header;
