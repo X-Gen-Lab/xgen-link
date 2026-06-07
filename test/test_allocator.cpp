@@ -9,6 +9,10 @@
 #include <xgl/xgl_allocator.h>
 #include <cstring>
 
+#ifndef XGL_ALLOW_FALLBACK_MALLOC
+#error "XGL_ALLOW_FALLBACK_MALLOC must declare the build allocator fallback policy"
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Test Fixtures                                                             */
 /*---------------------------------------------------------------------------*/
@@ -65,6 +69,7 @@ TEST_F(XglAllocatorTest, DefaultAllocatorMallocFree) {
  */
 TEST_F(XglAllocatorTest, AllocWithNullAllocator) {
     void* ptr = xgl_alloc(nullptr, 256);
+#if XGL_ALLOW_FALLBACK_MALLOC
     ASSERT_NE(ptr, nullptr);
     
     /* Write to memory */
@@ -72,6 +77,9 @@ TEST_F(XglAllocatorTest, AllocWithNullAllocator) {
     
     /* Free memory */
     xgl_free(nullptr, ptr);
+#else
+    EXPECT_EQ(ptr, nullptr);
+#endif
 }
 
 /**
