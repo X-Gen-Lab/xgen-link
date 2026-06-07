@@ -517,6 +517,41 @@ typedef struct {
     .callback_user_data = NULL, \
 }
 
+/**
+ * \brief           Production configuration preset
+ * \details         Production profile requires authentication by default.
+ *                  The application must provide auth_provider before validate/create.
+ */
+#define XGL_CONFIG_PRESET_PRODUCTION { \
+    .name = "production", \
+    .source_id = 1, \
+    .memory = { \
+        .tx_pool_size = 8192, \
+        .rx_buffer_size = 1056, \
+        .allocator = NULL, \
+    }, \
+    .protocol = { \
+        .ack_timeout_ms = 1000, \
+        .max_retry_count = 7, \
+        .window_size = 16, \
+        .max_frame_size = 1024, \
+    }, \
+    .features = { \
+        .enable_fragmentation = true, \
+        .enable_compression = false, \
+        .enable_encryption = false, \
+        .thread_safe = false, \
+    }, \
+    .auth_required = true, \
+    .auth_key_id = 1, \
+    .auth_provider = NULL, \
+    .route_table = NULL, \
+    .route_table_len = 0, \
+    .rx_callback = NULL, \
+    .error_callback = NULL, \
+    .callback_user_data = NULL, \
+}
+
 #ifdef __cplusplus
 }
 #endif

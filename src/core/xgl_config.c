@@ -103,6 +103,19 @@ void xgl_config_get_preset_large(xgl_config_t* config) {
     memcpy(config, &preset, sizeof(xgl_config_t));
 }
 
+/**
+ * \brief           Get production configuration preset
+ * \details         Production profile requires authentication provider wiring.
+ */
+void xgl_config_get_preset_production(xgl_config_t* config) {
+    if (config == NULL) {
+        return;
+    }
+
+    xgl_config_t preset = XGL_CONFIG_PRESET_PRODUCTION;
+    memcpy(config, &preset, sizeof(xgl_config_t));
+}
+
 /*---------------------------------------------------------------------------*/
 /* Configuration Validation                                                  */
 /*---------------------------------------------------------------------------*/

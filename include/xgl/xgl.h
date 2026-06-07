@@ -396,6 +396,15 @@ void xgl_config_get_preset_medium(xgl_config_t* config);
 void xgl_config_get_preset_large(xgl_config_t* config);
 
 /**
+ * \brief           Get production configuration preset
+ * \param[out]      config: Configuration structure to fill
+ * \note            Requires authentication by default. Set auth_provider before
+ *                  validating or creating an instance.
+ * \note            Values: 8KB TX pool, 1056B RX buffer, 1024B max frame
+ */
+void xgl_config_get_preset_production(xgl_config_t* config);
+
+/**
  * \brief           Validate configuration parameters
  * \param[in]       config: Configuration structure to validate
  * \return          XGL_OK if valid, error code otherwise
