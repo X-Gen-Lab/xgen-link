@@ -164,6 +164,14 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         .source_id = packet->source_id,
         .target_id = packet->target_id,
         .data_type = packet->data_type,
+        .packet_type = (packet->packet_type != XGL_PACKET_TYPE_INVALID) ?
+                       packet->packet_type :
+                       packet->data_type,
+        .flags = packet->flags,
+        .traffic_class = packet->traffic_class,
+        .connection_id = packet->connection_id,
+        .packet_number = packet->packet_number,
+        .session_epoch = packet->session_epoch,
         .seq_num = packet->seq_num,
         .ack_num = packet->ack_num,
         .extensions = packet->extensions,
@@ -278,12 +286,16 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
         
         /* Forward to transport layer via interface */
         if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
-            /* Extract frame attributes and build packet structure */
-            xgl_frame_header_t header;
-            xgl_frame_decode_header(&header, frame_buf);
             xgl_wire_header_t wire_header;
             if (xgl_wire_decode_header(&wire_header, frame_buf, frame_len) != XGL_OK) {
                 return XGL_ERR_INVALID_FRAME;
+            }
+            uint8_t reliable = XGL_ATTR_RELIABLE_NONE;
+            if ((wire_header.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
+                reliable = XGL_ATTR_RELIABLE_TX;
+            } else if (wire_header.packet_type == XGL_PACKET_TYPE_ACK ||
+                       (wire_header.flags & XGL_WIRE_FLAG_CONTROL) != 0U) {
+                reliable = XGL_ATTR_RELIABLE_ACK;
             }
             
             /* Build packet data structure for payload */
@@ -306,17 +318,17 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .source_id = source_id,
                 .target_id = target_id,
                 .data_type = data_type,
-                .seq_num = header.seq_num,
-                .ack_num = header.ack_num,
-                .session_id = (uint16_t)(header.attr_msb & XGL_ATTR_SESSION_MASK),
+                .seq_num = (uint8_t)(wire_header.packet_number & 0xFFU),
+                .ack_num = 0,
+                .session_id = (uint16_t)(wire_header.connection_id & UINT16_MAX),
                 .connection_id = wire_header.connection_id,
                 .packet_number = wire_header.packet_number,
-                .session_epoch = (uint32_t)(header.attr_msb & XGL_ATTR_SESSION_MASK),
+                .session_epoch = 0,
                 .packet_type = wire_header.packet_type,
                 .flags = wire_header.flags,
-                .reliable = header.attr_lsb & XGL_ATTR_RELIABLE_MASK,
-                .fragment = (header.attr_lsb & XGL_ATTR_FRAGMENT_MASK) >> XGL_ATTR_FRAGMENT_SHIFT,
-                .priority = (header.attr_lsb & XGL_ATTR_PRIORITY_MASK) >> XGL_ATTR_PRIORITY_SHIFT,
+                .reliable = reliable,
+                .fragment = ((wire_header.flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U) ? 1U : 0U,
+                .priority = (wire_header.traffic_class & XGL_ATTR_PRIORITY_MASK) >> XGL_ATTR_PRIORITY_SHIFT,
                 .ttl = wire_header.ttl,
                 .traffic_class = wire_header.traffic_class,
                 .data = &packet_data,
@@ -358,10 +370,15 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             return XGL_ERR_ROUTE_NOT_FOUND;
         }
 
-        xgl_frame_header_t header;
-        xgl_frame_decode_header(&header, frame_buf);
+        xgl_wire_header_t incoming_header;
+        if (xgl_wire_decode_header(&incoming_header, frame_buf, frame_len) != XGL_OK) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_dropped++;
+            }
+            return XGL_ERR_INVALID_FRAME;
+        }
 
-        if (header.reserved == 0U) {
+        if (incoming_header.ttl == 0U) {
             if (ctx->stats != NULL) {
                 ctx->stats->rx_dropped++;
             }
@@ -392,13 +409,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
 
         uint8_t forward_buf[XGL_DATALINK_MAX_FRAME_SIZE];
         memcpy(forward_buf, frame_buf, frame_len);
-        xgl_wire_header_t wire_header;
-        if (xgl_wire_decode_header(&wire_header, forward_buf, frame_len) != XGL_OK) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped++;
-            }
-            return XGL_ERR_INVALID_FRAME;
-        }
+        xgl_wire_header_t wire_header = incoming_header;
         wire_header.ttl = (uint8_t)(wire_header.ttl - 1U);
         if (xgl_wire_encode_header(forward_buf, frame_len, &wire_header) != XGL_OK) {
             if (ctx->stats != NULL) {

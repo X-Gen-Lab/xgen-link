@@ -223,7 +223,7 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
             << "Magic byte 0 mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_buffer[1], XGL_WIRE_MAGIC_1)
             << "Magic byte 1 mismatch at iteration " << iteration;
-        EXPECT_EQ(xgl_frame_get_version(&parsed_header), xgl_frame_get_version(&frame.header))
+        EXPECT_EQ(xgl_frame_get_version(&parsed_header), XGL_PROTOCOL_VERSION)
             << "Version mismatch at iteration " << iteration;
         EXPECT_EQ(xgl_frame_get_datatype(&parsed_header), data_type)
             << "Data type mismatch at iteration " << iteration;

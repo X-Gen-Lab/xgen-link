@@ -470,26 +470,6 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
     
-    /* Decode frame header */
-    xgl_frame_header_t header;
-    xgl_frame_decode_header(&header, frame_buffer);
-    
-    /* Validate header CRC8 */
-    if (!xgl_frame_validate_header_crc(&header)) {
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
-        }
-        if (ctx->rx_crc8_errors != NULL) {
-            (*ctx->rx_crc8_errors)++;
-        }
-        if (ctx->error_callback != NULL) {
-            ctx->error_callback(ctx->owner_handle, XGL_ERR_CRC_FAILED,
-                              "Header CRC8 validation failed", 
-                              ctx->callback_user_data);
-        }
-        return XGL_ERR_CRC_FAILED;
-    }
-    
     /* Validate frame CRC16 */
     size_t crc_offset = frame_len - XGL_CRC16_SIZE;
     uint16_t calculated_crc = xgl_crc16_modbus(frame_buffer, crc_offset);

@@ -16,6 +16,7 @@ extern "C" {
 #include <stdbool.h>
 #include "xgl_types.h"
 #include "xgl_error.h"
+#include "xgl_wire.h"
 
 /*---------------------------------------------------------------------------*/
 /* Frame Structure                                                           */
@@ -27,7 +28,7 @@ extern "C" {
  * \note            The header already contains SOF, so no separate SOF field
  */
 typedef struct {
-    xgl_frame_header_t header;      /**< Frame header (12 bytes with SOF) */
+    xgl_wire_header_t header;       /**< Production logical wire header */
     const uint8_t* extensions;      /**< Production TLV extension bytes */
     size_t extensions_len;          /**< Extension length in bytes */
     const uint8_t* payload;         /**< Pointer to payload data */
@@ -47,6 +48,12 @@ typedef struct {
     uint16_t source_id;         /**< Source node ID */
     uint16_t target_id;         /**< Target node ID */
     uint8_t data_type;          /**< Data type */
+    uint8_t packet_type;        /**< Production packet type, 0 uses data_type/DATA */
+    uint8_t flags;              /**< Production wire flags merged with derived flags */
+    uint8_t traffic_class;      /**< Production traffic class, 0 uses priority */
+    uint32_t connection_id;     /**< Production connection context ID */
+    uint32_t packet_number;     /**< Production monotonic packet number */
+    uint32_t session_epoch;     /**< Production session epoch for SESSION_EXT users */
     uint8_t seq_num;            /**< Sequence number */
     uint8_t ack_num;            /**< Acknowledgment number */
     const uint8_t* extensions;   /**< Production TLV extension bytes */

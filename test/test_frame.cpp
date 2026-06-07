@@ -148,7 +148,7 @@ TEST(XglFrameTest, BuildFrameEmptyPayload) {
     EXPECT_EQ(result, XGL_OK);
     EXPECT_EQ(frame.payload, nullptr);
     EXPECT_EQ(frame.payload_len, 0);
-    EXPECT_EQ(frame.header.data_len, 0);
+    EXPECT_EQ(frame.header.payload_len, 0);
 }
 
 TEST(XglFrameTest, BuildFrameRejectsPayloadLargerThanWireLength) {
@@ -498,9 +498,13 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
     };
     xgl_frame_build(&frame, &params);
     
-    /* Validate CRC8 */
-    bool valid = xgl_frame_validate_header_crc(&frame.header);
-    EXPECT_TRUE(valid);
+    uint8_t buffer[256] = {};
+    size_t bytes_written = 0;
+    ASSERT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &bytes_written), XGL_OK);
+
+    xgl_wire_header_t decoded = {};
+    EXPECT_EQ(xgl_wire_decode_header(&decoded, buffer, bytes_written), XGL_OK);
+    EXPECT_EQ(decoded.header_crc16, xgl_deserialize_u16_le(&buffer[22]));
 }
 
 TEST(XglFrameTest, InvalidHeaderCRC) {
