@@ -1286,6 +1286,166 @@ TEST(XglTransportTest, ReliableFragmentTimeoutRetransmitsWithFragmentExtension) 
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    RxTracker rx_tracker;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.enable_fragmentation = true;
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &rx_tracker;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t peer2_part[] = {'a', 'b'};
+    const uint8_t peer3_part[] = {'x', 'y'};
+    const uint8_t peer3_tail[] = {'z', 'w'};
+
+    uint8_t peer2_ext_value[12] = {};
+    size_t peer2_ext_value_len = 0;
+    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(peer2_ext_value,
+                                                 sizeof(peer2_ext_value),
+                                                 10,
+                                                 0,
+                                                 4,
+                                                 &peer2_ext_value_len),
+              XGL_OK);
+    uint8_t peer2_ext[16] = {};
+    size_t peer2_ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(peer2_ext,
+                                  sizeof(peer2_ext),
+                                  XGL_WIRE_EXT_FRAGMENT,
+                                  peer2_ext_value,
+                                  peer2_ext_value_len,
+                                  &peer2_ext_len),
+              XGL_OK);
+
+    uint8_t peer3_ext_value[12] = {};
+    size_t peer3_ext_value_len = 0;
+    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(peer3_ext_value,
+                                                 sizeof(peer3_ext_value),
+                                                 20,
+                                                 0,
+                                                 4,
+                                                 &peer3_ext_value_len),
+              XGL_OK);
+    uint8_t peer3_ext[16] = {};
+    size_t peer3_ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(peer3_ext,
+                                  sizeof(peer3_ext),
+                                  XGL_WIRE_EXT_FRAGMENT,
+                                  peer3_ext_value,
+                                  peer3_ext_value_len,
+                                  &peer3_ext_len),
+              XGL_OK);
+
+    xgl_packet_data_t peer2_data = {
+        .ref_count = 1,
+        .data_len = sizeof(peer2_part),
+        .data = peer2_part,
+        .owned_data = nullptr
+    };
+    xgl_packet_t peer2_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = 0,
+        .connection_id = 11,
+        .session_epoch = 100,
+        .data_type = 1,
+        .fragment = true,
+        .data = &peer2_data,
+        .extensions = peer2_ext,
+        .extensions_len = peer2_ext_len
+    };
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &peer2_packet), XGL_OK);
+
+    xgl_packet_data_t peer3_data = {
+        .ref_count = 1,
+        .data_len = sizeof(peer3_part),
+        .data = peer3_part,
+        .owned_data = nullptr
+    };
+    xgl_packet_t peer3_packet = {
+        .source_id = 3,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = 0,
+        .connection_id = 22,
+        .session_epoch = 200,
+        .data_type = 1,
+        .fragment = true,
+        .data = &peer3_data,
+        .extensions = peer3_ext,
+        .extensions_len = peer3_ext_len
+    };
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &peer3_packet), XGL_OK);
+    ASSERT_EQ(xgl_fragment_get_reassembly_count(ctx.fragment_mgr), 2U);
+
+    xgl_packet_data_t reset_data = {
+        .ref_count = 1,
+        .data_len = 0,
+        .data = nullptr,
+        .owned_data = nullptr
+    };
+    xgl_packet_t reset_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = 100,
+        .connection_id = 11,
+        .session_epoch = 100,
+        .data_type = kTransportControlReset,
+        .data = &reset_data
+    };
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &reset_packet), XGL_OK);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(ctx.fragment_mgr), 1U);
+
+    uint8_t peer3_tail_ext_value[12] = {};
+    size_t peer3_tail_ext_value_len = 0;
+    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(peer3_tail_ext_value,
+                                                 sizeof(peer3_tail_ext_value),
+                                                 20,
+                                                 2,
+                                                 4,
+                                                 &peer3_tail_ext_value_len),
+              XGL_OK);
+    uint8_t peer3_tail_ext[16] = {};
+    size_t peer3_tail_ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(peer3_tail_ext,
+                                  sizeof(peer3_tail_ext),
+                                  XGL_WIRE_EXT_FRAGMENT,
+                                  peer3_tail_ext_value,
+                                  peer3_tail_ext_value_len,
+                                  &peer3_tail_ext_len),
+              XGL_OK);
+
+    xgl_packet_data_t peer3_tail_data = {
+        .ref_count = 1,
+        .data_len = sizeof(peer3_tail),
+        .data = peer3_tail,
+        .owned_data = nullptr
+    };
+    peer3_packet.extensions = peer3_tail_ext;
+    peer3_packet.extensions_len = peer3_tail_ext_len;
+    peer3_packet.data = &peer3_tail_data;
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &peer3_packet), XGL_OK);
+    ASSERT_EQ(rx_tracker.receive_count, 1);
+    ASSERT_EQ(rx_tracker.payloads.size(), 1U);
+    EXPECT_EQ(rx_tracker.payloads[0], std::vector<uint8_t>({'x', 'y', 'z', 'w'}));
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
