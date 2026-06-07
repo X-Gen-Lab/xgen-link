@@ -109,7 +109,7 @@ TEST_F(XglStatsTest, InitialStatsAreZero) {
     EXPECT_EQ(stats.datalink.rx_packets, 0);
     EXPECT_EQ(stats.datalink.rx_bytes, 0);
     EXPECT_EQ(stats.datalink.rx_errors, 0);
-    EXPECT_EQ(stats.rx_crc8_errors, 0);
+    EXPECT_EQ(stats.rx_header_crc_errors, 0);
     EXPECT_EQ(stats.rx_crc16_errors, 0);
     EXPECT_EQ(stats.datalink.rx_dropped, 0);
     
@@ -184,7 +184,7 @@ TEST_F(XglStatsTest, StatsRemainZeroAfterReset) {
     EXPECT_EQ(stats.datalink.rx_packets, 0);
     EXPECT_EQ(stats.datalink.rx_bytes, 0);
     EXPECT_EQ(stats.datalink.rx_errors, 0);
-    EXPECT_EQ(stats.rx_crc8_errors, 0);
+    EXPECT_EQ(stats.rx_header_crc_errors, 0);
     EXPECT_EQ(stats.rx_crc16_errors, 0);
     EXPECT_EQ(stats.datalink.rx_dropped, 0);
     

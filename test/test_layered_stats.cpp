@@ -87,7 +87,7 @@ TEST_F(XglLayeredStatsTest, ProtocolSpecificCountersSeparate) {
     
     /* Verify protocol-specific counters exist */
     EXPECT_EQ(stats.tx_retries, 0);
-    EXPECT_EQ(stats.rx_crc8_errors, 0);
+    EXPECT_EQ(stats.rx_header_crc_errors, 0);
     EXPECT_EQ(stats.rx_crc16_errors, 0);
 }
 
@@ -189,7 +189,7 @@ TEST_F(XglLayeredStatsTest, DatalinkLayerSemantics) {
      */
     
     /* Verify CRC error counters are at protocol level, not layer level */
-    EXPECT_EQ(stats.rx_crc8_errors, 0);   /* Protocol-specific */
+    EXPECT_EQ(stats.rx_header_crc_errors, 0);   /* Protocol-specific */
     EXPECT_EQ(stats.rx_crc16_errors, 0);  /* Protocol-specific */
 }
 

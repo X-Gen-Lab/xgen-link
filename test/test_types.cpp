@@ -324,7 +324,8 @@ TEST(XglTypesTest, PacketUsesProductionAddressAndPacketNumberFields) {
  * \brief           Test protocol constants
  */
 TEST(XglTypesTest, ProtocolConstants) {
-    EXPECT_EQ(XGL_SOF, 0x55);
+    EXPECT_EQ(XGL_WIRE_MAGIC_0, static_cast<uint8_t>('X'));
+    EXPECT_EQ(XGL_WIRE_MAGIC_1, static_cast<uint8_t>('G'));
     EXPECT_EQ(XGL_CRC16_SIZE, 2);
     EXPECT_EQ(XGL_FRAME_HEADER_SIZE, XGL_WIRE_BASE_HEADER_SIZE);
 }

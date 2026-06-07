@@ -86,7 +86,7 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
     ctx->rx_cache = config->rx_cache;
     ctx->rx_cache_size = config->rx_cache_size;
     ctx->stats = config->stats;
-    ctx->rx_crc8_errors = config->rx_crc8_errors;
+    ctx->rx_header_crc_errors = config->rx_header_crc_errors;
     ctx->rx_crc16_errors = config->rx_crc16_errors;
     ctx->source_id = config->source_id;
     ctx->upper_layer = config->upper_layer;
@@ -386,8 +386,8 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         if (ctx->stats != NULL) {
             ctx->stats->rx_errors++;
         }
-        if (ctx->rx_crc8_errors != NULL) {
-            (*ctx->rx_crc8_errors)++;
+        if (ctx->rx_header_crc_errors != NULL) {
+            (*ctx->rx_header_crc_errors)++;
         }
         return XGL_ERR_CRC_FAILED;
     }

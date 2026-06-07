@@ -56,11 +56,6 @@ typedef struct {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Start of frame marker
- */
-#define XGL_SOF                     0x55
-
-/**
  * \brief           CRC16 size in bytes
  */
 #define XGL_CRC16_SIZE              2
@@ -309,8 +304,8 @@ typedef struct {
     /* Protocol-Specific Counters                                            */
     /*-----------------------------------------------------------------------*/
     uint64_t tx_retries;            /**< Retransmission count (transport) */
-    uint64_t rx_crc8_errors;        /**< CRC8 errors (datalink) */
-    uint64_t rx_crc16_errors;       /**< CRC16 errors (datalink) */
+    uint64_t rx_header_crc_errors;  /**< Header CRC errors (datalink) */
+    uint64_t rx_crc16_errors;       /**< Frame CRC16 errors (datalink) */
     
     /*-----------------------------------------------------------------------*/
     /* Performance Metrics                                                   */

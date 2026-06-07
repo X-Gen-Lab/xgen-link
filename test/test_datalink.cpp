@@ -134,7 +134,7 @@ protected:
         
         /* Initialize statistics */
         std::memset(&stats, 0, sizeof(stats));
-        rx_crc8_errors = 0;
+        rx_header_crc_errors = 0;
         rx_crc16_errors = 0;
         
         /* Initialize datalink context */
@@ -143,7 +143,7 @@ protected:
             .rx_cache_size = sizeof(rx_cache),
             .source_id = SOURCE_ID,
             .stats = &stats,
-            .rx_crc8_errors = &rx_crc8_errors,
+            .rx_header_crc_errors = &rx_header_crc_errors,
             .rx_crc16_errors = &rx_crc16_errors,
             .upper_layer = nullptr,
             .error_callback = nullptr,
@@ -159,7 +159,7 @@ protected:
     MockPhyOps mock_phy;
     xgl_phy_ops_t phy_ops;
     xgl_layer_stats_t stats;
-    uint64_t rx_crc8_errors;
+    uint64_t rx_header_crc_errors;
     uint64_t rx_crc16_errors;
     xgl_datalink_ctx_t ctx;
     uint8_t rx_cache[512];
@@ -176,14 +176,14 @@ TEST_F(XglDatalinkTest, InitSuccess) {
     xgl_datalink_ctx_t test_ctx;
     uint8_t cache[256];
     xgl_layer_stats_t test_stats = {0};
-    uint64_t crc8 = 0, crc16 = 0;
+    uint64_t header_crc = 0, crc16 = 0;
     
     xgl_datalink_config_t config = {
         .rx_cache = cache,
         .rx_cache_size = sizeof(cache),
         .source_id = SOURCE_ID,
         .stats = &test_stats,
-        .rx_crc8_errors = &crc8,
+        .rx_header_crc_errors = &header_crc,
         .rx_crc16_errors = &crc16,
         .upper_layer = nullptr,
         .error_callback = nullptr,
@@ -198,14 +198,14 @@ TEST_F(XglDatalinkTest, InitSuccess) {
 TEST_F(XglDatalinkTest, InitNullPointer) {
     uint8_t cache[256];
     xgl_layer_stats_t test_stats = {0};
-    uint64_t crc8 = 0, crc16 = 0;
+    uint64_t header_crc = 0, crc16 = 0;
     
     xgl_datalink_config_t config = {
         .rx_cache = cache,
         .rx_cache_size = sizeof(cache),
         .source_id = SOURCE_ID,
         .stats = &test_stats,
-        .rx_crc8_errors = &crc8,
+        .rx_header_crc_errors = &header_crc,
         .rx_crc16_errors = &crc16,
         .upper_layer = nullptr,
         .error_callback = nullptr,
@@ -291,14 +291,14 @@ TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     xgl_datalink_ctx_t large_ctx;
     uint8_t cache[1024];
     xgl_layer_stats_t large_stats = {};
-    uint64_t crc8 = 0;
+    uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {
         .rx_cache = cache,
         .rx_cache_size = sizeof(cache),
         .source_id = SOURCE_ID,
         .stats = &large_stats,
-        .rx_crc8_errors = &crc8,
+        .rx_header_crc_errors = &header_crc,
         .rx_crc16_errors = &crc16,
         .upper_layer = nullptr,
         .error_callback = nullptr,
@@ -339,14 +339,14 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     xgl_datalink_ctx_t auth_ctx;
     uint8_t cache[512] = {};
     xgl_layer_stats_t auth_stats = {};
-    uint64_t crc8 = 0;
+    uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {
         .rx_cache = cache,
         .rx_cache_size = sizeof(cache),
         .source_id = SOURCE_ID,
         .stats = &auth_stats,
-        .rx_crc8_errors = &crc8,
+        .rx_header_crc_errors = &header_crc,
         .rx_crc16_errors = &crc16,
         .upper_layer = nullptr,
         .error_callback = nullptr,
@@ -403,14 +403,14 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsTamperedAuthenticatedPayload) {
     xgl_datalink_ctx_t auth_ctx;
     uint8_t cache[512] = {};
     xgl_layer_stats_t auth_stats = {};
-    uint64_t crc8 = 0;
+    uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {
         .rx_cache = cache,
         .rx_cache_size = sizeof(cache),
         .source_id = SOURCE_ID,
         .stats = &auth_stats,
-        .rx_crc8_errors = &crc8,
+        .rx_header_crc_errors = &header_crc,
         .rx_crc16_errors = &crc16,
         .upper_layer = nullptr,
         .error_callback = nullptr,
@@ -465,14 +465,14 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsAuthenticatedReplay) {
     xgl_datalink_ctx_t auth_ctx;
     uint8_t cache[512] = {};
     xgl_layer_stats_t auth_stats = {};
-    uint64_t crc8 = 0;
+    uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {
         .rx_cache = cache,
         .rx_cache_size = sizeof(cache),
         .source_id = SOURCE_ID,
         .stats = &auth_stats,
-        .rx_crc8_errors = &crc8,
+        .rx_header_crc_errors = &header_crc,
         .rx_crc16_errors = &crc16,
         .upper_layer = nullptr,
         .error_callback = nullptr,

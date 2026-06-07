@@ -170,7 +170,7 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .rx_cache_size = rx_buffer_size,
         .source_id = handle->config.source_id,
         .stats = &handle->stats.datalink,
-        .rx_crc8_errors = &handle->stats.rx_crc8_errors,
+        .rx_header_crc_errors = &handle->stats.rx_header_crc_errors,
         .rx_crc16_errors = &handle->stats.rx_crc16_errors,
         .upper_layer = NULL,  /* Will be set after network layer init */
         .error_callback = handle->config.error_callback,

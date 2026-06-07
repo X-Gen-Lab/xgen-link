@@ -43,8 +43,8 @@ typedef struct xgl_datalink_ctx_s {
     uint8_t* rx_cache;              /**< RX cache buffer */
     size_t rx_cache_size;           /**< RX cache size */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
-    uint64_t* rx_crc8_errors;       /**< CRC8 error counter pointer */
-    uint64_t* rx_crc16_errors;      /**< CRC16 error counter pointer */
+    uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer */
+    uint64_t* rx_crc16_errors;      /**< Frame CRC16 error counter pointer */
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;       /**< User data for callbacks */
     xgl_handle_t owner_handle;      /**< Owning protocol instance handle */
@@ -68,8 +68,8 @@ typedef struct {
     size_t rx_cache_size;           /**< RX cache size */
     uint16_t source_id;             /**< Local source ID */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
-    uint64_t* rx_crc8_errors;       /**< CRC8 error counter pointer (can be NULL) */
-    uint64_t* rx_crc16_errors;      /**< CRC16 error counter pointer (can be NULL) */
+    uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer (can be NULL) */
+    uint64_t* rx_crc16_errors;      /**< Frame CRC16 error counter pointer (can be NULL) */
     xgl_layer_interface_t* upper_layer; /**< Upper layer interface (can be NULL) */
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
     void* callback_user_data;       /**< User data for callbacks (can be NULL) */
