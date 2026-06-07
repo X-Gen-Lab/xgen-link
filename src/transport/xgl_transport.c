@@ -1511,6 +1511,11 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             if (handled_sack) {
                 return XGL_OK;
             }
+
+            if (packet->packet_type == XGL_PACKET_TYPE_ACK ||
+                (packet->flags & XGL_WIRE_FLAG_HAS_EXTENSIONS) != 0U) {
+                return XGL_ERR_INVALID_FRAME;
+            }
         }
 
         /* Process ACK */
