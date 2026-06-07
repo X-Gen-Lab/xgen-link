@@ -11,6 +11,33 @@
 #include <xgl/xgl_wire.h>
 #include <vector>
 
+static xgl_error_t parser_test_auth_sign(uint32_t key_id,
+                                         const uint8_t* aad,
+                                         size_t aad_len,
+                                         const uint8_t* payload,
+                                         size_t payload_len,
+                                         uint8_t* tag,
+                                         size_t tag_capacity,
+                                         size_t* tag_len,
+                                         void* user_data) {
+    (void)user_data;
+    if (tag == nullptr || tag_len == nullptr || tag_capacity < 4U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint32_t acc = key_id;
+    for (size_t i = 0; i < aad_len; ++i) {
+        acc = (acc * 33U) ^ aad[i];
+    }
+    for (size_t i = 0; i < payload_len; ++i) {
+        acc = (acc * 33U) ^ payload[i];
+    }
+
+    xgl_serialize_u32_le(tag, acc);
+    *tag_len = 4U;
+    return XGL_OK;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Test Fixtures                                                             */
 /*---------------------------------------------------------------------------*/
@@ -280,6 +307,53 @@ TEST_F(XglParserTest, ParseCompleteFrameWithExtensionsAndPayload) {
     ASSERT_EQ(xgl_parser_get_frame(&parser, &frame_buffer, &frame_len), XGL_OK);
     EXPECT_EQ(frame_len, frame.size());
     EXPECT_EQ(frame_buffer[3], XGL_WIRE_BASE_HEADER_SIZE + ext.size());
+}
+
+TEST_F(XglParserTest, ParseCompleteAuthenticatedFrameWithSecurityTrailer) {
+    xgl_auth_provider_t provider = {
+        .sign = parser_test_auth_sign,
+        .verify = nullptr,
+        .user_data = nullptr
+    };
+    const std::vector<uint8_t> payload = {0x11, 0x22, 0x33};
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = 0x1234,
+        .target_id = 0x5678,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .seq_num = 9,
+        .ack_num = 0,
+        .payload = payload.data(),
+        .payload_len = payload.size(),
+        .reliable = true,
+        .priority = 2
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> encoded(128);
+    size_t encoded_len = 0;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded.data(),
+                                                encoded.size(),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+    encoded.resize(encoded_len);
+
+    xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
+    for (size_t i = 0; i < encoded.size(); ++i) {
+        result = xgl_parser_feed_byte(&parser, encoded[i], 0);
+        if (i < encoded.size() - 1U) {
+            EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
+        }
+    }
+
+    EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
+    uint8_t* frame_buffer = nullptr;
+    size_t frame_len = 0;
+    ASSERT_EQ(xgl_parser_get_frame(&parser, &frame_buffer, &frame_len), XGL_OK);
+    EXPECT_EQ(frame_len, encoded.size());
 }
 
 TEST_F(XglParserTest, InvalidExtensionLengthResetsParser) {
