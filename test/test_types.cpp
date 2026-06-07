@@ -10,6 +10,10 @@
 #include "xgl/xgl_types.h"
 #include "xgl/xgl_wire.h"
 
+#if defined(XGL_SEQUENCE_H)
+#error "xgl/xgl.h must not expose legacy 8-bit sequence manager in the production API"
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Type Size Tests                                                           */
 /*---------------------------------------------------------------------------*/
