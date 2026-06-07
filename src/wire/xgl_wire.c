@@ -541,6 +541,9 @@ xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
     if (tag_offset > buffer_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
+    if (buffer_size - tag_offset < provider->tag_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
 
     size_t tag_len = 0U;
     xgl_error_t err = provider->sign(key_id,
