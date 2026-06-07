@@ -128,14 +128,14 @@ xgl_timer_handle_t xgl_timer_create(const xgl_timer_config_t* config);
  * \param[in]       handle: Timer handle
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_timer_start(xgl_timer_handle_t handle);
+xgl_error_t xgl_timer_start(const xgl_timer_handle_t handle);
 
 /**
  * \brief           Stop hardware timer
  * \param[in]       handle: Timer handle
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_timer_stop(xgl_timer_handle_t handle);
+xgl_error_t xgl_timer_stop(const xgl_timer_handle_t handle);
 
 /**
  * \brief           Destroy hardware timer

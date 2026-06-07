@@ -4,6 +4,10 @@
  * \author          Nexus Team
  */
 
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "xgl/xgl_time.h"
 #include <stddef.h>
 
@@ -307,7 +311,7 @@ xgl_timer_handle_t xgl_timer_create(const xgl_timer_config_t* config) {
 /**
  * \brief           Start hardware timer (FreeRTOS)
  */
-xgl_error_t xgl_timer_start(xgl_timer_handle_t handle) {
+xgl_error_t xgl_timer_start(const xgl_timer_handle_t handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -321,7 +325,7 @@ xgl_error_t xgl_timer_start(xgl_timer_handle_t handle) {
 /**
  * \brief           Stop hardware timer (FreeRTOS)
  */
-xgl_error_t xgl_timer_stop(xgl_timer_handle_t handle) {
+xgl_error_t xgl_timer_stop(const xgl_timer_handle_t handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -366,7 +370,7 @@ xgl_timer_handle_t xgl_timer_create(const xgl_timer_config_t* config) {
 /**
  * \brief           Start hardware timer (stub)
  */
-xgl_error_t xgl_timer_start(xgl_timer_handle_t handle) {
+xgl_error_t xgl_timer_start(const xgl_timer_handle_t handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -376,7 +380,7 @@ xgl_error_t xgl_timer_start(xgl_timer_handle_t handle) {
 /**
  * \brief           Stop hardware timer (stub)
  */
-xgl_error_t xgl_timer_stop(xgl_timer_handle_t handle) {
+xgl_error_t xgl_timer_stop(const xgl_timer_handle_t handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
