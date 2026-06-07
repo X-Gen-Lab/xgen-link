@@ -29,6 +29,8 @@ typedef struct {
     uint8_t send_base;              /**< Base of sending window */
     uint8_t next_seq_num;           /**< Next sequence number to send */
     uint8_t expected_seq_num;       /**< Expected sequence number for receive */
+    uint32_t send_base_packet_number; /**< Base production packet number */
+    uint32_t next_packet_number;    /**< Next production packet number */
     bool* ack_received;             /**< ACK bitmap (dynamically allocated) */
 } xgl_sliding_window_t;
 
@@ -113,6 +115,20 @@ void xgl_window_reset(xgl_sliding_window_t* window);
  * \return          true if ACK received, false otherwise
  */
 bool xgl_window_is_acked(const xgl_sliding_window_t* window, uint8_t seq_num);
+
+bool xgl_window_can_send_packet_number(const xgl_sliding_window_t* window);
+
+uint32_t xgl_window_get_next_packet_number(const xgl_sliding_window_t* window);
+
+void xgl_window_advance_next_packet_number(xgl_sliding_window_t* window);
+
+xgl_error_t xgl_window_mark_ack_packet_number(xgl_sliding_window_t* window,
+                                              uint32_t packet_number);
+
+uint8_t xgl_window_advance_base_packet_number(xgl_sliding_window_t* window);
+
+bool xgl_window_is_in_window_packet_number(const xgl_sliding_window_t* window,
+                                           uint32_t packet_number);
 
 #ifdef __cplusplus
 }
