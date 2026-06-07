@@ -249,6 +249,19 @@ size_t xgl_fragment_get_reassembly_count(const xgl_fragment_manager_t* manager);
 void xgl_fragment_clear_reassembly(xgl_fragment_manager_t* manager);
 
 /**
+ * \brief           Clear production FRAGMENT_EXT reassembly buffers for a scope
+ * \param[in,out]   manager: Fragmentation manager structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       connection_id: Production connection ID
+ * \param[in]       session_epoch: Production session epoch
+ * \return          Number of reassembly buffers cleared
+ */
+size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
+                                           uint16_t source_id,
+                                           uint32_t connection_id,
+                                           uint32_t session_epoch);
+
+/**
  * \brief           Free fragment data allocated by xgl_fragment_data
  * \param[in]       manager: Fragmentation manager structure
  * \param[in]       fragments: Array of fragment data pointers

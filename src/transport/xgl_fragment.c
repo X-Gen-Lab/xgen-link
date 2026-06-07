@@ -804,6 +804,34 @@ void xgl_fragment_clear_reassembly(xgl_fragment_manager_t* manager) {
     }
 }
 
+size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
+                                           uint16_t source_id,
+                                           uint32_t connection_id,
+                                           uint32_t session_epoch) {
+    if (manager == NULL) {
+        return 0U;
+    }
+
+    size_t cleared = 0U;
+    xgl_list_node_t* node;
+    xgl_list_node_t* tmp;
+    XGL_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
+        xgl_reassembly_buffer_t* buffer =
+            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+
+        if (buffer->uses_fragment_ext &&
+            buffer->source_id == source_id &&
+            buffer->connection_id == connection_id &&
+            buffer->session_epoch == session_epoch) {
+            xgl_list_remove(&manager->reassembly_list, node);
+            free_reassembly_buffer(manager, buffer);
+            cleared++;
+        }
+    }
+
+    return cleared;
+}
+
 /**
  * \brief           Free fragment data allocated by xgl_fragment_data
  */
