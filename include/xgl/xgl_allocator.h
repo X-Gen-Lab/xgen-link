@@ -144,6 +144,8 @@ void xgl_tracking_allocator_get_phase_stats(
  * \brief           Get base allocator interface from tracking allocator
  * \param[in]       tracker: Pointer to tracking allocator structure
  * \return          Pointer to base allocator interface
+ * \note            Use with xgl_alloc()/xgl_free(); direct callback calls do
+ *                  not carry tracker context and fail closed.
  */
 xgl_allocator_t* xgl_tracking_allocator_get_interface(
     xgl_tracking_allocator_t* tracker);

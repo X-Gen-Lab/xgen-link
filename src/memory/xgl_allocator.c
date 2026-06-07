@@ -142,15 +142,6 @@ typedef struct {
  */
 #define XGL_ALLOC_MAGIC             0xA110CA7E
 
-/**
- * \brief           Active tracker for allocator callback compatibility
- * \details         xgl_allocator_t callbacks do not receive user_data, so the
- *                  tracking allocator uses a single active tracker for the
- *                  callback interface. Direct xgl_tracking_alloc/free calls do
- *                  not depend on this global pointer.
- */
-static xgl_tracking_allocator_t* active_tracker = NULL;
-
 static void update_alloc_stats(xgl_allocator_stats_t* stats, size_t size) {
     if (stats == NULL) {
         return;
@@ -216,9 +207,13 @@ static void* tracking_malloc_impl(xgl_tracking_allocator_t* tracker, size_t size
 
 /**
  * \brief           Tracking allocator malloc wrapper
+ * \details         xgl_allocator_t callbacks do not receive user_data. Use
+ *                  xgl_alloc(interface, size) or xgl_tracking_alloc() so the
+ *                  tracker is resolved from user_data instead of a global.
  */
 static void* tracking_malloc(size_t size) {
-    return tracking_malloc_impl(active_tracker, size);
+    (void)size;
+    return NULL;
 }
 
 /**
@@ -261,9 +256,10 @@ static void tracking_free_impl(xgl_tracking_allocator_t* tracker, void* ptr) {
 
 /**
  * \brief           Tracking allocator free wrapper
+ * \details         See tracking_malloc().
  */
 static void tracking_free(void* ptr) {
-    tracking_free_impl(active_tracker, ptr);
+    (void)ptr;
 }
 
 /**
@@ -291,12 +287,9 @@ int xgl_tracking_allocator_init(xgl_tracking_allocator_t* tracker,
     tracker->current_phase = XGL_ALLOCATOR_PHASE_INIT;
     
     /* Set up base allocator interface */
-    /* Note: This simplified implementation doesn't support proper context */
-    /* A production implementation would use thread-local storage */
     tracker->base.malloc = tracking_malloc;
     tracker->base.free = tracking_free;
     tracker->base.user_data = tracker;
-    active_tracker = tracker;
     
     return 0;
 }
