@@ -187,6 +187,37 @@ TEST(XglWireTest, EncodesAndDecodesSackExtension) {
     EXPECT_EQ(memcmp(decoded_bitmap, bitmap, sizeof(bitmap)), 0);
 }
 
+TEST(XglWireTest, EncodesAndDecodesFragmentExtension) {
+    uint8_t value[16] = {};
+    size_t value_len = 0;
+
+    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(value,
+                                                 sizeof(value),
+                                                 0x01020304U,
+                                                 0x00001000U,
+                                                 0x00004000U,
+                                                 &value_len),
+              XGL_OK);
+
+    EXPECT_EQ(value_len, 12U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[0]), 0x01020304U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[4]), 0x00001000U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[8]), 0x00004000U);
+
+    uint32_t message_id = 0;
+    uint32_t fragment_offset = 0;
+    uint32_t message_len = 0;
+    ASSERT_EQ(xgl_wire_decode_fragment_ext_value(value,
+                                                 value_len,
+                                                 &message_id,
+                                                 &fragment_offset,
+                                                 &message_len),
+              XGL_OK);
+    EXPECT_EQ(message_id, 0x01020304U);
+    EXPECT_EQ(fragment_offset, 0x00001000U);
+    EXPECT_EQ(message_len, 0x00004000U);
+}
+
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
     uint8_t invalid[] = {
         XGL_WIRE_EXT_ACK_RANGE,
