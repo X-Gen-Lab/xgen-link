@@ -278,6 +278,11 @@ TEST_F(XglNetworkTest, ValidateBroadcastTargetValid) {
     EXPECT_TRUE(valid);
 }
 
+TEST_F(XglNetworkTest, ValidateSelfAddressInvalid) {
+    bool valid = xgl_network_validate_address(&network_ctx, LOCAL_ID, LOCAL_ID);
+    EXPECT_FALSE(valid);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Local Node Detection Tests                                                */
 /*---------------------------------------------------------------------------*/
