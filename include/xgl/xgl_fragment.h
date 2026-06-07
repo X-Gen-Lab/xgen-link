@@ -68,10 +68,15 @@ typedef struct {
     uint8_t fragment_id;            /**< Fragment ID */
     uint16_t source_id;             /**< Source node ID */
     uint8_t data_type;              /**< Data type */
+    bool uses_fragment_ext;         /**< Uses production FRAGMENT_EXT key */
+    uint32_t connection_id;         /**< Production connection ID */
+    uint32_t session_epoch;         /**< Production session epoch */
+    uint32_t message_id;            /**< Production message ID */
     
     /* Reassembly state */
     uint8_t total_fragments;        /**< Total number of fragments */
     uint8_t received_count;         /**< Number of fragments received */
+    size_t received_bytes;          /**< Number of unique payload bytes received */
     uint8_t* received_bitmap;       /**< Bitmap of received fragments */
     
     /* Data buffer */
@@ -189,6 +194,37 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
                                  uint8_t** complete_data,
                                  size_t* complete_len,
                                  uint32_t current_time_ms);
+
+/**
+ * \brief           Process received fragment described by FRAGMENT_EXT metadata
+ * \param[in,out]   manager: Fragmentation manager structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       connection_id: Production connection ID
+ * \param[in]       session_epoch: Production session epoch
+ * \param[in]       data_type: Application data type
+ * \param[in]       message_id: Fragmented message ID
+ * \param[in]       fragment_offset: Payload offset in original message
+ * \param[in]       message_len: Complete message length
+ * \param[in]       fragment_payload: Fragment payload bytes
+ * \param[in]       fragment_payload_len: Fragment payload length
+ * \param[out]      complete_data: Pointer to complete data when ready
+ * \param[out]      complete_len: Complete data length when ready
+ * \param[in]       current_time_ms: Current time in milliseconds (0 = system time)
+ * \return          XGL_OK if complete, XGL_ERR_BUSY if waiting, error otherwise
+ */
+xgl_error_t xgl_fragment_process_ext(xgl_fragment_manager_t* manager,
+                                     uint16_t source_id,
+                                     uint32_t connection_id,
+                                     uint32_t session_epoch,
+                                     uint8_t data_type,
+                                     uint32_t message_id,
+                                     uint32_t fragment_offset,
+                                     uint32_t message_len,
+                                     const uint8_t* fragment_payload,
+                                     size_t fragment_payload_len,
+                                     uint8_t** complete_data,
+                                     size_t* complete_len,
+                                     uint32_t current_time_ms);
 
 /**
  * \brief           Process reassembly timeouts

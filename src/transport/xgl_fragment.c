@@ -87,12 +87,41 @@ static xgl_reassembly_buffer_t* find_reassembly_buffer(
         xgl_reassembly_buffer_t* buffer = 
             XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
         
-        if (buffer->fragment_id == fragment_id &&
+        if (!buffer->uses_fragment_ext &&
+            buffer->fragment_id == fragment_id &&
             buffer->source_id == source_id) {
             return buffer;
         }
     }
     
+    return NULL;
+}
+
+static xgl_reassembly_buffer_t* find_reassembly_buffer_ext(
+    xgl_fragment_manager_t* manager,
+    uint16_t source_id,
+    uint32_t connection_id,
+    uint32_t session_epoch,
+    uint32_t message_id) {
+
+    if (manager == NULL) {
+        return NULL;
+    }
+
+    xgl_list_node_t* node;
+    XGL_LIST_FOR_EACH(&manager->reassembly_list, node) {
+        xgl_reassembly_buffer_t* buffer =
+            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+
+        if (buffer->uses_fragment_ext &&
+            buffer->source_id == source_id &&
+            buffer->connection_id == connection_id &&
+            buffer->session_epoch == session_epoch &&
+            buffer->message_id == message_id) {
+            return buffer;
+        }
+    }
+
     return NULL;
 }
 
@@ -125,6 +154,28 @@ static void mark_fragment_received(xgl_reassembly_buffer_t* buffer,
     size_t byte_index = fragment_index / 8;
     uint8_t bit_mask = (uint8_t)(1U << (fragment_index % 8U));
     
+    buffer->received_bitmap[byte_index] |= bit_mask;
+}
+
+static bool is_byte_received(const xgl_reassembly_buffer_t* buffer,
+                             size_t byte_offset) {
+    if (buffer == NULL || buffer->received_bitmap == NULL) {
+        return false;
+    }
+
+    size_t byte_index = byte_offset / 8U;
+    uint8_t bit_mask = (uint8_t)(1U << (byte_offset % 8U));
+    return (buffer->received_bitmap[byte_index] & bit_mask) != 0U;
+}
+
+static void mark_byte_received(xgl_reassembly_buffer_t* buffer,
+                               size_t byte_offset) {
+    if (buffer == NULL || buffer->received_bitmap == NULL) {
+        return;
+    }
+
+    size_t byte_index = byte_offset / 8U;
+    uint8_t bit_mask = (uint8_t)(1U << (byte_offset % 8U));
     buffer->received_bitmap[byte_index] |= bit_mask;
 }
 
@@ -542,6 +593,145 @@ xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
     }
     
     /* Still waiting for more fragments */
+    return XGL_ERR_BUSY;
+}
+
+xgl_error_t xgl_fragment_process_ext(xgl_fragment_manager_t* manager,
+                                     uint16_t source_id,
+                                     uint32_t connection_id,
+                                     uint32_t session_epoch,
+                                     uint8_t data_type,
+                                     uint32_t message_id,
+                                     uint32_t fragment_offset,
+                                     uint32_t message_len,
+                                     const uint8_t* fragment_payload,
+                                     size_t fragment_payload_len,
+                                     uint8_t** complete_data,
+                                     size_t* complete_len,
+                                     uint32_t current_time_ms) {
+    if (manager == NULL || fragment_payload == NULL || fragment_payload_len == 0U) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    if (complete_data == NULL || complete_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    *complete_data = NULL;
+    *complete_len = 0U;
+
+    if (message_len == 0U ||
+        fragment_offset > message_len ||
+        fragment_payload_len > (size_t)message_len - (size_t)fragment_offset) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    xgl_reassembly_buffer_t* buffer = find_reassembly_buffer_ext(manager,
+                                                                 source_id,
+                                                                 connection_id,
+                                                                 session_epoch,
+                                                                 message_id);
+    if (buffer == NULL) {
+        if (xgl_list_count(&manager->reassembly_list) >=
+            manager->max_reassembly_buffers) {
+            return XGL_ERR_NO_MEMORY;
+        }
+
+        if (manager->max_message_size != 0U &&
+            (size_t)message_len > manager->max_message_size) {
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+
+        if (manager->max_reassembly_bytes != 0U &&
+            (manager->current_reassembly_bytes > manager->max_reassembly_bytes ||
+             (size_t)message_len > manager->max_reassembly_bytes - manager->current_reassembly_bytes)) {
+            return XGL_ERR_NO_MEMORY;
+        }
+
+        buffer = (xgl_reassembly_buffer_t*)fragment_malloc(manager->allocator,
+                                                           sizeof(xgl_reassembly_buffer_t));
+        if (buffer == NULL) {
+            return XGL_ERR_NO_MEMORY;
+        }
+
+        memset(buffer, 0, sizeof(xgl_reassembly_buffer_t));
+        buffer->uses_fragment_ext = true;
+        buffer->source_id = source_id;
+        buffer->connection_id = connection_id;
+        buffer->session_epoch = session_epoch;
+        buffer->message_id = message_id;
+        buffer->data_type = data_type;
+        buffer->timeout_ms = manager->reassembly_timeout_ms;
+        buffer->buffer_size = message_len;
+        buffer->reserved_size = message_len;
+        buffer->data_len = message_len;
+
+        size_t bitmap_size = ((size_t)message_len + 7U) / 8U;
+        buffer->received_bitmap = (uint8_t*)fragment_malloc(manager->allocator,
+                                                            bitmap_size);
+        if (buffer->received_bitmap == NULL) {
+            fragment_free(manager->allocator, buffer);
+            return XGL_ERR_NO_MEMORY;
+        }
+        memset(buffer->received_bitmap, 0, bitmap_size);
+
+        buffer->data = (uint8_t*)fragment_malloc(manager->allocator,
+                                                 buffer->buffer_size);
+        if (buffer->data == NULL) {
+            fragment_free(manager->allocator, buffer->received_bitmap);
+            fragment_free(manager->allocator, buffer);
+            return XGL_ERR_NO_MEMORY;
+        }
+
+        manager->current_reassembly_bytes += buffer->reserved_size;
+
+        xgl_list_node_init(&buffer->node);
+        xgl_list_insert_tail(&manager->reassembly_list, &buffer->node);
+    }
+
+    if (buffer->data_type != data_type ||
+        buffer->buffer_size != (size_t)message_len) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    size_t start = fragment_offset;
+    size_t end = start + fragment_payload_len;
+    for (size_t i = start; i < end; ++i) {
+        if (is_byte_received(buffer, i)) {
+            return XGL_ERR_BUSY;
+        }
+    }
+
+    bool is_first_received_range = (buffer->received_bytes == 0U);
+
+    memcpy(&buffer->data[start], fragment_payload, fragment_payload_len);
+    for (size_t i = start; i < end; ++i) {
+        mark_byte_received(buffer, i);
+    }
+    buffer->received_bytes += fragment_payload_len;
+
+    if (is_first_received_range) {
+        buffer->first_fragment_time = (current_time_ms == 0U) ?
+                                      xgl_time_ms() : current_time_ms;
+    }
+
+    if (buffer->received_bytes == buffer->buffer_size) {
+        *complete_data = buffer->data;
+        *complete_len = buffer->data_len;
+
+        xgl_list_remove(&manager->reassembly_list, &buffer->node);
+
+        if (buffer->received_bitmap != NULL) {
+            fragment_free(manager->allocator, buffer->received_bitmap);
+        }
+        if (buffer->reserved_size <= manager->current_reassembly_bytes) {
+            manager->current_reassembly_bytes -= buffer->reserved_size;
+        }
+        fragment_free(manager->allocator, buffer);
+
+        return XGL_OK;
+    }
+
     return XGL_ERR_BUSY;
 }
 
