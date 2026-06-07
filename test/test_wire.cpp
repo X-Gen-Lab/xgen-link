@@ -365,6 +365,7 @@ TEST(XglWireTest, AppendsAndVerifiesAuthenticationTrailer) {
     xgl_auth_provider_t provider = {
         .sign = wire_test_auth_sign,
         .verify = wire_test_auth_verify,
+        .tag_len = 4,
         .user_data = nullptr
     };
 
@@ -409,6 +410,32 @@ TEST(XglWireTest, AppendsAndVerifiesAuthenticationTrailer) {
                                            &valid),
               XGL_OK);
     EXPECT_FALSE(valid);
+}
+
+TEST(XglWireTest, AuthenticationTrailerRejectsUnspecifiedTagLength) {
+    xgl_auth_provider_t provider = {
+        .sign = wire_test_auth_sign,
+        .verify = wire_test_auth_verify,
+        .tag_len = 0,
+        .user_data = nullptr
+    };
+
+    uint8_t frame[64] = {
+        'X', 'G', 2, 24,
+        1, 0, 8, 0,
+        0x34, 0x12, 0x78, 0x56,
+        'p', 'i', 'n', 'g'
+    };
+    size_t frame_len = 0;
+
+    EXPECT_EQ(xgl_wire_append_auth_trailer(frame,
+                                           sizeof(frame),
+                                           12,
+                                           4,
+                                           7,
+                                           &provider,
+                                           &frame_len),
+              XGL_ERR_INVALID_PARAM);
 }
 
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
