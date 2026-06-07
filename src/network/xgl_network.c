@@ -139,7 +139,7 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
     packet->version = XGL_PROTOCOL_VERSION;
     
     /* Assign sequence number if requested */
-    /* Note: Sequence number assignment is typically done by transport layer */
+    /* Packet number assignment is handled by transport layer. */
     /* This is just a placeholder for network layer forwarding */
     (void)assign_seq;  /* Unused in this layer */
     
@@ -172,8 +172,6 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         .connection_id = packet->connection_id,
         .packet_number = packet->packet_number,
         .session_epoch = packet->session_epoch,
-        .seq_num = packet->seq_num,
-        .ack_num = packet->ack_num,
         .extensions = packet->extensions,
         .extensions_len = packet->extensions_len,
         .payload = packet->data->data,
@@ -317,15 +315,13 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             xgl_packet_t packet = {
                 .source_id = source_id,
                 .target_id = target_id,
-                .data_type = data_type,
-                .seq_num = (uint8_t)(wire_header.packet_number & 0xFFU),
-                .ack_num = 0,
                 .session_id = (uint16_t)(wire_header.connection_id & UINT16_MAX),
                 .connection_id = wire_header.connection_id,
                 .packet_number = wire_header.packet_number,
                 .session_epoch = 0,
                 .packet_type = wire_header.packet_type,
                 .flags = wire_header.flags,
+                .data_type = data_type,
                 .reliable = reliable,
                 .fragment = ((wire_header.flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U) ? 1U : 0U,
                 .priority = (wire_header.traffic_class & XGL_ATTR_PRIORITY_MASK) >> XGL_ATTR_PRIORITY_SHIFT,

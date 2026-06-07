@@ -33,8 +33,7 @@ TEST(XglFrameProperties, CrcErrorDetection) {
         uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
-        uint8_t seq_num = gen.random_uint8();
-        uint8_t ack_num = gen.random_uint8();
+        uint32_t packet_number = gen.random_uint32();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07;  /* 3 bits */
         
@@ -48,8 +47,7 @@ TEST(XglFrameProperties, CrcErrorDetection) {
             .source_id = source_id,
             .target_id = target_id,
             .data_type = data_type,
-            .seq_num = seq_num,
-            .ack_num = ack_num,
+            .packet_number = packet_number,
             .payload = payload.data(),
             .payload_len = payload_len,
             .reliable = reliable,
@@ -154,8 +152,7 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
         uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
-        uint8_t seq_num = gen.random_uint8();
-        uint8_t ack_num = gen.random_uint8();
+        uint32_t packet_number = gen.random_uint32();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07;  /* 3 bits */
         
@@ -169,8 +166,7 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
             .source_id = source_id,
             .target_id = target_id,
             .data_type = data_type,
-            .seq_num = seq_num,
-            .ack_num = ack_num,
+            .packet_number = packet_number,
             .payload = payload.data(),
             .payload_len = payload_len,
             .reliable = reliable,
@@ -231,8 +227,8 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
             << "Source ID mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_header.target_id, target_id)
             << "Target ID mismatch at iteration " << iteration;
-        EXPECT_EQ(parsed_header.packet_number, seq_num)
-            << "Sequence number mismatch at iteration " << iteration;
+        EXPECT_EQ(parsed_header.packet_number, packet_number)
+            << "Packet number mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_header.payload_len, payload_len)
             << "Payload length mismatch at iteration " << iteration;
         
@@ -270,8 +266,8 @@ TEST(XglFrameProperties, FieldValidation) {
         uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
-        uint8_t seq_num = gen.random_uint8();
-        uint8_t ack_num = gen.random_uint8();
+        uint8_t packet_number = gen.random_uint8();
+        uint8_t ack_range = gen.random_uint8();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07;  /* Valid: 3 bits (0-7) */
         
@@ -285,8 +281,6 @@ TEST(XglFrameProperties, FieldValidation) {
             .source_id = source_id,
             .target_id = target_id,
             .data_type = data_type,
-            .seq_num = seq_num,
-            .ack_num = ack_num,
             .payload = payload.data(),
             .payload_len = payload_len,
             .reliable = reliable,
@@ -375,8 +369,6 @@ TEST(XglFrameProperties, FrameSizeCalculation) {
             .source_id = 1,
             .target_id = 2,
             .data_type = 0,
-            .seq_num = 0,
-            .ack_num = 0,
             .payload = payload.data(),
             .payload_len = payload_len,
             .reliable = false,
@@ -424,8 +416,6 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
             .source_id = source_id,
             .target_id = target_id,
             .data_type = data_type,
-            .seq_num = 0,
-            .ack_num = 0,
             .payload = payload.data(),
             .payload_len = payload_len,
             .reliable = false,
@@ -510,3 +500,4 @@ TEST(XglFrameProperties, ParserRejectsGarbageData) {
             << "Parser left SOF state after garbage at iteration " << iteration;
     }
 }
+

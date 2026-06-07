@@ -112,8 +112,6 @@ TEST(XglFrameTest, BuildFrameNullPointer) {
         .source_id = 0x10,
         .target_id = 0x20,
         .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = false,
@@ -135,8 +133,6 @@ TEST(XglFrameTest, BuildFrameEmptyPayload) {
         .source_id = 0x10,
         .target_id = 0x20,
         .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = nullptr,
         .payload_len = 0,
         .reliable = false,
@@ -158,8 +154,6 @@ TEST(XglFrameTest, BuildFrameRejectsPayloadLargerThanWireLength) {
         .source_id = 0x10,
         .target_id = 0x20,
         .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = 65536,
         .reliable = false,
@@ -184,8 +178,6 @@ TEST(XglFrameTest, SerializeFrame) {
         .source_id = 0x10,
         .target_id = 0x20,
         .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = true,
@@ -223,8 +215,6 @@ TEST(XglFrameTest, SerializeFramePreserves16BitNodeIds) {
         .source_id = 0x1234,
         .target_id = 0x2345,
         .data_type = XGL_PACKET_TYPE_DATA,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = false,
@@ -255,8 +245,6 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameAddsSecurityExtensionAndTrailer) {
         .source_id = 0x1234,
         .target_id = 0x2345,
         .data_type = XGL_PACKET_TYPE_DATA,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = true,
@@ -325,8 +313,6 @@ TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
         .source_id = 0x10,
         .target_id = 0x20,
         .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = false,
@@ -378,7 +364,7 @@ TEST(XglFrameTest, BuildZeroCopyFrame) {
     xgl_error_t result = xgl_frame_build_zerocopy(
         buffer, sizeof(buffer),
         data_offset, data_len,
-        0x10, 0x20, 0x05, 0x42, 0x00,
+        0x10, 0x20, 0x05, 0x42,
         true, 3,
         &frame_len
     );
@@ -406,7 +392,7 @@ TEST(XglFrameTest, ZeroCopyInvalidOffset) {
         buffer, sizeof(buffer),
         10,  /* Too small, needs to be at least 12 */
         8,
-        0x10, 0x20, 0x05, 0x42, 0x00,
+        0x10, 0x20, 0x05, 0x42,
         false, 0,
         &frame_len
     );
@@ -424,7 +410,7 @@ TEST(XglFrameTest, ZeroCopyBufferTooSmall) {
         buffer, sizeof(buffer),
         data_offset,
         100,  /* Too large */
-        0x10, 0x20, 0x05, 0x42, 0x00,
+        0x10, 0x20, 0x05, 0x42,
         false, 0,
         &frame_len
     );
@@ -445,8 +431,6 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
         .source_id = 0x10,
         .target_id = 0x20,
         .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = false,
@@ -472,8 +456,6 @@ TEST(XglFrameTest, InvalidHeaderCRC) {
         .source_id = 0x10,
         .target_id = 0x20,
         .data_type = 0x05,
-        .seq_num = 0x42,
-        .ack_num = 0x00,
         .payload = payload,
         .payload_len = sizeof(payload),
         .reliable = false,

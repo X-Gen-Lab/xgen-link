@@ -44,7 +44,7 @@ static const struct {
     {XGL_ERR_CRC_FAILED, "CRC check failed"},
     {XGL_ERR_INVALID_VERSION, "Invalid version"},
     {XGL_ERR_INVALID_DATA_TYPE, "Invalid data type"},
-    {XGL_ERR_SEQUENCE_ERROR, "Sequence number error"},
+    {XGL_ERR_SEQUENCE_ERROR, "Packet number/window error"},
     
     /* State errors (400-499) */
     {XGL_ERR_BUSY, "Resource busy"},

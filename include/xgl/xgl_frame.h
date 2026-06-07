@@ -54,8 +54,6 @@ typedef struct {
     uint32_t connection_id;     /**< Production connection context ID */
     uint32_t packet_number;     /**< Production monotonic packet number */
     uint32_t session_epoch;     /**< Production session epoch for SESSION_EXT users */
-    uint8_t seq_num;            /**< Sequence number */
-    uint8_t ack_num;            /**< Acknowledgment number */
     const uint8_t* extensions;   /**< Production TLV extension bytes */
     size_t extensions_len;       /**< Extension length in bytes */
     const uint8_t* payload;     /**< Payload data */
@@ -116,8 +114,7 @@ xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
  * \param[in]       source_id: Source node ID
  * \param[in]       target_id: Target node ID
  * \param[in]       data_type: Data type
- * \param[in]       seq_num: Sequence number
- * \param[in]       ack_num: Acknowledgment number
+ * \param[in]       packet_number: Production packet number
  * \param[in]       reliable: Reliable transmission flag
  * \param[in]       priority: Priority level (0-7)
  * \param[out]      frame_len: Total frame length
@@ -130,8 +127,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
                                      uint16_t source_id,
                                      uint16_t target_id,
                                      uint8_t data_type,
-                                     uint8_t seq_num,
-                                     uint8_t ack_num,
+                                     uint32_t packet_number,
                                      bool reliable,
                                      uint8_t priority,
                                      size_t* frame_len);

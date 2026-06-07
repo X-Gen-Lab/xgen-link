@@ -192,7 +192,6 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
                                            tx_data->target_id,
                                            tx_data->data_type,
                                            0,
-                                           0,
                                            false,
                                            tx_data->priority,
                                            &frame_len);

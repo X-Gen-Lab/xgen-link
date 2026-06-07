@@ -78,8 +78,6 @@ protected:
             .source_id = source_id,
             .target_id = target_id,
             .data_type = 1,
-            .seq_num = 0,
-            .ack_num = 0,
             .payload = reinterpret_cast<const uint8_t*>(payload),
             .payload_len = std::strlen(payload),
             .reliable = true,
@@ -256,8 +254,6 @@ TEST_F(XglNetworkTest, SendPacketWithRoute) {
     xgl_packet_t packet = {
         .source_id = LOCAL_ID,
         .target_id = REMOTE_ID,
-        .seq_num = 0,
-        .ack_num = 0,
         .data_type = 1,
         .reliable = 1,
         .priority = 0,

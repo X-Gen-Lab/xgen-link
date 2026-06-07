@@ -100,7 +100,7 @@ TEST_F(XglReliableTest, AddPacketToQueue) {
         data, sizeof(data),
         1,      /* source_id */
         2,      /* target_id */
-        10,     /* seq_num */
+        10,     /* packet_number */
         5,      /* data_type */
         3,      /* priority */
         1000,   /* timeout_ms */
@@ -549,3 +549,4 @@ TEST_F(XglReliableTest, AddPacketWithLargeData) {
     EXPECT_EQ(packet->data_len, sizeof(data));
     EXPECT_EQ(memcmp(packet->data, data, sizeof(data)), 0);
 }
+

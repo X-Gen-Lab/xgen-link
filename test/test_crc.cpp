@@ -186,23 +186,21 @@ TEST(XglCrc16Test, DifferentLengths) {
  * \brief           Test CRC16 with frame header simulation
  */
 TEST(XglCrc16Test, FrameHeaderSimulation) {
-    /* Simulate a frame header (12 bytes) */
-    uint8_t header[12] = {
-        0x01,  /* version + data_type */
-        0x01,  /* source_id */
-        0x02,  /* target_id */
-        0x00,  /* attr_lsb */
-        0x00,  /* attr_msb */
-        0x10, 0x00,  /* data_len (16 bytes, little-endian) */
-        0x01,  /* seq_num */
-        0x00,  /* ack_num */
-        0x00,  /* reserved */
-        0x00   /* crc8 placeholder */
+    uint8_t header[24] = {
+        0x58, 0x47,        /* magic "XG" */
+        0x02,              /* version */
+        0x18,              /* header_len */
+        0x01,              /* packet_type */
+        0x01,              /* flags */
+        0x08,              /* ttl */
+        0x00,              /* traffic_class */
+        0x01, 0x00,        /* source_id */
+        0x02, 0x00,        /* target_id */
+        0x34, 0x12, 0x00, 0x00,  /* connection_id */
+        0x78, 0x56, 0x34, 0x12,  /* packet_number */
+        0x10, 0x00,        /* payload_len */
+        0x00, 0x00         /* header_crc16 placeholder */
     };
-    
-    /* Calculate CRC8 for header (first 11 bytes) */
-    uint8_t crc8 = xgl_crc8_maxim(header, 11);
-    header[11] = crc8;
     
     /* Simulate payload */
     uint8_t payload[16];
@@ -212,7 +210,7 @@ TEST(XglCrc16Test, FrameHeaderSimulation) {
     
     /* Calculate CRC16 for entire frame (header + payload) */
     uint16_t crc16 = 0xFFFF;
-    crc16 = xgl_crc16_modbus_update(crc16, header, 12);
+    crc16 = xgl_crc16_modbus_update(crc16, header, sizeof(header));
     crc16 = xgl_crc16_modbus_update(crc16, payload, 16);
     
     /* Verify CRC16 is calculated */

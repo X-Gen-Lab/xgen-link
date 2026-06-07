@@ -200,7 +200,7 @@ static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
                                           xgl_handle_t handle,
                                           uint16_t target_id,
                                           uint8_t control_type,
-                                          uint8_t ack_num,
+                                          uint32_t control_packet_number,
                                           uint16_t session_id) {
     xgl_packet_data_t packet_data = {
         .ref_count = 1,
@@ -212,10 +212,9 @@ static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
     xgl_packet_t packet = {
         .source_id = ctx->local_id,
         .target_id = target_id,
-        .data_type = control_type,
-        .seq_num = 0,
-        .ack_num = ack_num,
         .session_id = session_id,
+        .packet_number = control_packet_number,
+        .data_type = control_type,
         .reliable = (control_type == XGL_TRANSPORT_CONTROL_NACK ||
                      control_type == XGL_TRANSPORT_CONTROL_SACK) ?
                     XGL_ATTR_RELIABLE_ACK : XGL_ATTR_RELIABLE_NONE,
@@ -314,15 +313,14 @@ static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
     };
     
     xgl_packet_t ack_packet = {
-            .source_id = ctx->local_id,
+        .source_id = ctx->local_id,
         .target_id = source_id,
-        .data_type = 0,
-        .seq_num = 0,
-        .ack_num = (uint8_t)(packet_number & 0xFFU),
         .session_id = session_id,
+        .packet_number = packet_number,
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
-            .reliable = XGL_ATTR_RELIABLE_ACK,
+        .data_type = 0,
+        .reliable = XGL_ATTR_RELIABLE_ACK,
         .fragment = false,
         .priority = 7,
         .data = &ack_packet_data,
@@ -357,8 +355,6 @@ static xgl_error_t transport_retransmit_reliable_packet(xgl_transport_ctx_t* ctx
     xgl_packet_t packet = {
         .source_id = rel_packet->source_id,
         .target_id = rel_packet->target_id,
-        .seq_num = (uint8_t)(rel_packet->packet_number & 0xFFU),
-        .ack_num = 0,
         .session_id = rel_packet->session_id,
         .connection_id = rel_packet->connection_id,
         .packet_number = rel_packet->packet_number,
@@ -1187,10 +1183,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             }
 
             uint32_t packet_number = 0;
-            uint8_t seq_num = 0;
             if (tx_data->reliable && peer != NULL) {
                 packet_number = transport_allocate_packet_number(ctx, peer);
-                seq_num = (uint8_t)(packet_number & 0xFFU);
             }
             
             /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
@@ -1280,11 +1274,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             xgl_packet_t packet = {
                 .source_id = ctx->local_id,
                 .target_id = tx_data->target_id,
-                .data_type = tx_data->data_type,
                 .packet_number = packet_number,
-                .seq_num = seq_num,
-                .ack_num = 0,  /* ACK number is 0 for data packets */
                 .session_id = (peer != NULL) ? peer->session_id : 0,
+                .data_type = tx_data->data_type,
                 .reliable = tx_data->reliable,
                 .fragment = true,  /* Mark as fragment */
                 .priority = tx_data->priority,
@@ -1319,10 +1311,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         
         /* Get sequence number */
         uint32_t packet_number = 0;
-        uint8_t seq_num = 0;
         if (tx_data->reliable && peer != NULL) {
             packet_number = transport_allocate_packet_number(ctx, peer);
-            seq_num = (uint8_t)(packet_number & 0xFFU);
         }
         
         /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
@@ -1348,11 +1338,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         xgl_packet_t packet = {
             .source_id = ctx->local_id,
             .target_id = tx_data->target_id,
-            .data_type = tx_data->data_type,
-            .packet_number = packet_number,
-            .seq_num = seq_num,
-            .ack_num = 0,  /* ACK number is 0 for data packets */
             .session_id = (peer != NULL) ? peer->session_id : 0,
+            .packet_number = packet_number,
+            .data_type = tx_data->data_type,
             .reliable = tx_data->reliable,
             .fragment = false,  /* Not a fragment */
             .priority = tx_data->priority,

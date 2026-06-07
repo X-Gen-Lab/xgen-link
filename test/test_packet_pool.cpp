@@ -10,6 +10,15 @@
 #include <vector>
 #include <cstring>
 
+template <typename T>
+concept HasLegacyPacketSequenceFields = requires(T value) {
+    value.seq_num;
+    value.ack_num;
+};
+
+static_assert(!HasLegacyPacketSequenceFields<xgl_packet_t>,
+              "xgl_packet_t must not expose legacy seq_num/ack_num fields");
+
 /*---------------------------------------------------------------------------*/
 /* Test Fixtures                                                             */
 /*---------------------------------------------------------------------------*/
@@ -148,8 +157,9 @@ TEST_F(XglPacketPoolTest, AllocInitializesFields) {
     /* Verify all fields are initialized to zero */
     EXPECT_EQ(packet->source_id, 0);
     EXPECT_EQ(packet->target_id, 0);
-    EXPECT_EQ(packet->seq_num, 0);
-    EXPECT_EQ(packet->ack_num, 0);
+    EXPECT_EQ(packet->connection_id, 0U);
+    EXPECT_EQ(packet->packet_number, 0U);
+    EXPECT_EQ(packet->session_epoch, 0U);
     EXPECT_EQ(packet->version, 0);
     EXPECT_EQ(packet->data_type, 0);
     EXPECT_EQ(packet->reliable, 0);

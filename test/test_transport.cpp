@@ -180,8 +180,6 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
     xgl_packet_t ack_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = find_peer(&ctx, 2)->session_id,
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
@@ -262,8 +260,6 @@ TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
     xgl_packet_t ack_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 3,
         .session_id = peer->session_id,
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
@@ -342,8 +338,6 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
     xgl_packet_t sack_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = peer->session_id,
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
@@ -415,8 +409,6 @@ TEST(XglTransportTest, ProductionAckWithUnknownExtensionDoesNotUseLegacyAckNumbe
     xgl_packet_t ack_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = peer->session_id,
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
@@ -479,7 +471,7 @@ TEST(XglTransportTest, ReliableSendUsesMonotonicPacketNumbersPastEightBitWrap) {
     EXPECT_EQ(spy.sent_packets[0].packet_number, 254U);
     EXPECT_EQ(spy.sent_packets[1].packet_number, 255U);
     EXPECT_EQ(spy.sent_packets[2].packet_number, 256U);
-    EXPECT_EQ(spy.sent_packets[2].seq_num, 0U);
+    EXPECT_EQ(spy.sent_packets[2].packet_number, 256U);
 
     EXPECT_NE(xgl_reliable_find_packet_number(&peer->reliable_queue, 254, 2), nullptr);
     EXPECT_NE(xgl_reliable_find_packet_number(&peer->reliable_queue, 255, 2), nullptr);
@@ -525,8 +517,6 @@ TEST(XglTransportTest, AckFromUnexpectedSourceIsRejected) {
     xgl_packet_t ack_packet = {
         .source_id = 3,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .data_type = 0,
         .reliable = XGL_ATTR_RELIABLE_ACK,
         .priority = 7,
@@ -653,8 +643,6 @@ TEST(XglTransportTest, AckWithWrongSessionIsRejected) {
     xgl_packet_t ack_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = wrong_session,
         .data_type = 0,
         .reliable = XGL_ATTR_RELIABLE_ACK,
@@ -693,8 +681,6 @@ TEST(XglTransportTest, HelloSetsPeerSessionWithoutDeliveringToApplication) {
     xgl_packet_t hello_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 9,
         .data_type = kTransportControlHello,
         .reliable = XGL_ATTR_RELIABLE_NONE,
@@ -747,8 +733,6 @@ TEST(XglTransportTest, ResetUpdatesSessionAndClearsPeerReliableState) {
     xgl_packet_t reset_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 11,
         .data_type = kTransportControlReset,
         .reliable = XGL_ATTR_RELIABLE_NONE,
@@ -791,8 +775,6 @@ TEST(XglTransportTest, ReliableDataWithStaleSessionIsRejectedBeforeAckOrDelivery
     xgl_packet_t hello_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 5,
         .data_type = kTransportControlHello,
         .reliable = XGL_ATTR_RELIABLE_NONE,
@@ -811,8 +793,6 @@ TEST(XglTransportTest, ReliableDataWithStaleSessionIsRejectedBeforeAckOrDelivery
     xgl_packet_t stale_data_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 7,
-        .ack_num = 0,
         .session_id = 4,
         .data_type = 1,
         .reliable = XGL_ATTR_RELIABLE_TX,
@@ -852,8 +832,6 @@ TEST(XglTransportTest, FirstReliableDataWithSessionCreatesPeerState) {
     xgl_packet_t data_packet = {
         .source_id = 4,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 13,
         .data_type = 1,
         .reliable = XGL_ATTR_RELIABLE_TX,
@@ -916,8 +894,6 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
     xgl_packet_t first_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 5,
         .data_type = 1,
         .reliable = XGL_ATTR_RELIABLE_NONE,
@@ -941,8 +917,6 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
     xgl_packet_t reset_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 6,
         .data_type = kTransportControlReset,
         .reliable = XGL_ATTR_RELIABLE_NONE,
@@ -965,7 +939,7 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
     };
     xgl_packet_t stale_packet = first_packet;
     stale_packet.session_id = 5;
-    stale_packet.seq_num = 1;
+    stale_packet.packet_number = 1;
     stale_packet.data = &second_data;
 
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &stale_packet), XGL_ERR_SEQUENCE_ERROR);
@@ -999,8 +973,6 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
     xgl_packet_t packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 5,
         .packet_number = 2,
         .data_type = 1,
@@ -1014,7 +986,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
     ASSERT_EQ(spy.send_count, 1);
     EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
     EXPECT_EQ(spy.last_packet.reliable, XGL_ATTR_RELIABLE_ACK);
-    EXPECT_EQ(spy.last_packet.ack_num, 0U);
+    EXPECT_EQ(spy.last_packet.packet_number, 0U);
     EXPECT_EQ(spy.last_packet.session_id, 5U);
 
     xgl_transport_destroy(&ctx);
@@ -1046,8 +1018,6 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
     xgl_packet_t packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 5,
         .packet_number = 0,
         .data_type = 1,
@@ -1059,16 +1029,16 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
     ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
     ASSERT_EQ(rx_tracker.receive_count, 1);
 
-    packet.seq_num = 2;
+    packet.packet_number = 2;
     packet.packet_number = 2;
     packet.data = &data2;
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
     EXPECT_EQ(rx_tracker.receive_count, 1);
     ASSERT_EQ(spy.send_count, 2);
     EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
-    EXPECT_EQ(spy.last_packet.ack_num, 1U);
+    EXPECT_EQ(spy.last_packet.packet_number, 1U);
 
-    packet.seq_num = 1;
+    packet.packet_number = 1;
     packet.packet_number = 1;
     packet.data = &data1;
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
@@ -1106,8 +1076,6 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     xgl_packet_t packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 5,
         .packet_number = 0,
         .data_type = 1,
@@ -1121,7 +1089,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     ASSERT_EQ(spy.send_count, 1);
     EXPECT_EQ(spy.last_packet.packet_type, XGL_PACKET_TYPE_ACK);
     EXPECT_NE(spy.last_packet.flags & XGL_WIRE_FLAG_HAS_EXTENSIONS, 0U);
-    EXPECT_EQ(spy.last_packet.ack_num, 0U);
+    EXPECT_EQ(spy.last_packet.packet_number, 0U);
     ASSERT_EQ(spy.sent_payloads.size(), 1U);
 
     xgl_wire_ext_cursor_t cursor;
@@ -1179,8 +1147,6 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     xgl_packet_t packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 5,
         .packet_number = 0,
         .data_type = 1,
@@ -1194,12 +1160,11 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     EXPECT_EQ(spy.send_count, 1);
 
     packet.packet_number = 256;
-    packet.seq_num = 0;
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_WINDOW_FULL);
     EXPECT_EQ(rx_tracker.receive_count, 1);
     ASSERT_EQ(spy.send_count, 2);
     EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
-    EXPECT_EQ(spy.last_packet.ack_num, 1U);
+    EXPECT_EQ(spy.last_packet.packet_number, 1U);
 
     xgl_transport_destroy(&ctx);
 }
@@ -1332,8 +1297,6 @@ TEST(XglTransportTest, FragmentReceiveUsesFragmentExtensionMetadata) {
     xgl_packet_t first_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 0,
         .connection_id = 7,
         .packet_number = 10,
@@ -1412,7 +1375,7 @@ TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
     EXPECT_EQ(queued->retry_count, 1);
     EXPECT_EQ(queued->send_timestamp, 201U);
     EXPECT_EQ(spy.last_packet.target_id, 2);
-    EXPECT_EQ(spy.last_packet.seq_num, 0);
+    EXPECT_EQ(spy.last_packet.packet_number, 0U);
     EXPECT_EQ(spy.last_packet.reliable, 1);
 
     xgl_transport_destroy(&ctx);
@@ -1559,8 +1522,6 @@ TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
     xgl_packet_t peer2_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 0,
         .connection_id = 11,
         .session_epoch = 100,
@@ -1581,8 +1542,6 @@ TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
     xgl_packet_t peer3_packet = {
         .source_id = 3,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 0,
         .connection_id = 22,
         .session_epoch = 200,
@@ -1604,8 +1563,6 @@ TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
     xgl_packet_t reset_packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .session_id = 100,
         .connection_id = 11,
         .session_epoch = 100,
@@ -1677,8 +1634,6 @@ TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
     xgl_packet_t packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .data_type = 1,
         .reliable = XGL_ATTR_RELIABLE_NONE,
         .priority = 0,
@@ -1717,8 +1672,6 @@ TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
     xgl_packet_t packet = {
         .source_id = 2,
         .target_id = 1,
-        .seq_num = 0,
-        .ack_num = 0,
         .data_type = 1,
         .reliable = XGL_ATTR_RELIABLE_TX,
         .priority = 0,

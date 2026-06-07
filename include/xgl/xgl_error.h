@@ -51,7 +51,7 @@ typedef enum {
     XGL_ERR_CRC_FAILED = 301,       /**< CRC check failed */
     XGL_ERR_INVALID_VERSION = 302,  /**< Invalid version */
     XGL_ERR_INVALID_DATA_TYPE = 303,/**< Invalid data type */
-    XGL_ERR_SEQUENCE_ERROR = 304,   /**< Sequence number error */
+    XGL_ERR_SEQUENCE_ERROR = 304,   /**< Packet number/window error */
     
     /*-----------------------------------------------------------------------*/
     /* State errors (400-499)                                                */

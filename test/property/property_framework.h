@@ -118,11 +118,8 @@ public:
         return random_uint8(1, 254);
     }
     
-    /**
-     * \brief           Generate random sequence number (0-255)
-     */
-    uint8_t random_seq_num() {
-        return random_uint8();
+    uint32_t random_packet_number() {
+        return random_uint32();
     }
     
     /**
@@ -149,29 +146,27 @@ public:
      */
     struct RandomFrameHeader {
         uint8_t version;
-        uint8_t data_type;
-        uint8_t source_id;
-        uint8_t target_id;
-        uint8_t reliable;
-        uint8_t fragment;
-        uint8_t priority;
+        uint8_t packet_type;
+        uint8_t flags;
+        uint16_t source_id;
+        uint16_t target_id;
+        uint32_t connection_id;
+        uint32_t packet_number;
+        uint8_t traffic_class;
         uint16_t data_len;
-        uint8_t seq_num;
-        uint8_t ack_num;
     };
     
     RandomFrameHeader random_frame_header() {
         RandomFrameHeader header;
-        header.version = random_uint8(0, 15);
-        header.data_type = random_data_type();
+        header.version = XGL_WIRE_VERSION;
+        header.packet_type = random_data_type();
+        header.flags = random_uint8();
         header.source_id = random_node_id();
         header.target_id = random_node_id();
-        header.reliable = random_uint8(0, 2);
-        header.fragment = random_bool() ? 1 : 0;
-        header.priority = random_priority();
+        header.connection_id = random_uint32();
+        header.packet_number = random_packet_number();
+        header.traffic_class = random_priority();
         header.data_len = random_uint16(0, 1024);
-        header.seq_num = random_seq_num();
-        header.ack_num = random_seq_num();
         return header;
     }
     

@@ -30,8 +30,6 @@ typedef struct xgl_packet {
     /*-----------------------------------------------------------------------*/
     uint16_t source_id;             /**< Source node ID */
     uint16_t target_id;             /**< Target node ID */
-    uint8_t seq_num;                /**< Sequence number */
-    uint8_t ack_num;                /**< Acknowledgment number */
     uint16_t session_id;            /**< Transport session/epoch ID */
     uint32_t connection_id;         /**< Production connection context ID */
     uint32_t packet_number;         /**< Monotonic production packet number */

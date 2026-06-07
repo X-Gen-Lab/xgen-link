@@ -114,9 +114,7 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.connection_id = (params->connection_id != 0U) ?
                                   params->connection_id :
                                   (uint32_t)params->session_id;
-    frame->header.packet_number = (params->packet_number != 0U) ?
-                                  params->packet_number :
-                                  (uint32_t)params->seq_num;
+    frame->header.packet_number = params->packet_number;
     frame->header.payload_len = (uint16_t)params->payload_len;
     frame->header.header_crc16 = 0;
     
@@ -358,8 +356,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
                                      uint16_t source_id,
                                      uint16_t target_id,
                                      uint8_t data_type,
-                                     uint8_t seq_num,
-                                     uint8_t ack_num,
+                                     uint32_t packet_number,
                                      bool reliable,
                                      uint8_t priority,
                                      size_t* frame_len) {
@@ -380,7 +377,6 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     /* Calculate header position (before data) */
     size_t header_offset = data_offset - XGL_FRAME_HEADER_SIZE;
 
-    (void)ack_num;
     uint8_t flags = reliable ? XGL_WIRE_FLAG_ACK_ELICITING : 0U;
     uint8_t packet_type = (data_type != XGL_PACKET_TYPE_INVALID) ?
                           data_type : XGL_PACKET_TYPE_DATA;
@@ -394,7 +390,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
         .source_id = source_id,
         .target_id = target_id,
         .connection_id = 0,
-        .packet_number = seq_num,
+        .packet_number = packet_number,
         .payload_len = (uint16_t)data_len,
         .header_crc16 = 0
     };
