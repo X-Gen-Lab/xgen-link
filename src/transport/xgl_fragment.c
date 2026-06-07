@@ -96,26 +96,73 @@ static xgl_reassembly_buffer_t* find_reassembly_buffer_ext(
     return NULL;
 }
 
-static bool is_byte_received(const xgl_reassembly_buffer_t* buffer,
-                             size_t byte_offset) {
-    if (buffer == NULL || buffer->received_bitmap == NULL) {
-        return false;
-    }
-
-    size_t byte_index = byte_offset / 8U;
-    uint8_t bit_mask = (uint8_t)(1U << (byte_offset % 8U));
-    return (buffer->received_bitmap[byte_index] & bit_mask) != 0U;
+static bool fragment_range_overlaps(const xgl_fragment_received_range_t* range,
+                                    size_t start,
+                                    size_t end) {
+    return range != NULL && start < range->end && end > range->start;
 }
 
-static void mark_byte_received(xgl_reassembly_buffer_t* buffer,
-                               size_t byte_offset) {
-    if (buffer == NULL || buffer->received_bitmap == NULL) {
+static void fragment_remove_range_at(xgl_reassembly_buffer_t* buffer,
+                                     size_t index) {
+    if (buffer == NULL || index >= buffer->received_range_count) {
         return;
     }
 
-    size_t byte_index = byte_offset / 8U;
-    uint8_t bit_mask = (uint8_t)(1U << (byte_offset % 8U));
-    buffer->received_bitmap[byte_index] |= bit_mask;
+    for (size_t i = index + 1U; i < buffer->received_range_count; ++i) {
+        buffer->received_ranges[i - 1U] = buffer->received_ranges[i];
+    }
+    buffer->received_range_count--;
+}
+
+static xgl_error_t fragment_insert_received_range(xgl_reassembly_buffer_t* buffer,
+                                                  size_t start,
+                                                  size_t end) {
+    if (buffer == NULL || start >= end) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    for (size_t i = 0; i < buffer->received_range_count; ++i) {
+        if (fragment_range_overlaps(&buffer->received_ranges[i], start, end)) {
+            return XGL_ERR_BUSY;
+        }
+    }
+
+    size_t insert_index = 0U;
+    while (insert_index < buffer->received_range_count &&
+           buffer->received_ranges[insert_index].start < start) {
+        insert_index++;
+    }
+
+    if (insert_index > 0U &&
+        buffer->received_ranges[insert_index - 1U].end == start) {
+        buffer->received_ranges[insert_index - 1U].end = end;
+        if (insert_index < buffer->received_range_count &&
+            buffer->received_ranges[insert_index].start == end) {
+            buffer->received_ranges[insert_index - 1U].end =
+                buffer->received_ranges[insert_index].end;
+            fragment_remove_range_at(buffer, insert_index);
+        }
+        return XGL_OK;
+    }
+
+    if (insert_index < buffer->received_range_count &&
+        buffer->received_ranges[insert_index].start == end) {
+        buffer->received_ranges[insert_index].start = start;
+        return XGL_OK;
+    }
+
+    if (buffer->received_range_count >= XGL_FRAGMENT_MAX_RECEIVED_RANGES) {
+        return XGL_ERR_NO_MEMORY;
+    }
+
+    for (size_t i = buffer->received_range_count; i > insert_index; --i) {
+        buffer->received_ranges[i] = buffer->received_ranges[i - 1U];
+    }
+    buffer->received_ranges[insert_index].start = start;
+    buffer->received_ranges[insert_index].end = end;
+    buffer->received_range_count++;
+
+    return XGL_OK;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -247,19 +294,12 @@ xgl_error_t xgl_fragment_process_ext(xgl_fragment_manager_t* manager,
         buffer->reserved_size = message_len;
         buffer->data_len = message_len;
 
-        size_t bitmap_size = ((size_t)message_len + 7U) / 8U;
-        buffer->received_bitmap = (uint8_t*)fragment_malloc(manager->allocator,
-                                                            bitmap_size);
-        if (buffer->received_bitmap == NULL) {
-            fragment_free(manager->allocator, buffer);
-            return XGL_ERR_NO_MEMORY;
-        }
-        memset(buffer->received_bitmap, 0, bitmap_size);
+        buffer->received_bitmap = NULL;
+        buffer->received_range_count = 0U;
 
         buffer->data = (uint8_t*)fragment_malloc(manager->allocator,
                                                  buffer->buffer_size);
         if (buffer->data == NULL) {
-            fragment_free(manager->allocator, buffer->received_bitmap);
             fragment_free(manager->allocator, buffer);
             return XGL_ERR_NO_MEMORY;
         }
@@ -277,18 +317,14 @@ xgl_error_t xgl_fragment_process_ext(xgl_fragment_manager_t* manager,
 
     size_t start = fragment_offset;
     size_t end = start + fragment_payload_len;
-    for (size_t i = start; i < end; ++i) {
-        if (is_byte_received(buffer, i)) {
-            return XGL_ERR_BUSY;
-        }
+    xgl_error_t range_err = fragment_insert_received_range(buffer, start, end);
+    if (range_err != XGL_OK) {
+        return range_err;
     }
 
     bool is_first_received_range = (buffer->received_bytes == 0U);
 
     memcpy(&buffer->data[start], fragment_payload, fragment_payload_len);
-    for (size_t i = start; i < end; ++i) {
-        mark_byte_received(buffer, i);
-    }
     buffer->received_bytes += fragment_payload_len;
 
     if (is_first_received_range) {

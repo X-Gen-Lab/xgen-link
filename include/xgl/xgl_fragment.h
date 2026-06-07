@@ -25,6 +25,12 @@ extern "C" {
  * \brief           Fragment reassembly timeout in milliseconds
  */
 #define XGL_FRAGMENT_TIMEOUT_MS     5000
+#define XGL_FRAGMENT_MAX_RECEIVED_RANGES 16U
+
+typedef struct {
+    size_t start;                   /**< Inclusive byte offset */
+    size_t end;                     /**< Exclusive byte offset */
+} xgl_fragment_received_range_t;
 
 /*---------------------------------------------------------------------------*/
 /* Reassembly Buffer Structure                                               */
@@ -46,7 +52,9 @@ typedef struct {
     
     /* Reassembly state */
     size_t received_bytes;          /**< Number of unique payload bytes received */
-    uint8_t* received_bitmap;       /**< Bitmap of received fragments */
+    uint8_t* received_bitmap;       /**< Reserved; range tracking replaces byte bitmap */
+    xgl_fragment_received_range_t received_ranges[XGL_FRAGMENT_MAX_RECEIVED_RANGES];
+    size_t received_range_count;    /**< Number of active received ranges */
     
     /* Data buffer */
     uint8_t* data;                  /**< Reassembly data buffer */
