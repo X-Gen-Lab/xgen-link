@@ -83,29 +83,37 @@ include_directories(
 #-----------------------------------------------------------------------------
 
 set(XGL_SOURCES
-    # Core
-    src/core/xgl_instance.c
-    src/core/xgl_config.c
-    src/core/xgl_send.c
-    src/core/xgl_stats.c
+    # Public API orchestration
+    src/api/xgl_instance.c
+    src/api/xgl_config.c
+    src/api/xgl_send.c
+    src/api/xgl_stats.c
+
+    # Wire format and serialization
+    src/wire/xgl_crc.c
+    src/wire/xgl_serialize.c
+    src/wire/xgl_wire.c
+    src/wire/xgl_frame.c
+    src/wire/xgl_parser.c
+
+    # Security
+    src/security/xgl_security.c
+
+    # Core utilities
     src/core/xgl_error.c
-    src/core/xgl_crc.c
-    src/core/xgl_serialize.c
-    src/core/xgl_wire.c
-    src/core/xgl_security.c
     src/core/xgl_list.c
     src/core/xgl_hashtable.c
-    src/core/xgl_mempool.c
-    src/core/xgl_tiered_pool.c
-    src/core/xgl_packet_pool.c
-    src/core/xgl_allocator.c
+
+    # Memory management
+    src/memory/xgl_mempool.c
+    src/memory/xgl_tiered_pool.c
+    src/memory/xgl_packet_pool.c
+    src/memory/xgl_allocator.c
 
     # Optional Modules
     src/codec/xgl_codec.c
 
     # Data Link Layer
-    src/datalink/xgl_frame.c
-    src/datalink/xgl_parser.c
     src/datalink/xgl_datalink.c
 
     # Network Layer

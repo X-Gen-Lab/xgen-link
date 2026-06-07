@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include "../src/core/xgl_instance_internal.h"
+#include "../src/api/xgl_instance_internal.h"
 
 template <typename T>
 concept HasLegacySequenceState = requires(T value) {
