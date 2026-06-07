@@ -463,13 +463,14 @@ TEST_F(XglSendTest, ZeroCopyReliableIsRejectedInsteadOfImplicitCopyFallback) {
     EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_ERR_INVALID_PARAM);
 }
 
-TEST_F(XglSendTest, ZeroCopyRejectedWhenAuthenticationRequired) {
+TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
     xgl_destroy(handle);
     handle = nullptr;
 
     xgl_auth_provider_t provider = {
         .sign = send_test_auth_sign,
         .verify = send_test_auth_verify,
+        .tag_len = 8,
         .user_data = nullptr
     };
     config.auth_required = true;
@@ -480,14 +481,16 @@ TEST_F(XglSendTest, ZeroCopyRejectedWhenAuthenticationRequired) {
     ASSERT_NE(handle, nullptr);
     ASSERT_EQ(xgl_init(handle), XGL_OK);
 
-    uint8_t buffer[96] = {};
+    constexpr size_t auth_header_len =
+        XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13U;
+    uint8_t buffer[128] = {};
     const char payload[] = "auth-zcopy";
-    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+    memcpy(buffer + auth_header_len, payload, sizeof(payload) - 1U);
 
     xgl_tx_data_zerocopy_t tx_data = {
         .buffer = buffer,
         .buffer_size = sizeof(buffer),
-        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_offset = auth_header_len,
         .data_len = sizeof(payload) - 1U,
         .target_id = 2,
         .data_type = 1,
@@ -496,8 +499,51 @@ TEST_F(XglSendTest, ZeroCopyRejectedWhenAuthenticationRequired) {
         .timeout_ms = 0
     };
 
-    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
-    EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_ERR_INVALID_PARAM);
+    const size_t expected_frame_len = auth_header_len + tx_data.data_len + 8U + XGL_CRC16_SIZE;
+    EXPECT_CALL(*mock_phy, tx(buffer, expected_frame_len, testing::_))
+        .Times(1)
+        .WillOnce(testing::Return(XGL_OK));
+
+    EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
+
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, buffer, expected_frame_len), XGL_OK);
+    EXPECT_EQ(header.header_len, auth_header_len);
+    EXPECT_EQ(header.payload_len, tx_data.data_len);
+    EXPECT_NE(header.flags & XGL_WIRE_FLAG_AUTHENTICATED, 0);
+    EXPECT_NE(header.flags & XGL_WIRE_FLAG_HAS_EXTENSIONS, 0);
+
+    xgl_wire_ext_cursor_t cursor = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
+                                       buffer + XGL_WIRE_BASE_HEADER_SIZE,
+                                       header.header_len - XGL_WIRE_BASE_HEADER_SIZE),
+              XGL_OK);
+    xgl_wire_ext_t ext = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+    EXPECT_EQ(ext.type, XGL_WIRE_EXT_SECURITY);
+
+    uint32_t key_id = 0;
+    uint64_t nonce_id = 0;
+    uint8_t tag_len = 0;
+    ASSERT_EQ(xgl_wire_decode_security_ext_value(ext.value,
+                                                 ext.len,
+                                                 &key_id,
+                                                 &nonce_id,
+                                                 &tag_len),
+              XGL_OK);
+    EXPECT_EQ(key_id, 7U);
+    EXPECT_EQ(tag_len, 8U);
+
+    bool valid = false;
+    ASSERT_EQ(xgl_wire_verify_auth_trailer(buffer,
+                                           expected_frame_len - XGL_CRC16_SIZE,
+                                           header.header_len,
+                                           header.payload_len,
+                                           7,
+                                           &provider,
+                                           &valid),
+              XGL_OK);
+    EXPECT_TRUE(valid);
 }
 
 TEST_F(XglSendTest, ZeroCopyUnreliableRejectsPayloadExceedingRouteMtu) {

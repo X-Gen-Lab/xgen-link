@@ -20,9 +20,12 @@ static xgl_error_t frame_test_auth_sign(uint32_t key_id,
                                         size_t tag_capacity,
                                         size_t* tag_len,
                                         void* user_data) {
-    (void)user_data;
     if (tag == nullptr || tag_len == nullptr || tag_capacity < 4U) {
         return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    if (user_data != nullptr) {
+        size_t* sign_count = static_cast<size_t*>(user_data);
+        (*sign_count)++;
     }
 
     uint32_t acc = key_id;
@@ -301,6 +304,56 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameAddsSecurityExtensionAndTrailer) {
 
     uint16_t received_crc = xgl_deserialize_u16_le(&buffer[bytes_written - XGL_CRC16_SIZE]);
     EXPECT_EQ(received_crc, xgl_crc16_modbus(buffer, bytes_written - XGL_CRC16_SIZE));
+}
+
+TEST(XglFrameTest, SerializeAuthenticatedFrameUsesConfiguredTagLengthAndSignsOnce) {
+    size_t sign_count = 0;
+    xgl_auth_provider_t provider = {
+        .sign = frame_test_auth_sign,
+        .verify = frame_test_auth_verify,
+        .tag_len = 4,
+        .user_data = &sign_count
+    };
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x10, 0x20};
+    uint8_t buffer[128] = {};
+    size_t bytes_written = 0;
+
+    xgl_frame_params_t params = {
+        .source_id = 1,
+        .target_id = 2,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0
+    };
+
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    ASSERT_EQ(xgl_frame_serialize_authenticated(buffer,
+                                                sizeof(buffer),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &bytes_written),
+              XGL_OK);
+
+    EXPECT_EQ(sign_count, 1U);
+
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, buffer, bytes_written), XGL_OK);
+    EXPECT_EQ(header.header_len, XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13U);
+
+    bool valid = false;
+    ASSERT_EQ(xgl_wire_verify_auth_trailer(buffer,
+                                           bytes_written - XGL_CRC16_SIZE,
+                                           header.header_len,
+                                           header.payload_len,
+                                           7,
+                                           &provider,
+                                           &valid),
+              XGL_OK);
+    EXPECT_TRUE(valid);
 }
 
 TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
