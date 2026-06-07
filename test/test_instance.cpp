@@ -293,6 +293,73 @@ TEST_F(XglInstanceTest, MultipleInstances) {
     xgl_destroy(handle2);
 }
 
+TEST_F(XglInstanceTest, NextDeadlineReportsNoWorkWhenIdleWithoutRoutes) {
+    xgl_handle_t handle = xgl_create(&config);
+    ASSERT_NE(handle, nullptr);
+
+    ASSERT_EQ(xgl_init(handle), XGL_OK);
+
+    EXPECT_EQ(xgl_next_deadline_ms(handle), XGL_NO_DEADLINE_MS);
+
+    xgl_destroy(handle);
+}
+
+TEST_F(XglInstanceTest, NextDeadlineReportsRoutePollingAndReliableTimeouts) {
+    xgl_phy_ops_t phy = {
+        .tx = [](const uint8_t* data, size_t len, void* user_data) -> xgl_error_t {
+            (void)data;
+            (void)len;
+            (void)user_data;
+            return XGL_OK;
+        },
+        .rx = [](uint8_t* buffer, size_t* len, void* user_data) -> xgl_error_t {
+            (void)buffer;
+            (void)user_data;
+            *len = 0;
+            return XGL_OK;
+        },
+        .user_data = NULL
+    };
+    xgl_route_item_t routes[] = {
+        {
+            .target_id = 2,
+            .phy = &phy,
+            .max_frame_size = 256,
+            .read_freq_hz = 1,
+            .metric = 1
+        }
+    };
+
+    config.route_table = routes;
+    config.route_table_len = 1;
+    config.protocol.ack_timeout_ms = 500;
+
+    xgl_handle_t handle = xgl_create(&config);
+    ASSERT_NE(handle, nullptr);
+    ASSERT_EQ(xgl_init(handle), XGL_OK);
+
+    EXPECT_EQ(xgl_next_deadline_ms(handle), 0U);
+
+    xgl_run(handle, 100);
+
+    const uint8_t payload[] = {'d', 'a', 't', 'a'};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 250
+    };
+    ASSERT_EQ(xgl_send(handle, &tx_data), XGL_OK);
+
+    uint32_t deadline_ms = xgl_next_deadline_ms(handle);
+    EXPECT_LE(deadline_ms, 250U);
+
+    xgl_destroy(handle);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Route Configuration Tests                                                 */
 /*---------------------------------------------------------------------------*/
