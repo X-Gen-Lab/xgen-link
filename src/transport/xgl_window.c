@@ -5,7 +5,7 @@
  */
 
 #include "xgl/xgl_window.h"
-#include <stdlib.h>
+#include "xgl/xgl_allocator.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -15,27 +15,33 @@
 /**
  * \brief           Initialize sliding window
  */
-xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size) {
+xgl_error_t xgl_window_init_with_allocator(xgl_sliding_window_t* window,
+                                           uint8_t window_size,
+                                           xgl_allocator_t* allocator) {
     if (window == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (window_size == 0 || window_size > 128) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
-    /* Allocate ACK bitmap */
-    window->ack_received = (bool*)calloc(window_size, sizeof(bool));
+
+    window->allocator = allocator;
+    window->ack_received = (bool*)xgl_alloc(allocator, window_size * sizeof(bool));
     if (window->ack_received == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
-    
-    /* Initialize window state */
+    memset(window->ack_received, 0, window_size * sizeof(bool));
+
     window->window_size = window_size;
     window->send_base_packet_number = 0;
     window->next_packet_number = 0;
-    
+
     return XGL_OK;
+}
+
+xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size) {
+    return xgl_window_init_with_allocator(window, window_size, NULL);
 }
 
 /**
@@ -45,11 +51,12 @@ void xgl_window_destroy(xgl_sliding_window_t* window) {
     if (window == NULL) {
         return;
     }
-    
+
     if (window->ack_received != NULL) {
-        free(window->ack_received);
+        xgl_free(window->allocator, window->ack_received);
         window->ack_received = NULL;
     }
+    window->allocator = NULL;
 }
 
 /**
@@ -89,8 +96,7 @@ void xgl_window_reset(xgl_sliding_window_t* window) {
     if (window == NULL || window->ack_received == NULL) {
         return;
     }
-    
-    /* Clear all ACK flags */
+
     memset(window->ack_received, 0, window->window_size * sizeof(bool));
 
     window->send_base_packet_number = 0;

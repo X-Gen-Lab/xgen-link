@@ -14,6 +14,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include "xgl_error.h"
+#include "xgl_types.h"
 
 /*---------------------------------------------------------------------------*/
 /* Sliding Window Structure                                                  */
@@ -29,6 +30,7 @@ typedef struct {
     uint32_t send_base_packet_number; /**< Base packet number of sending window */
     uint32_t next_packet_number;    /**< Next packet number to send */
     bool* ack_received;             /**< ACK bitmap (dynamically allocated) */
+    xgl_allocator_t* allocator;     /**< Allocator used for ACK bitmap */
 } xgl_sliding_window_t;
 
 /*---------------------------------------------------------------------------*/
@@ -42,6 +44,17 @@ typedef struct {
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size);
+
+/**
+ * \brief           Initialize sliding window with an explicit allocator
+ * \param[in,out]   window: Sliding window structure
+ * \param[in]       window_size: Maximum window size
+ * \param[in]       allocator: Allocator for ACK bitmap (NULL = default)
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_window_init_with_allocator(xgl_sliding_window_t* window,
+                                           uint8_t window_size,
+                                           xgl_allocator_t* allocator);
 
 /**
  * \brief           Destroy sliding window and free resources

@@ -139,7 +139,9 @@ static xgl_transport_peer_state_t* transport_get_or_create_peer_internal(
     }
     xgl_rtt_init(&peer->rtt_est);
 
-    xgl_error_t err = xgl_window_init(&peer->tx_window, ctx->window.window_size);
+    xgl_error_t err = xgl_window_init_with_allocator(&peer->tx_window,
+                                                     ctx->window.window_size,
+                                                     ctx->allocator);
     if (err != XGL_OK) {
         transport_free(ctx->allocator, peer);
         return NULL;
@@ -1056,7 +1058,9 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     xgl_rtt_init(&ctx->rtt_est);
     
     /* Initialize sliding window */
-    err = xgl_window_init(&ctx->window, config->window_size);
+    err = xgl_window_init_with_allocator(&ctx->window,
+                                         config->window_size,
+                                         config->allocator);
     if (err != XGL_OK) {
         return err;
     }
