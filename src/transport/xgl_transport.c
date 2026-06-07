@@ -181,7 +181,9 @@ static uint32_t transport_receive_packet_number(const xgl_packet_t* packet) {
 
 static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
                                        xgl_transport_peer_state_t* peer,
-                                       uint16_t session_id) {
+                                       uint16_t session_id,
+                                       uint32_t connection_id,
+                                       uint32_t session_epoch) {
     if (ctx == NULL || peer == NULL) {
         return;
     }
@@ -194,7 +196,10 @@ static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
     xgl_window_reset(&ctx->window);
     xgl_ack_reset(&ctx->ack_handler);
     if (ctx->fragment_mgr != NULL) {
-        xgl_fragment_clear_reassembly(ctx->fragment_mgr);
+        (void)xgl_fragment_clear_reassembly_scope(ctx->fragment_mgr,
+                                                  peer->peer_id,
+                                                  connection_id,
+                                                  session_epoch);
     }
     xgl_rtt_init(&peer->rtt_est);
     peer->rx_next_packet_number = 0U;
@@ -258,7 +263,11 @@ static xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
 
     if (packet->data_type == XGL_TRANSPORT_CONTROL_RESET ||
         peer->session_id != session_id) {
-        transport_reset_peer_state(ctx, peer, session_id);
+        transport_reset_peer_state(ctx,
+                                   peer,
+                                   session_id,
+                                   packet->connection_id,
+                                   packet->session_epoch);
     } else {
         peer->session_established = true;
         peer->last_active_ms = xgl_time_ms();
@@ -1392,7 +1401,11 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             if (rx_peer == NULL) {
                 return XGL_ERR_NO_MEMORY;
             }
-            transport_reset_peer_state(ctx, rx_peer, packet->session_id);
+            transport_reset_peer_state(ctx,
+                                       rx_peer,
+                                       packet->session_id,
+                                       packet->connection_id,
+                                       packet->session_epoch);
         } else if (packet->session_id != rx_peer->session_id) {
             return XGL_ERR_SEQUENCE_ERROR;
         }

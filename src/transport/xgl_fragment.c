@@ -819,10 +819,18 @@ size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
         xgl_reassembly_buffer_t* buffer =
             XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
 
-        if (buffer->uses_fragment_ext &&
+        bool matches_production_scope =
+            buffer->uses_fragment_ext &&
             buffer->source_id == source_id &&
             buffer->connection_id == connection_id &&
-            buffer->session_epoch == session_epoch) {
+            buffer->session_epoch == session_epoch;
+        bool matches_legacy_source =
+            !buffer->uses_fragment_ext &&
+            connection_id == 0U &&
+            session_epoch == 0U &&
+            buffer->source_id == source_id;
+
+        if (matches_production_scope || matches_legacy_source) {
             xgl_list_remove(&manager->reassembly_list, node);
             free_reassembly_buffer(manager, buffer);
             cleared++;
