@@ -111,6 +111,21 @@ static xgl_transport_peer_state_t* find_peer(xgl_transport_ctx_t* ctx, uint16_t 
     return nullptr;
 }
 
+static xgl_transport_peer_state_t* find_peer_scope_for_test(xgl_transport_ctx_t* ctx,
+                                                            uint16_t peer_id,
+                                                            uint32_t connection_id,
+                                                            uint32_t session_epoch) {
+    for (xgl_transport_peer_state_t* peer = ctx->peers; peer != nullptr; peer = peer->next) {
+        if (peer->peer_id == peer_id &&
+            peer->has_connection_scope &&
+            peer->connection_id == connection_id &&
+            peer->session_epoch == session_epoch) {
+            return peer;
+        }
+    }
+    return nullptr;
+}
+
 }  // namespace
 
 TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
@@ -1436,6 +1451,50 @@ TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
     EXPECT_EQ(spy.last_packet.target_id, 2);
     EXPECT_EQ(spy.last_packet.packet_number, 0U);
     EXPECT_EQ(spy.last_packet.reliable, 1);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, ReliableSendUsesIndependentWindowsPerConnectionScope) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.window_size = 1;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    xgl_tx_data_t first = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 100,
+        .connection_id = 11,
+        .session_epoch = 100
+    };
+    xgl_tx_data_t second = first;
+    second.connection_id = 22;
+    second.session_epoch = 200;
+
+    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &first), XGL_OK);
+    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &second), XGL_OK);
+
+    EXPECT_NE(find_peer_scope_for_test(&ctx, 2, 11, 100), nullptr);
+    EXPECT_NE(find_peer_scope_for_test(&ctx, 2, 22, 200), nullptr);
+
+    ASSERT_GE(spy.sent_packets.size(), 4U);
+    EXPECT_EQ(spy.sent_packets[1].connection_id, 11U);
+    EXPECT_EQ(spy.sent_packets[1].session_epoch, 100U);
+    EXPECT_EQ(spy.sent_packets[3].connection_id, 22U);
+    EXPECT_EQ(spy.sent_packets[3].session_epoch, 200U);
 
     xgl_transport_destroy(&ctx);
 }
