@@ -944,7 +944,7 @@ TEST(XglTransportTest, FragmentedSendUsesFragmentExtensionNotPayloadPrefix) {
     xgl_transport_ctx_t ctx;
     xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
     config.enable_fragmentation = true;
-    config.max_frame_size = 40;
+    config.max_frame_size = 48;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
 
@@ -1000,6 +1000,104 @@ TEST(XglTransportTest, FragmentedSendUsesFragmentExtensionNotPayloadPrefix) {
     }
 
     EXPECT_EQ(observed_payload_bytes, sizeof(payload));
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, FragmentReceiveUsesFragmentExtensionMetadata) {
+    RxTracker tracker;
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(nullptr, &stats, &tx_retries);
+    config.enable_fragmentation = true;
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &tracker;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t first_payload[] = {'A', 'B'};
+    const uint8_t second_payload[] = {'C', 'D'};
+    uint8_t first_ext_value[12] = {};
+    uint8_t second_ext_value[12] = {};
+    uint8_t first_ext[14] = {};
+    uint8_t second_ext[14] = {};
+    size_t value_len = 0;
+    size_t first_ext_len = 0;
+    size_t second_ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(first_ext_value,
+                                                 sizeof(first_ext_value),
+                                                 99,
+                                                 0,
+                                                 4,
+                                                 &value_len),
+              XGL_OK);
+    ASSERT_EQ(xgl_wire_encode_ext(first_ext,
+                                  sizeof(first_ext),
+                                  XGL_WIRE_EXT_FRAGMENT,
+                                  first_ext_value,
+                                  value_len,
+                                  &first_ext_len),
+              XGL_OK);
+    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(second_ext_value,
+                                                 sizeof(second_ext_value),
+                                                 99,
+                                                 2,
+                                                 4,
+                                                 &value_len),
+              XGL_OK);
+    ASSERT_EQ(xgl_wire_encode_ext(second_ext,
+                                  sizeof(second_ext),
+                                  XGL_WIRE_EXT_FRAGMENT,
+                                  second_ext_value,
+                                  value_len,
+                                  &second_ext_len),
+              XGL_OK);
+
+    xgl_packet_data_t first_data = {
+        .ref_count = 1,
+        .data_len = sizeof(first_payload),
+        .data = first_payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t first_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = 0,
+        .connection_id = 7,
+        .packet_number = 10,
+        .session_epoch = 3,
+        .version = 0,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .flags = XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS,
+        .data_type = 1,
+        .fragment = true,
+        .data = &first_data,
+        .extensions = first_ext,
+        .extensions_len = first_ext_len
+    };
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &first_packet), XGL_OK);
+    EXPECT_EQ(tracker.receive_count, 0);
+
+    xgl_packet_data_t second_data = {
+        .ref_count = 1,
+        .data_len = sizeof(second_payload),
+        .data = second_payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t second_packet = first_packet;
+    second_packet.packet_number = 11;
+    second_packet.data = &second_data;
+    second_packet.extensions = second_ext;
+    second_packet.extensions_len = second_ext_len;
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &second_packet), XGL_OK);
+    EXPECT_EQ(tracker.receive_count, 1);
+    EXPECT_EQ(stats.rx_packets, 1U);
+    EXPECT_EQ(stats.rx_bytes, 4U);
+
     xgl_transport_destroy(&ctx);
 }
 
