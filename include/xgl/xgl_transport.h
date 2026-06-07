@@ -21,6 +21,7 @@ extern "C" {
 #include "xgl_ack.h"
 #include "xgl_fragment.h"
 #include "xgl_layer_interface.h"
+#include "xgl_packet_pool.h"
 #include "xgl_route.h"
 
 /**
@@ -37,6 +38,16 @@ extern "C" {
 /* Transport Layer Context                                                   */
 /*---------------------------------------------------------------------------*/
 
+typedef struct xgl_transport_rx_buffered_packet_s {
+    struct xgl_transport_rx_buffered_packet_s* next; /**< Linked-list node */
+    xgl_packet_t packet;                             /**< Cached packet metadata */
+    xgl_packet_data_t packet_data;                   /**< Cached packet data view */
+    uint8_t* data;                                   /**< Owned payload bytes */
+    size_t data_len;                                 /**< Payload length */
+    uint8_t* extensions;                             /**< Owned TLV extension bytes */
+    size_t extensions_len;                           /**< TLV extension length */
+} xgl_transport_rx_buffered_packet_t;
+
 typedef struct xgl_transport_peer_state_s {
     struct xgl_transport_peer_state_s* next; /**< Linked-list node */
     uint16_t peer_id;                        /**< Remote node ID */
@@ -49,6 +60,8 @@ typedef struct xgl_transport_peer_state_s {
     uint32_t last_active_ms;                 /**< Last activity timestamp */
     uint32_t rx_next_packet_number;          /**< Next in-order packet number expected from peer */
     bool rx_has_packet_number_state;         /**< Receive packet-number state initialized */
+    xgl_transport_rx_buffered_packet_t* rx_buffered; /**< Out-of-order RX packets */
+    uint8_t rx_buffered_count;               /**< Number of buffered RX packets */
 } xgl_transport_peer_state_t;
 
 /**

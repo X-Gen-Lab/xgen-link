@@ -803,7 +803,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
         .data = &packet_data
     };
 
-    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_WINDOW_FULL);
     EXPECT_EQ(rx_tracker.receive_count, 0);
     ASSERT_EQ(spy.send_count, 1);
     EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
@@ -826,6 +826,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
     xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
     config.callback_user_data = &rx_tracker;
+    config.window_size = 8;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
 
@@ -947,7 +948,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     xgl_transport_destroy(&ctx);
 }
 
-TEST(XglTransportTest, ReliableReceiveUsesPacketNumberForDuplicateDetection) {
+TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
     xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
@@ -988,7 +989,7 @@ TEST(XglTransportTest, ReliableReceiveUsesPacketNumberForDuplicateDetection) {
 
     packet.packet_number = 256;
     packet.seq_num = 0;
-    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_WINDOW_FULL);
     EXPECT_EQ(rx_tracker.receive_count, 1);
     ASSERT_EQ(spy.send_count, 2);
     EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
