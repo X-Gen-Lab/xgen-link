@@ -49,5 +49,24 @@ int main(void) {
         return 5;
     }
 
+    uint8_t small_pool[XGL_TIERED_POOL_SMALL_SIZE];
+    if (xgl_tiered_pool_init_static(&tiered_pool,
+                                    small_pool,
+                                    1U,
+                                    NULL,
+                                    0U,
+                                    NULL,
+                                    0U) != 0) {
+        return 7;
+    }
+
+    void* tiered_ptr = xgl_tiered_pool_alloc(&tiered_pool, 16U);
+    if (tiered_ptr == NULL) {
+        xgl_tiered_pool_destroy(&tiered_pool);
+        return 8;
+    }
+    xgl_tiered_pool_free(&tiered_pool, tiered_ptr, 16U);
+    xgl_tiered_pool_destroy(&tiered_pool);
+
     return 0;
 }

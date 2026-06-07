@@ -74,6 +74,46 @@ TEST_F(XglTieredPoolTest, InitOnlyLarge) {
     EXPECT_NE(pool.large_buffer, nullptr);
 }
 
+TEST_F(XglTieredPoolTest, InitStaticUsesApplicationBuffers) {
+    uint8_t small_buffer[2 * XGL_TIERED_POOL_SMALL_SIZE] = {};
+    uint8_t medium_buffer[1 * XGL_TIERED_POOL_MEDIUM_SIZE] = {};
+    uint8_t large_buffer[1 * XGL_TIERED_POOL_LARGE_SIZE] = {};
+
+    int result = xgl_tiered_pool_init_static(&pool,
+                                             small_buffer, 2,
+                                             medium_buffer, 1,
+                                             large_buffer, 1);
+    ASSERT_EQ(result, 0);
+    EXPECT_EQ(pool.small_buffer, small_buffer);
+    EXPECT_EQ(pool.medium_buffer, medium_buffer);
+    EXPECT_EQ(pool.large_buffer, large_buffer);
+
+    void* small = xgl_tiered_pool_alloc(&pool, 32);
+    void* medium = xgl_tiered_pool_alloc(&pool, 128);
+    void* large = xgl_tiered_pool_alloc(&pool, 512);
+    ASSERT_NE(small, nullptr);
+    ASSERT_NE(medium, nullptr);
+    ASSERT_NE(large, nullptr);
+
+    xgl_tiered_pool_free(&pool, small, 32);
+    xgl_tiered_pool_free(&pool, medium, 128);
+    xgl_tiered_pool_free(&pool, large, 512);
+}
+
+TEST_F(XglTieredPoolTest, InitStaticRejectsMissingRequiredBuffer) {
+    uint8_t small_buffer[2 * XGL_TIERED_POOL_SMALL_SIZE] = {};
+
+    EXPECT_EQ(xgl_tiered_pool_init_static(&pool,
+                                          nullptr, 1,
+                                          nullptr, 0,
+                                          nullptr, 0), -1);
+
+    EXPECT_EQ(xgl_tiered_pool_init_static(&pool,
+                                          small_buffer, 2,
+                                          nullptr, 1,
+                                          nullptr, 0), -1);
+}
+
 TEST_F(XglTieredPoolTest, Destroy) {
     xgl_tiered_pool_init(&pool, 10, 5, 2);
     xgl_tiered_pool_destroy(&pool);
