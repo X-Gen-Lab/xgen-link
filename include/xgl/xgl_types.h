@@ -66,29 +66,27 @@ typedef struct {
 #define XGL_CRC16_SIZE              2
 
 /**
- * \brief           Frame header structure (12 bytes with SOF)
- * \note            Packed structure to ensure consistent layout across platforms
+ * \brief           Legacy logical frame header adapter
+ * \note            This structure is not the production wire layout. Production
+ *                  frames are encoded with the 24-byte xgl_wire_header_t format
+ *                  and explicit offset-based serialization.
  */
-#pragma pack(push, 1)
 typedef struct {
-    uint8_t sof;                    /**< Start of frame (0x55) */
-    uint8_t version_datatype;       /**< Version (4 bits) + Data type (4 bits) */
+    uint8_t sof;                    /**< Legacy start marker */
+    uint8_t version_datatype;       /**< Legacy version + data type mirror */
     uint16_t source_id;             /**< Source node ID */
     uint16_t target_id;             /**< Target node ID */
-    uint8_t attr_lsb;               /**< Attributes LSB */
-    uint8_t attr_msb;               /**< Attributes MSB */
-    uint16_t data_len;              /**< Payload length (little-endian) */
-    uint8_t seq_num;                /**< Sequence number */
-    uint8_t ack_num;                /**< Acknowledgment number */
-    uint8_t reserved;               /**< Reserved byte */
-    uint8_t crc8;                   /**< Header CRC8 */
+    uint8_t attr_lsb;               /**< Legacy attributes LSB */
+    uint8_t attr_msb;               /**< Legacy attributes MSB */
+    uint16_t data_len;              /**< Payload length */
+    uint8_t seq_num;                /**< Legacy low 8 bits of packet number */
+    uint8_t ack_num;                /**< Legacy ACK mirror, not wire ACK range */
+    uint8_t reserved;               /**< Legacy TTL mirror */
+    uint8_t crc8;                   /**< Legacy CRC mirror, not wire header CRC */
 } xgl_frame_header_t;
-#pragma pack(pop)
 
 /**
- * \brief           Frame header size in bytes
- * \note            Manually defined to ensure correct size (12 bytes)
- *                  Structure packing may vary across compilers
+ * \brief           Production fixed wire header size in bytes
  */
 #define XGL_FRAME_HEADER_SIZE       24
 
