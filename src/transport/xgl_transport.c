@@ -626,24 +626,23 @@ static xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
             }
         }
 
-        if (has_fragment_ext) {
-            err = xgl_fragment_process_ext(ctx->fragment_mgr,
-                                           source_id,
-                                           packet->connection_id,
-                                           packet->session_epoch,
-                                           data_type,
-                                           message_id,
-                                           fragment_offset,
-                                           message_len,
-                                           data,
-                                           data_len,
-                                           &complete_data,
-                                           &complete_len,
-                                           0);
-        } else {
-            err = xgl_fragment_process(ctx->fragment_mgr, source_id, data_type,
-                                       data, data_len, &complete_data, &complete_len, 0);
+        if (!has_fragment_ext) {
+            return XGL_ERR_INVALID_FRAME;
         }
+
+        err = xgl_fragment_process_ext(ctx->fragment_mgr,
+                                       source_id,
+                                       packet->connection_id,
+                                       packet->session_epoch,
+                                       data_type,
+                                       message_id,
+                                       fragment_offset,
+                                       message_len,
+                                       data,
+                                       data_len,
+                                       &complete_data,
+                                       &complete_len,
+                                       0);
 
         if (err == XGL_OK) {
             if (ctx->rx_callback != NULL) {
@@ -1183,7 +1182,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         }
 
         size_t fragment_payload_max = max_payload_size - fragment_ext_len;
-        uint32_t message_id = ctx->fragment_mgr->next_fragment_id++;
+        uint32_t message_id = ctx->fragment_mgr->next_message_id++;
         size_t fragment_count =
             (tx_data->data_len + fragment_payload_max - 1U) / fragment_payload_max;
 

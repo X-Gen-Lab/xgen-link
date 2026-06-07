@@ -888,10 +888,25 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
     ASSERT_NE(ctx.fragment_mgr, nullptr);
 
-    uint8_t first_fragment[] = {
-        3, 0, 2, 0, 0,
-        'a', 'b', 'c', 'd'
-    };
+    const uint8_t first_fragment[] = {'a', 'b', 'c', 'd'};
+    uint8_t first_fragment_ext_value[12] = {};
+    size_t first_fragment_ext_value_len = 0;
+    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(first_fragment_ext_value,
+                                                 sizeof(first_fragment_ext_value),
+                                                 3,
+                                                 0,
+                                                 6,
+                                                 &first_fragment_ext_value_len),
+              XGL_OK);
+    uint8_t first_fragment_ext[16] = {};
+    size_t first_fragment_ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(first_fragment_ext,
+                                  sizeof(first_fragment_ext),
+                                  XGL_WIRE_EXT_FRAGMENT,
+                                  first_fragment_ext_value,
+                                  first_fragment_ext_value_len,
+                                  &first_fragment_ext_len),
+              XGL_OK);
     xgl_packet_data_t first_data = {
         .ref_count = 1,
         .data_len = sizeof(first_fragment),
@@ -908,7 +923,9 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
         .reliable = XGL_ATTR_RELIABLE_NONE,
         .fragment = true,
         .priority = 0,
-        .data = &first_data
+        .data = &first_data,
+        .extensions = first_fragment_ext,
+        .extensions_len = first_fragment_ext_len
     };
 
     ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &first_packet), XGL_OK);
