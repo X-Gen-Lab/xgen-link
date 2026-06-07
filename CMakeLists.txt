@@ -305,9 +305,15 @@ install(TARGETS xgl
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(DIRECTORY include/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILES_MATCHING PATTERN "*.h"
+set(XGL_PUBLIC_HEADERS
+    include/xgl/xgl.h
+    include/xgl/xgl_config.h
+    include/xgl/xgl_error.h
+    include/xgl/xgl_types.h
+)
+
+install(FILES ${XGL_PUBLIC_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xgl
 )
 
 install(EXPORT xglTargets
