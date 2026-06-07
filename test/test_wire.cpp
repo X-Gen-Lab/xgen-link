@@ -4,6 +4,8 @@
 #include <xgl/xgl_serialize.h>
 #include <xgl/xgl_wire.h>
 
+#include <cstring>
+
 TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;

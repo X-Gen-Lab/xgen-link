@@ -26,6 +26,7 @@ typedef enum {
     XGL_ERR_NULL_POINTER = 2,       /**< Null pointer */
     XGL_ERR_NOT_INITIALIZED = 3,    /**< Not initialized */
     XGL_ERR_ALREADY_INITIALIZED = 4,/**< Already initialized */
+    XGL_ERR_NOT_FOUND = 5,          /**< Requested item not found */
     
     /*-----------------------------------------------------------------------*/
     /* Memory errors (100-199)                                               */

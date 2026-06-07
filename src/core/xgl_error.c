@@ -25,6 +25,7 @@ static const struct {
     {XGL_ERR_NULL_POINTER, "Null pointer"},
     {XGL_ERR_NOT_INITIALIZED, "Not initialized"},
     {XGL_ERR_ALREADY_INITIALIZED, "Already initialized"},
+    {XGL_ERR_NOT_FOUND, "Not found"},
     
     /* Memory errors (100-199) */
     {XGL_ERR_NO_MEMORY, "Out of memory"},

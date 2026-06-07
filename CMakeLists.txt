@@ -91,6 +91,7 @@ set(XGL_SOURCES
     src/core/xgl_error.c
     src/core/xgl_crc.c
     src/core/xgl_serialize.c
+    src/core/xgl_wire.c
     src/core/xgl_list.c
     src/core/xgl_hashtable.c
     src/core/xgl_mempool.c
