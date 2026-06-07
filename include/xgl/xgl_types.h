@@ -73,8 +73,8 @@ typedef struct {
 typedef struct {
     uint8_t sof;                    /**< Start of frame (0x55) */
     uint8_t version_datatype;       /**< Version (4 bits) + Data type (4 bits) */
-    uint8_t source_id;              /**< Source node ID */
-    uint8_t target_id;              /**< Target node ID */
+    uint16_t source_id;             /**< Source node ID */
+    uint16_t target_id;             /**< Target node ID */
     uint8_t attr_lsb;               /**< Attributes LSB */
     uint8_t attr_msb;               /**< Attributes MSB */
     uint16_t data_len;              /**< Payload length (little-endian) */

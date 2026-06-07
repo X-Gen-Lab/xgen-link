@@ -86,8 +86,8 @@ void xgl_frame_decode_header(xgl_frame_header_t* header, const uint8_t* buffer) 
     header->version_datatype = 0;
     xgl_frame_set_version(header, XGL_PROTOCOL_VERSION);
     xgl_frame_set_datatype(header, wire.packet_type);
-    header->source_id = (uint8_t)(wire.source_id & 0xFFU);
-    header->target_id = (uint8_t)(wire.target_id & 0xFFU);
+    header->source_id = wire.source_id;
+    header->target_id = wire.target_id;
     header->attr_lsb = (uint8_t)(wire.traffic_class & XGL_ATTR_PRIORITY_MASK);
     if ((wire.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
         header->attr_lsb |= XGL_ATTR_RELIABLE_TX;
@@ -130,8 +130,8 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.sof = XGL_SOF;
     xgl_frame_set_version(&frame->header, XGL_PROTOCOL_VERSION);
     xgl_frame_set_datatype(&frame->header, params->data_type);
-    frame->header.source_id = (uint8_t)(params->source_id & 0xFFU);
-    frame->header.target_id = (uint8_t)(params->target_id & 0xFFU);
+    frame->header.source_id = params->source_id;
+    frame->header.target_id = params->target_id;
     frame->header.data_len = (uint16_t)params->payload_len;
     frame->header.seq_num = params->seq_num;
     frame->header.ack_num = params->ack_num;
@@ -247,8 +247,8 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     header.sof = XGL_SOF;
     xgl_frame_set_version(&header, XGL_PROTOCOL_VERSION);
     xgl_frame_set_datatype(&header, data_type);
-    header.source_id = (uint8_t)(source_id & 0xFFU);
-    header.target_id = (uint8_t)(target_id & 0xFFU);
+    header.source_id = source_id;
+    header.target_id = target_id;
     header.data_len = (uint16_t)data_len;
     header.seq_num = seq_num;
     header.ack_num = ack_num;

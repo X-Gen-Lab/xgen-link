@@ -223,8 +223,8 @@ xgl_error_t xgl_ack_generate(uint8_t seq_num,
     header.sof = XGL_SOF;
     xgl_frame_set_version(&header, 1);
     xgl_frame_set_datatype(&header, XGL_PACKET_TYPE_ACK);
-    header.source_id = (uint8_t)(target_id & 0xFFU);
-    header.target_id = (uint8_t)(source_id & 0xFFU);
+    header.source_id = target_id;
+    header.target_id = source_id;
     header.attr_lsb = XGL_ATTR_RELIABLE_ACK;
     header.seq_num = seq_num;
     header.ack_num = seq_num;
