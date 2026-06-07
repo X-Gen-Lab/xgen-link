@@ -332,6 +332,72 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, ProductionAckWithUnknownExtensionDoesNotUseLegacyAckNumber) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    ASSERT_NE(peer, nullptr);
+    ASSERT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 1U);
+
+    const uint8_t value[] = {0xAA};
+    uint8_t ext[8] = {};
+    size_t ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(ext,
+                                  sizeof(ext),
+                                  XGL_WIRE_EXT_ROUTE,
+                                  value,
+                                  sizeof(value),
+                                  &ext_len),
+              XGL_OK);
+
+    xgl_packet_data_t ack_ext_data = {
+        .ref_count = 1,
+        .data_len = ext_len,
+        .data = ext,
+        .owned_data = nullptr
+    };
+    xgl_packet_t ack_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = peer->session_id,
+        .packet_type = XGL_PACKET_TYPE_ACK,
+        .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
+        .data_type = 0,
+        .reliable = XGL_ATTR_RELIABLE_ACK,
+        .priority = 7,
+        .data = &ack_ext_data
+    };
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &ack_packet), XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 1U);
+    EXPECT_NE(xgl_reliable_find_packet_number(&peer->reliable_queue, 0, 2), nullptr);
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, ReliableSendUsesMonotonicPacketNumbersPastEightBitWrap) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
