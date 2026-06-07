@@ -59,6 +59,7 @@ static void free_reassembly_buffer(xgl_fragment_manager_t* manager,
 }
 
 static xgl_reassembly_buffer_t* find_reassembly_buffer_ext(
+    // cppcheck-suppress constParameterPointer
     xgl_fragment_manager_t* manager,
     uint16_t source_id,
     uint32_t connection_id,

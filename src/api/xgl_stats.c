@@ -29,6 +29,8 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
         return XGL_ERR_NULL_POINTER;
     }
     
+    /* The thread-safe path locks inst->mutex, so this handle must stay mutable. */
+    // cppcheck-suppress constVariablePointer
     struct xgl_instance* inst = (struct xgl_instance*)handle;
     
     /* Check if instance is initialized */

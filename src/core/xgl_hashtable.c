@@ -173,7 +173,7 @@ xgl_route_item_t* xgl_hashtable_lookup(const xgl_hashtable_t* table,
     size_t index = xgl_hash(key, table->size);
     
     /* Search chain for matching key */
-    xgl_hashtable_entry_t* entry = table->buckets[index];
+    const xgl_hashtable_entry_t* entry = table->buckets[index];
     while (entry != NULL) {
         if (entry->key == key) {
             return entry->value;

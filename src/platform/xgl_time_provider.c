@@ -37,8 +37,9 @@ xgl_time_provider_t xgl_time_provider_default(void) {
 /**
  * \brief           Mock time provider function
  */
+// cppcheck-suppress constParameterCallback
 static uint32_t mock_time_provider_fn(void* user_data) {
-    xgl_mock_time_t* mock = (xgl_mock_time_t*)user_data;
+    const xgl_mock_time_t* mock = (const xgl_mock_time_t*)user_data;
     if (mock == NULL) {
         return 0;
     }

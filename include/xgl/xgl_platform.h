@@ -348,7 +348,7 @@ static inline int xgl_is_aligned(const void* ptr, size_t alignment) {
  * \param[in]       alignment: Required alignment (power of 2)
  * \return          Aligned pointer
  */
-static inline void* xgl_align_up(void* ptr, size_t alignment) {
+static inline void* xgl_align_up(const void* ptr, size_t alignment) {
     uintptr_t addr = (uintptr_t)ptr;
     return (void*)((addr + alignment - 1) & ~(alignment - 1));
 }

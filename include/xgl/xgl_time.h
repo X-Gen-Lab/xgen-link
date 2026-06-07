@@ -92,23 +92,23 @@ void xgl_delay_us(uint32_t us);
 
 /**
  * \brief           Calculate elapsed time in milliseconds
- * \param[in]       start_time: Start time from xgl_time_ms()
+ * \param[in]       start_time_ms: Start time from xgl_time_ms()
  * \return          Elapsed time in milliseconds
  * \note            Handles wraparound correctly
  */
-static inline uint32_t xgl_time_elapsed_ms(uint32_t start_time) {
-    return xgl_time_ms() - start_time;
+static inline uint32_t xgl_time_elapsed_ms(uint32_t start_time_ms) {
+    return xgl_time_ms() - start_time_ms;
 }
 
 /**
  * \brief           Check if timeout has occurred
- * \param[in]       start_time: Start time from xgl_time_ms()
+ * \param[in]       start_time_ms: Start time from xgl_time_ms()
  * \param[in]       timeout_ms: Timeout duration in milliseconds
  * \return          true if timeout occurred, false otherwise
  * \note            Handles wraparound correctly
  */
-static inline bool xgl_time_is_timeout(uint32_t start_time, uint32_t timeout_ms) {
-    return (xgl_time_ms() - start_time) >= timeout_ms;
+static inline bool xgl_time_is_timeout(uint32_t start_time_ms, uint32_t timeout_ms) {
+    return (xgl_time_ms() - start_time_ms) >= timeout_ms;
 }
 
 /*---------------------------------------------------------------------------*/

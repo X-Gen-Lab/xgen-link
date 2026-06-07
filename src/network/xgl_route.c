@@ -273,6 +273,7 @@ xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
 /**
  * \brief           Update route metric
  */
+// cppcheck-suppress constParameterPointer
 xgl_error_t xgl_route_table_update_metric(xgl_route_table_t* table,
                                           uint16_t target_id,
                                           uint8_t metric) {

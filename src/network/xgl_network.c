@@ -631,6 +631,7 @@ static xgl_error_t network_send_impl(void* ctx,
  */
 static xgl_error_t network_receive_impl(void* ctx,
                                        xgl_handle_t handle,
+                                       // cppcheck-suppress constParameterCallback
                                        void* data) {
     xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
     
@@ -639,7 +640,7 @@ static xgl_error_t network_receive_impl(void* ctx,
     }
     
     /* Extract frame buffer and length from data */
-    xgl_frame_rx_message_t* frame_data = (xgl_frame_rx_message_t*)data;
+    const xgl_frame_rx_message_t* frame_data = (const xgl_frame_rx_message_t*)data;
     
     /* Forward to network receive function */
     return xgl_network_receive(net_ctx, handle, frame_data->frame_buf, frame_data->frame_len);

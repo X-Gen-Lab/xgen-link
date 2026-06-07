@@ -239,7 +239,7 @@ static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
     peer->last_active_ms = xgl_time_ms();
 }
 
-static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
+static xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
                                           xgl_handle_t handle,
                                           uint16_t target_id,
                                           uint8_t control_type,
@@ -324,7 +324,7 @@ static xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
  * \param[in]       source_id: Source node ID
  * \return          XGL_OK on success, error code otherwise
  */
-static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
+static xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,
                                      uint32_t packet_number,
                                      uint16_t source_id,
@@ -623,7 +623,6 @@ static xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    xgl_error_t err = XGL_OK;
     uint16_t source_id = packet->source_id;
     uint8_t data_type = packet->data_type;
 
@@ -637,9 +636,9 @@ static xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
 
         if (packet->extensions != NULL && packet->extensions_len > 0U) {
             xgl_wire_ext_cursor_t cursor;
-            err = xgl_wire_ext_cursor_init(&cursor,
-                                           packet->extensions,
-                                           packet->extensions_len);
+            xgl_error_t err = xgl_wire_ext_cursor_init(&cursor,
+                                                       packet->extensions,
+                                                       packet->extensions_len);
             if (err != XGL_OK) {
                 return err;
             }
@@ -668,19 +667,19 @@ static xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
             return XGL_ERR_INVALID_FRAME;
         }
 
-        err = xgl_fragment_process_ext(ctx->fragment_mgr,
-                                       source_id,
-                                       packet->connection_id,
-                                       packet->session_epoch,
-                                       data_type,
-                                       message_id,
-                                       fragment_offset,
-                                       message_len,
-                                       data,
-                                       data_len,
-                                       &complete_data,
-                                       &complete_len,
-                                       0);
+        xgl_error_t err = xgl_fragment_process_ext(ctx->fragment_mgr,
+                                                   source_id,
+                                                   packet->connection_id,
+                                                   packet->session_epoch,
+                                                   data_type,
+                                                   message_id,
+                                                   fragment_offset,
+                                                   message_len,
+                                                   data,
+                                                   data_len,
+                                                   &complete_data,
+                                                   &complete_len,
+                                                   0);
 
         if (err == XGL_OK) {
             if (ctx->rx_callback != NULL) {
@@ -915,7 +914,7 @@ static xgl_error_t transport_process_sack_value(xgl_transport_ctx_t* ctx,
         uint32_t packet_number = base_packet + (uint32_t)i;
         bool received = transport_sack_bit_is_set(bitmap, i);
         if (received) {
-            xgl_reliable_packet_t* rel_packet =
+            const xgl_reliable_packet_t* rel_packet =
                 xgl_reliable_find_packet_number(&peer->reliable_queue,
                                                 packet_number,
                                                 source_id);
@@ -1183,8 +1182,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     
     uint16_t effective_max_frame_size = ctx->max_frame_size;
     if (ctx->route_table != NULL) {
-        xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
-                                                         tx_data->target_id);
+        const xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
+                                                               tx_data->target_id);
         if (route != NULL && route->max_frame_size < effective_max_frame_size) {
             effective_max_frame_size = route->max_frame_size;
         }
@@ -1760,9 +1759,10 @@ static xgl_error_t transport_send_impl(void* ctx,
  */
 static xgl_error_t transport_receive_impl(void* ctx,
                                          xgl_handle_t handle,
+                                         // cppcheck-suppress constParameterCallback
                                          void* data) {
     xgl_transport_ctx_t* trans_ctx = (xgl_transport_ctx_t*)ctx;
-    xgl_packet_t* packet = (xgl_packet_t*)data;
+    const xgl_packet_t* packet = (const xgl_packet_t*)data;
     
     if (trans_ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
