@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_crc.h>
+#include <xgl/xgl_serialize.h>
 #include <xgl/xgl_wire.h>
 #include <vector>
 
@@ -57,6 +59,43 @@ protected:
         
         /* Copy to result */
         frame.assign(buffer.begin(), buffer.begin() + bytes_written);
+        return frame;
+    }
+
+    std::vector<uint8_t> create_wire_frame_with_ext(const std::vector<uint8_t>& ext,
+                                                    const std::vector<uint8_t>& payload) {
+        std::vector<uint8_t> frame(XGL_WIRE_BASE_HEADER_SIZE + ext.size() +
+                                   payload.size() + XGL_CRC16_SIZE);
+
+        xgl_wire_header_t header = {
+            .version = XGL_WIRE_VERSION,
+            .header_len = static_cast<uint8_t>(XGL_WIRE_BASE_HEADER_SIZE + ext.size()),
+            .packet_type = XGL_PACKET_TYPE_DATA,
+            .flags = static_cast<uint8_t>(XGL_WIRE_FLAG_HAS_EXTENSIONS),
+            .ttl = 8,
+            .traffic_class = 3,
+            .source_id = 0x1234,
+            .target_id = 0x5678,
+            .connection_id = 0x01020304,
+            .packet_number = 0x10203040,
+            .payload_len = static_cast<uint16_t>(payload.size()),
+            .header_crc16 = 0
+        };
+
+        EXPECT_EQ(xgl_wire_encode_header(frame.data(), frame.size(), &header), XGL_OK);
+
+        size_t offset = XGL_WIRE_BASE_HEADER_SIZE;
+        if (!ext.empty()) {
+            memcpy(&frame[offset], ext.data(), ext.size());
+            offset += ext.size();
+        }
+        if (!payload.empty()) {
+            memcpy(&frame[offset], payload.data(), payload.size());
+            offset += payload.size();
+        }
+
+        uint16_t crc16 = xgl_crc16_modbus(frame.data(), offset);
+        xgl_serialize_u16_le(&frame[offset], crc16);
         return frame;
     }
     
@@ -202,6 +241,69 @@ TEST_F(XglParserTest, ParseCompleteFrameWithPayload) {
     for (size_t i = 0; i < frame.size(); ++i) {
         EXPECT_EQ(frame_buffer[i], frame[i]);
     }
+}
+
+TEST_F(XglParserTest, ParseCompleteFrameWithExtensionsAndPayload) {
+    uint8_t ack_value[32] = {};
+    size_t ack_value_len = 0;
+    const xgl_wire_ack_range_t ranges[] = {
+        {.gap = 0, .length = 3},
+        {.gap = 2, .length = 1}
+    };
+    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(ack_value, sizeof(ack_value),
+                                                  42, 250, ranges, 2,
+                                                  &ack_value_len),
+              XGL_OK);
+
+    std::vector<uint8_t> ext(64);
+    size_t ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(ext.data(), ext.size(), XGL_WIRE_EXT_ACK_RANGE,
+                                  ack_value, ack_value_len, &ext_len),
+              XGL_OK);
+    ext.resize(ext_len);
+
+    std::vector<uint8_t> payload = {0xAA, 0xBB, 0xCC};
+    std::vector<uint8_t> frame = create_wire_frame_with_ext(ext, payload);
+
+    xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
+    for (size_t i = 0; i < frame.size(); ++i) {
+        result = xgl_parser_feed_byte(&parser, frame[i], 0);
+        if (i < frame.size() - 1) {
+            EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
+        }
+    }
+
+    EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
+
+    uint8_t* frame_buffer = nullptr;
+    size_t frame_len = 0;
+    ASSERT_EQ(xgl_parser_get_frame(&parser, &frame_buffer, &frame_len), XGL_OK);
+    EXPECT_EQ(frame_len, frame.size());
+    EXPECT_EQ(frame_buffer[3], XGL_WIRE_BASE_HEADER_SIZE + ext.size());
+}
+
+TEST_F(XglParserTest, InvalidExtensionLengthResetsParser) {
+    std::vector<uint8_t> invalid_ext = {
+        XGL_WIRE_EXT_ACK_RANGE,
+        12,
+        0x01,
+        0x02
+    };
+    std::vector<uint8_t> frame = create_wire_frame_with_ext(invalid_ext, {});
+
+    xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
+    bool error_detected = false;
+    for (size_t i = 0; i < frame.size(); ++i) {
+        result = xgl_parser_feed_byte(&parser, frame[i], 0);
+        if (result == XGL_PARSE_RESULT_ERROR) {
+            error_detected = true;
+            EXPECT_EQ(i, XGL_WIRE_BASE_HEADER_SIZE + invalid_ext.size() - 1U);
+            EXPECT_EQ(parser.state, XGL_PARSE_SOF);
+            break;
+        }
+    }
+
+    EXPECT_TRUE(error_detected);
 }
 
 TEST_F(XglParserTest, ParseCompleteFrameLargePayload) {
