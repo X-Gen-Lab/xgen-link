@@ -165,6 +165,7 @@ extern "C" {
 /* Core types and error handling */
 #include "xgl_error.h"
 #include "xgl_types.h"
+#include "xgl_security.h"
 
 /* Data link layer */
 #include "xgl_crc.h"
