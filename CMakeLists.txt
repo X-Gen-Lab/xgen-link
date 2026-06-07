@@ -197,6 +197,7 @@ if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
                 --std=c11
                 --inline-suppr
                 --error-exitcode=1
+                --suppress=toomanyconfigs
                 -I ${CMAKE_CURRENT_SOURCE_DIR}/include
                 ${XGL_SOURCES}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

@@ -41,8 +41,8 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.details
-  - pymdownx.highlight
-  - pymdownx.inlinehilite
+  - pymdownx.highlight:
+      use_pygments: false
   - pymdownx.snippets
   - pymdownx.tabbed:
       alternate_style: true
