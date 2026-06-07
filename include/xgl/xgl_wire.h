@@ -146,6 +146,19 @@ xgl_error_t xgl_wire_decode_sack_ext_value(const uint8_t* buffer,
                                            size_t bitmap_capacity,
                                            size_t* bitmap_len);
 
+xgl_error_t xgl_wire_encode_fragment_ext_value(uint8_t* buffer,
+                                               size_t buffer_size,
+                                               uint32_t message_id,
+                                               uint32_t fragment_offset,
+                                               uint32_t message_len,
+                                               size_t* bytes_written);
+
+xgl_error_t xgl_wire_decode_fragment_ext_value(const uint8_t* buffer,
+                                               size_t buffer_size,
+                                               uint32_t* message_id,
+                                               uint32_t* fragment_offset,
+                                               uint32_t* message_len);
+
 #ifdef __cplusplus
 }
 #endif

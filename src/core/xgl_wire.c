@@ -330,3 +330,46 @@ xgl_error_t xgl_wire_decode_sack_ext_value(const uint8_t* buffer,
 
     return XGL_OK;
 }
+
+xgl_error_t xgl_wire_encode_fragment_ext_value(uint8_t* buffer,
+                                               size_t buffer_size,
+                                               uint32_t message_id,
+                                               uint32_t fragment_offset,
+                                               uint32_t message_len,
+                                               size_t* bytes_written) {
+    if (buffer == NULL || bytes_written == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (buffer_size < 12U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    xgl_serialize_u32_le(&buffer[0], message_id);
+    xgl_serialize_u32_le(&buffer[4], fragment_offset);
+    xgl_serialize_u32_le(&buffer[8], message_len);
+    *bytes_written = 12U;
+
+    return XGL_OK;
+}
+
+xgl_error_t xgl_wire_decode_fragment_ext_value(const uint8_t* buffer,
+                                               size_t buffer_size,
+                                               uint32_t* message_id,
+                                               uint32_t* fragment_offset,
+                                               uint32_t* message_len) {
+    if (buffer == NULL || message_id == NULL || fragment_offset == NULL ||
+        message_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (buffer_size != 12U) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    *message_id = xgl_deserialize_u32_le(&buffer[0]);
+    *fragment_offset = xgl_deserialize_u32_le(&buffer[4]);
+    *message_len = xgl_deserialize_u32_le(&buffer[8]);
+
+    return XGL_OK;
+}
