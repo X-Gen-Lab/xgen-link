@@ -5,6 +5,7 @@
  */
 
 #include <xgl/xgl_mempool.h>
+#include <stdint.h>
 #include <string.h>
 
 static void mempool_store_next(void* block, void* next) {
@@ -15,6 +16,49 @@ static void* mempool_load_next(const void* block) {
     void* next;
     memcpy(&next, block, sizeof(next));
     return next;
+}
+
+static bool mempool_size_overflows(size_t count, size_t block_size) {
+    return block_size != 0U && count > ((size_t)-1) / block_size;
+}
+
+static bool mempool_contains_block(const xgl_mempool_t* pool,
+                                   const void* ptr) {
+    if (pool == NULL || pool->pool == NULL || ptr == NULL ||
+        pool->block_size == 0U || pool->block_count == 0U ||
+        mempool_size_overflows(pool->block_count, pool->block_size)) {
+        return false;
+    }
+
+    uintptr_t start = (uintptr_t)pool->pool;
+    uintptr_t end = start + (pool->block_count * pool->block_size);
+    uintptr_t address = (uintptr_t)ptr;
+    if (address < start || address >= end) {
+        return false;
+    }
+
+    return ((address - start) % pool->block_size) == 0U;
+}
+
+static bool mempool_free_list_contains(const xgl_mempool_t* pool,
+                                       const void* ptr) {
+    const void* current;
+    size_t scanned = 0U;
+
+    if (pool == NULL || ptr == NULL) {
+        return false;
+    }
+
+    current = pool->free_list;
+    while (current != NULL && scanned < pool->block_count) {
+        if (current == ptr) {
+            return true;
+        }
+        current = mempool_load_next(current);
+        scanned++;
+    }
+
+    return false;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -123,6 +167,12 @@ void* xgl_mempool_alloc(xgl_mempool_t* pool) {
 void xgl_mempool_free(xgl_mempool_t* pool, void* ptr) {
     /* Validate parameters */
     if (pool == NULL || ptr == NULL) {
+        return;
+    }
+
+    if (!mempool_contains_block(pool, ptr) ||
+        pool->free_count >= pool->block_count ||
+        mempool_free_list_contains(pool, ptr)) {
         return;
     }
     
