@@ -52,6 +52,7 @@ typedef struct {
     uint32_t timestamp;         /**< Timestamp when parsing started (ms) */
     size_t expected_header_len; /**< Expected fixed + extension header length */
     uint16_t expected_payload_len; /**< Expected payload length from header */
+    uint8_t expected_auth_tag_len; /**< Expected authentication trailer length */
 } xgl_parser_t;
 
 /*---------------------------------------------------------------------------*/

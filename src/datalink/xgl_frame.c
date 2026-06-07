@@ -19,6 +19,8 @@
 #define XGL_PROTOCOL_VERSION    0x01
 #define XGL_FRAME_DEFAULT_TTL   8U
 
+#define XGL_AUTH_TRAILER_TAG_CAPACITY 32U
+
 /*---------------------------------------------------------------------------*/
 /* Frame Header Encoding/Decoding                                            */
 /*---------------------------------------------------------------------------*/
@@ -202,6 +204,181 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
     offset += XGL_CRC16_SIZE;
     
     *bytes_written = offset;
+    return XGL_OK;
+}
+
+static uint8_t frame_flags_from_legacy_header(const xgl_frame_header_t* header) {
+    uint8_t flags = 0;
+    uint8_t reliable = (uint8_t)(header->attr_lsb & XGL_ATTR_RELIABLE_MASK);
+    if (reliable == XGL_ATTR_RELIABLE_TX) {
+        flags |= XGL_WIRE_FLAG_ACK_ELICITING;
+    } else if (reliable == XGL_ATTR_RELIABLE_ACK) {
+        flags |= XGL_WIRE_FLAG_CONTROL;
+    }
+    if ((header->attr_lsb & XGL_ATTR_FRAGMENT_MASK) != 0U) {
+        flags |= XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    }
+    return flags;
+}
+
+static uint8_t frame_packet_type_from_legacy_header(const xgl_frame_header_t* header) {
+    uint8_t packet_type = xgl_frame_get_datatype(header);
+    if (packet_type == XGL_PACKET_TYPE_INVALID) {
+        packet_type = XGL_PACKET_TYPE_DATA;
+    }
+    if ((header->attr_lsb & XGL_ATTR_RELIABLE_MASK) == XGL_ATTR_RELIABLE_ACK) {
+        packet_type = XGL_PACKET_TYPE_ACK;
+    }
+    return packet_type;
+}
+
+static xgl_error_t encode_authenticated_header(uint8_t* buffer,
+                                               size_t buffer_size,
+                                               const xgl_frame_t* frame,
+                                               uint32_t key_id,
+                                               uint8_t tag_len,
+                                               size_t* header_len) {
+    if (buffer_size < XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint8_t security_value[13] = {0};
+    size_t security_value_len = 0;
+    xgl_error_t err = xgl_wire_encode_security_ext_value(security_value,
+                                                         sizeof(security_value),
+                                                         key_id,
+                                                         frame->header.seq_num,
+                                                         tag_len,
+                                                         &security_value_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    size_t security_ext_len = 0;
+    err = xgl_wire_encode_ext(&buffer[XGL_WIRE_BASE_HEADER_SIZE],
+                              buffer_size - XGL_WIRE_BASE_HEADER_SIZE,
+                              XGL_WIRE_EXT_SECURITY,
+                              security_value,
+                              security_value_len,
+                              &security_ext_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    size_t produced_header_len = XGL_WIRE_BASE_HEADER_SIZE + security_ext_len;
+    if (produced_header_len > UINT8_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint8_t flags = (uint8_t)(frame_flags_from_legacy_header(&frame->header) |
+                              XGL_WIRE_FLAG_HAS_EXTENSIONS |
+                              XGL_WIRE_FLAG_AUTHENTICATED);
+    xgl_wire_header_t wire = {
+        .version = XGL_WIRE_VERSION,
+        .header_len = (uint8_t)produced_header_len,
+        .packet_type = frame_packet_type_from_legacy_header(&frame->header),
+        .flags = flags,
+        .ttl = frame->header.reserved,
+        .traffic_class = (uint8_t)(frame->header.attr_lsb & XGL_ATTR_PRIORITY_MASK),
+        .source_id = frame->header.source_id,
+        .target_id = frame->header.target_id,
+        .connection_id = (uint32_t)(frame->header.attr_msb & XGL_ATTR_SESSION_MASK),
+        .packet_number = frame->header.seq_num,
+        .payload_len = frame->header.data_len,
+        .header_crc16 = 0
+    };
+
+    err = xgl_wire_encode_header(buffer, buffer_size, &wire);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    *header_len = produced_header_len;
+    return XGL_OK;
+}
+
+xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
+                                              size_t buffer_size,
+                                              const xgl_frame_t* frame,
+                                              uint32_t key_id,
+                                              const xgl_auth_provider_t* provider,
+                                              size_t* bytes_written) {
+    if (buffer == NULL || frame == NULL || provider == NULL ||
+        provider->sign == NULL || bytes_written == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (frame->payload_len > UINT16_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    size_t header_len = 0;
+    xgl_error_t err = encode_authenticated_header(buffer,
+                                                  buffer_size,
+                                                  frame,
+                                                  key_id,
+                                                  0U,
+                                                  &header_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    if (buffer_size < header_len + frame->payload_len + XGL_CRC16_SIZE + 1U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    if (frame->payload != NULL && frame->payload_len > 0U) {
+        memcpy(&buffer[header_len], frame->payload, frame->payload_len);
+    }
+
+    uint8_t trial_tag[XGL_AUTH_TRAILER_TAG_CAPACITY] = {0};
+    size_t tag_len = 0;
+    err = provider->sign(key_id,
+                         buffer,
+                         header_len,
+                         &buffer[header_len],
+                         frame->payload_len,
+                         trial_tag,
+                         sizeof(trial_tag),
+                         &tag_len,
+                         provider->user_data);
+    if (err != XGL_OK) {
+        return err;
+    }
+    if (tag_len == 0U || tag_len > UINT8_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    err = encode_authenticated_header(buffer,
+                                      buffer_size,
+                                      frame,
+                                      key_id,
+                                      (uint8_t)tag_len,
+                                      &header_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+    if (frame->payload != NULL && frame->payload_len > 0U) {
+        memcpy(&buffer[header_len], frame->payload, frame->payload_len);
+    }
+
+    size_t frame_len_without_crc = 0;
+    err = xgl_wire_append_auth_trailer(buffer,
+                                       buffer_size - XGL_CRC16_SIZE,
+                                       header_len,
+                                       frame->payload_len,
+                                       key_id,
+                                       provider,
+                                       &frame_len_without_crc);
+    if (err != XGL_OK) {
+        return err;
+    }
+    if (frame_len_without_crc + XGL_CRC16_SIZE > buffer_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint16_t crc16 = xgl_crc16_modbus(buffer, frame_len_without_crc);
+    xgl_serialize_u16_le(&buffer[frame_len_without_crc], crc16);
+    *bytes_written = frame_len_without_crc + XGL_CRC16_SIZE;
     return XGL_OK;
 }
 

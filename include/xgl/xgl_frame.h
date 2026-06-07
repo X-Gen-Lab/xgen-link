@@ -80,6 +80,23 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
                                 size_t* bytes_written);
 
 /**
+ * \brief           Serialize frame with production authentication trailer
+ * \param[out]      buffer: Output buffer
+ * \param[in]       buffer_size: Buffer size in bytes
+ * \param[in]       frame: Frame structure to serialize
+ * \param[in]       key_id: Authentication key identifier
+ * \param[in]       provider: Authentication provider callbacks
+ * \param[out]      bytes_written: Number of bytes written
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
+                                              size_t buffer_size,
+                                              const xgl_frame_t* frame,
+                                              uint32_t key_id,
+                                              const xgl_auth_provider_t* provider,
+                                              size_t* bytes_written);
+
+/**
  * \brief           Build frame in zero-copy mode
  * \param[in,out]   buffer: Buffer with pre-allocated header space
  * \param[in]       buffer_size: Total buffer size

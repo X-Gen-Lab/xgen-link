@@ -39,6 +39,7 @@ xgl_error_t xgl_parser_init(xgl_parser_t* parser,
     parser->timestamp = 0;
     parser->expected_header_len = 0;
     parser->expected_payload_len = 0;
+    parser->expected_auth_tag_len = 0;
     
     return XGL_OK;
 }
@@ -61,12 +62,23 @@ void xgl_parser_reset(xgl_parser_t* parser) {
     parser->timestamp = 0;
     parser->expected_header_len = 0;
     parser->expected_payload_len = 0;
+    parser->expected_auth_tag_len = 0;
 }
 
 static xgl_parse_result_t validate_extensions_or_reset(xgl_parser_t* parser) {
+    parser->expected_auth_tag_len = 0U;
+
     size_t ext_len = parser->expected_header_len - XGL_WIRE_BASE_HEADER_SIZE;
     if (ext_len == 0U) {
         return XGL_PARSE_RESULT_INCOMPLETE;
+    }
+
+    xgl_wire_header_t header;
+    if (xgl_wire_decode_header(&header,
+                               parser->cache,
+                               XGL_WIRE_BASE_HEADER_SIZE) != XGL_OK) {
+        xgl_parser_reset(parser);
+        return XGL_PARSE_RESULT_ERROR;
     }
 
     xgl_wire_ext_cursor_t cursor;
@@ -80,10 +92,32 @@ static xgl_parse_result_t validate_extensions_or_reset(xgl_parser_t* parser) {
 
     xgl_wire_ext_t ext;
     while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
-        /* Extension cursor performs structural TLV validation. */
+        if (ext.type == XGL_WIRE_EXT_SECURITY) {
+            uint32_t key_id = 0;
+            uint64_t nonce_id = 0;
+            uint8_t tag_len = 0;
+            if (xgl_wire_decode_security_ext_value(ext.value,
+                                                   ext.len,
+                                                   &key_id,
+                                                   &nonce_id,
+                                                   &tag_len) != XGL_OK ||
+                tag_len == 0U) {
+                xgl_parser_reset(parser);
+                return XGL_PARSE_RESULT_ERROR;
+            }
+            (void)key_id;
+            (void)nonce_id;
+            parser->expected_auth_tag_len = tag_len;
+        }
     }
 
     if (err != XGL_ERR_NOT_FOUND) {
+        xgl_parser_reset(parser);
+        return XGL_PARSE_RESULT_ERROR;
+    }
+
+    if ((header.flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U &&
+        parser->expected_auth_tag_len == 0U) {
         xgl_parser_reset(parser);
         return XGL_PARSE_RESULT_ERROR;
     }
@@ -149,16 +183,6 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
                 parser->expected_header_len = header.header_len;
                 parser->expected_payload_len = header.payload_len;
 
-                /* Check if payload fits in cache */
-                size_t total_frame_size = parser->expected_header_len +
-                                         parser->expected_payload_len + 
-                                         XGL_CRC16_SIZE;
-                if (total_frame_size > parser->cache_size) {
-                    /* Frame too large for cache buffer */
-                    xgl_parser_reset(parser);
-                    return XGL_PARSE_RESULT_ERROR;
-                }
-
                 if (parser->cache_len < parser->expected_header_len) {
                     return XGL_PARSE_RESULT_INCOMPLETE;
                 }
@@ -167,9 +191,20 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
                 if (ext_result == XGL_PARSE_RESULT_ERROR) {
                     return ext_result;
                 }
+
+                /* Check if payload, auth trailer, and CRC fit in cache. */
+                size_t total_frame_size = parser->expected_header_len +
+                                         parser->expected_payload_len +
+                                         parser->expected_auth_tag_len +
+                                         XGL_CRC16_SIZE;
+                if (total_frame_size > parser->cache_size) {
+                    xgl_parser_reset(parser);
+                    return XGL_PARSE_RESULT_ERROR;
+                }
                 
-                /* Move to payload state (or CRC if no payload) */
-                if (parser->expected_payload_len > 0) {
+                /* Move to body state (payload plus optional auth trailer). */
+                if (parser->expected_payload_len > 0 ||
+                    parser->expected_auth_tag_len > 0U) {
                     parser->state = XGL_PARSE_PAYLOAD;
                 } else {
                     parser->state = XGL_PARSE_CRC;
@@ -185,8 +220,10 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             parser->cache[parser->cache_len++] = byte;
             
             /* Check if we have complete payload */
-            size_t payload_received = parser->cache_len - parser->expected_header_len;
-            if (payload_received >= parser->expected_payload_len) {
+            size_t body_received = parser->cache_len - parser->expected_header_len;
+            size_t expected_body_len = (size_t)parser->expected_payload_len +
+                                       (size_t)parser->expected_auth_tag_len;
+            if (body_received >= expected_body_len) {
                 /* Move to CRC state */
                 parser->state = XGL_PARSE_CRC;
                 parser->index = 0;
