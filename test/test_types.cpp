@@ -23,6 +23,11 @@
 #error "xgl/xgl.h must not expose v1 attribute-byte macros in the production API"
 #endif
 
+#if defined(XGL_PARSER_H) || defined(XGL_WINDOW_H) || defined(XGL_RELIABLE_H) || \
+    defined(XGL_FRAGMENT_H) || defined(XGL_HASHTABLE_H) || defined(XGL_LIST_H)
+#error "xgl/xgl.h must not expose internal protocol layer headers in the production API"
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Type Size Tests                                                           */
 /*---------------------------------------------------------------------------*/
