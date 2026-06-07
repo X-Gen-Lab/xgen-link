@@ -6,6 +6,16 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include "../src/core/xgl_instance_internal.h"
+
+template <typename T>
+concept HasLegacySequenceState = requires(T value) {
+    value.seq_numbers;
+    value.seq_numbers_count;
+};
+
+static_assert(!HasLegacySequenceState<struct xgl_instance>,
+              "xgl_instance must not allocate or retain legacy 8-bit sequence state");
 
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */
