@@ -146,6 +146,24 @@ TEST_F(XglConfigTest, GetPresetLarge) {
     EXPECT_FALSE(config.features.enable_encryption);
 }
 
+TEST_F(XglConfigTest, GetPresetProductionRequiresAuthentication) {
+    xgl_config_get_preset_production(&config);
+
+    EXPECT_STREQ(config.name, "production");
+    EXPECT_TRUE(config.auth_required);
+    EXPECT_NE(config.auth_key_id, 0U);
+    EXPECT_EQ(config.auth_provider, nullptr);
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+
+    xgl_auth_provider_t provider = {
+        .sign = mock_auth_sign,
+        .verify = mock_auth_verify,
+        .user_data = nullptr
+    };
+    config.auth_provider = &provider;
+    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Configuration Validation Tests                                            */
 /*---------------------------------------------------------------------------*/
