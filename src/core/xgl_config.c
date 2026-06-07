@@ -163,6 +163,14 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
         return XGL_ERR_INVALID_PARAM;
     }
 
+    if (config->auth_required) {
+        if (config->auth_provider == NULL ||
+            config->auth_provider->sign == NULL ||
+            config->auth_provider->verify == NULL) {
+            return XGL_ERR_INVALID_PARAM;
+        }
+    }
+
 #ifndef XGL_THREAD_SAFE
     if (config->features.thread_safe) {
         return XGL_ERR_INVALID_PARAM;

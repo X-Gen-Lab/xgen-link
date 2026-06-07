@@ -213,6 +213,32 @@ typedef struct {
     uint16_t max_frame_size;        /**< Maximum frame size in bytes */
 } xgl_protocol_config_t;
 
+typedef xgl_error_t (*xgl_auth_sign_fn)(uint32_t key_id,
+                                        const uint8_t* aad,
+                                        size_t aad_len,
+                                        const uint8_t* payload,
+                                        size_t payload_len,
+                                        uint8_t* tag,
+                                        size_t tag_capacity,
+                                        size_t* tag_len,
+                                        void* user_data);
+
+typedef xgl_error_t (*xgl_auth_verify_fn)(uint32_t key_id,
+                                          const uint8_t* aad,
+                                          size_t aad_len,
+                                          const uint8_t* payload,
+                                          size_t payload_len,
+                                          const uint8_t* tag,
+                                          size_t tag_len,
+                                          bool* valid,
+                                          void* user_data);
+
+typedef struct {
+    xgl_auth_sign_fn sign;          /**< Generate authentication tag */
+    xgl_auth_verify_fn verify;      /**< Verify authentication tag */
+    void* user_data;                /**< Provider user data */
+} xgl_auth_provider_t;
+
 /**
  * \brief           Feature flags configuration
  */
@@ -239,6 +265,13 @@ typedef struct {
     xgl_memory_config_t memory;     /**< Memory configuration */
     xgl_protocol_config_t protocol; /**< Protocol parameters */
     xgl_feature_config_t features;  /**< Feature flags */
+
+    /*-----------------------------------------------------------------------*/
+    /* Authentication Configuration                                          */
+    /*-----------------------------------------------------------------------*/
+    bool auth_required;             /**< Require authentication for packets */
+    uint32_t auth_key_id;           /**< Active authentication key id */
+    xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
     
     /*-----------------------------------------------------------------------*/
     /* Routing Configuration                                                 */
@@ -377,6 +410,9 @@ typedef struct {
         .enable_encryption = false, \
         .thread_safe = false, \
     }, \
+    .auth_required = false, \
+    .auth_key_id = 0, \
+    .auth_provider = NULL, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
@@ -407,6 +443,9 @@ typedef struct {
         .enable_encryption = false, \
         .thread_safe = false, \
     }, \
+    .auth_required = false, \
+    .auth_key_id = 0, \
+    .auth_provider = NULL, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
@@ -437,6 +476,9 @@ typedef struct {
         .enable_encryption = false, \
         .thread_safe = false, \
     }, \
+    .auth_required = false, \
+    .auth_key_id = 0, \
+    .auth_provider = NULL, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
@@ -467,6 +509,9 @@ typedef struct {
         .enable_encryption = false, \
         .thread_safe = false, \
     }, \
+    .auth_required = false, \
+    .auth_key_id = 0, \
+    .auth_provider = NULL, \
     .route_table = NULL, \
     .route_table_len = 0, \
     .rx_callback = NULL, \
