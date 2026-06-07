@@ -12,6 +12,14 @@
 #include <cstring>
 #include <vector>
 
+template <typename T>
+concept HasLegacyAckHandler = requires(T value) {
+    value.ack_handler;
+};
+
+static_assert(!HasLegacyAckHandler<xgl_transport_ctx_t>,
+              "xgl_transport_ctx_t must not retain legacy 8-bit ACK handler state");
+
 namespace {
 
 struct LowerLayerSpy {
