@@ -40,7 +40,7 @@ static void xgl_route_free(xgl_route_table_t* table, void* ptr) {
  * \details         Linear search through routes array
  */
 static int xgl_route_find_index(const xgl_route_table_t* table,
-                                uint8_t target_id) {
+                                uint16_t target_id) {
     for (size_t i = 0; i < table->route_count; i++) {
         if (table->routes[i].target_id == target_id) {
             return (int)i;
@@ -168,7 +168,7 @@ void xgl_route_table_destroy(xgl_route_table_t* table) {
  * \brief           Add route to table
  */
 xgl_error_t xgl_route_table_add(xgl_route_table_t* table,
-                                uint8_t target_id,
+                                uint16_t target_id,
                                 xgl_phy_ops_t* phy,
                                 uint16_t max_frame_size,
                                 uint32_t read_freq_hz,
@@ -227,7 +227,7 @@ xgl_error_t xgl_route_table_add(xgl_route_table_t* table,
  * \brief           Remove route from table
  */
 xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
-                                   uint8_t target_id) {
+                                   uint16_t target_id) {
     if (table == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -268,7 +268,7 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
  * \brief           Lookup route in table (O(1) average)
  */
 xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
-                                         uint8_t target_id) {
+                                         uint16_t target_id) {
     if (table == NULL) {
         return NULL;
     }
@@ -281,7 +281,7 @@ xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
  * \brief           Update route metric
  */
 xgl_error_t xgl_route_table_update_metric(xgl_route_table_t* table,
-                                          uint8_t target_id,
+                                          uint16_t target_id,
                                           uint8_t metric) {
     if (table == NULL) {
         return XGL_ERR_NULL_POINTER;

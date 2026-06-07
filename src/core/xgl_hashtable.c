@@ -14,10 +14,9 @@
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Hash function for uint8_t keys
- * \details         Simple modulo hash for small key space (0-255)
+ * \brief           Hash function for uint16_t route keys
  */
-static inline size_t xgl_hash(uint8_t key, size_t size) {
+static inline size_t xgl_hash(uint16_t key, size_t size) {
     /* For power-of-2 sizes, use bitwise AND for fast modulo */
     return key & (size - 1);
 }
@@ -122,7 +121,7 @@ void xgl_hashtable_destroy(xgl_hashtable_t* table) {
  * \brief           Insert or update entry in hash table
  */
 xgl_error_t xgl_hashtable_insert(xgl_hashtable_t* table,
-                                 uint8_t key,
+                                 uint16_t key,
                                  xgl_route_item_t* value) {
     if (table == NULL || table->buckets == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -172,7 +171,7 @@ xgl_error_t xgl_hashtable_insert(xgl_hashtable_t* table,
  * \brief           Lookup entry in hash table (O(1) average)
  */
 xgl_route_item_t* xgl_hashtable_lookup(const xgl_hashtable_t* table,
-                                       uint8_t key) {
+                                       uint16_t key) {
     if (table == NULL || table->buckets == NULL) {
         return NULL;
     }
@@ -196,7 +195,7 @@ xgl_route_item_t* xgl_hashtable_lookup(const xgl_hashtable_t* table,
 /**
  * \brief           Remove entry from hash table
  */
-xgl_error_t xgl_hashtable_remove(xgl_hashtable_t* table, uint8_t key) {
+xgl_error_t xgl_hashtable_remove(xgl_hashtable_t* table, uint16_t key) {
     if (table == NULL || table->buckets == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

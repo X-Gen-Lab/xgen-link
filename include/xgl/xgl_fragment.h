@@ -66,7 +66,7 @@ typedef struct {
     
     /* Fragment identification */
     uint8_t fragment_id;            /**< Fragment ID */
-    uint8_t source_id;              /**< Source node ID */
+    uint16_t source_id;             /**< Source node ID */
     uint8_t data_type;              /**< Data type */
     
     /* Reassembly state */
@@ -182,7 +182,7 @@ xgl_error_t xgl_fragment_data(xgl_fragment_manager_t* manager,
  * \return          XGL_OK if reassembly complete, XGL_ERR_BUSY if waiting for more fragments, error code otherwise
  */
 xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
-                                 uint8_t source_id,
+                                 uint16_t source_id,
                                  uint8_t data_type,
                                  const uint8_t* fragment_data,
                                  size_t fragment_len,

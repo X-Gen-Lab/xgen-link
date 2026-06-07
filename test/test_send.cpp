@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_wire.h>
 #include <cstring>
 #include <vector>
 
@@ -364,7 +365,8 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
         .WillOnce(testing::Return(XGL_OK));
 
     EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
-    EXPECT_EQ(buffer[0], XGL_SOF);
+    EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
+    EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
     EXPECT_EQ(std::memcmp(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U), 0);
 }
 
@@ -438,8 +440,8 @@ TEST_F(XglSendTest, ZeroCopyUnreliableWritesDefaultTtlAndEmptySession) {
 
     ASSERT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
 
-    xgl_frame_header_t header = {};
-    xgl_frame_decode_header(&header, buffer);
-    EXPECT_EQ(header.reserved, XGL_DEFAULT_TTL);
-    EXPECT_EQ(header.attr_msb & XGL_ATTR_SESSION_MASK, 0U);
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, buffer, sizeof(buffer)), XGL_OK);
+    EXPECT_EQ(header.ttl, XGL_DEFAULT_TTL);
+    EXPECT_EQ(header.connection_id, 0U);
 }

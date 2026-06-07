@@ -32,7 +32,7 @@ extern "C" {
 /**
  * \brief           Broadcast address
  */
-#define XGL_BROADCAST_ID            0xFF
+#define XGL_BROADCAST_ID            0xFFFFU
 
 /**
  * \brief           Default hop limit for routed packets
@@ -60,7 +60,7 @@ struct xgl_datalink_ctx_s;
  * \brief           Network layer context structure
  */
 typedef struct xgl_network_ctx_s {
-    uint8_t local_id;               /**< Local node ID */
+    uint16_t local_id;              /**< Local node ID */
     xgl_route_table_t* route_table; /**< Route table */
     
     /* Layer interfaces for decoupled communication */
@@ -76,7 +76,7 @@ typedef struct xgl_network_ctx_s {
  * \brief           Network layer configuration structure
  */
 typedef struct {
-    uint8_t local_id;               /**< Local node ID */
+    uint16_t local_id;              /**< Local node ID */
     xgl_route_table_t* route_table; /**< Route table */
     xgl_layer_interface_t* upper_layer;  /**< Upper layer interface (can be NULL) */
     xgl_layer_interface_t* lower_layer;  /**< Lower layer interface (can be NULL) */
@@ -132,8 +132,8 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
  * \return          true if addressing is valid, false otherwise
  */
 bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
-                                  uint8_t target_id,
-                                  uint8_t source_id);
+                                  uint16_t target_id,
+                                  uint16_t source_id);
 
 /**
  * \brief           Check if packet is addressed to local node
@@ -142,7 +142,7 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
  * \return          true if packet is for local node, false otherwise
  */
 static inline bool xgl_network_is_local(const xgl_network_ctx_t* ctx,
-                                       uint8_t target_id) {
+                                       uint16_t target_id) {
     return (target_id == ctx->local_id) || (target_id == XGL_BROADCAST_ID);
 }
 

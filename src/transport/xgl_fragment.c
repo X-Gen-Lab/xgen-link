@@ -75,7 +75,7 @@ static void free_reassembly_buffer(xgl_fragment_manager_t* manager,
 static xgl_reassembly_buffer_t* find_reassembly_buffer(
     xgl_fragment_manager_t* manager,
     uint8_t fragment_id,
-    uint8_t source_id) {
+    uint16_t source_id) {
     
     if (manager == NULL) {
         return NULL;
@@ -316,7 +316,7 @@ xgl_error_t xgl_fragment_data(xgl_fragment_manager_t* manager,
  * \brief           Process received fragment
  */
 xgl_error_t xgl_fragment_process(xgl_fragment_manager_t* manager,
-                                 uint8_t source_id,
+                                 uint16_t source_id,
                                  uint8_t data_type,
                                  const uint8_t* fragment_data,
                                  size_t fragment_len,

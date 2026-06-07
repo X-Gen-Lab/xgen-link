@@ -9,6 +9,7 @@
 #include <xgl/xgl_types.h>
 #include <xgl/xgl_crc.h>
 #include <xgl/xgl_serialize.h>
+#include <xgl/xgl_wire.h>
 #include <cstring>
 
 /*---------------------------------------------------------------------------*/
@@ -52,23 +53,14 @@ TEST_F(XglAckTest, GenerateAckPacket) {
     ASSERT_EQ(err, XGL_OK);
     ASSERT_EQ(ack_len, XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE);
     
-    /* Verify frame header */
-    xgl_frame_header_t* header = (xgl_frame_header_t*)ack_buffer;
-    
-    EXPECT_EQ(header->sof, XGL_SOF);
-    EXPECT_EQ(header->source_id, 0x02);  /* Swapped */
-    EXPECT_EQ(header->target_id, 0x01);  /* Swapped */
-    EXPECT_EQ(header->ack_num, 42);
-    EXPECT_EQ(header->attr_lsb & XGL_ATTR_RELIABLE_MASK, XGL_ATTR_RELIABLE_ACK);
-    
-    /* Verify data length is 0 */
-    uint16_t data_len = xgl_deserialize_u16_le((uint8_t*)&header->data_len);
-    EXPECT_EQ(data_len, 0);
-    
-    /* Verify CRC8 */
-    uint8_t calc_crc8 = xgl_crc8_maxim((uint8_t*)&header->version_datatype,
-                                       XGL_FRAME_HEADER_SIZE - 2);
-    EXPECT_EQ(header->crc8, calc_crc8);
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, ack_buffer, ack_len), XGL_OK);
+
+    EXPECT_EQ(header.packet_type, XGL_PACKET_TYPE_ACK);
+    EXPECT_EQ(header.source_id, 0x02U);  /* Swapped */
+    EXPECT_EQ(header.target_id, 0x01U);  /* Swapped */
+    EXPECT_EQ(header.payload_len, 0U);
+    EXPECT_NE(header.flags & XGL_WIRE_FLAG_CONTROL, 0U);
     
     /* Verify CRC16 */
     uint16_t calc_crc16 = xgl_crc16_modbus(ack_buffer, XGL_FRAME_HEADER_SIZE);

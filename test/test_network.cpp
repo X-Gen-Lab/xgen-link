@@ -8,6 +8,7 @@
 #include <xgl/xgl_network.h>
 #include <xgl/xgl_route.h>
 #include <cstring>
+#include <vector>
 
 /*---------------------------------------------------------------------------*/
 /* Test PHY Operations                                                       */
@@ -67,6 +68,35 @@ protected:
     static constexpr uint8_t LOCAL_ID = 1;
     static constexpr uint8_t REMOTE_ID = 2;
     static constexpr uint8_t FORWARD_ID = 3;
+
+    std::vector<uint8_t> make_frame(uint16_t source_id,
+                                    uint16_t target_id,
+                                    uint8_t ttl = XGL_DEFAULT_TTL,
+                                    const char* payload = "hello") {
+        xgl_frame_t frame = {};
+        xgl_frame_params_t params = {
+            .source_id = source_id,
+            .target_id = target_id,
+            .data_type = 1,
+            .seq_num = 0,
+            .ack_num = 0,
+            .payload = reinterpret_cast<const uint8_t*>(payload),
+            .payload_len = std::strlen(payload),
+            .reliable = true,
+            .reliable_type = XGL_ATTR_RELIABLE_NONE,
+            .fragment = false,
+            .priority = 0,
+            .session_id = 0,
+            .ttl = ttl
+        };
+        EXPECT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+        std::vector<uint8_t> bytes(xgl_frame_calculate_size(params.payload_len));
+        size_t written = 0;
+        EXPECT_EQ(xgl_frame_serialize(bytes.data(), bytes.size(), &frame, &written), XGL_OK);
+        bytes.resize(written);
+        return bytes;
+    }
     
     xgl_route_table_t route_table;
     xgl_network_ctx_t network_ctx;
@@ -263,30 +293,7 @@ TEST_F(XglNetworkTest, SendPacketNullPointer) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglNetworkTest, ReceivePacketForLocalNode) {
-    /* Build a simple frame */
-    uint8_t frame_buf[64];
-    memset(frame_buf, 0, sizeof(frame_buf));
-    
-    /* Frame header */
-    frame_buf[0] = XGL_SOF;                    // SOF
-    frame_buf[1] = (1 << 4) | 1;               // Version 1, Data type 1
-    frame_buf[2] = REMOTE_ID;                  // Source ID
-    frame_buf[3] = LOCAL_ID;                   // Target ID (local)
-    frame_buf[4] = 0x40;                       // Reliable TX
-    frame_buf[5] = 0;                          // Attributes MSB
-    frame_buf[6] = 5;                          // Data length LSB
-    frame_buf[7] = 0;                          // Data length MSB
-    frame_buf[8] = 0;                          // Seq num
-    frame_buf[9] = 0;                          // Ack num
-    frame_buf[10] = 0;                         // Reserved
-    frame_buf[11] = 0;                         // CRC8 (not validated in this test)
-    
-    /* Payload */
-    memcpy(&frame_buf[12], "hello", 5);
-    
-    /* CRC16 */
-    frame_buf[17] = 0;
-    frame_buf[18] = 0;
+    std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, LOCAL_ID);
     
     /* Mock upper layer interface */
     bool upper_called = false;
@@ -304,7 +311,7 @@ TEST_F(XglNetworkTest, ReceivePacketForLocalNode) {
     
     network_ctx.upper_layer = &upper_layer;
     
-    xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf, 19);
+    xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size());
     EXPECT_EQ(err, XGL_OK);
     EXPECT_TRUE(upper_called);
     EXPECT_EQ(stats.rx_packets, 1);
@@ -314,30 +321,11 @@ TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
     /* Add route for forwarding */
     xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1);
     
-    /* Build frame for another node */
-    uint8_t frame_buf[64];
-    memset(frame_buf, 0, sizeof(frame_buf));
-    
-    frame_buf[0] = XGL_SOF;
-    frame_buf[1] = (1 << 4) | 1;
-    frame_buf[2] = REMOTE_ID;                  // Source
-    frame_buf[3] = FORWARD_ID;                 // Target (not local)
-    frame_buf[4] = 0x40;
-    frame_buf[5] = 0;
-    frame_buf[6] = 5;
-    frame_buf[7] = 0;
-    frame_buf[8] = 0;
-    frame_buf[9] = 0;
-    frame_buf[10] = XGL_DEFAULT_TTL;
-    frame_buf[11] = 0;
-    
-    memcpy(&frame_buf[12], "hello", 5);
-    frame_buf[17] = 0;
-    frame_buf[18] = 0;
+    std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID);
     
     int initial_tx_count = phy_tx_count;
     
-    xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf, 19);
+    xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size());
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(phy_tx_count, initial_tx_count + 1);  // Should forward
 }
@@ -359,26 +347,9 @@ TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
     ASSERT_EQ(xgl_route_table_add(&route_table, 4, &first_phy, 256, 100, 10), XGL_OK);
     ASSERT_EQ(xgl_route_table_add(&route_table, 5, &second_phy, 256, 100, 1), XGL_OK);
 
-    uint8_t frame_buf[64];
-    memset(frame_buf, 0, sizeof(frame_buf));
+    std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, 5);
 
-    frame_buf[0] = XGL_SOF;
-    frame_buf[1] = (1 << 4) | 1;
-    frame_buf[2] = REMOTE_ID;
-    frame_buf[3] = 5;
-    frame_buf[4] = 0x40;
-    frame_buf[5] = 0;
-    frame_buf[6] = 5;
-    frame_buf[7] = 0;
-    frame_buf[8] = 0;
-    frame_buf[9] = 0;
-    frame_buf[10] = XGL_DEFAULT_TTL;
-    frame_buf[11] = 0;
-    memcpy(&frame_buf[12], "hello", 5);
-    frame_buf[17] = 0;
-    frame_buf[18] = 0;
-
-    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf, 19), XGL_OK);
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size()), XGL_OK);
     EXPECT_EQ(first_phy_count, 0);
     EXPECT_EQ(second_phy_count, 1);
     EXPECT_EQ(stats.tx_packets, 1);
@@ -387,53 +358,17 @@ TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
 TEST_F(XglNetworkTest, ForwardingDropsExpiredTtl) {
     ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1), XGL_OK);
 
-    uint8_t frame_buf[64];
-    memset(frame_buf, 0, sizeof(frame_buf));
+    std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID, 0);
 
-    frame_buf[0] = XGL_SOF;
-    frame_buf[1] = (1 << 4) | 1;
-    frame_buf[2] = REMOTE_ID;
-    frame_buf[3] = FORWARD_ID;
-    frame_buf[4] = 0x40;
-    frame_buf[5] = 0;
-    frame_buf[6] = 5;
-    frame_buf[7] = 0;
-    frame_buf[8] = 0;
-    frame_buf[9] = 0;
-    frame_buf[10] = 0;
-    frame_buf[11] = 0;
-    memcpy(&frame_buf[12], "hello", 5);
-    frame_buf[17] = 0;
-    frame_buf[18] = 0;
-
-    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf, 19), XGL_ERR_TTL_EXPIRED);
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size()), XGL_ERR_TTL_EXPIRED);
     EXPECT_EQ(phy_tx_count, 0);
     EXPECT_EQ(stats.rx_dropped, 1);
 }
 
 TEST_F(XglNetworkTest, ReceivePacketNoRouteForForwarding) {
-    /* Build frame for unknown node */
-    uint8_t frame_buf[64];
-    memset(frame_buf, 0, sizeof(frame_buf));
-    
-    frame_buf[0] = XGL_SOF;
-    frame_buf[1] = (1 << 4) | 1;
-    frame_buf[2] = REMOTE_ID;
-    frame_buf[3] = 99;                         // Unknown target
-    frame_buf[4] = 0x40;
-    frame_buf[5] = 0;
-    frame_buf[6] = 5;
-    frame_buf[7] = 0;
-    frame_buf[8] = 0;
-    frame_buf[9] = 0;
-    frame_buf[10] = XGL_DEFAULT_TTL;
-    frame_buf[11] = 0;
-    
-    memcpy(&frame_buf[12], "hello", 5);
-    frame_buf[17] = 0;
-    frame_buf[18] = 0;
-    
-    xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf, 19);
+    std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, 99);
+
+    xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size());
     EXPECT_EQ(err, XGL_ERR_ROUTE_NOT_FOUND);
     EXPECT_EQ(stats.rx_dropped, 1);
 }

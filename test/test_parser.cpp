@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_wire.h>
 #include <vector>
 
 /*---------------------------------------------------------------------------*/
@@ -137,8 +138,8 @@ TEST_F(XglParserTest, FindSOF) {
     EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
     EXPECT_EQ(parser.state, XGL_PARSE_SOF);
     
-    /* Feed SOF */
-    result = xgl_parser_feed_byte(&parser, XGL_SOF, 0);
+    /* Feed production magic */
+    result = xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 0);
     EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
     EXPECT_EQ(parser.state, XGL_PARSE_HEADER);
     EXPECT_EQ(parser.cache_len, 1);
@@ -230,8 +231,8 @@ TEST_F(XglParserTest, InvalidCRC8) {
     std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
     std::vector<uint8_t> frame = create_valid_frame(payload);
     
-    /* Corrupt CRC8 (byte 11 in header, last byte of 12-byte header) */
-    frame[11] ^= 0xFF;
+    /* Corrupt header CRC16 */
+    frame[22] ^= 0xFF;
     
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
@@ -242,7 +243,7 @@ TEST_F(XglParserTest, InvalidCRC8) {
         /* Parser validates CRC8 when header is complete (after byte 11) */
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
-            EXPECT_EQ(i, 11);  /* Should detect at byte 11 (12th byte, completing header) */
+            EXPECT_EQ(i, XGL_FRAME_HEADER_SIZE - 1U);
             EXPECT_EQ(parser.state, XGL_PARSE_SOF);  /* Reset to SOF */
             break;
         }
@@ -283,13 +284,13 @@ TEST_F(XglParserTest, FrameTooLarge) {
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     bool error_detected = false;
-    for (size_t i = 0; i < frame.size() && i < 20; ++i) {
+    for (size_t i = 0; i < frame.size() && i < XGL_FRAME_HEADER_SIZE; ++i) {
         result = xgl_parser_feed_byte(&small_parser, frame[i], 0);
         
         /* Parser detects frame too large when header is complete (after byte 11) */
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
-            EXPECT_EQ(i, 11);  /* Should detect at byte 11 (12th byte, completing header) */
+            EXPECT_EQ(i, XGL_FRAME_HEADER_SIZE - 1U);
             EXPECT_EQ(small_parser.state, XGL_PARSE_SOF);
             break;
         }
@@ -303,7 +304,7 @@ TEST_F(XglParserTest, FrameTooLarge) {
 
 TEST_F(XglParserTest, TimeoutDetection) {
     /* Start parsing */
-    xgl_parser_feed_byte(&parser, XGL_SOF, 1000);
+    xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 1000);
     EXPECT_EQ(parser.state, XGL_PARSE_HEADER);
     
     /* Check timeout - not expired */
@@ -332,8 +333,8 @@ TEST_F(XglParserTest, StateTransitions) {
     /* Initial state */
     EXPECT_EQ(parser.state, XGL_PARSE_SOF);
     
-    /* Feed SOF -> HEADER */
-    xgl_parser_feed_byte(&parser, XGL_SOF, 0);
+    /* Feed magic -> HEADER */
+    xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 0);
     EXPECT_EQ(parser.state, XGL_PARSE_HEADER);
     
     /* Create valid frame to continue */
@@ -341,7 +342,7 @@ TEST_F(XglParserTest, StateTransitions) {
     std::vector<uint8_t> frame = create_valid_frame(payload);
     
     /* Feed header bytes (skip SOF, already fed) */
-    for (size_t i = 1; i <= XGL_FRAME_HEADER_SIZE; ++i) {
+    for (size_t i = 1; i < XGL_FRAME_HEADER_SIZE; ++i) {
         xgl_parser_feed_byte(&parser, frame[i], 0);
     }
     
@@ -350,7 +351,7 @@ TEST_F(XglParserTest, StateTransitions) {
     
     /* Feed payload bytes */
     for (size_t i = 0; i < payload.size(); ++i) {
-        xgl_parser_feed_byte(&parser, frame[1 + XGL_FRAME_HEADER_SIZE + i], 0);
+        xgl_parser_feed_byte(&parser, frame[XGL_FRAME_HEADER_SIZE + i], 0);
     }
     
     /* Should transition to CRC */

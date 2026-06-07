@@ -39,7 +39,7 @@ extern "C" {
 
 typedef struct xgl_transport_peer_state_s {
     struct xgl_transport_peer_state_s* next; /**< Linked-list node */
-    uint8_t peer_id;                         /**< Remote node ID */
+    uint16_t peer_id;                        /**< Remote node ID */
     uint16_t session_id;                     /**< Peer transport session/epoch */
     bool hello_sent;                         /**< HELLO has been sent for this session */
     bool session_established;                /**< Peer session is known locally */
@@ -55,7 +55,7 @@ typedef struct xgl_transport_peer_state_s {
  */
 typedef struct xgl_transport_ctx_s {
     /* Configuration */
-    uint8_t local_id;               /**< Local node ID */
+    uint16_t local_id;              /**< Local node ID */
     uint8_t max_retry_count;        /**< Maximum retry count */
     uint32_t default_timeout_ms;    /**< Default timeout in milliseconds */
     bool enable_fragmentation;      /**< Enable fragmentation support */
@@ -92,7 +92,7 @@ typedef struct xgl_transport_ctx_s {
  * \brief           Transport layer configuration structure
  */
 typedef struct {
-    uint8_t local_id;               /**< Local node ID */
+    uint16_t local_id;              /**< Local node ID */
     uint8_t max_retry_count;        /**< Maximum retry count */
     uint32_t default_timeout_ms;    /**< Default timeout in milliseconds */
     uint8_t window_size;            /**< Sliding window size */

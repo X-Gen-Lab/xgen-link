@@ -39,7 +39,7 @@ extern "C" {
  * \brief           Hash table entry (for chaining collision resolution)
  */
 typedef struct xgl_hashtable_entry {
-    uint8_t key;                    /**< Target ID (key) */
+    uint16_t key;                   /**< Target ID (key) */
     xgl_route_item_t* value;        /**< Route item (value) */
     struct xgl_hashtable_entry* next; /**< Next entry in chain */
 } xgl_hashtable_entry_t;
@@ -87,7 +87,7 @@ void xgl_hashtable_destroy(xgl_hashtable_t* table);
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_hashtable_insert(xgl_hashtable_t* table,
-                                 uint8_t key,
+                                 uint16_t key,
                                  xgl_route_item_t* value);
 
 /**
@@ -97,7 +97,7 @@ xgl_error_t xgl_hashtable_insert(xgl_hashtable_t* table,
  * \return          Route item pointer, NULL if not found
  */
 xgl_route_item_t* xgl_hashtable_lookup(const xgl_hashtable_t* table,
-                                       uint8_t key);
+                                       uint16_t key);
 
 /**
  * \brief           Remove entry from hash table
@@ -105,7 +105,7 @@ xgl_route_item_t* xgl_hashtable_lookup(const xgl_hashtable_t* table,
  * \param[in]       key: Target ID (key)
  * \return          XGL_OK on success, XGL_ERR_ROUTE_NOT_FOUND if not found
  */
-xgl_error_t xgl_hashtable_remove(xgl_hashtable_t* table, uint8_t key);
+xgl_error_t xgl_hashtable_remove(xgl_hashtable_t* table, uint16_t key);
 
 /**
  * \brief           Clear all entries from hash table

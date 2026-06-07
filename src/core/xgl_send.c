@@ -197,16 +197,6 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
                                            tx_data->priority,
                                            &frame_len);
             if (err == XGL_OK) {
-                tx_data->buffer[10] = XGL_DEFAULT_TTL;
-                tx_data->buffer[11] = xgl_crc8_maxim(tx_data->buffer, 11);
-                uint16_t crc16 = xgl_crc16_modbus(tx_data->buffer,
-                                                  XGL_FRAME_HEADER_SIZE + tx_data->data_len);
-                tx_data->buffer[XGL_FRAME_HEADER_SIZE + tx_data->data_len] =
-                    (uint8_t)(crc16 & 0xFFU);
-                tx_data->buffer[XGL_FRAME_HEADER_SIZE + tx_data->data_len + 1U] =
-                    (uint8_t)((crc16 >> 8U) & 0xFFU);
-            }
-            if (err == XGL_OK) {
                 err = xgl_datalink_send_raw(&handle->layers.datalink_ctx,
                                             route->phy,
                                             tx_data->buffer,

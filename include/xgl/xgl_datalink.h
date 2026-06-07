@@ -45,7 +45,7 @@ typedef struct xgl_datalink_ctx_s {
     void* callback_user_data;       /**< User data for callbacks */
     xgl_handle_t owner_handle;      /**< Owning protocol instance handle */
     xgl_allocator_t* allocator;     /**< Allocator for large temporary TX buffers */
-    uint8_t source_id;              /**< Local source ID */
+    uint16_t source_id;             /**< Local source ID */
     
     /* Layer interface for decoupled communication */
     xgl_layer_interface_t* upper_layer; /**< Upper layer interface (network) */
@@ -57,7 +57,7 @@ typedef struct xgl_datalink_ctx_s {
 typedef struct {
     uint8_t* rx_cache;              /**< RX cache buffer */
     size_t rx_cache_size;           /**< RX cache size */
-    uint8_t source_id;              /**< Local source ID */
+    uint16_t source_id;             /**< Local source ID */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* rx_crc8_errors;       /**< CRC8 error counter pointer (can be NULL) */
     uint64_t* rx_crc16_errors;      /**< CRC16 error counter pointer (can be NULL) */

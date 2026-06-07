@@ -19,7 +19,7 @@ xgl_error_callback_t MockCallbacks::get_error_callback() {
     return error_callback_wrapper;
 }
 
-void MockCallbacks::rx_callback_wrapper(xgl_handle_t handle, uint8_t source_id,
+void MockCallbacks::rx_callback_wrapper(xgl_handle_t handle, uint16_t source_id,
                                        uint8_t data_type,
                                        const uint8_t* data, size_t len,
                                        void* user_data) {

@@ -5,9 +5,11 @@
  */
 
 #include <xgl/xgl_ack.h>
+#include <xgl/xgl_frame.h>
 #include <xgl/xgl_sequence.h>
 #include <xgl/xgl_crc.h>
 #include <xgl/xgl_serialize.h>
+#include <xgl/xgl_wire.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,7 +25,7 @@
 
 struct xgl_ack_peer_state {
     struct xgl_ack_peer_state* next;
-    uint8_t source_id;
+    uint16_t source_id;
     uint8_t* received_seq_bitmap;
     uint8_t expected_seq_num;
 };
@@ -76,7 +78,7 @@ static bool get_bit(const uint8_t* bitmap, uint8_t bit_index) {
 }
 
 static xgl_ack_peer_state_t* find_peer_state(const xgl_ack_handler_t* handler,
-                                             uint8_t source_id) {
+                                             uint16_t source_id) {
     if (handler == NULL) {
         return NULL;
     }
@@ -93,7 +95,7 @@ static xgl_ack_peer_state_t* find_peer_state(const xgl_ack_handler_t* handler,
 }
 
 static xgl_ack_peer_state_t* get_or_create_peer_state(xgl_ack_handler_t* handler,
-                                                      uint8_t source_id) {
+                                                      uint16_t source_id) {
     xgl_ack_peer_state_t* peer = find_peer_state(handler, source_id);
     if (peer != NULL) {
         return peer;
@@ -202,8 +204,8 @@ void xgl_ack_destroy(xgl_ack_handler_t* handler) {
  * \brief           Generate ACK packet
  */
 xgl_error_t xgl_ack_generate(uint8_t seq_num,
-                             uint8_t source_id,
-                             uint8_t target_id,
+                             uint16_t source_id,
+                             uint16_t target_id,
                              uint8_t* ack_buffer,
                              size_t buffer_size,
                              size_t* ack_len) {
@@ -216,38 +218,18 @@ xgl_error_t xgl_ack_generate(uint8_t seq_num,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     
-    /* Build frame header */
-    xgl_frame_header_t* header = (xgl_frame_header_t*)ack_buffer;
-    
-    /* Set SOF */
-    header->sof = XGL_SOF;
-    
-    /* Set version (0) and data type (0 for ACK) */
-    header->version_datatype = 0x00;
-    
-    /* Swap source and target for ACK */
-    header->source_id = target_id;  /* ACK sender is original receiver */
-    header->target_id = source_id;  /* ACK target is original sender */
-    
-    /* Set attributes - mark as ACK */
-    header->attr_lsb = XGL_ATTR_RELIABLE_ACK;
-    header->attr_msb = 0x00;
-    
-    /* Set data length (0 for ACK) */
-    xgl_serialize_u16_le((uint8_t*)&header->data_len, 0);
-    
-    /* Set sequence number (not used in ACK) */
-    header->seq_num = 0;
-    
-    /* Set ACK number */
-    header->ack_num = seq_num;
-    
-    /* Set reserved byte */
-    header->reserved = 0x00;
-    
-    /* Calculate CRC8 for header (exclude SOF and CRC8 itself) */
-    header->crc8 = xgl_crc8_maxim((uint8_t*)&header->version_datatype,
-                                  XGL_FRAME_HEADER_SIZE - 2);
+    xgl_frame_header_t header;
+    memset(&header, 0, sizeof(header));
+    header.sof = XGL_SOF;
+    xgl_frame_set_version(&header, 1);
+    xgl_frame_set_datatype(&header, XGL_PACKET_TYPE_ACK);
+    header.source_id = (uint8_t)(target_id & 0xFFU);
+    header.target_id = (uint8_t)(source_id & 0xFFU);
+    header.attr_lsb = XGL_ATTR_RELIABLE_ACK;
+    header.seq_num = seq_num;
+    header.ack_num = seq_num;
+
+    xgl_frame_encode_header(ack_buffer, &header);
     
     /* Calculate CRC16 for entire frame (header only, no payload) */
     uint16_t crc16 = xgl_crc16_modbus(ack_buffer, XGL_FRAME_HEADER_SIZE);
@@ -266,7 +248,7 @@ xgl_error_t xgl_ack_generate(uint8_t seq_num,
  */
 xgl_error_t xgl_ack_process(xgl_ack_handler_t* handler,
                             uint8_t ack_num,
-                            uint8_t source_id,
+                            uint16_t source_id,
                             bool* is_valid) {
     if (handler == NULL || is_valid == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -299,7 +281,7 @@ bool xgl_ack_is_duplicate(const xgl_ack_handler_t* handler,
 }
 
 bool xgl_ack_is_duplicate_from(const xgl_ack_handler_t* handler,
-                               uint8_t source_id,
+                               uint16_t source_id,
                                uint8_t seq_num) {
     xgl_ack_peer_state_t* peer = find_peer_state(handler, source_id);
     if (peer == NULL || peer->received_seq_bitmap == NULL) {
@@ -329,7 +311,7 @@ xgl_error_t xgl_ack_mark_received(xgl_ack_handler_t* handler,
 }
 
 xgl_error_t xgl_ack_mark_received_from(xgl_ack_handler_t* handler,
-                                       uint8_t source_id,
+                                       uint16_t source_id,
                                        uint8_t seq_num) {
     if (handler == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -362,7 +344,7 @@ bool xgl_ack_is_out_of_order(const xgl_ack_handler_t* handler,
 }
 
 bool xgl_ack_is_out_of_order_from(const xgl_ack_handler_t* handler,
-                                  uint8_t source_id,
+                                  uint16_t source_id,
                                   uint8_t seq_num) {
     if (handler == NULL) {
         return false;
@@ -388,7 +370,7 @@ void xgl_ack_update_expected(xgl_ack_handler_t* handler,
 }
 
 xgl_error_t xgl_ack_update_expected_from(xgl_ack_handler_t* handler,
-                                         uint8_t source_id,
+                                         uint16_t source_id,
                                          uint8_t seq_num) {
     if (handler == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -409,7 +391,7 @@ xgl_error_t xgl_ack_update_expected_from(xgl_ack_handler_t* handler,
 }
 
 uint8_t xgl_ack_get_expected_from(const xgl_ack_handler_t* handler,
-                                  uint8_t source_id) {
+                                  uint16_t source_id) {
     if (handler == NULL) {
         return 0;
     }

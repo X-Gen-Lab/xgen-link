@@ -33,8 +33,8 @@ typedef struct {
     size_t data_len;                /**< Data length in bytes */
     
     /* Addressing */
-    uint8_t source_id;              /**< Source node ID */
-    uint8_t target_id;              /**< Target node ID */
+    uint16_t source_id;             /**< Source node ID */
+    uint16_t target_id;             /**< Target node ID */
     uint8_t seq_num;                /**< Sequence number */
     uint16_t session_id;            /**< Transport session/epoch ID */
     uint8_t data_type;              /**< Data type */
@@ -105,8 +105,8 @@ void xgl_reliable_destroy(xgl_reliable_queue_t* queue);
 xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
                                     const uint8_t* data,
                                     size_t data_len,
-                                    uint8_t source_id,
-                                    uint8_t target_id,
+                                    uint16_t source_id,
+                                    uint16_t target_id,
                                     uint8_t seq_num,
                                     uint8_t data_type,
                                     uint8_t priority,
@@ -122,7 +122,7 @@ xgl_error_t xgl_reliable_add_packet(xgl_reliable_queue_t* queue,
  */
 xgl_error_t xgl_reliable_remove_packet(xgl_reliable_queue_t* queue,
                                        uint8_t seq_num,
-                                       uint8_t target_id);
+                                       uint16_t target_id);
 
 /**
  * \brief           Process timeouts and retransmit packets
@@ -164,7 +164,7 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue);
  */
 xgl_reliable_packet_t* xgl_reliable_find_packet(const xgl_reliable_queue_t* queue,
                                                 uint8_t seq_num,
-                                                uint8_t target_id);
+                                                uint16_t target_id);
 
 /**
  * \brief           Calculate exponential backoff timeout

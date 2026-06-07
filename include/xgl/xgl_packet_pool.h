@@ -28,21 +28,28 @@ typedef struct xgl_packet {
     /*-----------------------------------------------------------------------*/
     /* Addressing                                                            */
     /*-----------------------------------------------------------------------*/
-    uint8_t source_id;              /**< Source node ID */
-    uint8_t target_id;              /**< Target node ID */
+    uint16_t source_id;             /**< Source node ID */
+    uint16_t target_id;             /**< Target node ID */
     uint8_t seq_num;                /**< Sequence number */
     uint8_t ack_num;                /**< Acknowledgment number */
     uint16_t session_id;            /**< Transport session/epoch ID */
+    uint32_t connection_id;         /**< Production connection context ID */
+    uint32_t packet_number;         /**< Monotonic production packet number */
+    uint32_t session_epoch;         /**< Production session epoch */
     
     /*-----------------------------------------------------------------------*/
     /* Attributes                                                            */
     /*-----------------------------------------------------------------------*/
     uint8_t version;                /**< Protocol version */
+    uint8_t packet_type;            /**< Production packet type */
+    uint8_t flags;                  /**< Production wire flags */
     uint8_t data_type;              /**< Data type */
     uint8_t reliable;               /**< Reliable transmission flag */
     uint8_t fragment;               /**< Fragment flag */
     uint8_t encrypt;                /**< Encryption type */
     uint8_t priority;               /**< Priority level (0-7) */
+    uint8_t ttl;                    /**< Hop limit */
+    uint8_t traffic_class;          /**< Priority and traffic class */
     uint8_t compress;               /**< Compression type */
     
     /*-----------------------------------------------------------------------*/

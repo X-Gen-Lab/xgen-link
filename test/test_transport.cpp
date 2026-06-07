@@ -43,7 +43,7 @@ static xgl_error_t spy_send(void* ctx, xgl_handle_t handle, void* data) {
 }
 
 static void spy_receive(xgl_handle_t handle,
-                        uint8_t source_id,
+                        uint16_t source_id,
                         uint8_t data_type,
                         const uint8_t* data,
                         size_t len,
@@ -76,7 +76,7 @@ static xgl_transport_config_t make_transport_config(xgl_layer_interface_t* lower
     return config;
 }
 
-static xgl_transport_peer_state_t* find_peer(xgl_transport_ctx_t* ctx, uint8_t peer_id) {
+static xgl_transport_peer_state_t* find_peer(xgl_transport_ctx_t* ctx, uint16_t peer_id) {
     for (xgl_transport_peer_state_t* peer = ctx->peers; peer != nullptr; peer = peer->next) {
         if (peer->peer_id == peer_id) {
             return peer;

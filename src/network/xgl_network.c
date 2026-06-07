@@ -10,6 +10,7 @@
 #include <xgl/xgl_route.h>
 #include <xgl/xgl_crc.h>
 #include <xgl/xgl_serialize.h>
+#include <xgl/xgl_wire.h>
 #include <xgl/xgl_config.h>
 #include <string.h>
 #include <stdio.h>
@@ -24,8 +25,8 @@
  */
 static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
                                                    size_t frame_len,
-                                                   uint8_t* source_id,
-                                                   uint8_t* target_id,
+                                                   uint16_t* source_id,
+                                                   uint16_t* target_id,
                                                    uint8_t* data_type,
                                                    const uint8_t** payload,
                                                    size_t* payload_len) {
@@ -110,7 +111,7 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         /* Route not found - report error */
         char error_msg[64];
         snprintf(error_msg, sizeof(error_msg),
-                "Route not found for target ID: %u", packet->target_id);
+                "Route not found for target ID: %u", (unsigned int)packet->target_id);
         
         if (ctx->error_callback != NULL) {
             ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
@@ -236,7 +237,8 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
     }
     
     /* Extract packet information from frame */
-    uint8_t source_id, target_id, data_type;
+    uint16_t source_id, target_id;
+    uint8_t data_type;
     const uint8_t* payload;
     size_t payload_len;
     
@@ -319,7 +321,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             /* No route for forwarding - drop packet */
             char error_msg[64];
             snprintf(error_msg, sizeof(error_msg),
-                    "No route for forwarding to target ID: %u", target_id);
+                    "No route for forwarding to target ID: %u", (unsigned int)target_id);
             
             if (ctx->error_callback != NULL) {
                 ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
@@ -367,8 +369,20 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
 
         uint8_t forward_buf[XGL_DATALINK_MAX_FRAME_SIZE];
         memcpy(forward_buf, frame_buf, frame_len);
-        forward_buf[10] = (uint8_t)(header.reserved - 1U);
-        forward_buf[11] = xgl_crc8_maxim(forward_buf, XGL_FRAME_HEADER_SIZE - 1U);
+        xgl_wire_header_t wire_header;
+        if (xgl_wire_decode_header(&wire_header, forward_buf, frame_len) != XGL_OK) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_dropped++;
+            }
+            return XGL_ERR_INVALID_FRAME;
+        }
+        wire_header.ttl = (uint8_t)(wire_header.ttl - 1U);
+        if (xgl_wire_encode_header(forward_buf, frame_len, &wire_header) != XGL_OK) {
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_dropped++;
+            }
+            return XGL_ERR_INVALID_FRAME;
+        }
         uint16_t forward_crc = xgl_crc16_modbus(forward_buf, frame_len - XGL_CRC16_SIZE);
         xgl_serialize_u16_le(&forward_buf[frame_len - XGL_CRC16_SIZE], forward_crc);
 
@@ -392,8 +406,8 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
  * \details         Checks if source and target IDs are valid
  */
 bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
-                                  uint8_t target_id,
-                                  uint8_t source_id) {
+                                  uint16_t target_id,
+                                  uint16_t source_id) {
     if (ctx == NULL) {
         return false;
     }

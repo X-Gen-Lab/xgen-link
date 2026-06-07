@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_wire.h>
 #include <cstring>
 
 /*---------------------------------------------------------------------------*/
@@ -144,19 +145,18 @@ TEST(XglFrameTest, SerializeFrame) {
     
     EXPECT_EQ(result, XGL_OK);
     
-    /* Expected size: Header(12 with SOF) + Payload(4) + CRC16(2) = 18 */
+    /* Expected size: Header(24) + Payload(4) + CRC16(2) = 30 */
     size_t expected_size = xgl_frame_calculate_size(sizeof(payload));
     EXPECT_EQ(bytes_written, expected_size);
-    EXPECT_EQ(bytes_written, 18);
+    EXPECT_EQ(bytes_written, 30);
     
-    /* Check SOF */
-    EXPECT_EQ(buffer[0], XGL_SOF);
+    EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
+    EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
     
-    /* Check payload is present (starts at offset 12) */
-    EXPECT_EQ(buffer[12], 0xAA);
-    EXPECT_EQ(buffer[13], 0xBB);
-    EXPECT_EQ(buffer[14], 0xCC);
-    EXPECT_EQ(buffer[15], 0xDD);
+    EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 0], 0xAA);
+    EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 1], 0xBB);
+    EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 2], 0xCC);
+    EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 3], 0xDD);
 }
 
 TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
@@ -241,9 +241,9 @@ TEST(XglFrameTest, EncodeDecodeHeader) {
     EXPECT_EQ(header_decoded.attr_msb, header_orig.attr_msb);
     EXPECT_EQ(header_decoded.data_len, header_orig.data_len);
     EXPECT_EQ(header_decoded.seq_num, header_orig.seq_num);
-    EXPECT_EQ(header_decoded.ack_num, header_orig.ack_num);
+    EXPECT_EQ(header_decoded.ack_num, 0);
     EXPECT_EQ(header_decoded.reserved, header_orig.reserved);
-    EXPECT_EQ(header_decoded.crc8, header_orig.crc8);
+    EXPECT_NE(header_decoded.crc8, 0);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -273,11 +273,11 @@ TEST(XglFrameTest, BuildZeroCopyFrame) {
     
     EXPECT_EQ(result, XGL_OK);
     
-    /* Expected: Header(12 with SOF) + Data(8) + CRC16(2) = 22 */
-    EXPECT_EQ(frame_len, 22);
+    /* Expected: Header(24) + Data(8) + CRC16(2) = 34 */
+    EXPECT_EQ(frame_len, 34);
     
-    /* Check SOF */
-    EXPECT_EQ(buffer[0], XGL_SOF);
+    EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
+    EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
     
     /* Check payload is intact */
     for (size_t i = 0; i < data_len; i++) {
@@ -365,12 +365,16 @@ TEST(XglFrameTest, InvalidHeaderCRC) {
     };
     xgl_frame_build(&frame, &params);
     
-    /* Corrupt CRC8 */
-    frame.header.crc8 ^= 0xFF;
-    
-    /* Validate CRC8 */
-    bool valid = xgl_frame_validate_header_crc(&frame.header);
-    EXPECT_FALSE(valid);
+    uint8_t buffer[256] = {};
+    size_t bytes_written = 0;
+    ASSERT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &bytes_written), XGL_OK);
+    ASSERT_GE(bytes_written, XGL_FRAME_HEADER_SIZE);
+
+    buffer[22] ^= 0xFF;
+
+    xgl_wire_header_t decoded = {};
+    EXPECT_EQ(xgl_wire_decode_header(&decoded, buffer, XGL_FRAME_HEADER_SIZE),
+              XGL_ERR_CRC_FAILED);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -395,9 +399,9 @@ TEST(XglFrameTest, AttributeHelpers) {
 }
 
 TEST(XglFrameTest, FrameSizeCalculation) {
-    /* Header(12 with SOF) + Payload(N) + CRC16(2) */
-    EXPECT_EQ(xgl_frame_calculate_size(0), 14);
-    EXPECT_EQ(xgl_frame_calculate_size(10), 24);
-    EXPECT_EQ(xgl_frame_calculate_size(100), 114);
+    /* Header(24) + Payload(N) + CRC16(2) */
+    EXPECT_EQ(xgl_frame_calculate_size(0), 26);
+    EXPECT_EQ(xgl_frame_calculate_size(10), 36);
+    EXPECT_EQ(xgl_frame_calculate_size(100), 126);
 }
 

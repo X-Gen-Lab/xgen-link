@@ -42,8 +42,8 @@ typedef struct {
  * \details         Encapsulates all parameters needed to build a frame
  */
 typedef struct {
-    uint8_t source_id;          /**< Source node ID */
-    uint8_t target_id;          /**< Target node ID */
+    uint16_t source_id;         /**< Source node ID */
+    uint16_t target_id;         /**< Target node ID */
     uint8_t data_type;          /**< Data type */
     uint8_t seq_num;            /**< Sequence number */
     uint8_t ack_num;            /**< Acknowledgment number */
@@ -99,8 +99,8 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
                                      size_t buffer_size,
                                      size_t data_offset,
                                      size_t data_len,
-                                     uint8_t source_id,
-                                     uint8_t target_id,
+                                     uint16_t source_id,
+                                     uint16_t target_id,
                                      uint8_t data_type,
                                      uint8_t seq_num,
                                      uint8_t ack_num,

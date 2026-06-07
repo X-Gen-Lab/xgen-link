@@ -39,7 +39,7 @@ static void transport_free(xgl_allocator_t* allocator, void* ptr) {
 }
 
 static xgl_transport_peer_state_t* transport_find_peer(xgl_transport_ctx_t* ctx,
-                                                       uint8_t peer_id) {
+                                                       uint16_t peer_id) {
     if (ctx == NULL) {
         return NULL;
     }
@@ -56,7 +56,7 @@ static xgl_transport_peer_state_t* transport_find_peer(xgl_transport_ctx_t* ctx,
 }
 
 static xgl_transport_peer_state_t* transport_get_or_create_peer(xgl_transport_ctx_t* ctx,
-                                                                uint8_t peer_id) {
+                                                                uint16_t peer_id) {
     xgl_transport_peer_state_t* peer = transport_find_peer(ctx, peer_id);
     if (peer != NULL) {
         return peer;
@@ -145,7 +145,7 @@ static void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
 
 static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
                                           xgl_handle_t handle,
-                                          uint8_t target_id,
+                                          uint16_t target_id,
                                           uint8_t control_type,
                                           uint8_t ack_num,
                                           uint16_t session_id) {
@@ -218,7 +218,7 @@ static xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
 static xgl_error_t transport_send_ack(xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,
                                      uint8_t seq_num,
-                                     uint8_t source_id,
+                                     uint16_t source_id,
                                      uint16_t session_id) {
     xgl_packet_data_t ack_packet_data = {
         .ref_count = 1,
@@ -270,7 +270,7 @@ static uint32_t transport_process_retransmission_queue(xgl_transport_ctx_t* ctx,
 
         if (rel_packet->retry_count >= queue->max_retry_count) {
             uint8_t seq_num = rel_packet->seq_num;
-            uint8_t target_id = rel_packet->target_id;
+            uint16_t target_id = rel_packet->target_id;
 
             (void)xgl_reliable_remove_packet(queue, seq_num, target_id);
             if (ctx->error_callback != NULL) {
@@ -799,7 +799,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     }
     
     /* Extract packet fields */
-    uint8_t source_id = packet->source_id;
+    uint16_t source_id = packet->source_id;
     uint8_t seq_num = packet->seq_num;
     uint8_t ack_num = packet->ack_num;
     uint8_t data_type = packet->data_type;

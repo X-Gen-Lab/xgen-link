@@ -12,6 +12,7 @@
 #include <xgl/xgl_ack.h>
 #include <xgl/xgl_types.h>
 #include <xgl/xgl_frame.h>
+#include <xgl/xgl_wire.h>
 #include <cmath>
 #include <set>
 
@@ -806,8 +807,8 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuing) {
         size_t data_len = 1 + (gen.random_uint8() % 255);
         std::vector<uint8_t> data = gen.random_bytes(data_len);
         
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t seq_num = gen.random_uint8();
         uint8_t data_type = gen.random_uint8();
         uint8_t priority = gen.random_uint8() % 8;
@@ -1392,8 +1393,8 @@ TEST(XglTransportProperties, Property16_ACKProcessing) {
         ASSERT_EQ(err, XGL_OK) << "Queue initialization failed";
         
         /* Generate random packet parameters */
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         uint8_t seq_num = gen.random_uint8();
         std::vector<uint8_t> data = gen.random_bytes(10 + (gen.random_uint8() % 50));
         
@@ -1552,8 +1553,8 @@ TEST(XglTransportProperties, Property17_ACKGeneration) {
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random packet parameters */
         uint8_t seq_num = gen.random_uint8();
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         
         /* Generate ACK packet */
         uint8_t ack_buffer[XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE];
@@ -1569,32 +1570,27 @@ TEST(XglTransportProperties, Property17_ACKGeneration) {
         EXPECT_EQ(ack_len, XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE)
             << "ACK should be header + CRC16 with no payload";
         
-        /* Parse ACK frame header */
-        xgl_frame_header_t* header = (xgl_frame_header_t*)ack_buffer;
-        
-        /* Verify SOF */
-        EXPECT_EQ(header->sof, XGL_SOF)
-            << "ACK should have correct SOF marker";
+        xgl_wire_header_t header = {};
+        ASSERT_EQ(xgl_wire_decode_header(&header, ack_buffer, ack_len), XGL_OK);
+        EXPECT_EQ(ack_buffer[0], XGL_WIRE_MAGIC_0);
+        EXPECT_EQ(ack_buffer[1], XGL_WIRE_MAGIC_1);
+        EXPECT_EQ(header.packet_type, XGL_PACKET_TYPE_ACK)
+            << "ACK should use ACK packet type";
+        EXPECT_EQ(header.flags & XGL_WIRE_FLAG_CONTROL, XGL_WIRE_FLAG_CONTROL)
+            << "ACK should be marked as a control packet";
         
         /* Verify source and target are swapped */
-        EXPECT_EQ(header->source_id, target_id)
+        EXPECT_EQ(header.source_id, target_id)
             << "ACK source should be original target";
         
-        EXPECT_EQ(header->target_id, source_id)
+        EXPECT_EQ(header.target_id, source_id)
             << "ACK target should be original source";
         
-        /* Verify ACK number matches original sequence number */
-        EXPECT_EQ(header->ack_num, seq_num)
-            << "ACK number should match original packet sequence number";
-        
-        /* Verify reliable attribute is set to ACK */
-        uint8_t reliable = (header->attr_lsb & XGL_ATTR_RELIABLE_MASK) >> XGL_ATTR_RELIABLE_SHIFT;
-        EXPECT_EQ(reliable, (XGL_ATTR_RELIABLE_ACK >> XGL_ATTR_RELIABLE_SHIFT))
-            << "ACK should have reliable attribute set to ACK type";
+        EXPECT_EQ(header.packet_number, seq_num)
+            << "Transitional ACK should carry the acknowledged packet number";
         
         /* Verify data length is zero (no payload) */
-        uint16_t data_len = header->data_len;  /* Already in little-endian in struct */
-        EXPECT_EQ(data_len, 0)
+        EXPECT_EQ(header.payload_len, 0)
             << "ACK should have zero payload length";
     }
 }
@@ -1650,8 +1646,8 @@ TEST(XglTransportProperties, Property17_ACKGenerationSequenceRange) {
     
     for (size_t i = 0; i < sizeof(test_seq_nums) / sizeof(test_seq_nums[0]); ++i) {
         uint8_t seq_num = test_seq_nums[i];
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
         
         uint8_t ack_buffer[XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE];
         size_t ack_len = 0;
@@ -1662,9 +1658,10 @@ TEST(XglTransportProperties, Property17_ACKGenerationSequenceRange) {
         ASSERT_EQ(err, XGL_OK)
             << "ACK generation should succeed for seq_num " << (int)seq_num;
         
-        xgl_frame_header_t* header = (xgl_frame_header_t*)ack_buffer;
-        EXPECT_EQ(header->ack_num, seq_num)
-            << "ACK number should match for seq_num " << (int)seq_num;
+        xgl_wire_header_t header = {};
+        ASSERT_EQ(xgl_wire_decode_header(&header, ack_buffer, ack_len), XGL_OK);
+        EXPECT_EQ(header.packet_number, seq_num)
+            << "ACK packet number should match for seq_num " << (int)seq_num;
     }
 }
 

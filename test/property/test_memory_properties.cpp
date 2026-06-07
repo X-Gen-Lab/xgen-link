@@ -261,7 +261,7 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
         xgl_route_item_t route = {
             .target_id = 1,
             .phy = &phy,
-            .max_frame_size = 64,
+            .max_frame_size = 96,
             .read_freq_hz = 100,
             .metric = 0
         };
@@ -270,7 +270,7 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
         xgl_config_t config;
         xgl_config_get_preset_tiny(&config);  /* Use tiny preset for minimal pool */
         config.source_id = random_valid_source_id(gen);
-        config.protocol.max_frame_size = 64;
+        config.protocol.max_frame_size = 96;
         config.memory.rx_buffer_size = config.protocol.max_frame_size;
         config.route_table = &route;
         config.route_table_len = 1;

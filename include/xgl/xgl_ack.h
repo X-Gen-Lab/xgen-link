@@ -64,8 +64,8 @@ void xgl_ack_destroy(xgl_ack_handler_t* handler);
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_ack_generate(uint8_t seq_num,
-                             uint8_t source_id,
-                             uint8_t target_id,
+                             uint16_t source_id,
+                             uint16_t target_id,
                              uint8_t* ack_buffer,
                              size_t buffer_size,
                              size_t* ack_len);
@@ -82,7 +82,7 @@ xgl_error_t xgl_ack_generate(uint8_t seq_num,
  */
 xgl_error_t xgl_ack_process(xgl_ack_handler_t* handler,
                             uint8_t ack_num,
-                            uint8_t source_id,
+                            uint16_t source_id,
                             bool* is_valid);
 
 /**
@@ -102,7 +102,7 @@ bool xgl_ack_is_duplicate(const xgl_ack_handler_t* handler,
  * \return          true if duplicate, false otherwise
  */
 bool xgl_ack_is_duplicate_from(const xgl_ack_handler_t* handler,
-                               uint8_t source_id,
+                               uint16_t source_id,
                                uint8_t seq_num);
 
 /**
@@ -122,7 +122,7 @@ xgl_error_t xgl_ack_mark_received(xgl_ack_handler_t* handler,
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_ack_mark_received_from(xgl_ack_handler_t* handler,
-                                       uint8_t source_id,
+                                       uint16_t source_id,
                                        uint8_t seq_num);
 
 /**
@@ -142,7 +142,7 @@ bool xgl_ack_is_out_of_order(const xgl_ack_handler_t* handler,
  * \return          true if out-of-order, false otherwise
  */
 bool xgl_ack_is_out_of_order_from(const xgl_ack_handler_t* handler,
-                                  uint8_t source_id,
+                                  uint16_t source_id,
                                   uint8_t seq_num);
 
 /**
@@ -161,7 +161,7 @@ void xgl_ack_update_expected(xgl_ack_handler_t* handler,
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_ack_update_expected_from(xgl_ack_handler_t* handler,
-                                         uint8_t source_id,
+                                         uint16_t source_id,
                                          uint8_t seq_num);
 
 /**
@@ -171,7 +171,7 @@ xgl_error_t xgl_ack_update_expected_from(xgl_ack_handler_t* handler,
  * \return          Expected sequence number, or 0 if no source state exists
  */
 uint8_t xgl_ack_get_expected_from(const xgl_ack_handler_t* handler,
-                                  uint8_t source_id);
+                                  uint16_t source_id);
 
 /**
  * \brief           Reset ACK handler state

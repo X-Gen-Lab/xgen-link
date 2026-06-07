@@ -90,7 +90,7 @@ typedef struct {
  * \note            Manually defined to ensure correct size (12 bytes)
  *                  Structure packing may vary across compilers
  */
-#define XGL_FRAME_HEADER_SIZE       12
+#define XGL_FRAME_HEADER_SIZE       24
 
 /*---------------------------------------------------------------------------*/
 /* Attribute Bit Definitions                                                 */
@@ -151,7 +151,7 @@ typedef struct {
  * \brief           Route table entry
  */
 typedef struct {
-    uint8_t target_id;              /**< Target node ID */
+    uint16_t target_id;             /**< Target node ID */
     xgl_phy_ops_t* phy;             /**< Physical layer operations */
     uint16_t max_frame_size;        /**< Maximum frame size for this route */
     uint32_t read_freq_hz;          /**< Read frequency in Hz */
@@ -172,7 +172,7 @@ typedef struct {
  * \param[in]       user_data: User data
  */
 typedef void (*xgl_rx_callback_t)(xgl_handle_t handle,
-                                  uint8_t source_id,
+                                  uint16_t source_id,
                                   uint8_t data_type,
                                   const uint8_t* data,
                                   size_t len,
@@ -231,7 +231,7 @@ typedef struct {
     /* Instance Identification                                               */
     /*-----------------------------------------------------------------------*/
     const char* name;               /**< Instance name (for debugging) */
-    uint8_t source_id;              /**< Local node ID */
+    uint16_t source_id;             /**< Local node ID */
     
     /*-----------------------------------------------------------------------*/
     /* Grouped Configuration                                                 */
@@ -324,7 +324,7 @@ typedef struct {
  * \brief           Standard transmission data
  */
 typedef struct {
-    uint8_t target_id;              /**< Target node ID */
+    uint16_t target_id;             /**< Target node ID */
     uint8_t data_type;              /**< Data type */
     const uint8_t* data;            /**< Data buffer */
     size_t data_len;                /**< Data length */
@@ -343,7 +343,7 @@ typedef struct {
     size_t data_len;                /**< Actual data length */
     
     /* Transmission parameters */
-    uint8_t target_id;              /**< Target node ID */
+    uint16_t target_id;             /**< Target node ID */
     uint8_t data_type;              /**< Data type */
     bool reliable;                  /**< Enable reliable transmission */
     uint8_t priority;               /**< Priority level (0-7) */

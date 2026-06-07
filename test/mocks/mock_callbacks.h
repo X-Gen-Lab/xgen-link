@@ -16,7 +16,7 @@
  * \brief           Received data record
  */
 struct RxRecord {
-    uint8_t source_id;
+    uint16_t source_id;
     uint8_t data_type;
     std::vector<uint8_t> data;
 };
@@ -45,7 +45,7 @@ public:
      * \param[in]       len: Data length
      */
     MOCK_METHOD(void, rx_callback_impl, 
-                (xgl_handle_t handle, uint8_t source_id,
+                (xgl_handle_t handle, uint16_t source_id,
                  uint8_t data_type, const uint8_t* data, size_t len));
     
     /**
@@ -88,7 +88,7 @@ public:
     }
     
 private:
-    static void rx_callback_wrapper(xgl_handle_t handle, uint8_t source_id,
+    static void rx_callback_wrapper(xgl_handle_t handle, uint16_t source_id,
                                     uint8_t data_type,
                                     const uint8_t* data, size_t len,
                                     void* user_data);

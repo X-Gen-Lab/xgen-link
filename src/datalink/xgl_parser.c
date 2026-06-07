@@ -8,6 +8,7 @@
 #include <xgl/xgl_frame.h>
 #include <xgl/xgl_crc.h>
 #include <xgl/xgl_serialize.h>
+#include <xgl/xgl_wire.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -86,7 +87,7 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
         /* State: Searching for SOF                                         */
         /*-------------------------------------------------------------------*/
         case XGL_PARSE_SOF:
-            if (byte == XGL_SOF) {
+            if (byte == XGL_WIRE_MAGIC_0) {
                 /* Found SOF, store it and move to header state */
                 parser->cache[0] = byte;
                 parser->cache_len = 1;
@@ -106,19 +107,17 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             
             /* Check if we have complete header (12 bytes with SOF) */
             if (parser->cache_len >= XGL_FRAME_HEADER_SIZE) {
-                /* Decode header to get payload length */
-                xgl_frame_header_t header;
-                xgl_frame_decode_header(&header, parser->cache);
-                
-                /* Validate header CRC8 */
-                if (!xgl_frame_validate_header_crc(&header)) {
-                    /* CRC8 validation failed, reset and search for next SOF */
+                xgl_wire_header_t header;
+                if (xgl_wire_decode_header(&header,
+                                           parser->cache,
+                                           XGL_FRAME_HEADER_SIZE) != XGL_OK) {
+                    /* Header validation failed, reset and search for next magic */
                     xgl_parser_reset(parser);
                     return XGL_PARSE_RESULT_ERROR;
                 }
                 
                 /* Store expected payload length */
-                parser->expected_payload_len = header.data_len;
+                parser->expected_payload_len = header.payload_len;
                 
                 /* Check if payload fits in cache */
                 size_t total_frame_size = XGL_FRAME_HEADER_SIZE + 

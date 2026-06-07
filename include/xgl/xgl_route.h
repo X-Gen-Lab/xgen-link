@@ -84,7 +84,7 @@ void xgl_route_table_destroy(xgl_route_table_t* table);
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_route_table_add(xgl_route_table_t* table,
-                                uint8_t target_id,
+                                uint16_t target_id,
                                 xgl_phy_ops_t* phy,
                                 uint16_t max_frame_size,
                                 uint32_t read_freq_hz,
@@ -97,7 +97,7 @@ xgl_error_t xgl_route_table_add(xgl_route_table_t* table,
  * \return          XGL_OK on success, XGL_ERR_ROUTE_NOT_FOUND if not found
  */
 xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
-                                   uint8_t target_id);
+                                   uint16_t target_id);
 
 /**
  * \brief           Lookup route in table (O(1) average)
@@ -106,7 +106,7 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
  * \return          Route item pointer, NULL if not found
  */
 xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
-                                         uint8_t target_id);
+                                         uint16_t target_id);
 
 /**
  * \brief           Update route metric
@@ -116,7 +116,7 @@ xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
  * \return          XGL_OK on success, XGL_ERR_ROUTE_NOT_FOUND if not found
  */
 xgl_error_t xgl_route_table_update_metric(xgl_route_table_t* table,
-                                          uint8_t target_id,
+                                          uint16_t target_id,
                                           uint8_t metric);
 
 /**

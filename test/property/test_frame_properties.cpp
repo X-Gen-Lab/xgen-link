@@ -9,6 +9,7 @@
 #include <xgl/xgl_parser.h>
 #include <xgl/xgl_crc.h>
 #include <xgl/xgl_serialize.h>
+#include <xgl/xgl_wire.h>
 #include "property_framework.h"
 #include <vector>
 #include <cstring>
@@ -19,7 +20,7 @@
 
 /**
  * \brief           Feature: x-gen-link, Property 2: CRC Error Detection
- * \details         For any frame with corrupted CRC (either CRC8 or CRC16),
+ * \details         For any frame with corrupted CRC (either header CRC16 or frame CRC16),
  *                  the protocol should reject it and increment the appropriate
  *                  error counter.
  *                  Validates: Requirements 3.3, 3.4, 13.4
@@ -29,9 +30,9 @@ TEST(XglFrameProperties, CrcErrorDetection) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame parameters */
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
-        uint8_t data_type = gen.random_uint8() & 0x0F;  /* 4 bits */
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t data_type = XGL_PACKET_TYPE_DATA;
         uint8_t seq_num = gen.random_uint8();
         uint8_t ack_num = gen.random_uint8();
         bool reliable = (gen.random_uint8() & 1) != 0;
@@ -64,20 +65,19 @@ TEST(XglFrameProperties, CrcErrorDetection) {
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &bytes_written);
         ASSERT_EQ(err, XGL_OK);
         
-        /* Test CRC8 corruption detection */
+        /* Test header CRC16 corruption detection */
         {
             std::vector<uint8_t> corrupted = buffer;
-            /* Corrupt the CRC8 byte (at offset 11) */
-            corrupted[11] ^= 0x01;  /* Flip one bit */
+            corrupted[22] ^= 0x01;  /* Flip one bit in header CRC16 */
             
             /* Decode header and validate */
             xgl_frame_header_t header;
             xgl_frame_decode_header(&header, corrupted.data());
             
-            /* CRC8 validation should fail */
+            /* Header CRC16 validation should fail */
             bool valid = xgl_frame_validate_header_crc(&header);
             EXPECT_FALSE(valid)
-                << "CRC8 corruption not detected at iteration " << iteration;
+                << "Header CRC16 corruption not detected at iteration " << iteration;
         }
         
         /* Test CRC16 corruption detection */
@@ -109,12 +109,12 @@ TEST(XglFrameProperties, CrcErrorDetection) {
         
         /* Test that valid frame passes both CRC checks */
         {
-            /* Decode header and validate CRC8 */
+            /* Decode header and validate header CRC16 */
             xgl_frame_header_t header;
             xgl_frame_decode_header(&header, buffer.data());
-            bool valid_crc8 = xgl_frame_validate_header_crc(&header);
-            EXPECT_TRUE(valid_crc8)
-                << "Valid CRC8 rejected at iteration " << iteration;
+            bool valid_header_crc = xgl_frame_validate_header_crc(&header);
+            EXPECT_TRUE(valid_header_crc)
+                << "Valid header CRC16 rejected at iteration " << iteration;
             
             /* Parse the valid frame */
             xgl_parser_t parser;
@@ -153,9 +153,9 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame parameters */
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
-        uint8_t data_type = gen.random_uint8() & 0x0F;  /* 4 bits */
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t data_type = XGL_PACKET_TYPE_DATA;
         uint8_t seq_num = gen.random_uint8();
         uint8_t ack_num = gen.random_uint8();
         bool reliable = (gen.random_uint8() & 1) != 0;
@@ -219,8 +219,10 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
         xgl_frame_decode_header(&parsed_header, parsed_buffer);
         
         /* Verify all header fields match */
-        EXPECT_EQ(parsed_header.sof, XGL_SOF)
-            << "SOF mismatch at iteration " << iteration;
+        EXPECT_EQ(parsed_buffer[0], XGL_WIRE_MAGIC_0)
+            << "Magic byte 0 mismatch at iteration " << iteration;
+        EXPECT_EQ(parsed_buffer[1], XGL_WIRE_MAGIC_1)
+            << "Magic byte 1 mismatch at iteration " << iteration;
         EXPECT_EQ(xgl_frame_get_version(&parsed_header), xgl_frame_get_version(&frame.header))
             << "Version mismatch at iteration " << iteration;
         EXPECT_EQ(xgl_frame_get_datatype(&parsed_header), data_type)
@@ -231,8 +233,8 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
             << "Target ID mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_header.seq_num, seq_num)
             << "Sequence number mismatch at iteration " << iteration;
-        EXPECT_EQ(parsed_header.ack_num, ack_num)
-            << "ACK number mismatch at iteration " << iteration;
+        EXPECT_EQ(parsed_header.ack_num, 0)
+            << "ACK number should not be encoded in the production base header";
         EXPECT_EQ(parsed_header.data_len, payload_len)
             << "Payload length mismatch at iteration " << iteration;
         
@@ -269,9 +271,9 @@ TEST(XglFrameProperties, FieldValidation) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random but valid frame parameters */
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
-        uint8_t data_type = gen.random_uint8() & 0x0F;  /* Valid: 4 bits (0-15) */
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t data_type = XGL_PACKET_TYPE_DATA;
         uint8_t seq_num = gen.random_uint8();
         uint8_t ack_num = gen.random_uint8();
         bool reliable = (gen.random_uint8() & 1) != 0;
@@ -307,9 +309,10 @@ TEST(XglFrameProperties, FieldValidation) {
         xgl_frame_header_t header;
         xgl_frame_decode_header(&header, buffer.data());
         
-        /* Validate SOF */
-        EXPECT_EQ(header.sof, XGL_SOF)
-            << "SOF validation failed at iteration " << iteration;
+        EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0)
+            << "Magic byte 0 validation failed at iteration " << iteration;
+        EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1)
+            << "Magic byte 1 validation failed at iteration " << iteration;
         
         /* Validate version (4 bits, 0-15) */
         uint8_t version = xgl_frame_get_version(&header);
@@ -340,9 +343,9 @@ TEST(XglFrameProperties, FieldValidation) {
         EXPECT_EQ(header.data_len, payload_len)
             << "Data length validation failed at iteration " << iteration;
         
-        /* Validate CRC8 */
+        /* Validate header CRC16 */
         EXPECT_TRUE(xgl_frame_validate_header_crc(&header))
-            << "CRC8 validation failed at iteration " << iteration;
+            << "Header CRC16 validation failed at iteration " << iteration;
         
         /* Validate CRC16 */
         size_t crc16_offset = bytes_written - 2;
@@ -422,9 +425,9 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame */
-        uint8_t source_id = gen.random_uint8();
-        uint8_t target_id = gen.random_uint8();
-        uint8_t data_type = gen.random_uint8() & 0x0F;
+        uint8_t source_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t target_id = static_cast<uint8_t>((gen.random_uint8() % 254U) + 1U);
+        uint8_t data_type = XGL_PACKET_TYPE_DATA;
         size_t payload_len = gen.random_uint32() % 256;
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
         
@@ -481,20 +484,20 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
 
 /**
  * \brief           Property: Parser rejects random garbage data
- * \details         For any random byte sequence without valid SOF,
- *                  the parser should remain in SOF search state.
+ * \details         For any random byte sequence without valid magic,
+ *                  the parser should remain in magic search state.
  */
 TEST(XglFrameProperties, ParserRejectsGarbageData) {
     PropertyTestGenerator gen;
     
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
-        /* Generate random garbage data (no SOF) */
+        /* Generate random garbage data (no production magic start byte) */
         size_t garbage_len = 10 + (gen.random_uint32() % 100);
         std::vector<uint8_t> garbage = gen.random_bytes(garbage_len);
         
-        /* Ensure no SOF in garbage */
+        /* Ensure no magic start byte in garbage */
         for (size_t i = 0; i < garbage.size(); ++i) {
-            if (garbage[i] == XGL_SOF) {
+            if (garbage[i] == XGL_WIRE_MAGIC_0) {
                 garbage[i] ^= 0x01;  /* Change it to something else */
             }
         }
