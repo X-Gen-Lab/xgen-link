@@ -334,6 +334,7 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     xgl_auth_provider_t provider = {
         .sign = datalink_test_auth_sign,
         .verify = datalink_test_auth_verify,
+        .tag_len = 4,
         .user_data = nullptr
     };
     xgl_datalink_ctx_t auth_ctx;
@@ -398,6 +399,7 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsTamperedAuthenticatedPayload) {
     xgl_auth_provider_t provider = {
         .sign = datalink_test_auth_sign,
         .verify = datalink_test_auth_verify,
+        .tag_len = 4,
         .user_data = nullptr
     };
     xgl_datalink_ctx_t auth_ctx;
@@ -460,6 +462,7 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsAuthenticatedReplay) {
     xgl_auth_provider_t provider = {
         .sign = datalink_test_auth_sign,
         .verify = datalink_test_auth_verify,
+        .tag_len = 4,
         .user_data = nullptr
     };
     xgl_datalink_ctx_t auth_ctx;

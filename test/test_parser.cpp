@@ -313,6 +313,7 @@ TEST_F(XglParserTest, ParseCompleteAuthenticatedFrameWithSecurityTrailer) {
     xgl_auth_provider_t provider = {
         .sign = parser_test_auth_sign,
         .verify = nullptr,
+        .tag_len = 4,
         .user_data = nullptr
     };
     const std::vector<uint8_t> payload = {0x11, 0x22, 0x33};

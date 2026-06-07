@@ -209,7 +209,7 @@ typedef xgl_error_t (*xgl_auth_verify_fn)(uint32_t key_id,
 typedef struct {
     xgl_auth_sign_fn sign;          /**< Generate authentication tag */
     xgl_auth_verify_fn verify;      /**< Verify authentication tag */
-    size_t tag_len;                 /**< Fixed tag length; 0 allows provider-detected length */
+    size_t tag_len;                 /**< Fixed authentication tag length; must be non-zero */
     void* user_data;                /**< Provider user data */
 } xgl_auth_provider_t;
 

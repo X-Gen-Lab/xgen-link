@@ -189,6 +189,11 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
             config->auth_provider->verify == NULL) {
             return XGL_ERR_INVALID_PARAM;
         }
+
+        if (config->auth_provider->tag_len == 0U ||
+            config->auth_provider->tag_len > UINT8_MAX) {
+            return XGL_ERR_INVALID_PARAM;
+        }
     }
 
 #ifndef XGL_THREAD_SAFE

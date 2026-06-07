@@ -452,6 +452,7 @@ TEST_F(XglNetworkTest, ForwardingResignsAuthenticatedFrameAfterTtlDecrement) {
     xgl_auth_provider_t provider = {
         .sign = network_test_auth_sign,
         .verify = network_test_auth_verify,
+        .tag_len = 8,
         .user_data = nullptr
     };
     network_ctx.auth_required = true;
