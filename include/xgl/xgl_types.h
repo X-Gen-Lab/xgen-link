@@ -338,6 +338,8 @@ typedef struct {
     bool reliable;                  /**< Enable reliable transmission */
     uint8_t priority;               /**< Priority level (0-7) */
     uint32_t timeout_ms;            /**< Timeout in ms (0 = use default) */
+    uint32_t connection_id;         /**< Production connection scope (0 = default) */
+    uint32_t session_epoch;         /**< Production session epoch scope (0 = default) */
 } xgl_tx_data_t;
 
 /**

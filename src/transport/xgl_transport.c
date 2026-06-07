@@ -249,7 +249,9 @@ static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
                                           uint16_t target_id,
                                           uint8_t control_type,
                                           uint32_t control_packet_number,
-                                          uint16_t session_id) {
+                                          uint16_t session_id,
+                                          uint32_t connection_id,
+                                          uint32_t session_epoch) {
     xgl_packet_data_t packet_data = {
         .ref_count = 1,
         .data_len = 0,
@@ -261,7 +263,9 @@ static xgl_error_t transport_send_control(xgl_transport_ctx_t* ctx,
         .source_id = ctx->local_id,
         .target_id = target_id,
         .session_id = session_id,
+        .connection_id = connection_id,
         .packet_number = control_packet_number,
+        .session_epoch = session_epoch,
         .data_type = control_type,
         .reliable = (control_type == XGL_TRANSPORT_CONTROL_NACK ||
                      control_type == XGL_TRANSPORT_CONTROL_SACK) ?
@@ -290,7 +294,13 @@ static xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    xgl_transport_peer_state_t* peer =
+    bool has_connection_scope =
+        (packet->connection_id != 0U || packet->session_epoch != 0U);
+    xgl_transport_peer_state_t* peer = has_connection_scope ?
+        transport_get_or_create_peer_scope(ctx,
+                                           packet->source_id,
+                                           packet->connection_id,
+                                           packet->session_epoch) :
         transport_get_or_create_peer(ctx, packet->source_id);
     if (peer == NULL) {
         return XGL_ERR_NO_MEMORY;
@@ -1141,8 +1151,15 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     }
     
     xgl_transport_peer_state_t* peer = NULL;
+    bool has_tx_scope =
+        (tx_data->connection_id != 0U || tx_data->session_epoch != 0U);
     if (tx_data->reliable) {
-        peer = transport_get_or_create_peer(ctx, tx_data->target_id);
+        peer = has_tx_scope ?
+            transport_get_or_create_peer_scope(ctx,
+                                               tx_data->target_id,
+                                               tx_data->connection_id,
+                                               tx_data->session_epoch) :
+            transport_get_or_create_peer(ctx, tx_data->target_id);
         if (peer == NULL) {
             return XGL_ERR_NO_MEMORY;
         }
@@ -1157,7 +1174,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                                          tx_data->target_id,
                                          XGL_TRANSPORT_CONTROL_HELLO,
                                          0,
-                                         peer->session_id);
+                                         peer->session_id,
+                                         peer->connection_id,
+                                         peer->session_epoch);
             if (err != XGL_OK) {
                 return err;
             }
@@ -1293,6 +1312,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                                                     tx_data->target_id);
                 if (rel_packet != NULL) {
                     rel_packet->session_id = peer->session_id;
+                    rel_packet->connection_id = tx_data->connection_id;
+                    rel_packet->session_epoch = tx_data->session_epoch;
                     rel_packet->send_timestamp = xgl_time_ms();
                     rel_packet->packet_type = XGL_PACKET_TYPE_DATA;
                     rel_packet->flags = XGL_WIRE_FLAG_FRAGMENTED |
@@ -1324,6 +1345,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 .target_id = tx_data->target_id,
                 .packet_number = packet_number,
                 .session_id = (peer != NULL) ? peer->session_id : 0,
+                .connection_id = tx_data->connection_id,
+                .session_epoch = tx_data->session_epoch,
                 .data_type = tx_data->data_type,
                 .reliable = tx_data->reliable,
                 .fragment = true,  /* Mark as fragment */
@@ -1387,7 +1410,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             .source_id = ctx->local_id,
             .target_id = tx_data->target_id,
             .session_id = (peer != NULL) ? peer->session_id : 0,
+            .connection_id = tx_data->connection_id,
             .packet_number = packet_number,
+            .session_epoch = tx_data->session_epoch,
             .data_type = tx_data->data_type,
             .reliable = tx_data->reliable,
             .fragment = false,  /* Not a fragment */
@@ -1432,6 +1457,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                                                 tx_data->target_id);
             if (rel_packet != NULL) {
                 rel_packet->session_id = peer->session_id;
+                rel_packet->connection_id = tx_data->connection_id;
+                rel_packet->session_epoch = tx_data->session_epoch;
                 rel_packet->send_timestamp = xgl_time_ms();
                 rel_packet->packet_type = XGL_PACKET_TYPE_DATA;
                 rel_packet->fragment = false;
@@ -1604,7 +1631,9 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
                                          source_id,
                                          XGL_TRANSPORT_CONTROL_NACK,
                                          expected_packet_number,
-                                         packet->session_id);
+                                         packet->session_id,
+                                         packet->connection_id,
+                                         packet->session_epoch);
             if (err != XGL_OK && ctx->stats != NULL) {
                 ctx->stats->rx_dropped++;
             }
