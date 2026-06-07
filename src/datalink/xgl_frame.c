@@ -21,6 +21,9 @@
 
 #define XGL_AUTH_TRAILER_TAG_CAPACITY 32U
 
+static uint8_t frame_flags_from_legacy_header(const xgl_frame_header_t* header);
+static uint8_t frame_packet_type_from_legacy_header(const xgl_frame_header_t* header);
+
 /*---------------------------------------------------------------------------*/
 /* Frame Header Encoding/Decoding                                            */
 /*---------------------------------------------------------------------------*/
@@ -67,6 +70,49 @@ void xgl_frame_encode_header(uint8_t* buffer, const xgl_frame_header_t* header) 
     };
 
     (void)xgl_wire_encode_header(buffer, XGL_WIRE_BASE_HEADER_SIZE, &wire);
+}
+
+static xgl_error_t encode_frame_wire_header(uint8_t* buffer,
+                                            size_t buffer_size,
+                                            const xgl_frame_t* frame,
+                                            size_t extension_len,
+                                            uint8_t extra_flags,
+                                            size_t* header_len) {
+    if (buffer == NULL || frame == NULL || header_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (extension_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    size_t produced_header_len = XGL_WIRE_BASE_HEADER_SIZE + extension_len;
+    uint8_t flags = (uint8_t)(frame_flags_from_legacy_header(&frame->header) |
+                              extra_flags);
+    if (extension_len > 0U) {
+        flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    }
+
+    xgl_wire_header_t wire = {
+        .version = XGL_WIRE_VERSION,
+        .header_len = (uint8_t)produced_header_len,
+        .packet_type = frame_packet_type_from_legacy_header(&frame->header),
+        .flags = flags,
+        .ttl = frame->header.reserved,
+        .traffic_class = (uint8_t)(frame->header.attr_lsb & XGL_ATTR_PRIORITY_MASK),
+        .source_id = frame->header.source_id,
+        .target_id = frame->header.target_id,
+        .connection_id = (uint32_t)(frame->header.attr_msb & XGL_ATTR_SESSION_MASK),
+        .packet_number = frame->header.seq_num,
+        .payload_len = frame->header.data_len,
+        .header_crc16 = 0
+    };
+
+    xgl_error_t err = xgl_wire_encode_header(buffer, buffer_size, &wire);
+    if (err != XGL_OK) {
+        return err;
+    }
+    *header_len = produced_header_len;
+    return XGL_OK;
 }
 
 /**
@@ -158,6 +204,8 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     /* Set payload */
     frame->payload = params->payload;
     frame->payload_len = params->payload_len;
+    frame->extensions = params->extensions;
+    frame->extensions_len = params->extensions_len;
     
     /* CRC16 will be calculated during serialization */
     frame->crc16 = 0;
@@ -181,16 +229,35 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
     }
     
     /* Calculate required buffer size */
-    size_t required_size = xgl_frame_calculate_size(frame->payload_len);
+    if (frame->extensions_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    size_t required_size = XGL_FRAME_HEADER_SIZE + frame->extensions_len +
+                           frame->payload_len + XGL_CRC16_SIZE;
     if (buffer_size < required_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     
     size_t offset = 0;
     
-    /* Write header (includes SOF) */
-    xgl_frame_encode_header(buffer, &frame->header);
-    offset += XGL_FRAME_HEADER_SIZE;
+    size_t header_len = 0;
+    xgl_error_t err = encode_frame_wire_header(buffer,
+                                               buffer_size,
+                                               frame,
+                                               frame->extensions_len,
+                                               0U,
+                                               &header_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+    offset += header_len;
+
+    if (frame->extensions != NULL && frame->extensions_len > 0U) {
+        memcpy(&buffer[XGL_WIRE_BASE_HEADER_SIZE],
+               frame->extensions,
+               frame->extensions_len);
+    }
     
     /* Write payload */
     if (frame->payload != NULL && frame->payload_len > 0) {
@@ -238,8 +305,18 @@ static xgl_error_t encode_authenticated_header(uint8_t* buffer,
                                                uint32_t key_id,
                                                uint8_t tag_len,
                                                size_t* header_len) {
-    if (buffer_size < XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13U) {
+    size_t base_ext_len = frame->extensions_len;
+    if (base_ext_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    if (buffer_size < XGL_WIRE_BASE_HEADER_SIZE + base_ext_len +
+                      XGL_WIRE_EXT_HEADER_SIZE + 13U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    if (frame->extensions != NULL && base_ext_len > 0U) {
+        memcpy(&buffer[XGL_WIRE_BASE_HEADER_SIZE],
+               frame->extensions,
+               base_ext_len);
     }
 
     uint8_t security_value[13] = {0};
@@ -255,8 +332,8 @@ static xgl_error_t encode_authenticated_header(uint8_t* buffer,
     }
 
     size_t security_ext_len = 0;
-    err = xgl_wire_encode_ext(&buffer[XGL_WIRE_BASE_HEADER_SIZE],
-                              buffer_size - XGL_WIRE_BASE_HEADER_SIZE,
+    err = xgl_wire_encode_ext(&buffer[XGL_WIRE_BASE_HEADER_SIZE + base_ext_len],
+                              buffer_size - XGL_WIRE_BASE_HEADER_SIZE - base_ext_len,
                               XGL_WIRE_EXT_SECURITY,
                               security_value,
                               security_value_len,
@@ -265,7 +342,7 @@ static xgl_error_t encode_authenticated_header(uint8_t* buffer,
         return err;
     }
 
-    size_t produced_header_len = XGL_WIRE_BASE_HEADER_SIZE + security_ext_len;
+    size_t produced_header_len = XGL_WIRE_BASE_HEADER_SIZE + base_ext_len + security_ext_len;
     if (produced_header_len > UINT8_MAX) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }

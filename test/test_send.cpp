@@ -213,8 +213,14 @@ TEST_F(XglSendTest, BasicSendSuccess) {
 }
 
 TEST_F(XglSendTest, SendFragmentsByRouteMaxFrameSize) {
+    xgl_destroy(handle);
+    handle = nullptr;
+
     config.features.enable_fragmentation = true;
     ASSERT_LT(route.max_frame_size, config.protocol.max_frame_size);
+    handle = xgl_create(&config);
+    ASSERT_NE(handle, nullptr);
+    ASSERT_EQ(xgl_init(handle), XGL_OK);
 
     std::vector<uint8_t> data(300, 0x5A);
     xgl_tx_data_t tx_data = {

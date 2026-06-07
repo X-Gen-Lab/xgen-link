@@ -28,6 +28,8 @@ extern "C" {
  */
 typedef struct {
     xgl_frame_header_t header;      /**< Frame header (12 bytes with SOF) */
+    const uint8_t* extensions;      /**< Production TLV extension bytes */
+    size_t extensions_len;          /**< Extension length in bytes */
     const uint8_t* payload;         /**< Pointer to payload data */
     size_t payload_len;             /**< Payload length in bytes */
     uint16_t crc16;                 /**< Frame CRC16 */
@@ -47,6 +49,8 @@ typedef struct {
     uint8_t data_type;          /**< Data type */
     uint8_t seq_num;            /**< Sequence number */
     uint8_t ack_num;            /**< Acknowledgment number */
+    const uint8_t* extensions;   /**< Production TLV extension bytes */
+    size_t extensions_len;       /**< Extension length in bytes */
     const uint8_t* payload;     /**< Payload data */
     size_t payload_len;         /**< Payload length */
     bool reliable;              /**< Reliable transmission flag */

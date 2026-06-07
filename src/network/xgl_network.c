@@ -166,6 +166,8 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         .data_type = packet->data_type,
         .seq_num = packet->seq_num,
         .ack_num = packet->ack_num,
+        .extensions = packet->extensions,
+        .extensions_len = packet->extensions_len,
         .payload = packet->data->data,
         .payload_len = packet->data->data_len,
         .reliable = packet->reliable,
@@ -185,7 +187,7 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         return err;
     }
 
-    if (xgl_frame_calculate_size(frame.payload_len) > route->max_frame_size) {
+    if (xgl_frame_calculate_size(frame.payload_len) + frame.extensions_len > route->max_frame_size) {
         if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
@@ -291,6 +293,13 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .data = payload,
                 .owned_data = NULL
             };
+
+            const uint8_t* extensions = NULL;
+            size_t extensions_len = 0;
+            if (wire_header.header_len > XGL_WIRE_BASE_HEADER_SIZE) {
+                extensions = frame_buf + XGL_WIRE_BASE_HEADER_SIZE;
+                extensions_len = wire_header.header_len - XGL_WIRE_BASE_HEADER_SIZE;
+            }
             
             /* Build complete packet structure for transport layer */
             xgl_packet_t packet = {
@@ -311,6 +320,8 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .ttl = wire_header.ttl,
                 .traffic_class = wire_header.traffic_class,
                 .data = &packet_data,
+                .extensions = extensions,
+                .extensions_len = extensions_len,
                 .phy = NULL    /* Not needed for receive path */
             };
             

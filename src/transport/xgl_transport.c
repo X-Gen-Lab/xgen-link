@@ -10,6 +10,7 @@
 #include "xgl/xgl_frame.h"
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_time.h"
+#include "xgl/xgl_wire.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -725,46 +726,31 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     }
     
     if (needs_fragmentation) {
-        /* Fragment and send */
         if (!ctx->fragment_mgr) {
             return XGL_ERR_INVALID_PARAM;
         }
-        
-        /* Allocate fragment arrays */
-        size_t max_fragments = (tx_data->data_len + max_payload_size - 1) / max_payload_size;
-        
-        uint8_t** fragments = (uint8_t**)transport_malloc(ctx->allocator, 
-                                                           max_fragments * sizeof(uint8_t*));
-        size_t* fragment_lens = (size_t*)transport_malloc(ctx->allocator, 
-                                                          max_fragments * sizeof(size_t));
-        
-        if (!fragments || !fragment_lens) {
-            if (fragments) transport_free(ctx->allocator, fragments);
-            if (fragment_lens) transport_free(ctx->allocator, fragment_lens);
-            return XGL_ERR_NO_MEMORY;
+
+        const size_t fragment_ext_len = XGL_WIRE_EXT_HEADER_SIZE + 12U;
+        if (max_payload_size <= fragment_ext_len) {
+            if (ctx->stats) {
+                ctx->stats->tx_errors++;
+            }
+            return XGL_ERR_BUFFER_TOO_SMALL;
         }
-        
-        /* Fragment data */
-        size_t fragment_count = max_fragments;
-        uint8_t fragment_id;
-        err = xgl_fragment_data(ctx->fragment_mgr, tx_data->data, tx_data->data_len,
-                               max_payload_size, fragments, fragment_lens,
-                               &fragment_count, &fragment_id);
-        
-        if (err != XGL_OK) {
-            transport_free(ctx->allocator, fragments);
-            transport_free(ctx->allocator, fragment_lens);
-            return err;
-        }
-        
-        /* Send each fragment */
+
+        size_t fragment_payload_max = max_payload_size - fragment_ext_len;
+        uint32_t message_id = ctx->fragment_mgr->next_fragment_id++;
+        size_t fragment_count =
+            (tx_data->data_len + fragment_payload_max - 1U) / fragment_payload_max;
+
         for (size_t i = 0; i < fragment_count; i++) {
-            /* Get sequence number */
+            size_t fragment_offset = i * fragment_payload_max;
+            size_t remaining = tx_data->data_len - fragment_offset;
+            size_t fragment_payload_len = (remaining < fragment_payload_max) ?
+                                          remaining : fragment_payload_max;
+
             if (tx_data->reliable && peer != NULL &&
                 !xgl_window_can_send_packet_number(&peer->tx_window)) {
-                xgl_fragment_free_fragments(ctx->fragment_mgr, fragments, fragment_count);
-                transport_free(ctx->allocator, fragments);
-                transport_free(ctx->allocator, fragment_lens);
                 return XGL_ERR_WINDOW_FULL;
             }
 
@@ -790,18 +776,40 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             /* Note: Route lookup is now handled by network layer */
             /* The PHY will be determined when the packet reaches network layer */
             xgl_phy_ops_t* phy = NULL;  /* Will be set by network layer */
+
+            uint8_t fragment_ext_value[12] = {0};
+            size_t fragment_ext_value_len = 0;
+            err = xgl_wire_encode_fragment_ext_value(fragment_ext_value,
+                                                     sizeof(fragment_ext_value),
+                                                     message_id,
+                                                     (uint32_t)fragment_offset,
+                                                     (uint32_t)tx_data->data_len,
+                                                     &fragment_ext_value_len);
+            if (err != XGL_OK) {
+                return err;
+            }
+
+            uint8_t fragment_ext[XGL_WIRE_EXT_HEADER_SIZE + 12U] = {0};
+            size_t encoded_ext_len = 0;
+            err = xgl_wire_encode_ext(fragment_ext,
+                                      sizeof(fragment_ext),
+                                      XGL_WIRE_EXT_FRAGMENT,
+                                      fragment_ext_value,
+                                      fragment_ext_value_len,
+                                      &encoded_ext_len);
+            if (err != XGL_OK) {
+                return err;
+            }
             
             /* Add to reliable queue if needed */
             if (tx_data->reliable) {
                 err = xgl_reliable_add_packet_number(&peer->reliable_queue,
-                                                     fragments[i], fragment_lens[i],
+                                                     &tx_data->data[fragment_offset],
+                                                     fragment_payload_len,
                                                      ctx->local_id, tx_data->target_id,
                                                      packet_number, tx_data->data_type,
                                                      tx_data->priority, timeout_ms, phy);
                 if (err != XGL_OK) {
-                    xgl_fragment_free_fragments(ctx->fragment_mgr, fragments, fragment_count);
-                    transport_free(ctx->allocator, fragments);
-                    transport_free(ctx->allocator, fragment_lens);
                     return err;
                 }
 
@@ -816,12 +824,12 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             }
             
             /* Send fragment through network layer via interface */
-                xgl_packet_data_t packet_data = {
-                    .ref_count = 1,
-                    .data_len = fragment_lens[i],
-                    .data = fragments[i],
-                    .owned_data = NULL
-                };
+            xgl_packet_data_t packet_data = {
+                .ref_count = 1,
+                .data_len = fragment_payload_len,
+                .data = &tx_data->data[fragment_offset],
+                .owned_data = NULL
+            };
             
             xgl_packet_t packet = {
                 .source_id = ctx->local_id,
@@ -835,6 +843,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 .fragment = true,  /* Mark as fragment */
                 .priority = tx_data->priority,
                 .data = &packet_data,
+                .extensions = fragment_ext,
+                .extensions_len = encoded_ext_len,
                 .phy = NULL  /* Will be set by network layer */
             };
             
@@ -844,9 +854,6 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 if (ctx->stats) {
                     ctx->stats->tx_errors++;
                 }
-                xgl_fragment_free_fragments(ctx->fragment_mgr, fragments, fragment_count);
-                transport_free(ctx->allocator, fragments);
-                transport_free(ctx->allocator, fragment_lens);
                 return XGL_ERR_INVALID_PARAM;
             }
             
@@ -857,17 +864,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 if (ctx->stats) {
                     ctx->stats->tx_errors++;
                 }
-                xgl_fragment_free_fragments(ctx->fragment_mgr, fragments, fragment_count);
-                transport_free(ctx->allocator, fragments);
-                transport_free(ctx->allocator, fragment_lens);
                 return err;
             }
         }
-        
-        /* Clean up */
-        xgl_fragment_free_fragments(ctx->fragment_mgr, fragments, fragment_count);
-        transport_free(ctx->allocator, fragments);
-        transport_free(ctx->allocator, fragment_lens);
         
     } else {
         /* Send without fragmentation */

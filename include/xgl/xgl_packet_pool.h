@@ -56,6 +56,8 @@ typedef struct xgl_packet {
     /* Data                                                                  */
     /*-----------------------------------------------------------------------*/
     xgl_packet_data_t* data;        /**< Pointer to packet data */
+    const uint8_t* extensions;      /**< Production TLV extension bytes */
+    size_t extensions_len;          /**< Length of production TLV extensions */
     
     /*-----------------------------------------------------------------------*/
     /* Retransmission                                                        */

@@ -126,7 +126,8 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
     }
     
     /* Calculate required buffer size */
-    size_t frame_size = xgl_frame_calculate_size(frame->payload_len);
+    size_t frame_size = xgl_frame_calculate_size(frame->payload_len) +
+                        frame->extensions_len;
     if (ctx->auth_required) {
         if (ctx->auth_provider == NULL || ctx->auth_provider->sign == NULL) {
             if (ctx->stats != NULL) {
