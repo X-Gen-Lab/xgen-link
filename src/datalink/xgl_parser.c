@@ -37,6 +37,7 @@ xgl_error_t xgl_parser_init(xgl_parser_t* parser,
     parser->cache_len = 0;
     parser->index = 0;
     parser->timestamp = 0;
+    parser->expected_header_len = 0;
     parser->expected_payload_len = 0;
     
     return XGL_OK;
@@ -58,7 +59,36 @@ void xgl_parser_reset(xgl_parser_t* parser) {
     parser->cache_len = 0;
     parser->index = 0;
     parser->timestamp = 0;
+    parser->expected_header_len = 0;
     parser->expected_payload_len = 0;
+}
+
+static xgl_parse_result_t validate_extensions_or_reset(xgl_parser_t* parser) {
+    size_t ext_len = parser->expected_header_len - XGL_WIRE_BASE_HEADER_SIZE;
+    if (ext_len == 0U) {
+        return XGL_PARSE_RESULT_INCOMPLETE;
+    }
+
+    xgl_wire_ext_cursor_t cursor;
+    xgl_error_t err = xgl_wire_ext_cursor_init(&cursor,
+                                               &parser->cache[XGL_WIRE_BASE_HEADER_SIZE],
+                                               ext_len);
+    if (err != XGL_OK) {
+        xgl_parser_reset(parser);
+        return XGL_PARSE_RESULT_ERROR;
+    }
+
+    xgl_wire_ext_t ext;
+    while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
+        /* Extension cursor performs structural TLV validation. */
+    }
+
+    if (err != XGL_ERR_NOT_FOUND) {
+        xgl_parser_reset(parser);
+        return XGL_PARSE_RESULT_ERROR;
+    }
+
+    return XGL_PARSE_RESULT_INCOMPLETE;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -105,28 +135,37 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             /* Store header byte */
             parser->cache[parser->cache_len++] = byte;
             
-            /* Check if we have complete header (12 bytes with SOF) */
-            if (parser->cache_len >= XGL_FRAME_HEADER_SIZE) {
+            /* Check if we have complete production base header. */
+            if (parser->cache_len >= XGL_WIRE_BASE_HEADER_SIZE) {
                 xgl_wire_header_t header;
                 if (xgl_wire_decode_header(&header,
                                            parser->cache,
-                                           XGL_FRAME_HEADER_SIZE) != XGL_OK) {
+                                           XGL_WIRE_BASE_HEADER_SIZE) != XGL_OK) {
                     /* Header validation failed, reset and search for next magic */
                     xgl_parser_reset(parser);
                     return XGL_PARSE_RESULT_ERROR;
                 }
                 
-                /* Store expected payload length */
+                parser->expected_header_len = header.header_len;
                 parser->expected_payload_len = header.payload_len;
-                
+
                 /* Check if payload fits in cache */
-                size_t total_frame_size = XGL_FRAME_HEADER_SIZE + 
+                size_t total_frame_size = parser->expected_header_len +
                                          parser->expected_payload_len + 
                                          XGL_CRC16_SIZE;
                 if (total_frame_size > parser->cache_size) {
                     /* Frame too large for cache buffer */
                     xgl_parser_reset(parser);
                     return XGL_PARSE_RESULT_ERROR;
+                }
+
+                if (parser->cache_len < parser->expected_header_len) {
+                    return XGL_PARSE_RESULT_INCOMPLETE;
+                }
+
+                xgl_parse_result_t ext_result = validate_extensions_or_reset(parser);
+                if (ext_result == XGL_PARSE_RESULT_ERROR) {
+                    return ext_result;
                 }
                 
                 /* Move to payload state (or CRC if no payload) */
@@ -146,7 +185,7 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             parser->cache[parser->cache_len++] = byte;
             
             /* Check if we have complete payload */
-            size_t payload_received = parser->cache_len - XGL_FRAME_HEADER_SIZE;
+            size_t payload_received = parser->cache_len - parser->expected_header_len;
             if (payload_received >= parser->expected_payload_len) {
                 /* Move to CRC state */
                 parser->state = XGL_PARSE_CRC;

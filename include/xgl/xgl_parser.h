@@ -50,6 +50,7 @@ typedef struct {
     size_t cache_len;           /**< Current data length in cache */
     size_t index;               /**< Current parsing index */
     uint32_t timestamp;         /**< Timestamp when parsing started (ms) */
+    size_t expected_header_len; /**< Expected fixed + extension header length */
     uint16_t expected_payload_len; /**< Expected payload length from header */
 } xgl_parser_t;
 
