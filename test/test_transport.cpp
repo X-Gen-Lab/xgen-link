@@ -24,6 +24,7 @@ struct LowerLayerSpy {
 
 struct RxTracker {
     int receive_count = 0;
+    std::vector<std::vector<uint8_t>> payloads;
 };
 
 constexpr uint8_t kTransportControlHello = 0x0E;
@@ -66,12 +67,14 @@ static void spy_receive(xgl_handle_t handle,
     (void)handle;
     (void)source_id;
     (void)data_type;
-    (void)data;
-    (void)len;
-
     auto* tracker = static_cast<RxTracker*>(user_data);
     if (tracker != nullptr) {
         tracker->receive_count++;
+        if (data != nullptr && len > 0U) {
+            tracker->payloads.emplace_back(data, data + len);
+        } else {
+            tracker->payloads.emplace_back();
+        }
     }
 }
 
@@ -807,6 +810,66 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
     EXPECT_EQ(spy.last_packet.reliable, XGL_ATTR_RELIABLE_ACK);
     EXPECT_EQ(spy.last_packet.ack_num, 0U);
     EXPECT_EQ(spy.last_packet.session_id, 5U);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    RxTracker rx_tracker;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &rx_tracker;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload0[] = {'p', '0'};
+    const uint8_t payload1[] = {'p', '1'};
+    const uint8_t payload2[] = {'p', '2'};
+    xgl_packet_data_t data0 = {.ref_count = 1, .data_len = sizeof(payload0), .data = payload0};
+    xgl_packet_data_t data1 = {.ref_count = 1, .data_len = sizeof(payload1), .data = payload1};
+    xgl_packet_data_t data2 = {.ref_count = 1, .data_len = sizeof(payload2), .data = payload2};
+
+    xgl_packet_t packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = 5,
+        .packet_number = 0,
+        .data_type = 1,
+        .reliable = XGL_ATTR_RELIABLE_TX,
+        .priority = 0,
+        .data = &data0
+    };
+
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+    ASSERT_EQ(rx_tracker.receive_count, 1);
+
+    packet.seq_num = 2;
+    packet.packet_number = 2;
+    packet.data = &data2;
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+    EXPECT_EQ(rx_tracker.receive_count, 1);
+    ASSERT_EQ(spy.send_count, 2);
+    EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
+    EXPECT_EQ(spy.last_packet.ack_num, 1U);
+
+    packet.seq_num = 1;
+    packet.packet_number = 1;
+    packet.data = &data1;
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+    ASSERT_EQ(rx_tracker.receive_count, 3);
+    ASSERT_EQ(rx_tracker.payloads.size(), 3U);
+    EXPECT_EQ(rx_tracker.payloads[0], std::vector<uint8_t>({'p', '0'}));
+    EXPECT_EQ(rx_tracker.payloads[1], std::vector<uint8_t>({'p', '1'}));
+    EXPECT_EQ(rx_tracker.payloads[2], std::vector<uint8_t>({'p', '2'}));
 
     xgl_transport_destroy(&ctx);
 }
