@@ -731,6 +731,44 @@ TEST(XglTransportTest, ResetUpdatesSessionAndClearsPeerReliableState) {
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, ResetDoesNotGloballyClearAckHandlerState) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+    ctx.ack_handler.expected_seq_num = 42;
+
+    const uint8_t dummy = 0;
+    xgl_packet_data_t reset_data = {
+        .ref_count = 1,
+        .data_len = 0,
+        .data = &dummy,
+        .owned_data = nullptr
+    };
+    xgl_packet_t reset_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = 11,
+        .data_type = kTransportControlReset,
+        .reliable = XGL_ATTR_RELIABLE_NONE,
+        .priority = 7,
+        .data = &reset_data
+    };
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &reset_packet), XGL_OK);
+    EXPECT_EQ(ctx.ack_handler.expected_seq_num, 42U);
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, ReliableDataWithStaleSessionIsRejectedBeforeAckOrDelivery) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
