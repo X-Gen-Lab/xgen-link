@@ -253,6 +253,13 @@ extern "C" {
     (XGL_VERSION_INT >= ((major) * 10000 + (minor) * 100 + (patch)))
 
 /**
+ * \brief           No scheduled protocol deadline
+ * \details         Returned by xgl_next_deadline_ms() when the instance has no
+ *                  route polling, retransmission, or reassembly deadline.
+ */
+#define XGL_NO_DEADLINE_MS      UINT32_MAX
+
+/**
  * \brief           Get protocol version string at runtime
  * \return          Version string (e.g., "2.0.0")
  */
@@ -612,6 +619,17 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle);
  * \endcode
  */
 void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
+
+/**
+ * \brief           Get milliseconds until the next protocol processing deadline
+ * \param[in]       handle: Instance handle
+ * \return          Milliseconds until the next required xgl_run() wakeup, 0 if
+ *                  work is already due, or XGL_NO_DEADLINE_MS when idle.
+ * \note            Intended for low-power main loops and RTOS tasks. PHY ISRs
+ *                  should only enqueue bytes; call xgl_run() from task/main
+ *                  context when this deadline expires or new RX data arrives.
+ */
+uint32_t xgl_next_deadline_ms(xgl_handle_t handle);
 
 /*---------------------------------------------------------------------------*/
 /* Best Practices and Usage Notes                                            */
