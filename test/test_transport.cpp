@@ -877,6 +877,56 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, ReliableReceiveUsesPacketNumberForDuplicateDetection) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    RxTracker rx_tracker;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &rx_tracker;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'n'};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = sizeof(payload),
+        .data = payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .seq_num = 0,
+        .ack_num = 0,
+        .session_id = 5,
+        .packet_number = 0,
+        .data_type = 1,
+        .reliable = XGL_ATTR_RELIABLE_TX,
+        .priority = 0,
+        .data = &packet_data
+    };
+
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+    EXPECT_EQ(rx_tracker.receive_count, 1);
+    EXPECT_EQ(spy.send_count, 1);
+
+    packet.packet_number = 256;
+    packet.seq_num = 0;
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(rx_tracker.receive_count, 1);
+    ASSERT_EQ(spy.send_count, 2);
+    EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
+    EXPECT_EQ(spy.last_packet.ack_num, 1U);
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
