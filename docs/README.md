@@ -1,18 +1,21 @@
-# xgen-link Documentation
+# xgen-link Documentation Source
 
-This directory contains the documentation for the xgen-link protocol stack.
+This directory contains the MkDocs source for the XGL bilingual documentation site.
 
-## Contents
+- Chinese entry: [zh/index.md](zh/index.md)
+- English entry: [en/index.md](en/index.md)
+- Public C API reference is generated from Doxygen during the `xgl_docs` build.
 
-- [Architecture](architecture.md)
-- [API guide](api.md)
-- [Porting guide](porting.md)
-- [Footprint report](footprint.md)
-- [Production SDK plan](production_sdk_plan.md)
-- [Resource model](resource_model.md)
-- [Static analysis baseline](static_analysis.md)
-- [Release validation](release_validation.md)
-- Usage examples
-- Design decisions
+Build locally:
 
-Documentation will be generated using Doxygen.
+```sh
+python -m pip install -r docs/requirements.txt
+mkdocs build --strict
+```
+
+Build through CMake:
+
+```sh
+cmake --preset ci
+cmake --build build/ci --target xgl_docs
+```

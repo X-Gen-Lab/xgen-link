@@ -1,19 +1,19 @@
 /**
  * \file            main.c
- * \brief           Echo server example - demonstrates basic send/receive
+ * \brief           Two-node echo example
  * \author          Nexus Team
  * \date            2026-02-28
  *
  * \details         This example demonstrates:
- *                  - Creating and initializing a protocol instance
- *                  - Setting up physical layer callbacks (simulated)
- *                  - Receiving data via callback
- *                  - Echoing received data back to sender
- *                  - Basic error handling
- *                  - Statistics monitoring
+ *                  - Creating two protocol instances
+ *                  - Connecting them through simulated point-to-point PHY links
+ *                  - Receiving application data through callbacks
+ *                  - Echoing received data back to the source node
+ *                  - Collecting statistics from both nodes
  */
 
 #include <xgl/xgl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,69 +22,108 @@
 /* Simulated Physical Layer                                                  */
 /*---------------------------------------------------------------------------*/
 
-/**
- * \brief           Simulated TX/RX buffers for loopback testing
- */
-static uint8_t sim_loopback_buffer[2048];
-static size_t sim_loopback_write_pos = 0;
-static size_t sim_loopback_read_pos = 0;
+typedef struct {
+    uint8_t data[2048];
+    size_t write_pos;
+    size_t read_pos;
+} sim_channel_t;
 
-/**
- * \brief           Physical layer TX callback (simulated with loopback)
- * \param[in]       data: Data to transmit
- * \param[in]       len: Data length
- * \param[in]       user_data: User data (unused)
- * \return          XGL_OK on success
- */
-static xgl_error_t phy_tx(const uint8_t* data, size_t len, void* user_data)
+typedef struct {
+    const char* name;
+    sim_channel_t* tx;
+    sim_channel_t* rx;
+} sim_phy_ctx_t;
+
+typedef struct {
+    const char* name;
+    bool echo_enabled;
+    int received_count;
+    int echoed_count;
+    int error_count;
+} echo_app_ctx_t;
+
+static sim_channel_t channel_1_to_2;
+static sim_channel_t channel_2_to_1;
+
+static xgl_error_t sim_channel_write(sim_channel_t* channel,
+                                     const uint8_t* data,
+                                     size_t len)
 {
-    (void)user_data;
-    
-    if (sim_loopback_write_pos + len > sizeof(sim_loopback_buffer)) {
-        printf("[PHY] TX buffer overflow\n");
+    if (channel == NULL || data == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (channel->write_pos + len > sizeof(channel->data)) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    
-    /* Copy data to loopback buffer */
-    memcpy(sim_loopback_buffer + sim_loopback_write_pos, data, len);
-    sim_loopback_write_pos += len;
-    
-    printf("[PHY] Transmitted %zu bytes (total buffered: %zu)\n", len, sim_loopback_write_pos - sim_loopback_read_pos);
+
+    memcpy(channel->data + channel->write_pos, data, len);
+    channel->write_pos += len;
     return XGL_OK;
 }
 
-/**
- * \brief           Physical layer RX callback (simulated with loopback)
- * \param[out]      buffer: Buffer to receive data
- * \param[in,out]   len: Buffer size on input, received length on output
- * \param[in]       user_data: User data (unused)
- * \return          XGL_OK on success
- */
-static xgl_error_t phy_rx(uint8_t* buffer, size_t* len, void* user_data)
+static xgl_error_t sim_channel_read(sim_channel_t* channel,
+                                    uint8_t* buffer,
+                                    size_t* len)
 {
-    (void)user_data;
-    
-    if (sim_loopback_read_pos >= sim_loopback_write_pos) {
-        /* No data available */
+    if (channel == NULL || buffer == NULL || len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (channel->read_pos >= channel->write_pos) {
         *len = 0;
         return XGL_OK;
     }
-    
-    size_t available = sim_loopback_write_pos - sim_loopback_read_pos;
-    size_t to_read = (available < *len) ? available : *len;
-    
-    memcpy(buffer, sim_loopback_buffer + sim_loopback_read_pos, to_read);
-    sim_loopback_read_pos += to_read;
+
+    const size_t available = channel->write_pos - channel->read_pos;
+    const size_t to_read = (available < *len) ? available : *len;
+
+    memcpy(buffer, channel->data + channel->read_pos, to_read);
+    channel->read_pos += to_read;
     *len = to_read;
-    
-    printf("[PHY] Received %zu bytes (remaining: %zu)\n", to_read, sim_loopback_write_pos - sim_loopback_read_pos);
-    
-    /* Reset buffer when fully consumed */
-    if (sim_loopback_read_pos >= sim_loopback_write_pos) {
-        sim_loopback_read_pos = 0;
-        sim_loopback_write_pos = 0;
+
+    if (channel->read_pos >= channel->write_pos) {
+        channel->read_pos = 0;
+        channel->write_pos = 0;
     }
-    
+
+    return XGL_OK;
+}
+
+static xgl_error_t phy_tx(const uint8_t* data, size_t len, void* user_data)
+{
+    sim_phy_ctx_t* phy = (sim_phy_ctx_t*)user_data;
+    if (phy == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    const xgl_error_t err = sim_channel_write(phy->tx, data, len);
+    if (err != XGL_OK) {
+        printf("[PHY:%s] TX failed: %s\n", phy->name, xgl_error_string(err));
+        return err;
+    }
+
+    printf("[PHY:%s] Transmitted %zu bytes\n", phy->name, len);
+    return XGL_OK;
+}
+
+static xgl_error_t phy_rx(uint8_t* buffer, size_t* len, void* user_data)
+{
+    sim_phy_ctx_t* phy = (sim_phy_ctx_t*)user_data;
+    if (phy == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    const xgl_error_t err = sim_channel_read(phy->rx, buffer, len);
+    if (err != XGL_OK) {
+        printf("[PHY:%s] RX failed: %s\n", phy->name, xgl_error_string(err));
+        return err;
+    }
+
+    if (*len > 0) {
+        printf("[PHY:%s] Received %zu bytes\n", phy->name, *len);
+    }
+
     return XGL_OK;
 }
 
@@ -92,149 +131,125 @@ static xgl_error_t phy_rx(uint8_t* buffer, size_t* len, void* user_data)
 /* Protocol Callbacks                                                        */
 /*---------------------------------------------------------------------------*/
 
-/**
- * \brief           Echo tracking - prevents infinite echo loops
- */
-static int echo_depth = 0;
-static const int MAX_ECHO_DEPTH = 1;  /* Only echo once, don't echo echoes */
-static int received_count = 0;
-static int echoed_count = 0;
-static int error_count = 0;
-
-/**
- * \brief           Receive callback - echoes data back to sender
- * \param[in]       handle: Protocol instance handle
- * \param[in]       source_id: Source node ID
- * \param[in]       data_type: Data type
- * \param[in]       data: Received data
- * \param[in]       len: Data length
- * \param[in]       user_data: User data (protocol handle)
- */
 static void on_receive(xgl_handle_t handle,
-                      uint8_t source_id,
-                      uint8_t data_type,
-                      const uint8_t* data,
-                      size_t len,
-                      void* user_data)
+                       uint16_t source_id,
+                       uint8_t data_type,
+                       const uint8_t* data,
+                       size_t len,
+                       void* user_data)
 {
-    /* Get handle from user_data if handle is NULL */
-    if (handle == NULL && user_data != NULL) {
-        handle = (xgl_handle_t)user_data;
-    }
-    
-    printf("\n[ECHO] Received %zu bytes from node %d (type 0x%02X)\n", 
-           len, source_id, data_type);
-    received_count++;
-    
-    /* Print received data as string if printable */
-    printf("[ECHO] Data: \"");
-    for (size_t i = 0; i < len; i++) {
-        if (data[i] >= 32 && data[i] <= 126) {
-            printf("%c", data[i]);
-        } else {
-            printf(".");
-        }
-    }
-    printf("\"\n");
-    
-    /* Check echo depth to prevent infinite loops */
-    if (echo_depth >= MAX_ECHO_DEPTH) {
-        printf("[ECHO] Max echo depth reached, not echoing back (prevents infinite loop)\n");
-        echo_depth = 0;  /* Reset for next message */
+    echo_app_ctx_t* app = (echo_app_ctx_t*)user_data;
+    if (app == NULL) {
         return;
     }
-    
-    /* Increment echo depth */
-    echo_depth++;
-    
-    /* Echo data back to sender */
+
+    printf("\n[%s] Received %zu bytes from node %u (type 0x%02X)\n",
+           app->name,
+           len,
+           source_id,
+           data_type);
+
+    app->received_count++;
+    printf("[%s] Data: \"", app->name);
+    for (size_t i = 0; i < len; i++) {
+        const uint8_t ch = data[i];
+        printf("%c", (ch >= 32U && ch <= 126U) ? (char)ch : '.');
+    }
+    printf("\"\n");
+
+    if (!app->echo_enabled) {
+        return;
+    }
+
     xgl_tx_data_t tx_data = {
         .target_id = source_id,
         .data_type = data_type,
         .data = data,
         .data_len = len,
-        .reliable = true,
+        .reliable = false,
         .priority = 0
     };
-    
-    xgl_error_t err = xgl_send(handle, &tx_data);
+
+    const xgl_error_t err = xgl_send(handle, &tx_data);
     if (err != XGL_OK) {
-        printf("[ECHO] Failed to echo data: %s\n", xgl_error_string(err));
-        echo_depth--;  /* Decrement on failure */
-    } else {
-        echoed_count++;
-        printf("[ECHO] Echoed %zu bytes back to node %d (depth: %d)\n", len, source_id, echo_depth);
+        app->error_count++;
+        printf("[%s] Echo failed: %s\n", app->name, xgl_error_string(err));
+        return;
     }
+
+    app->echoed_count++;
+    printf("[%s] Echoed %zu bytes back to node %u\n",
+           app->name,
+           len,
+           source_id);
 }
 
-/**
- * \brief           Error callback - logs errors
- * \param[in]       handle: Protocol instance handle
- * \param[in]       error: Error code
- * \param[in]       message: Error message
- * \param[in]       user_data: User data (unused)
- */
 static void on_error(xgl_handle_t handle,
-                    xgl_error_t error,
-                    const char* message,
-                    void* user_data)
+                     xgl_error_t error,
+                     const char* message,
+                     void* user_data)
 {
     (void)handle;
-    (void)user_data;
-    
-    error_count++;
-    printf("[ERROR] Code %d: %s\n", error, message);
+
+    echo_app_ctx_t* app = (echo_app_ctx_t*)user_data;
+    if (app != NULL) {
+        app->error_count++;
+        printf("[%s][ERROR] Code %d: %s\n", app->name, error, message);
+    } else {
+        printf("[ERROR] Code %d: %s\n", error, message);
+    }
 }
 
 /*---------------------------------------------------------------------------*/
 /* Helper Functions                                                          */
 /*---------------------------------------------------------------------------*/
 
-/**
- * \brief           Send a test message to the echo server
- * \param[in]       handle: Protocol instance handle
- * \param[in]       target_id: Target node ID
- * \param[in]       message: Message string
- */
-static void send_test_message(xgl_handle_t handle, uint8_t target_id, const char* message)
+static void send_test_message(xgl_handle_t handle,
+                              uint16_t target_id,
+                              const char* message)
 {
-    printf("\n[TEST] Sending message to node %d: \"%s\"\n", target_id, message);
-    
-    /* Reset echo depth for new message */
-    echo_depth = 0;
-    
+    printf("\n[CLIENT] Sending message to node %u: \"%s\"\n", target_id, message);
+
     xgl_tx_data_t tx_data = {
         .target_id = target_id,
         .data_type = 0x01,
         .data = (const uint8_t*)message,
         .data_len = strlen(message),
-        .reliable = true,
+        .reliable = false,
         .priority = 0
     };
-    
-    xgl_error_t err = xgl_send(handle, &tx_data);
+
+    const xgl_error_t err = xgl_send(handle, &tx_data);
     if (err != XGL_OK) {
-        printf("[TEST] Failed to send message: %s\n", xgl_error_string(err));
+        printf("[CLIENT] Send failed: %s\n", xgl_error_string(err));
     } else {
-        printf("[TEST] Message sent successfully\n");
+        printf("[CLIENT] Message sent successfully\n");
     }
 }
 
-/**
- * \brief           Print statistics
- * \param[in]       handle: Protocol instance handle
- */
-static void print_statistics(xgl_handle_t handle)
+static void pump_protocol(xgl_handle_t client, xgl_handle_t server, int rounds)
+{
+    for (int i = 0; i < rounds; i++) {
+        (void)xgl_run(client, 100);
+        (void)xgl_run(server, 100);
+        (void)xgl_run(client, 100);
+        (void)xgl_run(server, 100);
+    }
+}
+
+static void print_statistics(const char* name, xgl_handle_t handle)
 {
     xgl_statistics_t stats;
-    xgl_error_t err = xgl_stats_get(handle, &stats);
-    
+    const xgl_error_t err = xgl_stats_get(handle, &stats);
+
     if (err != XGL_OK) {
-        printf("[STATS] Failed to get statistics: %s\n", xgl_error_string(err));
+        printf("[STATS:%s] Failed to get statistics: %s\n",
+               name,
+               xgl_error_string(err));
         return;
     }
-    
-    printf("\n[STATS] Protocol Statistics:\n");
+
+    printf("\n[STATS:%s] Protocol Statistics:\n", name);
     printf("  Data Link Layer:\n");
     printf("    TX Packets:    %llu\n", (unsigned long long)stats.datalink.tx_packets);
     printf("    TX Bytes:      %llu\n", (unsigned long long)stats.datalink.tx_bytes);
@@ -242,14 +257,14 @@ static void print_statistics(xgl_handle_t handle)
     printf("    RX Packets:    %llu\n", (unsigned long long)stats.datalink.rx_packets);
     printf("    RX Bytes:      %llu\n", (unsigned long long)stats.datalink.rx_bytes);
     printf("    RX Errors:     %llu\n", (unsigned long long)stats.datalink.rx_errors);
-  printf("  Transport Layer:\n");
+    printf("  Transport Layer:\n");
     printf("    TX Retries:    %llu\n", (unsigned long long)stats.tx_retries);
     printf("  CRC Errors:\n");
-    printf("    CRC8 Errors:   %llu\n", (unsigned long long)stats.rx_crc8_errors);
     printf("    CRC16 Errors:  %llu\n", (unsigned long long)stats.rx_crc16_errors);
-    printf("  Avg RTT:       %u ms\n", stats.avg_rtt_ms);
-    printf("  Memory Used:   %zu bytes\n", stats.memory_used);
-    printf("  Memory Peak:   %zu bytes\n", stats.memory_peak);
+    printf("  Runtime:\n");
+    printf("    Avg RTT:       %u ms\n", stats.avg_rtt_ms);
+    printf("    Memory Used:   %zu bytes\n", stats.memory_used);
+    printf("    Memory Peak:   %zu bytes\n", stats.memory_peak);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -259,121 +274,161 @@ static void print_statistics(xgl_handle_t handle)
 int main(void)
 {
     printf("=================================================\n");
-    printf("  xgen-link Echo Server Example\n");
+    printf("  xgen-link Two-Node Echo Example\n");
     printf("=================================================\n");
-    printf("This example demonstrates basic send/receive\n");
-    printf("functionality by echoing received data back.\n");
+    printf("This example demonstrates application\n");
+    printf("delivery between two MCU-style protocol nodes.\n");
     printf("=================================================\n\n");
-    
-    /* Setup physical layer operations */
-    xgl_phy_ops_t phy = {
+
+    sim_phy_ctx_t node1_phy_ctx = {
+        .name = "node1",
+        .tx = &channel_1_to_2,
+        .rx = &channel_2_to_1
+    };
+    sim_phy_ctx_t node2_phy_ctx = {
+        .name = "node2",
+        .tx = &channel_2_to_1,
+        .rx = &channel_1_to_2
+    };
+
+    xgl_phy_ops_t node1_phy = {
         .tx = phy_tx,
         .rx = phy_rx,
-        .user_data = NULL
+        .user_data = &node1_phy_ctx
     };
-    
-    /* Setup route table (routes to node 1 and node 2) */
-    xgl_route_item_t routes[] = {
+    xgl_phy_ops_t node2_phy = {
+        .tx = phy_tx,
+        .rx = phy_rx,
+        .user_data = &node2_phy_ctx
+    };
+
+    xgl_route_item_t node1_routes[] = {
         {
-            .target_id = 1,  /* Route to self (for loopback testing) */
-            .phy = &phy,
-            .max_frame_size = 256,
-            .read_freq_hz = 100,
-            .metric = 0
-        },
-        {
-            .target_id = 2,  /* Route to node 2 */
-            .phy = &phy,
+            .target_id = 2,
+            .phy = &node1_phy,
             .max_frame_size = 256,
             .read_freq_hz = 100,
             .metric = 0
         }
     };
-    
-    /* Get default configuration */
-    xgl_config_t config;
-    xgl_config_get_default(&config);
-    
-    /* Customize configuration */
-    config.name = "echo_server";
-    config.source_id = 1;  /* This node is ID 1 */
-    config.route_table = routes;
-    config.route_table_len = 2;  /* Two routes now */
-    config.rx_callback = on_receive;
-    config.error_callback = on_error;
-    config.callback_user_data = NULL;  /* Will be set to handle after creation */
-    
-    printf("[INIT] Creating protocol instance...\n");
-    xgl_handle_t handle = xgl_create(&config);
-    if (handle == NULL) {
-        printf("[ERROR] Failed to create protocol instance\n");
-        return -1;
-    }
-    printf("[INIT] Protocol instance created successfully\n");
-    
-    printf("[INIT] Initializing protocol...\n");
-    xgl_error_t err = xgl_init(handle);
-    if (err != XGL_OK) {
-        printf("[ERROR] Failed to initialize protocol: %s\n", xgl_error_string(err));
-        xgl_destroy(handle);
-        return -1;
-    }
-    printf("[INIT] Protocol initialized successfully\n");
-    
-    /* Print initial statistics */
-    print_statistics(handle);
-    
-    /* Test echo operations with real protocol stack */
-    printf("\n=================================================\n");
-    printf("  Testing Echo Operations (Full Protocol Stack)\n");
-    printf("=================================================\n");
-    printf("Note: Using loopback - sending to self (node 1)\n\n");
-    
-    /* Send test messages - they will be transmitted via PHY TX,
-     * looped back via PHY RX, and processed through all layers */
-    send_test_message(handle, 1, "Hello, Echo Server!");  /* Send to self */
-    
-    /* Run protocol to process TX and RX */
-    printf("\n[MAIN] Running protocol processing (iteration 1)...\n");
-    for (int i = 0; i < 10; i++) {
-        xgl_run(handle, 100);  /* Call at 100 Hz */
-    }
-    
-    send_test_message(handle, 1, "Testing 1-2-3");  /* Send to self */
-    
-    printf("\n[MAIN] Running protocol processing (iteration 2)...\n");
-    for (int i = 0; i < 10; i++) {
-        xgl_run(handle, 100);
-    }
-    
-    send_test_message(handle, 1, "xgen-link protocol");  /* Send to self */
-    
-    printf("\n[MAIN] Running protocol processing (iteration 3)...\n");
-    for (int i = 0; i < 10; i++) {
-        xgl_run(handle, 100);
-    }
-    
-    /* Print final statistics */
-    print_statistics(handle);
+    xgl_route_item_t node2_routes[] = {
+        {
+            .target_id = 1,
+            .phy = &node2_phy,
+            .max_frame_size = 256,
+            .read_freq_hz = 100,
+            .metric = 0
+        }
+    };
 
-    if (error_count != 0 || received_count < 3 || echoed_count < 3) {
-        printf("[ACCEPTANCE] FAILED: received=%d echoed=%d errors=%d\n",
-               received_count, echoed_count, error_count);
-        xgl_destroy(handle);
+    echo_app_ctx_t server_app = {
+        .name = "SERVER",
+        .echo_enabled = true
+    };
+    echo_app_ctx_t client_app = {
+        .name = "CLIENT",
+        .echo_enabled = false
+    };
+
+    xgl_config_t server_config;
+    xgl_config_t client_config;
+    xgl_config_get_default(&server_config);
+    xgl_config_get_default(&client_config);
+
+    server_config.name = "echo_server";
+    server_config.source_id = 1;
+    server_config.route_table = node1_routes;
+    server_config.route_table_len = 1;
+    server_config.rx_callback = on_receive;
+    server_config.error_callback = on_error;
+    server_config.callback_user_data = &server_app;
+
+    client_config.name = "echo_client";
+    client_config.source_id = 2;
+    client_config.route_table = node2_routes;
+    client_config.route_table_len = 1;
+    client_config.rx_callback = on_receive;
+    client_config.error_callback = on_error;
+    client_config.callback_user_data = &client_app;
+
+    printf("[INIT] Creating protocol instances...\n");
+    xgl_handle_t server = xgl_create(&server_config);
+    xgl_handle_t client = xgl_create(&client_config);
+    if (server == NULL || client == NULL) {
+        printf("[ERROR] Failed to create protocol instances\n");
+        xgl_destroy(server);
+        xgl_destroy(client);
         return 1;
     }
 
-    printf("[ACCEPTANCE] PASSED: received=%d echoed=%d errors=%d\n",
-           received_count, echoed_count, error_count);
-    
-    /* Cleanup */
-    printf("\n[CLEANUP] Destroying protocol instance...\n");
-    xgl_destroy(handle);
-    printf("[CLEANUP] Done\n");
-    
+    printf("[INIT] Initializing protocol instances...\n");
+    xgl_error_t err = xgl_init(server);
+    if (err != XGL_OK) {
+        printf("[ERROR] Failed to initialize server: %s\n", xgl_error_string(err));
+        xgl_destroy(server);
+        xgl_destroy(client);
+        return 1;
+    }
+
+    err = xgl_init(client);
+    if (err != XGL_OK) {
+        printf("[ERROR] Failed to initialize client: %s\n", xgl_error_string(err));
+        xgl_destroy(server);
+        xgl_destroy(client);
+        return 1;
+    }
+
+    print_statistics("SERVER", server);
+    print_statistics("CLIENT", client);
+
     printf("\n=================================================\n");
-    printf("  Echo Server Example Complete\n");
+    printf("  Testing Echo Operations (Full Protocol Stack)\n");
     printf("=================================================\n");
-    
+
+    send_test_message(client, 1, "Hello, Echo Server!");
+    pump_protocol(client, server, 10);
+
+    send_test_message(client, 1, "Testing 1-2-3");
+    pump_protocol(client, server, 10);
+
+    send_test_message(client, 1, "xgen-link protocol");
+    pump_protocol(client, server, 10);
+
+    print_statistics("SERVER", server);
+    print_statistics("CLIENT", client);
+
+    const bool passed = (server_app.error_count == 0) &&
+                        (client_app.error_count == 0) &&
+                        (server_app.received_count >= 3) &&
+                        (server_app.echoed_count >= 3) &&
+                        (client_app.received_count >= 3);
+
+    if (!passed) {
+        printf("[ACCEPTANCE] FAILED: server_rx=%d server_echo=%d "
+               "client_rx=%d server_errors=%d client_errors=%d\n",
+               server_app.received_count,
+               server_app.echoed_count,
+               client_app.received_count,
+               server_app.error_count,
+               client_app.error_count);
+        xgl_destroy(server);
+        xgl_destroy(client);
+        return 1;
+    }
+
+    printf("[ACCEPTANCE] PASSED: server_rx=%d server_echo=%d client_rx=%d\n",
+           server_app.received_count,
+           server_app.echoed_count,
+           client_app.received_count);
+
+    printf("\n[CLEANUP] Destroying protocol instances...\n");
+    xgl_destroy(server);
+    xgl_destroy(client);
+    printf("[CLEANUP] Done\n");
+
+    printf("\n=================================================\n");
+    printf("  Echo Example Complete\n");
+    printf("=================================================\n");
+
     return 0;
 }

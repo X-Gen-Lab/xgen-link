@@ -182,7 +182,7 @@ static xgl_error_t receiver_phy_rx(uint8_t* buffer, size_t* len, void* user_data
 /*---------------------------------------------------------------------------*/
 
 static void sender_on_receive(xgl_handle_t handle,
-                              uint8_t source_id,
+                              uint16_t source_id,
                               uint8_t data_type,
                               const uint8_t* data,
                               size_t len,
@@ -215,7 +215,7 @@ static void sender_on_error(xgl_handle_t handle,
 /*---------------------------------------------------------------------------*/
 
 static void receiver_on_receive(xgl_handle_t handle,
-                                uint8_t source_id,
+                                uint16_t source_id,
                                 uint8_t data_type,
                                 const uint8_t* data,
                                 size_t len,
@@ -442,7 +442,7 @@ static void print_protocol_stats(xgl_handle_t sender, xgl_handle_t receiver)
         printf("  RX Packets:    %llu\n", (unsigned long long)receiver_stats.transport.rx_packets);
         printf("  RX Bytes:      %llu\n", (unsigned long long)receiver_stats.transport.rx_bytes);
         printf("  RX Errors:     %llu\n", (unsigned long long)receiver_stats.transport.rx_errors);
-        printf("  CRC Errors:    %llu\n", (unsigned long long)(receiver_stats.rx_crc8_errors + receiver_stats.rx_crc16_errors));
+        printf("  CRC16 Errors:  %llu\n", (unsigned long long)receiver_stats.rx_crc16_errors);
         printf("  Memory Used:   %zu bytes\n", receiver_stats.memory_used);
     }
     

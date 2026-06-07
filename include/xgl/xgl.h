@@ -657,7 +657,7 @@ uint32_t xgl_next_deadline_ms(xgl_handle_t handle);
  *      - UART/SPI/I2C/CAN communication
  *
  * \par Further Reading
- *      - User Guide: docs/user_guide.md
+ *      - User Guide: docs/zh/getting-started/quick-start.md
  *      - Architecture: docs/architecture.md
  *      - Porting Guide: docs/porting.md
  *      - Examples: examples/

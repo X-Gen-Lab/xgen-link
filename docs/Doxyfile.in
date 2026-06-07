@@ -1,0 +1,24 @@
+PROJECT_NAME           = "XGL"
+PROJECT_NUMBER         = "@PROJECT_VERSION@"
+OUTPUT_DIRECTORY       = "@XGL_DOXYGEN_OUTPUT_DIR@"
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+FULL_PATH_NAMES        = NO
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+INPUT                  = "@CMAKE_SOURCE_DIR@/include/xgl/xgl.h" \
+                         "@CMAKE_SOURCE_DIR@/include/xgl/xgl_config.h" \
+                         "@CMAKE_SOURCE_DIR@/include/xgl/xgl_types.h" \
+                         "@CMAKE_SOURCE_DIR@/include/xgl/xgl_error.h"
+RECURSIVE              = NO
+FILE_PATTERNS          = *.h
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = NO
+JAVADOC_AUTOBRIEF      = NO
+OPTIMIZE_OUTPUT_FOR_C  = YES
+DISABLE_INDEX          = NO
+GENERATE_TREEVIEW      = YES
+HTML_OUTPUT            = html

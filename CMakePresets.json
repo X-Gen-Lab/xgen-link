@@ -90,7 +90,7 @@
       "name": "ci",
       "displayName": "CI",
       "description": "Continuous integration build",
-      "inherits": "base",
+      "inherits": "gcc-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "XGL_BUILD_TESTS": "ON",
@@ -130,6 +130,12 @@
       "configurePreset": "gcc-test",
       "displayName": "GCC Test Build",
       "description": "Build GCC test configuration"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
+      "displayName": "CI Build",
+      "description": "Build CI configuration"
     }
   ],
   "testPresets": [

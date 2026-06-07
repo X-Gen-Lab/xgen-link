@@ -1,0 +1,45 @@
+# TLV Extensions
+
+Extensions immediately follow the 24-byte base header.
+
+| Field | Size | Description |
+| --- | ---: | --- |
+| `ext_type` | 1 | Extension type |
+| `ext_len` | 1 | Value length |
+| `value` | `ext_len` | Extension value |
+
+## Extension Types
+
+| Extension | Contents | Purpose |
+| --- | --- | --- |
+| SESSION_EXT | `session_epoch`, `incarnation_id` | Session isolation and reboot detection |
+| ACK_RANGE_EXT | `largest_ack`, `ack_delay_us`, ranges | Batch acknowledgement |
+| SACK_EXT | `base_packet`, bitmap | Preserve acknowledgement holes |
+| FRAGMENT_EXT | `message_id`, `fragment_offset`, `message_len` | Fragment reassembly |
+| SECURITY_EXT | `key_id`, nonce/material metadata | Authentication trailer metadata |
+| ROUTE_EXT | previous hop, next hop, route epoch, metric | Routing metadata |
+
+## Value Format
+
+| Extension | Value Length | Fields |
+| --- | ---: | --- |
+| SESSION_EXT | 12 | `session_epoch u32`, `incarnation_id u64` |
+| ACK_RANGE_EXT | `8 + 4*n` | `largest_ack u32`, `ack_delay_us u32`, repeated `gap u16 + length u16` |
+| SACK_EXT | `4 + bitmap_len` | `base_packet u32`, bitmap bytes |
+| FRAGMENT_EXT | 12 | `message_id u32`, `fragment_offset u32`, `message_len u32` |
+| SECURITY_EXT | 13 | `key_id u32`, `nonce_id u64`, `tag_len u8` |
+| ROUTE_EXT | 10 | `previous_hop u16`, `next_hop u16`, `route_epoch u32`, `metric u16` |
+
+ACK ranges use `gap` and `length` to describe acknowledged ranges backwards from `largest_ack`. SACK bitmap bits describe receive state for `base_packet + bit_index`.
+
+## Failure Rules
+
+- Drop the frame when `ext_len` is too small for the declared extension.
+- Extension bytes must fit within `header_len - 24`.
+- Unknown extensions may be ignored only when they do not affect packet semantics; unknown security or fragmentation extensions should fail closed.
+
+## Implementation Constraints
+
+- Extension order must not be a semantic dependency; receivers find required extensions by type.
+- Duplicate semantic extensions should fail closed to avoid ambiguity.
+- Senders set HAS_EXTENSIONS only when extensions are present.

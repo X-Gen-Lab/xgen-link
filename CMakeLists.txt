@@ -287,9 +287,9 @@ endif()
 #-----------------------------------------------------------------------------
 
 if(XGL_BUILD_DOCS)
-    find_package(Doxygen)
-    if(DOXYGEN_FOUND)
-        add_subdirectory(docs)
+    add_subdirectory(docs)
+    if(TARGET xgl_release_validation AND TARGET xgl_docs)
+        add_dependencies(xgl_release_validation xgl_docs)
     endif()
 endif()
 

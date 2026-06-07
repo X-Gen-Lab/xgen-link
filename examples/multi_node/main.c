@@ -186,7 +186,7 @@ static xgl_error_t node3_phy_rx(uint8_t* buffer, size_t* len, void* user_data)
 /*---------------------------------------------------------------------------*/
 
 static void node1_on_receive(xgl_handle_t handle,
-                             uint8_t source_id,
+                             uint16_t source_id,
                              uint8_t data_type,
                              const uint8_t* data,
                              size_t len,
@@ -226,7 +226,7 @@ static void node1_on_error(xgl_handle_t handle,
 /*---------------------------------------------------------------------------*/
 
 static void node2_on_receive(xgl_handle_t handle,
-                             uint8_t source_id,
+                             uint16_t source_id,
                              uint8_t data_type,
                              const uint8_t* data,
                              size_t len,
@@ -259,7 +259,7 @@ static void node2_on_error(xgl_handle_t handle,
 /*---------------------------------------------------------------------------*/
 
 static void node3_on_receive(xgl_handle_t handle,
-                             uint8_t source_id,
+                             uint16_t source_id,
                              uint8_t data_type,
                              const uint8_t* data,
                              size_t len,
@@ -364,7 +364,6 @@ static void print_node_statistics(xgl_handle_t handle, const char* node_name)
     printf("  Transport Layer:\n");
     printf("    TX Retries:    %llu\n", (unsigned long long)stats.tx_retries);
     printf("  CRC Errors:\n");
-    printf("    CRC8 Errors:   %llu\n", (unsigned long long)stats.rx_crc8_errors);
     printf("    CRC16 Errors:  %llu\n", (unsigned long long)stats.rx_crc16_errors);
     printf("  Performance:\n");
     printf("    Avg RTT:       %u ms\n", stats.avg_rtt_ms);

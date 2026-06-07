@@ -310,7 +310,7 @@ transfer_file(sender, target_id);
 ```c
 /* In receiver callback */
 static void receiver_on_receive(xgl_handle_t handle,
-                                uint8_t source_id,
+                                uint16_t source_id,
                                 uint8_t data_type,
                                 const uint8_t* data,
                                 size_t len,

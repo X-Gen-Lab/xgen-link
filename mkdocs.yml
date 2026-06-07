@@ -1,0 +1,123 @@
+site_name: XGL
+site_description: Production-grade MCU multi-node reliable protocol stack
+site_author: Nexus Team
+repo_name: xgen-link
+docs_dir: docs
+site_dir: site
+strict: true
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: blue grey
+      accent: teal
+
+extra:
+  alternate:
+    - name: 简体中文
+      link: /zh/
+      lang: zh
+    - name: English
+      link: /en/
+      lang: en
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - 简体中文:
+      - 首页: zh/index.md
+      - 快速开始:
+          - 快速开始: zh/getting-started/quick-start.md
+          - 构建与测试: zh/getting-started/build-and-test.md
+          - 示例: zh/getting-started/examples.md
+      - 协议规范:
+          - 概览: zh/protocol/overview.md
+          - 架构设计: zh/protocol/architecture.md
+          - 实现映射: zh/protocol/implementation-map.md
+          - 状态机: zh/protocol/state-machines.md
+          - Wire Format: zh/protocol/wire-format.md
+          - TLV 扩展: zh/protocol/extensions.md
+          - 可靠传输: zh/protocol/reliability.md
+          - 安全模型: zh/protocol/security.md
+          - 路由: zh/protocol/routing.md
+          - 分片重组: zh/protocol/fragmentation.md
+      - 使用指南:
+          - 配置: zh/guide/configuration.md
+          - Send API: zh/guide/send-api.md
+          - Zero-Copy: zh/guide/zero-copy.md
+          - 低功耗运行时: zh/guide/low-power-runtime.md
+          - 移植: zh/guide/porting.md
+          - 资源模型: zh/guide/resource-model.md
+          - 生产检查表: zh/guide/production-checklist.md
+      - 参考:
+          - 公共 API: zh/reference/public-api.md
+          - 错误码: zh/reference/errors.md
+          - 配置预设: zh/reference/config-presets.md
+          - 发布验证: zh/reference/release-validation.md
+          - 验证矩阵: zh/reference/validation-matrix.md
+          - 静态分析: zh/reference/static-analysis.md
+      - 贡献:
+          - 文档规范: zh/contributing/documentation.md
+  - English:
+      - Home: en/index.md
+      - Getting Started:
+          - Quick Start: en/getting-started/quick-start.md
+          - Build and Test: en/getting-started/build-and-test.md
+          - Examples: en/getting-started/examples.md
+      - Protocol:
+          - Overview: en/protocol/overview.md
+          - Architecture: en/protocol/architecture.md
+          - Implementation Map: en/protocol/implementation-map.md
+          - State Machines: en/protocol/state-machines.md
+          - Wire Format: en/protocol/wire-format.md
+          - TLV Extensions: en/protocol/extensions.md
+          - Reliability: en/protocol/reliability.md
+          - Security: en/protocol/security.md
+          - Routing: en/protocol/routing.md
+          - Fragmentation: en/protocol/fragmentation.md
+      - Guides:
+          - Configuration: en/guide/configuration.md
+          - Send API: en/guide/send-api.md
+          - Zero-Copy: en/guide/zero-copy.md
+          - Low-Power Runtime: en/guide/low-power-runtime.md
+          - Porting: en/guide/porting.md
+          - Resource Model: en/guide/resource-model.md
+          - Production Checklist: en/guide/production-checklist.md
+      - Reference:
+          - Public API: en/reference/public-api.md
+          - Errors: en/reference/errors.md
+          - Config Presets: en/reference/config-presets.md
+          - Release Validation: en/reference/release-validation.md
+          - Validation Matrix: en/reference/validation-matrix.md
+          - Static Analysis: en/reference/static-analysis.md
+      - Contributing:
+          - Documentation: en/contributing/documentation.md

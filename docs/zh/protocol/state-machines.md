@@ -1,0 +1,147 @@
+# 协议状态机
+
+本页描述 XGL v2 的关键状态机。状态机是实现、测试和问题定位的共同语言。
+
+## Parser 状态机
+
+```mermaid
+stateDiagram-v2
+  [*] --> SearchMagic
+  SearchMagic --> SearchMagic: noise byte
+  SearchMagic --> BaseHeader: "XG"
+  BaseHeader --> SearchMagic: version/header_len/crc invalid
+  BaseHeader --> Extensions: header_len > 24
+  BaseHeader --> Body: header_len == 24
+  Extensions --> SearchMagic: TLV invalid or SECURITY_EXT missing when required
+  Extensions --> Body: all TLVs valid
+  Body --> SearchMagic: payload/auth/crc invalid
+  Body --> FrameReady: payload + optional auth trailer + frame crc complete
+  FrameReady --> SearchMagic: xgl_parser_get_frame + reset
+```
+
+实现要求：
+
+- `SearchMagic` 必须支持噪声和重叠 magic。
+- `BaseHeader` 只读取 24-byte base header，不提前信任 payload。
+- `Extensions` 按 TLV cursor 遍历，任何越界都 reset。
+- `Body` 的长度必须由 `payload_len + auth_tag_len + frame_crc16` 推导。
+
+## Datalink 验证状态机
+
+```mermaid
+flowchart TD
+  Ready[FrameReady] --> Decode[Decode wire header]
+  Decode --> Ext[Parse extensions]
+  Ext --> AuthReq{auth_required?}
+  AuthReq -- yes --> HasSec{SECURITY_EXT valid?}
+  HasSec -- no --> DropAuth[Drop auth error]
+  HasSec -- yes --> Verify[Verify auth trailer]
+  AuthReq -- no --> Replay[Replay check if authenticated]
+  Verify --> AuthOk{valid?}
+  AuthOk -- no --> DropAuth
+  AuthOk -- yes --> Replay
+  Replay --> ReplayOk{new packet?}
+  ReplayOk -- no --> DropReplay[Drop replay]
+  ReplayOk -- yes --> Network[Pass to network]
+```
+
+认证失败、replay 失败和 key mismatch 都不得 ACK，也不得进入 transport。
+
+## Network 转发状态机
+
+```mermaid
+stateDiagram-v2
+  [*] --> InspectTarget
+  InspectTarget --> LocalDelivery: target is local
+  InspectTarget --> CheckTTL: target is remote
+  CheckTTL --> DropTTL: ttl <= 1
+  CheckTTL --> LookupRoute: ttl > 1
+  LookupRoute --> DropNoRoute: route missing
+  LookupRoute --> CheckMTU: route found
+  CheckMTU --> DropMTU: serialized frame > route mtu
+  CheckMTU --> RewriteMutable: fits
+  RewriteMutable --> ResignIfNeeded: ttl decremented
+  ResignIfNeeded --> Forward: crc/auth boundary valid
+  ResignIfNeeded --> DropAuth: cannot resign required auth
+  Forward --> [*]
+  LocalDelivery --> [*]
+```
+
+TTL 是 mutable header 字段。转发后必须重算 header CRC；如果 frame 使用认证，转发路径必须保证下一跳校验仍可通过。
+
+## Transport 发送状态机
+
+```mermaid
+stateDiagram-v2
+  [*] --> Prepare
+  Prepare --> AssignPacket: send accepted
+  AssignPacket --> Fragment: payload exceeds route payload budget
+  AssignPacket --> QueueReliable: reliable single frame
+  Fragment --> QueueReliable: reliable fragment
+  Fragment --> SendUnreliable: unreliable fragment
+  QueueReliable --> SendFrame
+  SendUnreliable --> SendFrame
+  SendFrame --> AwaitAck: reliable frame sent
+  SendFrame --> Done: unreliable frame sent
+  AwaitAck --> Done: ACK range covers packet
+  AwaitAck --> Retransmit: timeout or SACK hole
+  Retransmit --> SendFrame
+  AwaitAck --> Failed: retry limit exceeded
+```
+
+关键约束：
+
+- packet number 对每个 peer key 单调递增。
+- reliable 包在 ACK 覆盖前不能释放 payload 副本。
+- retry limit 触发后只影响对应 peer/connection/session。
+
+## Transport 接收状态机
+
+```mermaid
+flowchart TD
+  Packet[Local packet] --> Scope[Resolve peer key]
+  Scope --> Type{packet type}
+  Type -- ACK/CONTROL --> Control[Process ACK range/SACK/reset/close]
+  Type -- DATA --> Number{packet_number}
+  Number -- "< rx_next" --> Duplicate[Drop duplicate]
+  Number -- "== rx_next" --> Deliver[Deliver payload or fragment]
+  Number -- "> rx_next" --> Buffer[Cache out-of-order]
+  Deliver --> Drain[Drain contiguous buffered packets]
+  Buffer --> AckSack[Send ACK/SACK]
+  Drain --> Ack[Send ACK]
+```
+
+应用 callback 只接收按序、完整、通过认证和重组预算的 payload。
+
+## Fragment Reassembly 状态机
+
+```mermaid
+stateDiagram-v2
+  [*] --> NoMessage
+  NoMessage --> AllocMessage: first FRAGMENT_EXT
+  AllocMessage --> Receiving: budget reserved
+  Receiving --> Receiving: non-overlapping range accepted
+  Receiving --> Complete: all ranges covered
+  Receiving --> DropMessage: timeout or budget error
+  Complete --> DeliverAndFree
+  DeliverAndFree --> [*]
+  DropMessage --> [*]
+```
+
+重组 key 是：
+
+```text
+source_id + connection_id + session_epoch + message_id
+```
+
+该 key 防止不同节点、连接或 session 的相同 `message_id` 混淆。
+
+## Reset/CLOSE 作用域
+
+RESET 和 CLOSE 必须只清理对应 scope：
+
+```text
+target/source node + connection_id + session_epoch
+```
+
+不得全局清空 route table、其他 peer 的 reliable queue、其他 session 的 replay window 或 fragment reassembly。
