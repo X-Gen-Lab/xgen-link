@@ -177,7 +177,6 @@ extern "C" {
 /* Network layer */
 #include "xgl_route.h"
 #include "xgl_network.h"
-#include "xgl_sequence.h"
 
 /* Transport layer */
 #include "xgl_rtt.h"
