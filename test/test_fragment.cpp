@@ -298,6 +298,69 @@ TEST_F(XglFragmentTest, FragmentExtensionKeyIncludesSession) {
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 2U);
 }
 
+TEST_F(XglFragmentTest, ClearFragmentExtensionReassemblyIsScopedToConnectionSession) {
+    const uint8_t part[] = {'x', 'y'};
+    uint8_t* complete_data = nullptr;
+    size_t complete_len = 0;
+
+    ASSERT_EQ(xgl_fragment_process_ext(&manager,
+                                       0x1234,
+                                       1,
+                                       100,
+                                       2,
+                                       77,
+                                       0,
+                                       4,
+                                       part,
+                                       sizeof(part),
+                                       &complete_data,
+                                       &complete_len,
+                                       1000),
+              XGL_ERR_BUSY);
+    ASSERT_EQ(xgl_fragment_process_ext(&manager,
+                                       0x1234,
+                                       2,
+                                       200,
+                                       2,
+                                       88,
+                                       0,
+                                       4,
+                                       part,
+                                       sizeof(part),
+                                       &complete_data,
+                                       &complete_len,
+                                       1001),
+              XGL_ERR_BUSY);
+    ASSERT_EQ(xgl_fragment_get_reassembly_count(&manager), 2U);
+
+    EXPECT_EQ(xgl_fragment_clear_reassembly_scope(&manager,
+                                                 0x1234,
+                                                 1,
+                                                 100),
+              1U);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 1U);
+
+    const uint8_t tail[] = {'z', 'w'};
+    EXPECT_EQ(xgl_fragment_process_ext(&manager,
+                                       0x1234,
+                                       2,
+                                       200,
+                                       2,
+                                       88,
+                                       2,
+                                       4,
+                                       tail,
+                                       sizeof(tail),
+                                       &complete_data,
+                                       &complete_len,
+                                       1002),
+              XGL_OK);
+    ASSERT_NE(complete_data, nullptr);
+    ASSERT_EQ(complete_len, 4U);
+    EXPECT_EQ(std::memcmp(complete_data, "xyzw", 4U), 0);
+    xgl_fragment_free_data(&manager, complete_data);
+}
+
 TEST_F(XglFragmentTest, RejectsFragmentOffsetThatDoesNotMatchIndexOrder) {
     uint8_t first_fragment[] = {
         7, 0, 3, 0, 0,
