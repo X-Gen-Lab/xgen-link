@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_platform.h>
+#include <xgl/internal/xgl_platform.h>
 #include <cstring>
 
 /*---------------------------------------------------------------------------*/

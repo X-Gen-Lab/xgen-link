@@ -7,7 +7,7 @@
 - `xgl_types.h`
 - `xgl_error.h`
 
-内部协议头如 `xgl_wire.h`、`xgl_parser.h`、`xgl_reliable.h` 不属于普通用户 API。
+内部协议头位于 `include/xgl/internal`，例如 `xgl/internal/xgl_wire.h`、`xgl/internal/xgl_parser.h`、`xgl/internal/xgl_reliable.h`。它们不会作为普通 SDK 头安装，也不是稳定用户 API。
 
 ## API 分组
 

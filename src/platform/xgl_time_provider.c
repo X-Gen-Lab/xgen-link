@@ -4,8 +4,8 @@
  * \author          Nexus Team
  */
 
-#include "xgl/xgl_time_provider.h"
-#include "xgl/xgl_time.h"
+#include "xgl/internal/xgl_time_provider.h"
+#include "xgl/internal/xgl_time.h"
 #include <stddef.h>
 
 /*---------------------------------------------------------------------------*/

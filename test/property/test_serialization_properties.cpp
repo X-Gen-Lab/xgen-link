@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include "property_framework.h"
-#include <xgl/xgl_serialize.h>
+#include <xgl/internal/xgl_serialize.h>
 
 /**
  * \brief           Feature: x-gen-link, Property 3: Serialization Round-Trip

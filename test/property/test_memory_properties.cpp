@@ -10,7 +10,7 @@
 #include "../mocks/mock_allocator.h"
 #include "../mocks/mock_phy.h"
 #include <xgl/xgl.h>
-#include <xgl/xgl_allocator.h>
+#include <xgl/internal/xgl_allocator.h>
 
 using ::testing::_;
 using ::testing::Return;

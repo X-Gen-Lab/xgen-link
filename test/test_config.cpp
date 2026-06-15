@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_allocator.h>
+#include <xgl/internal/xgl_allocator.h>
 
 static xgl_error_t mock_auth_sign(uint32_t /*key_id*/,
                                   const uint8_t* /*aad*/,

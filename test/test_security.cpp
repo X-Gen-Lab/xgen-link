@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <xgl/xgl_security.h>
+#include <xgl/internal/xgl_security.h>
 
 TEST(XglSecurityTest, ReplayWindowAcceptsNewPacketsAndRejectsDuplicates) {
     xgl_replay_window_t window = {};

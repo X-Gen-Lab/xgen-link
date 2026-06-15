@@ -4,7 +4,7 @@
  * \author          Nexus Team
  */
 
-#include "xgl/xgl_platform.h"
+#include "xgl/internal/xgl_platform.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>

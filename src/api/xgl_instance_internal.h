@@ -12,16 +12,16 @@ extern "C" {
 #endif
 
 #include <xgl/xgl.h>
-#include <xgl/xgl_tiered_pool.h>
-#include <xgl/xgl_packet_pool.h>
-#include <xgl/xgl_route.h>
-#include <xgl/xgl_window.h>
-#include <xgl/xgl_rtt.h>
-#include <xgl/xgl_parser.h>
-#include <xgl/xgl_datalink.h>
-#include <xgl/xgl_network.h>
-#include <xgl/xgl_transport.h>
-#include <xgl/xgl_layer_interface.h>
+#include <xgl/internal/xgl_tiered_pool.h>
+#include <xgl/internal/xgl_packet_pool.h>
+#include <xgl/internal/xgl_route.h>
+#include <xgl/internal/xgl_window.h>
+#include <xgl/internal/xgl_rtt.h>
+#include <xgl/internal/xgl_parser.h>
+#include <xgl/internal/xgl_datalink.h>
+#include <xgl/internal/xgl_network.h>
+#include <xgl/internal/xgl_transport.h>
+#include <xgl/internal/xgl_layer_interface.h>
 
 /*---------------------------------------------------------------------------*/
 /* Internal Instance Structure                                               */

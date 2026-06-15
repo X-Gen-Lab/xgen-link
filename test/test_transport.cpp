@@ -6,9 +6,9 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_transport.h>
-#include <xgl/xgl_reliable.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_transport.h>
+#include <xgl/internal/xgl_reliable.h>
+#include <xgl/internal/xgl_wire.h>
 #include <cstring>
 #include <vector>
 

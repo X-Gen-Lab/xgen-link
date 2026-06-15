@@ -13,10 +13,10 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "xgl_error.h"
-#include "xgl_list.h"
-#include "xgl_types.h"
-#include "xgl_wire.h"
+#include "xgl/xgl_error.h"
+#include "xgl/internal/xgl_list.h"
+#include "xgl/xgl_types.h"
+#include "xgl/internal/xgl_wire.h"
 
 /*---------------------------------------------------------------------------*/
 /* Reliable Packet Structure                                                */

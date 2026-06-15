@@ -48,10 +48,11 @@ sequenceDiagram
   P->>D: bytes
   D->>W: streaming input
   W->>W: magic/header/ext/payload/trailer validation
-  W->>N: parsed frame
+  D->>D: CRC/auth/replay checks
+  D->>N: validated frame
   N->>N: local target or forwarding decision
   N->>T: local packet
-  T->>T: auth/replay/reliability/order handling
+  T->>T: reliability/order/fragment handling
   T->>App: rx_callback
 ```
 
@@ -91,4 +92,4 @@ XGL 的生产路径偏 fail-closed：
 
 ## API 暴露原则
 
-普通 SDK 只安装公共 API 头。wire、parser、reliable、window、fragment 等内部头用于协议维护和测试，不作为稳定用户 ABI。
+普通 SDK 只安装公共 API 头。wire、parser、reliable、window、fragment 等内部头位于 `include/xgl/internal`，用于协议维护、测试和高级集成，不作为稳定用户 ABI。

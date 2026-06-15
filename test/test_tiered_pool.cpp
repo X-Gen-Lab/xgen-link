@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <cstring>
-#include "xgl/xgl_tiered_pool.h"
+#include "xgl/internal/xgl_tiered_pool.h"
 
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */

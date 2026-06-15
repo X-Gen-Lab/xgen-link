@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_crc.h>
+#include <xgl/internal/xgl_crc.h>
 #include "property_framework.h"
 
 /*---------------------------------------------------------------------------*/

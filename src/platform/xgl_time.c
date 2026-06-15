@@ -8,7 +8,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 
-#include "xgl/xgl_time.h"
+#include "xgl/internal/xgl_time.h"
 #include <stddef.h>
 
 /*---------------------------------------------------------------------------*/

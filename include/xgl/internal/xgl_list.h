@@ -191,7 +191,7 @@ xgl_list_node_t* xgl_list_prev(const xgl_list_node_t* node);
 
 #ifdef XGL_THREAD_SAFE
 
-#include "xgl_mutex.h"
+#include "xgl/internal/xgl_mutex.h"
 
 /**
  * \brief           Thread-safe list structure

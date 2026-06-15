@@ -6,9 +6,9 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <xgl/xgl_network.h>
-#include <xgl/xgl_route.h>
-#include <xgl/xgl_packet_pool.h>
+#include <xgl/internal/xgl_network.h>
+#include <xgl/internal/xgl_route.h>
+#include <xgl/internal/xgl_packet_pool.h>
 #include "property_framework.h"
 #include <map>
 #include <set>

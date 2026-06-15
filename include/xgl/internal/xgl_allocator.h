@@ -13,7 +13,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
-#include "xgl_types.h"
+#include "xgl/xgl_types.h"
 
 #ifndef XGL_ALLOW_FALLBACK_MALLOC
 #define XGL_ALLOW_FALLBACK_MALLOC 1

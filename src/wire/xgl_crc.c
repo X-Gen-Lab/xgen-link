@@ -4,7 +4,7 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_crc.h>
+#include <xgl/internal/xgl_crc.h>
 #include <stddef.h>
 #include <stdint.h>
 

@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_atomic.h>
+#include <xgl/internal/xgl_atomic.h>
 
 /*---------------------------------------------------------------------------*/
 /* Basic Atomic Operations Tests                                             */

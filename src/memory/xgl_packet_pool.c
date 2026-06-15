@@ -4,10 +4,10 @@
  * \author          Nexus Team
  */
 
-#include "xgl/xgl_packet_pool.h"
-#include "xgl/xgl_list.h"
+#include "xgl/internal/xgl_packet_pool.h"
+#include "xgl/internal/xgl_list.h"
 #include "xgl/xgl_error.h"
-#include "xgl/xgl_allocator.h"
+#include "xgl/internal/xgl_allocator.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/

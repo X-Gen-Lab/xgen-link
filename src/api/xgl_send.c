@@ -5,11 +5,11 @@
  */
 
 #include <xgl/xgl.h>
-#include <xgl/xgl_frame.h>
-#include <xgl/xgl_datalink.h>
-#include <xgl/xgl_route.h>
-#include <xgl/xgl_network.h>
-#include <xgl/xgl_crc.h>
+#include <xgl/internal/xgl_frame.h>
+#include <xgl/internal/xgl_datalink.h>
+#include <xgl/internal/xgl_route.h>
+#include <xgl/internal/xgl_network.h>
+#include <xgl/internal/xgl_crc.h>
 #include "xgl_instance_internal.h"
 #include <string.h>
 

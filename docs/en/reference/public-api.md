@@ -7,7 +7,7 @@ Normal SDK users depend only on installed public headers:
 - `xgl_types.h`
 - `xgl_error.h`
 
-Internal protocol headers such as `xgl_wire.h`, `xgl_parser.h`, and `xgl_reliable.h` are not normal user APIs.
+Internal protocol headers live under `include/xgl/internal`, for example `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_parser.h`, and `xgl/internal/xgl_reliable.h`. They are not installed as normal SDK headers and are not stable user APIs.
 
 ## API Groups
 

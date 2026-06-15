@@ -4,7 +4,7 @@
  * \author          Nexus Team
  */
 
-#include "xgl/xgl_mutex.h"
+#include "xgl/internal/xgl_mutex.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/

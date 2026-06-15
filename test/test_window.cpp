@@ -6,8 +6,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <gtest/gtest.h>
-#include "xgl/xgl_allocator.h"
-#include "xgl/xgl_window.h"
+#include "xgl/internal/xgl_allocator.h"
+#include "xgl/internal/xgl_window.h"
 
 template <typename T>
 concept HasLegacySequenceWindowState = requires(T value) {

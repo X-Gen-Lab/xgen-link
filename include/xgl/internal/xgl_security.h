@@ -12,7 +12,7 @@ extern "C" {
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "xgl_error.h"
+#include "xgl/xgl_error.h"
 
 typedef struct {
     uint16_t source_id;

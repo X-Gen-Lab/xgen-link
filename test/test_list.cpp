@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_list.h>
+#include <xgl/internal/xgl_list.h>
 
 /*---------------------------------------------------------------------------*/
 /* Test Data Structure                                                       */

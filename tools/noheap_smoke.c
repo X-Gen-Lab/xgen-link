@@ -1,6 +1,6 @@
-#include <xgl/xgl_allocator.h>
-#include <xgl/xgl_reliable.h>
-#include <xgl/xgl_tiered_pool.h>
+#include <xgl/internal/xgl_allocator.h>
+#include <xgl/internal/xgl_reliable.h>
+#include <xgl/internal/xgl_tiered_pool.h>
 
 int main(void) {
 #if XGL_ALLOW_FALLBACK_MALLOC != 0

@@ -3,7 +3,7 @@
  * \brief           Security helpers for authenticated production transport
  */
 
-#include <xgl/xgl_security.h>
+#include <xgl/internal/xgl_security.h>
 #include <string.h>
 
 xgl_error_t xgl_replay_window_init(xgl_replay_window_t* window,

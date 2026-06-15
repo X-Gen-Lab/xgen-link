@@ -5,7 +5,7 @@
 ## Supported Scope
 
 - True zero-copy: single-frame unreliable send.
-- Reliable zero-copy: may copy into the reliable queue to preserve retransmission semantics.
+- Reliable zero-copy: rejected with `XGL_ERR_INVALID_PARAM`; use `xgl_send()` when ACK/retry semantics are required.
 
 ## Buffer Requirements
 
@@ -20,10 +20,10 @@ Unauthenticated single-frame sends usually place payload at `XGL_FRAME_HEADER_SI
 
 ## Ownership
 
-The caller buffer must remain valid until the PHY TX callback returns. Reliable zero-copy may copy data for retransmission, so applications must not infer reliability state from whether a copy happened.
+The caller buffer must remain valid until the PHY TX callback returns. The zero-copy path bypasses transport and network send processing, then updates their TX statistics explicitly after the raw datalink send succeeds.
 
 ## Common Misuse
 
 - No header reservation.
 - Provider has no tag length while authentication is required.
-- Treating reliable zero-copy as guaranteed no-copy.
+- Passing reliable data to `xgl_send_zerocopy()` instead of using `xgl_send()`.

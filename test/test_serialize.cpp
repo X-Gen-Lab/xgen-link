@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_serialize.h>
+#include <xgl/internal/xgl_serialize.h>
 #include <cstring>
 
 /*---------------------------------------------------------------------------*/

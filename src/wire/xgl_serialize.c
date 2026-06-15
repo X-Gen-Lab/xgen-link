@@ -4,7 +4,7 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_serialize.h>
+#include <xgl/internal/xgl_serialize.h>
 #include <stddef.h>
 #include <stdint.h>
 

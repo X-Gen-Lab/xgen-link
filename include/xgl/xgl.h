@@ -104,8 +104,8 @@
  *
  * \par Zero-Copy Example
  * \note            Single-frame unreliable sends are framed in the caller
- *                  buffer and passed directly to the PHY. Reliable sends may
- *                  copy into the retransmission queue to preserve ACK/retry
+ *                  buffer and passed directly to the PHY. Reliable zero-copy
+ *                  requests are rejected; use xgl_send() for ACK/retry
  *                  semantics.
  * \note            When auth_required is true, zero-copy requires
  *                  auth_provider.tag_len to be non-zero and the payload must
@@ -125,7 +125,7 @@
  *     .data_len = 5,
  *     .target_id = 2,
  *     .data_type = 0x01,
- *     .reliable = true,
+ *     .reliable = false,
  *     .priority = 0
  * };
  * xgl_send_zerocopy(handle, &tx_data);
@@ -166,9 +166,9 @@ extern "C" {
 /*---------------------------------------------------------------------------*/
 
 /* Public API types, errors, and configuration constants */
-#include "xgl_error.h"
-#include "xgl_types.h"
-#include "xgl_config.h"
+#include "xgl/xgl_error.h"
+#include "xgl/xgl_types.h"
+#include "xgl/xgl_config.h"
 
 /*---------------------------------------------------------------------------*/
 /* Version Information                                                       */
@@ -460,8 +460,8 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
  * \note            Authenticated zero-copy requires data_offset to equal
  *                  XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13
  *                  and requires config.auth_provider->tag_len to be set.
- * \note            Reliable sends keep retransmission semantics and may copy into
- *                  the reliable queue.
+ * \note            Reliable zero-copy requests are rejected. Use xgl_send()
+ *                  when retransmission storage is required.
  *
  * \par Example
  * \code{.c}
@@ -480,7 +480,7 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
  *     .data_len = 14,
  *     .target_id = 2,
  *     .data_type = 0x01,
- *     .reliable = true,
+ *     .reliable = false,
  *     .priority = 0
  * };
  *
@@ -614,7 +614,7 @@ uint32_t xgl_next_deadline_ms(xgl_handle_t handle);
  *      - Use custom allocator for deterministic allocation
  *      - Memory pools eliminate heap fragmentation
  *      - Single-frame unreliable zero-copy TX uses the caller frame buffer
- *      - Reliable zero-copy requests may copy for retransmission storage
+ *      - Reliable sends use xgl_send(); zero-copy accepts only unreliable data
  *      - All memory is freed on xgl_destroy()
  *
  * \par Error Handling

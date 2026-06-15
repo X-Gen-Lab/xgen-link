@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <xgl/xgl_crc.h>
-#include <xgl/xgl_serialize.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_crc.h>
+#include <xgl/internal/xgl_serialize.h>
+#include <xgl/internal/xgl_wire.h>
 
 #include <cstring>
 

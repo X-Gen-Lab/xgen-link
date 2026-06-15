@@ -6,12 +6,12 @@
 
 #include <gtest/gtest.h>
 #include "property_framework.h"
-#include <xgl/xgl_rtt.h>
-#include <xgl/xgl_window.h>
-#include <xgl/xgl_reliable.h>
+#include <xgl/internal/xgl_rtt.h>
+#include <xgl/internal/xgl_window.h>
+#include <xgl/internal/xgl_reliable.h>
 #include <xgl/xgl_types.h>
-#include <xgl/xgl_frame.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_frame.h>
+#include <xgl/internal/xgl_wire.h>
 #include <cmath>
 
 /*---------------------------------------------------------------------------*/

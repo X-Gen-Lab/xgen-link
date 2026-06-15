@@ -13,7 +13,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "xgl_error.h"
+#include "xgl/xgl_error.h"
 
 typedef enum {
     XGL_CODEC_KIND_COMPRESSION = 1,

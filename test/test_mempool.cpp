@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_mempool.h>
+#include <xgl/internal/xgl_mempool.h>
 #include <vector>
 #include <cstring>
 

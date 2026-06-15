@@ -121,7 +121,7 @@ void xgl_mempool_reset_stats(xgl_mempool_t* pool);
 
 #ifdef XGL_THREAD_SAFE
 
-#include "xgl_mutex.h"
+#include "xgl/internal/xgl_mutex.h"
 
 /**
  * \brief           Thread-safe memory pool structure

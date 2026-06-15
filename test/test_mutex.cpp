@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_mutex.h>
+#include <xgl/internal/xgl_mutex.h>
 
 /*---------------------------------------------------------------------------*/
 /* Basic Mutex Tests                                                         */

@@ -4,8 +4,8 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_reliable.h>
-#include <xgl/xgl_allocator.h>
+#include <xgl/internal/xgl_reliable.h>
+#include <xgl/internal/xgl_allocator.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/

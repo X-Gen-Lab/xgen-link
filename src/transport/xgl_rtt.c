@@ -12,7 +12,7 @@
  *                  average to smooth RTT measurements and calculate RTO.
  */
 
-#include <xgl/xgl_rtt.h>
+#include <xgl/internal/xgl_rtt.h>
 #include <stddef.h>
 #include <stdlib.h>
 

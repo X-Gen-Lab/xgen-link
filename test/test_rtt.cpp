@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_rtt.h>
+#include <xgl/internal/xgl_rtt.h>
 
 /*---------------------------------------------------------------------------*/
 /* Initialization Tests                                                      */

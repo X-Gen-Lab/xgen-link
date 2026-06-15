@@ -13,15 +13,15 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "xgl_error.h"
-#include "xgl_types.h"
-#include "xgl_rtt.h"
-#include "xgl_window.h"
-#include "xgl_reliable.h"
-#include "xgl_fragment.h"
-#include "xgl_layer_interface.h"
-#include "xgl_packet_pool.h"
-#include "xgl_route.h"
+#include "xgl/xgl_error.h"
+#include "xgl/xgl_types.h"
+#include "xgl/internal/xgl_rtt.h"
+#include "xgl/internal/xgl_window.h"
+#include "xgl/internal/xgl_reliable.h"
+#include "xgl/internal/xgl_fragment.h"
+#include "xgl/internal/xgl_layer_interface.h"
+#include "xgl/internal/xgl_packet_pool.h"
+#include "xgl/internal/xgl_route.h"
 
 /**
  * \brief           Reserved transport control data types

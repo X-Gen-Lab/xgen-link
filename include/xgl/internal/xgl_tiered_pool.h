@@ -13,7 +13,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdbool.h>
-#include "xgl_mempool.h"
+#include "xgl/internal/xgl_mempool.h"
 
 /*---------------------------------------------------------------------------*/
 /* Tiered Pool Configuration                                                 */

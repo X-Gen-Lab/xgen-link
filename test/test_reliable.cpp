@@ -6,10 +6,10 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <xgl/xgl_reliable.h>
+#include <xgl/internal/xgl_reliable.h>
 #include <xgl/xgl_types.h>
 #include <xgl/xgl_error.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_wire.h>
 
 using ::testing::_;
 using ::testing::Return;

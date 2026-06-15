@@ -14,8 +14,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "xgl_list.h"
-#include "xgl_types.h"
+#include "xgl/internal/xgl_list.h"
+#include "xgl/xgl_types.h"
 
 /*---------------------------------------------------------------------------*/
 /* Packet Structure                                                          */

@@ -14,12 +14,12 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "xgl_types.h"
-#include "xgl_error.h"
-#include "xgl_frame.h"
-#include "xgl_parser.h"
-#include "xgl_layer_interface.h"
-#include "xgl_security.h"
+#include "xgl/xgl_types.h"
+#include "xgl/xgl_error.h"
+#include "xgl/internal/xgl_frame.h"
+#include "xgl/internal/xgl_parser.h"
+#include "xgl/internal/xgl_layer_interface.h"
+#include "xgl/internal/xgl_security.h"
 
 #define XGL_DATALINK_REPLAY_WINDOW_COUNT 16U
 #define XGL_DATALINK_REPLAY_WINDOW_SIZE  64U

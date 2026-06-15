@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_transport.h>
+#include <xgl/internal/xgl_transport.h>
 
 /**
  * \brief           Test fixture for timeout control tests

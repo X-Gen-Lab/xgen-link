@@ -5,8 +5,8 @@
  */
 
 #include <xgl/xgl.h>
-#include <xgl/xgl_atomic.h>
-#include <xgl/xgl_mutex.h>
+#include <xgl/internal/xgl_atomic.h>
+#include <xgl/internal/xgl_mutex.h>
 #include "xgl_instance_internal.h"
 #include <string.h>
 

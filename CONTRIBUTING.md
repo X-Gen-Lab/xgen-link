@@ -222,7 +222,7 @@ test/
 
 extern "C" {
 #include "xgl/xgl.h"
-#include "transport/xgl_transport.h"
+#include "xgl/internal/xgl_transport.h"
 }
 
 class TransportTest : public ::testing::Test {
@@ -331,4 +331,3 @@ Open an issue or discussion for questions about:
 - Platform porting
 
 Thank you for contributing! 🎉
-

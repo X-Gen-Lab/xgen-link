@@ -13,7 +13,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "xgl_error.h"
+#include "xgl/xgl_error.h"
 
 /*---------------------------------------------------------------------------*/
 /* Platform Detection                                                        */

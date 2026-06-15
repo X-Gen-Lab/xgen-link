@@ -48,10 +48,11 @@ sequenceDiagram
   P->>D: bytes
   D->>W: streaming input
   W->>W: magic/header/ext/payload/trailer validation
-  W->>N: parsed frame
+  D->>D: CRC/auth/replay checks
+  D->>N: validated frame
   N->>N: local target or forwarding decision
   N->>T: local packet
-  T->>T: auth/replay/reliability/order handling
+  T->>T: reliability/order/fragment handling
   T->>App: rx_callback
 ```
 
@@ -91,4 +92,4 @@ The production path is fail-closed:
 
 ## API Exposure
 
-Normal SDK installs only public API headers. Wire, parser, reliable, window, and fragment headers are internal maintenance/test surfaces, not stable user ABI.
+Normal SDK installs only public API headers. Wire, parser, reliable, window, and fragment headers live under `include/xgl/internal` for maintenance, tests, and advanced integrations; they are not stable user ABI.

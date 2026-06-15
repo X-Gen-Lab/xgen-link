@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_route.h>
+#include <xgl/internal/xgl_route.h>
 #include <xgl/xgl_error.h>
 #include <cstring>
 

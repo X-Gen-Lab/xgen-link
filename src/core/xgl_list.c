@@ -4,7 +4,7 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_list.h>
+#include <xgl/internal/xgl_list.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -272,7 +272,7 @@ xgl_list_node_t* xgl_list_prev(const xgl_list_node_t* node) {
 
 #ifdef XGL_THREAD_SAFE
 
-#include "xgl_mutex.h"
+#include "xgl/internal/xgl_mutex.h"
 
 /**
  * \brief           Initialize thread-safe list

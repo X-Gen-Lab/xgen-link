@@ -4,8 +4,8 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_fragment.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_fragment.h>
+#include <xgl/internal/xgl_wire.h>
 #include <cstring>
 #include <vector>
 

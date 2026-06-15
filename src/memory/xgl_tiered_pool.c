@@ -4,8 +4,8 @@
  * \author          Nexus Team
  */
 
-#include "xgl/xgl_tiered_pool.h"
-#include "xgl/xgl_allocator.h"
+#include "xgl/internal/xgl_tiered_pool.h"
+#include "xgl/internal/xgl_allocator.h"
 #include <stdint.h>
 #include <string.h>
 

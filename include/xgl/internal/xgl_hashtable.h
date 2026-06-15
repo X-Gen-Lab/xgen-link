@@ -14,8 +14,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "xgl_types.h"
-#include "xgl_error.h"
+#include "xgl/xgl_types.h"
+#include "xgl/xgl_error.h"
 
 /*---------------------------------------------------------------------------*/
 /* Hash Table Configuration                                                  */

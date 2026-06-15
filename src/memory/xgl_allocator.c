@@ -4,7 +4,7 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_allocator.h>
+#include <xgl/internal/xgl_allocator.h>
 #include <stdlib.h>
 #include <string.h>
 

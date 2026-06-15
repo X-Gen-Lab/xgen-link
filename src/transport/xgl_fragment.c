@@ -4,10 +4,10 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_fragment.h>
-#include <xgl/xgl_allocator.h>
-#include <xgl/xgl_time.h>
-#include <xgl/xgl_serialize.h>
+#include <xgl/internal/xgl_fragment.h>
+#include <xgl/internal/xgl_allocator.h>
+#include <xgl/internal/xgl_time.h>
+#include <xgl/internal/xgl_serialize.h>
 #include <string.h>
 #include <stdint.h>
 

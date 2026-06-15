@@ -3,7 +3,7 @@
  * \brief           Optional codec module registry
  */
 
-#include "xgl/xgl_codec.h"
+#include "xgl/internal/xgl_codec.h"
 #include <string.h>
 
 xgl_error_t xgl_codec_registry_init(xgl_codec_registry_t* registry,

@@ -5,7 +5,7 @@
 ## 支持范围
 
 - true zero-copy：单帧 unreliable。
-- reliable zero-copy：为了重传语义，可能复制到 reliable queue。
+- reliable zero-copy：返回 `XGL_ERR_INVALID_PARAM`；需要 ACK/retry 语义时使用 `xgl_send()`。
 
 ## Buffer 要求
 
@@ -20,10 +20,10 @@
 
 ## 所有权
 
-PHY TX 调用返回前 caller buffer 必须保持有效。可靠 zero-copy 可能复制数据用于重传，因此 caller 不应通过观察是否复制来推断可靠性状态。
+PHY TX 调用返回前 caller buffer 必须保持有效。zero-copy 路径会绕过 transport 和 network 的常规发送处理，在 raw datalink 发送成功后显式补齐两层 TX 统计。
 
 ## 常见误用
 
 - 未预留 header 空间。
 - 在 `auth_required=true` 时使用不带 tag length 的 provider。
-- 把 reliable zero-copy 当作永不复制。
+- 把 reliable 数据传给 `xgl_send_zerocopy()`，而不是使用 `xgl_send()`。

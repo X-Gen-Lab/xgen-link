@@ -7,9 +7,9 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_allocator.h>
-#include <xgl/xgl_network.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_allocator.h>
+#include <xgl/internal/xgl_network.h>
+#include <xgl/internal/xgl_wire.h>
 #include <cstring>
 #include <vector>
 
@@ -442,6 +442,41 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
     EXPECT_EQ(std::memcmp(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U), 0);
+}
+
+TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
+    uint8_t buffer[64] = {};
+    const char payload[] = "stats";
+    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+
+    xgl_tx_data_zerocopy_t tx_data = {
+        .buffer = buffer,
+        .buffer_size = sizeof(buffer),
+        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_len = sizeof(payload) - 1U,
+        .target_id = 2,
+        .data_type = 1,
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 0
+    };
+
+    const size_t expected_frame_len =
+        XGL_FRAME_HEADER_SIZE + tx_data.data_len + XGL_CRC16_SIZE;
+    EXPECT_CALL(*mock_phy, tx(buffer, expected_frame_len, testing::_))
+        .Times(1)
+        .WillOnce(testing::Return(XGL_OK));
+
+    ASSERT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
+
+    xgl_statistics_t stats = {};
+    ASSERT_EQ(xgl_stats_get(handle, &stats), XGL_OK);
+    EXPECT_EQ(stats.transport.tx_packets, 1U);
+    EXPECT_EQ(stats.transport.tx_bytes, tx_data.data_len);
+    EXPECT_EQ(stats.network.tx_packets, 1U);
+    EXPECT_EQ(stats.network.tx_bytes, tx_data.data_len);
+    EXPECT_EQ(stats.datalink.tx_packets, 1U);
+    EXPECT_EQ(stats.datalink.tx_bytes, expected_frame_len);
 }
 
 TEST_F(XglSendTest, ZeroCopyReliableIsRejectedInsteadOfImplicitCopyFallback) {

@@ -4,7 +4,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_codec.h>
+#include <xgl/internal/xgl_codec.h>
 #include <cstring>
 
 namespace {

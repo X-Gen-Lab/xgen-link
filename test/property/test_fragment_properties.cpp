@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 #include "property_framework.h"
-#include <xgl/xgl_fragment.h>
+#include <xgl/internal/xgl_fragment.h>
 #include <xgl/xgl_error.h>
 #include <cstring>
 #include <vector>

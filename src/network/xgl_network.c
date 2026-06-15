@@ -4,13 +4,13 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_network.h>
-#include <xgl/xgl_frame.h>
+#include <xgl/internal/xgl_network.h>
+#include <xgl/internal/xgl_frame.h>
 #include <xgl/xgl_error.h>
-#include <xgl/xgl_route.h>
-#include <xgl/xgl_crc.h>
-#include <xgl/xgl_serialize.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_route.h>
+#include <xgl/internal/xgl_crc.h>
+#include <xgl/internal/xgl_serialize.h>
+#include <xgl/internal/xgl_wire.h>
 #include <xgl/xgl_config.h>
 #include <string.h>
 #include <stdio.h>

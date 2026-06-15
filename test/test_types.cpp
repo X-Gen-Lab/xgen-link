@@ -8,7 +8,7 @@
 #include <cstring>
 #include "xgl/xgl.h"
 #include "xgl/xgl_types.h"
-#include "xgl/xgl_wire.h"
+#include "xgl/internal/xgl_wire.h"
 
 #if defined(XGL_SEQUENCE_H)
 #error "xgl/xgl.h must not expose legacy 8-bit sequence manager in the production API"
@@ -28,7 +28,7 @@
 #error "xgl/xgl.h must not expose internal protocol layer headers in the production API"
 #endif
 
-#include "xgl/xgl_packet_pool.h"
+#include "xgl/internal/xgl_packet_pool.h"
 
 /*---------------------------------------------------------------------------*/
 /* Type Size Tests                                                           */

@@ -9,7 +9,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_wire.h>
+#include <xgl/internal/xgl_wire.h>
 #include <random>
 #include <vector>
 #include <algorithm>

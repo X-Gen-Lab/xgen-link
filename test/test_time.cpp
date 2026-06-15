@@ -5,7 +5,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <xgl/xgl_time.h>
+#include <xgl/internal/xgl_time.h>
 #include <thread>
 #include <chrono>
 

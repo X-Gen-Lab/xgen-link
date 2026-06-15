@@ -4,10 +4,10 @@
  * \author          Nexus Team
  */
 
-#include <xgl/xgl_route.h>
-#include <xgl/xgl_allocator.h>
+#include <xgl/internal/xgl_route.h>
+#include <xgl/internal/xgl_allocator.h>
 #include <xgl/xgl_error.h>
-#include <xgl/xgl_hashtable.h>
+#include <xgl/internal/xgl_hashtable.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/

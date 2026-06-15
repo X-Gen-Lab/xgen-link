@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
-#include <xgl/xgl_allocator.h>
+#include <xgl/internal/xgl_allocator.h>
 #include <cstdlib>
 
 namespace {

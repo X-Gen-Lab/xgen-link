@@ -45,6 +45,10 @@ foreach(header IN LISTS forbidden_installed_headers)
     endif()
 endforeach()
 
+if(EXISTS "${install_prefix}/include/xgl/internal")
+    message(FATAL_ERROR "internal xgl header directory was installed")
+endif()
+
 file(WRITE "${consumer_src}/CMakeLists.txt" [=[
 cmake_minimum_required(VERSION 3.21)
 project(xgl_consumer_smoke C)
