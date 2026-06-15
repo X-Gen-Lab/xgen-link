@@ -21,4 +21,4 @@ Internal protocol headers such as `xgl_wire.h`, `xgl_parser.h`, and `xgl_reliabl
 
 The CMake documentation build generates the public C API reference:
 
-[Open generated Doxygen API](/api/doxygen/html/index.html)
+<a href="../../../api/doxygen/html/index.html">Open generated Doxygen API</a>

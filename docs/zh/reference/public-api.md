@@ -21,4 +21,4 @@
 
 CMake 文档构建会生成公共 C API 参考：
 
-[Open generated Doxygen API](/api/doxygen/html/index.html)
+<a href="../../../api/doxygen/html/index.html">Open generated Doxygen API</a>

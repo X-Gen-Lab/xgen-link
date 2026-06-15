@@ -1,12 +1,17 @@
 site_name: XGL
 site_description: Production-grade MCU multi-node reliable protocol stack
 site_author: Nexus Team
+site_url: https://x-gen-lab.github.io/xgen-link/
 repo_name: xgen-link
+repo_url: https://github.com/X-Gen-Lab/xgen-link
 docs_dir: docs
 site_dir: site
 strict: true
 exclude_docs: |
   README.md
+  CMakeLists.txt
+  Doxyfile.in
+  requirements.txt
 
 theme:
   name: material
@@ -26,10 +31,10 @@ theme:
 extra:
   alternate:
     - name: 简体中文
-      link: /zh/
+      link: https://x-gen-lab.github.io/xgen-link/zh/
       lang: zh
     - name: English
-      link: /en/
+      link: https://x-gen-lab.github.io/xgen-link/en/
       lang: en
 
 plugins:
@@ -53,6 +58,7 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
 
 nav:
+  - Home: index.md
   - 简体中文:
       - 首页: zh/index.md
       - 快速开始:
