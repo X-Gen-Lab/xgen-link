@@ -366,6 +366,102 @@ TEST_F(XglNetworkTest, SendPacketWithRoute) {
     EXPECT_EQ(stats.tx_packets, 1);
 }
 
+TEST_F(XglNetworkTest, SendPacketEncodesApplicationTypeAsHeaderExtension) {
+    constexpr uint8_t kAppTypeThatCollidesWithAck = XGL_PACKET_TYPE_ACK;
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1);
+
+    const uint8_t payload[] = {'a', 'p', 'p'};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = sizeof(payload),
+        .data = payload,
+        .owned_data = nullptr
+    };
+
+    struct CapturedFrameMessage {
+        xgl_frame_t frame = {};
+        std::vector<uint8_t> extensions;
+    } capture;
+    xgl_layer_interface_t lower_layer = {};
+    lower_layer.ctx = &capture;
+    lower_layer.send = [](void* ctx, xgl_handle_t handle, void* data) -> xgl_error_t {
+        (void)handle;
+        auto* capture = static_cast<CapturedFrameMessage*>(ctx);
+        auto* message = static_cast<xgl_frame_tx_message_t*>(data);
+        if (capture == nullptr || message == nullptr || message->frame == nullptr) {
+            return XGL_ERR_NULL_POINTER;
+        }
+        capture->frame = *message->frame;
+        if (message->frame->extensions != nullptr && message->frame->extensions_len > 0U) {
+            capture->extensions.assign(message->frame->extensions,
+                                       message->frame->extensions +
+                                           message->frame->extensions_len);
+            capture->frame.extensions = capture->extensions.data();
+        }
+        return XGL_OK;
+    };
+    network_ctx.lower_layer = &lower_layer;
+
+    xgl_packet_t packet = {
+        .source_id = LOCAL_ID,
+        .target_id = REMOTE_ID,
+        .data_type = kAppTypeThatCollidesWithAck,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
+        .priority = 4,
+        .data = &packet_data
+    };
+
+    ASSERT_EQ(xgl_network_send(&network_ctx, &packet, false), XGL_OK);
+    EXPECT_EQ(capture.frame.header.packet_type, XGL_PACKET_TYPE_DATA);
+    EXPECT_NE(capture.frame.header.flags & XGL_WIRE_FLAG_HAS_EXTENSIONS, 0U);
+    ASSERT_NE(capture.frame.extensions, nullptr);
+
+    xgl_wire_ext_cursor_t cursor = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
+                                       capture.extensions.data(),
+                                       capture.extensions.size()),
+              XGL_OK);
+    xgl_wire_ext_t ext = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+    EXPECT_EQ(ext.type, XGL_WIRE_EXT_DATA_TYPE);
+    ASSERT_EQ(ext.len, 1U);
+    EXPECT_EQ(ext.value[0], kAppTypeThatCollidesWithAck);
+}
+
+TEST_F(XglNetworkTest, SendPacketRejectsConflictingDataTypeExtension) {
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1);
+
+    uint8_t ext_buf[XGL_DATA_TYPE_EXT_SIZE] = {};
+    uint8_t ext_data_type = 7U;
+    size_t ext_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(ext_buf,
+                                  sizeof(ext_buf),
+                                  XGL_WIRE_EXT_DATA_TYPE,
+                                  &ext_data_type,
+                                  1U,
+                                  &ext_len),
+              XGL_OK);
+
+    const uint8_t payload[] = {'a'};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = sizeof(payload),
+        .data = payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t packet = {
+        .source_id = LOCAL_ID,
+        .target_id = REMOTE_ID,
+        .data_type = 9U,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
+        .data = &packet_data,
+        .extensions = ext_buf,
+        .extensions_len = ext_len
+    };
+
+    EXPECT_EQ(xgl_network_send(&network_ctx, &packet, false), XGL_ERR_INVALID_PARAM);
+}
+
 TEST_F(XglNetworkTest, SendPacketNullPointer) {
     xgl_error_t err = xgl_network_send(nullptr, nullptr, false);
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
@@ -543,6 +639,59 @@ TEST_F(XglNetworkTest, ReceiveInvalidFrame) {
     
     xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf, 5);
     EXPECT_EQ(err, XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(stats.rx_errors, 1);
+}
+
+TEST_F(XglNetworkTest, ReceiveRejectsDuplicateDataTypeExtension) {
+    uint8_t ext_buf[XGL_DATA_TYPE_EXT_SIZE * 2U] = {};
+    uint8_t data_type_a = 3U;
+    uint8_t data_type_b = 4U;
+    size_t ext_len = 0U;
+    size_t written = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(ext_buf,
+                                  sizeof(ext_buf),
+                                  XGL_WIRE_EXT_DATA_TYPE,
+                                  &data_type_a,
+                                  1U,
+                                  &written),
+              XGL_OK);
+    ext_len += written;
+    ASSERT_EQ(xgl_wire_encode_ext(&ext_buf[ext_len],
+                                  sizeof(ext_buf) - ext_len,
+                                  XGL_WIRE_EXT_DATA_TYPE,
+                                  &data_type_b,
+                                  1U,
+                                  &written),
+              XGL_OK);
+    ext_len += written;
+
+    const uint8_t payload[] = {'x'};
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = REMOTE_ID,
+        .target_id = LOCAL_ID,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .extensions = ext_buf,
+        .extensions_len = ext_len,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .ttl = XGL_DEFAULT_TTL
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> frame_buf(xgl_frame_calculate_size(sizeof(payload)) + ext_len);
+    size_t frame_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(),
+                                  frame_buf.size(),
+                                  &frame,
+                                  &frame_len),
+              XGL_OK);
+
+    EXPECT_EQ(xgl_network_receive(&network_ctx,
+                                  nullptr,
+                                  frame_buf.data(),
+                                  frame_len),
+              XGL_ERR_INVALID_FRAME);
     EXPECT_EQ(stats.rx_errors, 1);
 }
 

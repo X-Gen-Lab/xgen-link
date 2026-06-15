@@ -20,16 +20,20 @@ XGL v2 的基础头固定 24 bytes。wire path 不依赖 packed struct 或 `memc
 
 ## CRC 范围
 
-`header_crc16` 覆盖基础头和扩展头，但 CRC 字段本身按零值参与计算。payload 完整性由 frame CRC 和认证 tag 覆盖。
+`header_crc16` 只覆盖 24-byte 基础头，CRC 字段本身按零值参与计算。TLV 扩展、payload 和认证 trailer 的完整性由 frame CRC 覆盖；认证开启时还由 auth tag 覆盖。
+
+## Traffic Class
+
+`traffic_class` 的高两位表示可靠性类别：`NONE(0x00)`、`ACK_ELICITING(0x40)`、`ACK_ONLY(0x80)`。`0x20` 表示分片，低三位表示优先级。`flags` 中的 ACK/FRAGMENT/CONTROL 位用于快速判断和冗余校验，不能替代 `traffic_class` 的类别语义。
 
 ## Packet Type
 
 | 值 | 名称 | 说明 |
 | ---: | --- | --- |
 | 0 | INVALID | 非法类型，不应出现在生产帧 |
-| 1 | DATA | 应用 payload |
+| 1 | DATA | 应用 payload；应用 `data_type` 放在 DATA_TYPE_EXT |
 | 2 | ACK | ACK range 或 SACK 控制包 |
-| 3 | CONTROL | RESET、NACK 等控制语义 |
+| 3 | CONTROL | RESET、NACK 等控制语义；控制子类型放在 DATA_TYPE_EXT |
 | 4 | HANDSHAKE | 会话/能力协商预留 |
 | 5 | ROUTE | 路由控制预留 |
 | 6 | PROBE | 探测预留 |

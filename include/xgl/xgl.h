@@ -108,20 +108,23 @@
  *                  requests are rejected; use xgl_send() for ACK/retry
  *                  semantics.
  * \note            When auth_required is true, zero-copy requires
- *                  auth_provider.tag_len to be non-zero and the payload must
- *                  start after the base header plus SECURITY_EXT.
+ *                  auth_provider.tag_len to be within
+ *                  (0, XGL_AUTH_TAG_MAX_LEN] and the payload must
+ *                  start after DATA_TYPE_EXT (when data_type is non-zero)
+ *                  plus SECURITY_EXT.
  * \code{.c}
  * // Allocate buffer with header space
- * uint8_t buffer[XGL_FRAME_HEADER_SIZE + 100];
+ * uint8_t buffer[XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE + 100];
  *
  * // Write data after header space
- * memcpy(buffer + XGL_FRAME_HEADER_SIZE, "Hello", 5);
+ * size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE;
+ * memcpy(buffer + data_offset, "Hello", 5);
  *
  * // Send without copying
  * xgl_tx_data_zerocopy_t tx_data = {
  *     .buffer = buffer,
  *     .buffer_size = sizeof(buffer),
- *     .data_offset = XGL_FRAME_HEADER_SIZE,
+ *     .data_offset = data_offset,
  *     .data_len = 5,
  *     .target_id = 2,
  *     .data_type = 0x01,
@@ -454,29 +457,33 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
  * \param[in]       handle: Instance handle
  * \param[in]       tx_data: Zero-copy transmission data structure
  * \return          XGL_OK on success, error code otherwise
- * \note            Buffer must have XGL_FRAME_HEADER_SIZE bytes reserved at start
+ * \note            Buffer must reserve XGL_FRAME_HEADER_SIZE bytes plus
+ *                  XGL_DATA_TYPE_EXT_SIZE when data_type is non-zero.
  * \note            Unreliable single-frame sends are framed in the caller buffer
  *                  and transmitted without an intermediate frame copy.
  * \note            Authenticated zero-copy requires data_offset to equal
- *                  XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13
- *                  and requires config.auth_provider->tag_len to be set.
+ *                  XGL_FRAME_HEADER_SIZE + optional XGL_DATA_TYPE_EXT_SIZE
+ *                  + SECURITY_EXT(15 bytes)
+ *                  and requires config.auth_provider->tag_len to be within
+ *                  (0, XGL_AUTH_TAG_MAX_LEN].
  * \note            Reliable zero-copy requests are rejected. Use xgl_send()
  *                  when retransmission storage is required.
  *
  * \par Example
  * \code{.c}
  * // Allocate buffer with header space
- * uint8_t buffer[XGL_FRAME_HEADER_SIZE + 100];
+ * uint8_t buffer[XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE + 100];
  *
  * // Write data after header space
- * uint8_t* data_ptr = buffer + XGL_FRAME_HEADER_SIZE;
+ * size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE;
+ * uint8_t* data_ptr = buffer + data_offset;
  * memcpy(data_ptr, "Zero-copy data", 14);
  *
  * // Send without copying
  * xgl_tx_data_zerocopy_t tx_data = {
  *     .buffer = buffer,
  *     .buffer_size = sizeof(buffer),
- *     .data_offset = XGL_FRAME_HEADER_SIZE,
+ *     .data_offset = data_offset,
  *     .data_len = 14,
  *     .target_id = 2,
  *     .data_type = 0x01,

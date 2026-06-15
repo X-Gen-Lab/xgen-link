@@ -21,6 +21,7 @@ This key isolates:
 
 - ACK_RANGE_EXT can release multiple sent packets at once.
 - SACK_EXT describes holes, keeps missing packets pending, and enables fast retransmit.
+- ACK_RANGE_EXT and SACK_EXT live in the header TLV area and do not consume payload.
 - ACK-only packets do not rely on a single-byte ACK field in the base header.
 
 ## Sender State

@@ -47,8 +47,8 @@ typedef struct {
 typedef struct {
     uint16_t source_id;         /**< Source node ID */
     uint16_t target_id;         /**< Target node ID */
-    uint8_t data_type;          /**< Data type */
-    uint8_t packet_type;        /**< Production packet type, 0 uses data_type/DATA */
+    uint8_t data_type;          /**< Application/control data type; encoded by upper layers */
+    uint8_t packet_type;        /**< Production packet type, 0 uses DATA */
     uint8_t flags;              /**< Production wire flags merged with derived flags */
     uint8_t traffic_class;      /**< Production traffic class, 0 uses priority */
     uint32_t connection_id;     /**< Production connection context ID */
@@ -109,11 +109,12 @@ xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
  * \brief           Build frame in zero-copy mode
  * \param[in,out]   buffer: Buffer with pre-allocated header space
  * \param[in]       buffer_size: Total buffer size
- * \param[in]       data_offset: Offset where payload data starts
+ * \param[in]       data_offset: Payload offset; use XGL_FRAME_HEADER_SIZE plus
+ *                  XGL_DATA_TYPE_EXT_SIZE when data_type is non-zero
  * \param[in]       data_len: Payload data length
  * \param[in]       source_id: Source node ID
  * \param[in]       target_id: Target node ID
- * \param[in]       data_type: Data type
+ * \param[in]       data_type: Application data type encoded as DATA_TYPE_EXT
  * \param[in]       packet_number: Production packet number
  * \param[in]       reliable: Reliable transmission flag
  * \param[in]       priority: Priority level (0-7)

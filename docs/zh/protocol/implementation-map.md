@@ -49,6 +49,7 @@
 | `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | payload 内不再放分片头 |
 | `SECURITY_EXT` | `xgl_wire_encode/decode_security_ext_value` | frame、datalink、network | 标记 key、nonce/material、tag 长度 |
 | `ROUTE_EXT` | `xgl_wire_encode/decode_route_ext_value` | network/routing | route epoch、上一跳、下一跳、metric |
+| `DATA_TYPE_EXT` | `xgl_wire_encode_ext` | network、transport | 应用 data_type 或控制子类型，避免污染 packet_type |
 
 ## 公共 API 与内部 API
 

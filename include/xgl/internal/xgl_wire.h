@@ -51,7 +51,8 @@ typedef enum {
     XGL_WIRE_EXT_FRAGMENT = 4,
     XGL_WIRE_EXT_SECURITY = 5,
     XGL_WIRE_EXT_ROUTE = 6,
-    XGL_WIRE_EXT_TIMESTAMP = 7
+    XGL_WIRE_EXT_TIMESTAMP = 7,
+    XGL_WIRE_EXT_DATA_TYPE = 8
 } xgl_wire_ext_type_t;
 
 /*---------------------------------------------------------------------------*/

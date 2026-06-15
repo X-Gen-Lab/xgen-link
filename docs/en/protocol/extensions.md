@@ -18,6 +18,7 @@ Extensions immediately follow the 24-byte base header.
 | FRAGMENT_EXT | `message_id`, `fragment_offset`, `message_len` | Fragment reassembly |
 | SECURITY_EXT | `key_id`, nonce/material metadata | Authentication trailer metadata |
 | ROUTE_EXT | previous hop, next hop, route epoch, metric | Routing metadata |
+| DATA_TYPE_EXT | `data_type` | Application payload class or transport control subtype |
 
 ## Value Format
 
@@ -29,8 +30,10 @@ Extensions immediately follow the 24-byte base header.
 | FRAGMENT_EXT | 12 | `message_id u32`, `fragment_offset u32`, `message_len u32` |
 | SECURITY_EXT | 13 | `key_id u32`, `nonce_id u64`, `tag_len u8` |
 | ROUTE_EXT | 10 | `previous_hop u16`, `next_hop u16`, `route_epoch u32`, `metric u16` |
+| DATA_TYPE_EXT | 1 | `data_type u8` |
 
 ACK ranges use `gap` and `length` to describe acknowledged ranges backwards from `largest_ack`. SACK bitmap bits describe receive state for `base_packet + bit_index`.
+ACK_RANGE_EXT and SACK_EXT live in the header TLV area, not in payload.
 
 ## Failure Rules
 

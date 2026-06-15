@@ -25,6 +25,8 @@ public:
 
 /* Global mock instance for C callbacks */
 static MockPhy* g_mock_phy = nullptr;
+static constexpr size_t kZeroCopyAppHeaderLen =
+    XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
 
 /* C callback wrappers */
 static xgl_error_t mock_phy_tx(const uint8_t* data, size_t len, void* user_data) {
@@ -418,12 +420,12 @@ TEST_F(XglSendTest, ZeroCopySendWithBufferTooSmall) {
 TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     uint8_t buffer[64] = {};
     const char payload[] = "zcopy";
-    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+    memcpy(buffer + kZeroCopyAppHeaderLen, payload, sizeof(payload) - 1U);
 
     xgl_tx_data_zerocopy_t tx_data = {
         .buffer = buffer,
         .buffer_size = sizeof(buffer),
-        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_offset = kZeroCopyAppHeaderLen,
         .data_len = sizeof(payload) - 1U,
         .target_id = 2,
         .data_type = 1,
@@ -433,7 +435,7 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     };
 
     EXPECT_CALL(*mock_phy, tx(buffer,
-                              XGL_FRAME_HEADER_SIZE + tx_data.data_len + XGL_CRC16_SIZE,
+                              kZeroCopyAppHeaderLen + tx_data.data_len + XGL_CRC16_SIZE,
                               testing::_))
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
@@ -441,18 +443,18 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     EXPECT_EQ(xgl_send_zerocopy(handle, &tx_data), XGL_OK);
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
-    EXPECT_EQ(std::memcmp(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U), 0);
+    EXPECT_EQ(std::memcmp(buffer + kZeroCopyAppHeaderLen, payload, sizeof(payload) - 1U), 0);
 }
 
 TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
     uint8_t buffer[64] = {};
     const char payload[] = "stats";
-    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+    memcpy(buffer + kZeroCopyAppHeaderLen, payload, sizeof(payload) - 1U);
 
     xgl_tx_data_zerocopy_t tx_data = {
         .buffer = buffer,
         .buffer_size = sizeof(buffer),
-        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_offset = kZeroCopyAppHeaderLen,
         .data_len = sizeof(payload) - 1U,
         .target_id = 2,
         .data_type = 1,
@@ -462,7 +464,7 @@ TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
     };
 
     const size_t expected_frame_len =
-        XGL_FRAME_HEADER_SIZE + tx_data.data_len + XGL_CRC16_SIZE;
+        kZeroCopyAppHeaderLen + tx_data.data_len + XGL_CRC16_SIZE;
     EXPECT_CALL(*mock_phy, tx(buffer, expected_frame_len, testing::_))
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
@@ -520,7 +522,8 @@ TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
     ASSERT_EQ(xgl_init(handle), XGL_OK);
 
     constexpr size_t auth_header_len =
-        XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 13U;
+        XGL_WIRE_BASE_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U +
+        XGL_WIRE_EXT_HEADER_SIZE + 13U;
     uint8_t buffer[128] = {};
     const char payload[] = "auth-zcopy";
     memcpy(buffer + auth_header_len, payload, sizeof(payload) - 1U);
@@ -558,6 +561,10 @@ TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
               XGL_OK);
     xgl_wire_ext_t ext = {};
     ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+    EXPECT_EQ(ext.type, XGL_WIRE_EXT_DATA_TYPE);
+    ASSERT_EQ(ext.len, 1U);
+    EXPECT_EQ(ext.value[0], tx_data.data_type);
+    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
     EXPECT_EQ(ext.type, XGL_WIRE_EXT_SECURITY);
 
     uint32_t key_id = 0;
@@ -593,11 +600,11 @@ TEST_F(XglSendTest, ZeroCopyUnreliableRejectsPayloadExceedingRouteMtu) {
     ASSERT_EQ(xgl_init(handle), XGL_OK);
 
     uint8_t buffer[128] = {};
-    memset(buffer + XGL_FRAME_HEADER_SIZE, 0xAB, 60);
+    memset(buffer + kZeroCopyAppHeaderLen, 0xAB, 60);
     xgl_tx_data_zerocopy_t tx_data = {
         .buffer = buffer,
         .buffer_size = sizeof(buffer),
-        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_offset = kZeroCopyAppHeaderLen,
         .data_len = 60,
         .target_id = 2,
         .data_type = 1,
@@ -613,12 +620,12 @@ TEST_F(XglSendTest, ZeroCopyUnreliableRejectsPayloadExceedingRouteMtu) {
 TEST_F(XglSendTest, ZeroCopyUnreliableWritesDefaultTtlAndEmptySession) {
     uint8_t buffer[64] = {};
     const char payload[] = "zcopy";
-    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
+    memcpy(buffer + kZeroCopyAppHeaderLen, payload, sizeof(payload) - 1U);
 
     xgl_tx_data_zerocopy_t tx_data = {
         .buffer = buffer,
         .buffer_size = sizeof(buffer),
-        .data_offset = XGL_FRAME_HEADER_SIZE,
+        .data_offset = kZeroCopyAppHeaderLen,
         .data_len = sizeof(payload) - 1U,
         .target_id = 2,
         .data_type = 1,

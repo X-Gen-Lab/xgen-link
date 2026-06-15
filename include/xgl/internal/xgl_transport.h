@@ -25,8 +25,7 @@ extern "C" {
 
 /**
  * \brief           Reserved transport control data types
- * \details         Frame data_type is 4-bit wide. Values 0x0E and 0x0F are
- *                  reserved for transport session lifecycle control.
+ * \details         Values are carried in DATA_TYPE_EXT on CONTROL packets.
  */
 #define XGL_TRANSPORT_CONTROL_HELLO 0x0E
 #define XGL_TRANSPORT_CONTROL_RESET 0x0F

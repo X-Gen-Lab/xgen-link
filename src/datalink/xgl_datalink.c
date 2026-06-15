@@ -135,7 +135,7 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
             }
             return XGL_ERR_INVALID_PARAM;
         }
-        frame_size += XGL_WIRE_EXT_HEADER_SIZE + 13U + 32U;
+        frame_size += XGL_WIRE_EXT_HEADER_SIZE + 13U + XGL_AUTH_TAG_MAX_LEN;
     }
     
     /* Use stack buffer for small frames, heap for large frames */

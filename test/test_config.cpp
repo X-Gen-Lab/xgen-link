@@ -222,6 +222,23 @@ TEST_F(XglConfigTest, ValidateAuthRequiredNeedsProvider) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 }
 
+TEST_F(XglConfigTest, ValidateRejectsAuthTagLengthAboveProtocolLimit) {
+    xgl_config_get_default(&config);
+    config.auth_required = true;
+    config.auth_key_id = 7;
+    config.memory.allocator = xgl_allocator_get_default();
+
+    xgl_auth_provider_t provider = {
+        .sign = mock_auth_sign,
+        .verify = mock_auth_verify,
+        .tag_len = 33U,
+        .user_data = nullptr
+    };
+    config.auth_provider = &provider;
+
+    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+}
+
 #ifndef XGL_THREAD_SAFE
 TEST_F(XglConfigTest, ValidateRejectsRuntimeThreadSafeWithoutBuildSupport) {
     xgl_config_get_default(&config);

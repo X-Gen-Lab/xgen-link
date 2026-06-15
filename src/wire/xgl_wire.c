@@ -533,7 +533,7 @@ xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
         frame_len == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    if (provider->tag_len == 0U || provider->tag_len > UINT8_MAX) {
+    if (provider->tag_len == 0U || provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -582,7 +582,7 @@ xgl_error_t xgl_wire_verify_auth_trailer(const uint8_t* buffer,
         valid == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    if (provider->tag_len == 0U || provider->tag_len > UINT8_MAX) {
+    if (provider->tag_len == 0U || provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
         return XGL_ERR_INVALID_PARAM;
     }
 

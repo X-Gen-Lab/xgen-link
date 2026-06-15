@@ -16,7 +16,7 @@
 
 ## 偏移规则
 
-未认证单帧发送通常从 `XGL_FRAME_HEADER_SIZE` 开始放 payload。认证路径需要额外 SECURITY_EXT，因此 data offset 必须匹配当前 frame builder 对 header/ext 的要求。不要手写 magic 或 CRC，调用 API 让协议栈填充。
+未认证单帧发送在 `data_type == 0` 时从 `XGL_FRAME_HEADER_SIZE` 开始放 payload；当 `data_type != 0` 时必须额外预留 DATA_TYPE_EXT，因此 offset 为 `XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE`。认证路径还需要 SECURITY_EXT，offset 必须再加 15 bytes。不要手写 magic 或 CRC，调用 API 让协议栈填充。
 
 ## 所有权
 

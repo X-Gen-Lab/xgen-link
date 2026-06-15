@@ -15,11 +15,125 @@
 #include <string.h>
 #include <stdio.h>
 
-#define XGL_NETWORK_AUTH_TAG_CAPACITY 32U
-
 /*---------------------------------------------------------------------------*/
 /* Private Helper Functions                                                  */
 /*---------------------------------------------------------------------------*/
+
+static xgl_error_t network_decode_data_type_ext(const uint8_t* extensions,
+                                                size_t extensions_len,
+                                                uint8_t* data_type,
+                                                bool* found);
+
+static xgl_error_t network_append_data_type_ext(uint8_t* extensions,
+                                                size_t extensions_capacity,
+                                                size_t* extensions_len,
+                                                uint8_t data_type) {
+    if (extensions == NULL || extensions_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (data_type == 0U) {
+        return XGL_OK;
+    }
+    if (*extensions_len > extensions_capacity) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    size_t bytes_written = 0U;
+    xgl_error_t err = xgl_wire_encode_ext(&extensions[*extensions_len],
+                                          extensions_capacity - *extensions_len,
+                                          XGL_WIRE_EXT_DATA_TYPE,
+                                          &data_type,
+                                          1U,
+                                          &bytes_written);
+    if (err != XGL_OK) {
+        return err;
+    }
+    *extensions_len += bytes_written;
+    return XGL_OK;
+}
+
+static xgl_error_t network_copy_packet_extensions(uint8_t* extensions,
+                                                  size_t extensions_capacity,
+                                                  size_t* extensions_len,
+                                                  const xgl_packet_t* packet) {
+    if (extensions == NULL || extensions_len == NULL || packet == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    *extensions_len = 0U;
+    if (packet->extensions != NULL && packet->extensions_len > 0U) {
+        if (packet->extensions_len > extensions_capacity) {
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+        memcpy(extensions, packet->extensions, packet->extensions_len);
+        *extensions_len = packet->extensions_len;
+    }
+
+    uint8_t existing_data_type = 0U;
+    bool data_type_found = false;
+    xgl_error_t err = network_decode_data_type_ext(extensions,
+                                                   *extensions_len,
+                                                   &existing_data_type,
+                                                   &data_type_found);
+    if (err != XGL_OK) {
+        return err;
+    }
+    if (data_type_found) {
+        if (packet->data_type != 0U && packet->data_type != existing_data_type) {
+            return XGL_ERR_INVALID_PARAM;
+        }
+        return XGL_OK;
+    }
+
+    return network_append_data_type_ext(extensions,
+                                        extensions_capacity,
+                                        extensions_len,
+                                        packet->data_type);
+}
+
+static xgl_error_t network_decode_data_type_ext(const uint8_t* extensions,
+                                                size_t extensions_len,
+                                                uint8_t* data_type,
+                                                bool* found) {
+    if (data_type == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    *data_type = 0U;
+    if (found != NULL) {
+        *found = false;
+    }
+    if (extensions == NULL || extensions_len == 0U) {
+        return XGL_OK;
+    }
+
+    xgl_wire_ext_cursor_t cursor;
+    xgl_error_t err = xgl_wire_ext_cursor_init(&cursor, extensions, extensions_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    bool seen = false;
+    xgl_wire_ext_t ext;
+    while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
+        if (ext.type != XGL_WIRE_EXT_DATA_TYPE) {
+            continue;
+        }
+        if (ext.len != 1U || ext.value == NULL) {
+            return XGL_ERR_INVALID_FRAME;
+        }
+        if (seen) {
+            return XGL_ERR_INVALID_FRAME;
+        }
+        *data_type = ext.value[0];
+        seen = true;
+        if (found != NULL) {
+            *found = true;
+        }
+    }
+
+    return (err == XGL_ERR_NOT_FOUND) ? XGL_OK : err;
+}
 
 /**
  * \brief           Extract packet information from frame buffer
@@ -45,7 +159,19 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
     /* Extract addressing */
     *source_id = wire_header.source_id;
     *target_id = wire_header.target_id;
-    *data_type = wire_header.packet_type;
+    const uint8_t* extensions = NULL;
+    size_t extensions_len = 0U;
+    if (wire_header.header_len > XGL_WIRE_BASE_HEADER_SIZE) {
+        extensions = frame_buf + XGL_WIRE_BASE_HEADER_SIZE;
+        extensions_len = wire_header.header_len - XGL_WIRE_BASE_HEADER_SIZE;
+    }
+    xgl_error_t err = network_decode_data_type_ext(extensions,
+                                                   extensions_len,
+                                                   data_type,
+                                                   NULL);
+    if (err != XGL_OK) {
+        return err;
+    }
     
     /* Extract payload */
     *payload = frame_buf + wire_header.header_len;
@@ -120,7 +246,7 @@ static xgl_error_t network_resign_forwarded_frame(xgl_network_ctx_t* ctx,
     uint32_t key_id = 0U;
     uint8_t tag_len = 0U;
     xgl_error_t err = network_find_security_ext(frame_buf, header, &key_id, &tag_len);
-    if (err != XGL_OK || tag_len == 0U || tag_len > XGL_NETWORK_AUTH_TAG_CAPACITY) {
+    if (err != XGL_OK || tag_len == 0U || tag_len > XGL_AUTH_TAG_MAX_LEN) {
         return XGL_ERR_INVALID_FRAME;
     }
 
@@ -134,7 +260,7 @@ static xgl_error_t network_resign_forwarded_frame(xgl_network_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    uint8_t tag[XGL_NETWORK_AUTH_TAG_CAPACITY] = {0};
+    uint8_t tag[XGL_AUTH_TAG_MAX_LEN] = {0};
     size_t produced_tag_len = 0U;
     err = ctx->auth_provider->sign(key_id,
                                    frame_buf,
@@ -254,6 +380,19 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
     
     /* Build frame from packet for datalink transmission */
     xgl_frame_t frame;
+    uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
+    size_t extensions_len = 0U;
+    xgl_error_t err = network_copy_packet_extensions(extensions,
+                                                     sizeof(extensions),
+                                                     &extensions_len,
+                                                     packet);
+    if (err != XGL_OK) {
+        if (ctx->stats != NULL) {
+            ctx->stats->tx_errors++;
+        }
+        return err;
+    }
+
     uint8_t reliability_class = XGL_RELIABILITY_NONE;
     if (packet->reliable == XGL_RELIABILITY_ACK_ONLY) {
         reliability_class = XGL_RELIABILITY_ACK_ONLY;
@@ -265,16 +404,14 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         .source_id = packet->source_id,
         .target_id = packet->target_id,
         .data_type = packet->data_type,
-        .packet_type = (packet->packet_type != XGL_PACKET_TYPE_INVALID) ?
-                       packet->packet_type :
-                       packet->data_type,
+        .packet_type = packet->packet_type,
         .flags = packet->flags,
         .traffic_class = packet->traffic_class,
         .connection_id = packet->connection_id,
         .packet_number = packet->packet_number,
         .session_epoch = packet->session_epoch,
-        .extensions = packet->extensions,
-        .extensions_len = packet->extensions_len,
+        .extensions = (extensions_len > 0U) ? extensions : NULL,
+        .extensions_len = extensions_len,
         .payload = packet->data->data,
         .payload_len = packet->data->data_len,
         .reliable = packet->reliable,
@@ -285,7 +422,7 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         .ttl = XGL_DEFAULT_TTL
     };
     
-    xgl_error_t err = xgl_frame_build(&frame, &params);
+    err = xgl_frame_build(&frame, &params);
     
     if (err != XGL_OK) {
         if (ctx->stats != NULL) {
@@ -390,9 +527,13 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 return XGL_ERR_INVALID_FRAME;
             }
             uint8_t reliable = XGL_RELIABILITY_NONE;
-            if ((wire_header.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
+            uint8_t traffic_reliability =
+                (uint8_t)(wire_header.traffic_class & XGL_RELIABILITY_CLASS_MASK);
+            if (traffic_reliability == XGL_RELIABILITY_ACK_ELICITING ||
+                (wire_header.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
                 reliable = XGL_RELIABILITY_ACK_ELICITING;
-            } else if (wire_header.packet_type == XGL_PACKET_TYPE_ACK ||
+            } else if (traffic_reliability == XGL_RELIABILITY_ACK_ONLY ||
+                       wire_header.packet_type == XGL_PACKET_TYPE_ACK ||
                        (wire_header.flags & XGL_WIRE_FLAG_CONTROL) != 0U) {
                 reliable = XGL_RELIABILITY_ACK_ONLY;
             }

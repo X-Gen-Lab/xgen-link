@@ -188,8 +188,8 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
 
     xgl_packet_data_t ack_data = {
         .ref_count = 1,
-        .data_len = ack_ext_len,
-        .data = ack_ext,
+        .data_len = 0,
+        .data = nullptr,
         .owned_data = nullptr
     };
     xgl_packet_t ack_packet = {
@@ -201,7 +201,9 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
         .data_type = 0,
         .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
-        .data = &ack_data
+        .data = &ack_data,
+        .extensions = ack_ext,
+        .extensions_len = ack_ext_len
     };
 
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &ack_packet), XGL_OK);
@@ -268,8 +270,8 @@ TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
 
     xgl_packet_data_t ack_ext_data = {
         .ref_count = 1,
-        .data_len = ext_len,
-        .data = ext,
+        .data_len = 0,
+        .data = nullptr,
         .owned_data = nullptr
     };
     xgl_packet_t ack_packet = {
@@ -281,7 +283,9 @@ TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
         .data_type = 0,
         .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
-        .data = &ack_ext_data
+        .data = &ack_ext_data,
+        .extensions = ext,
+        .extensions_len = ext_len
     };
 
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &ack_packet), XGL_OK);
@@ -346,8 +350,8 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
 
     xgl_packet_data_t sack_ext_data = {
         .ref_count = 1,
-        .data_len = ext_len,
-        .data = ext,
+        .data_len = 0,
+        .data = nullptr,
         .owned_data = nullptr
     };
     xgl_packet_t sack_packet = {
@@ -359,7 +363,9 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
         .data_type = 0,
         .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
-        .data = &sack_ext_data
+        .data = &sack_ext_data,
+        .extensions = ext,
+        .extensions_len = ext_len
     };
 
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &sack_packet), XGL_OK);
@@ -1105,12 +1111,12 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     EXPECT_EQ(spy.last_packet.packet_type, XGL_PACKET_TYPE_ACK);
     EXPECT_NE(spy.last_packet.flags & XGL_WIRE_FLAG_HAS_EXTENSIONS, 0U);
     EXPECT_EQ(spy.last_packet.packet_number, 0U);
-    ASSERT_EQ(spy.sent_payloads.size(), 1U);
+    ASSERT_EQ(spy.sent_extensions.size(), 1U);
 
     xgl_wire_ext_cursor_t cursor;
     ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
-                                       spy.sent_payloads.back().data(),
-                                       spy.sent_payloads.back().size()),
+                                       spy.sent_extensions.back().data(),
+                                       spy.sent_extensions.back().size()),
               XGL_OK);
     xgl_wire_ext_t ext = {};
     ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
@@ -1133,6 +1139,57 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     ASSERT_EQ(range_count, 1U);
     EXPECT_EQ(ranges[0].gap, 0U);
     EXPECT_EQ(ranges[0].length, 1U);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, AckRangeUsesHeaderExtensionNotPayload) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    lower_layer.ctx = &spy;
+    lower_layer.send = spy_send;
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    RxTracker rx_tracker;
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &rx_tracker;
+
+    xgl_transport_ctx_t ctx = {};
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p'};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = sizeof(payload),
+        .data = payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .session_id = 5,
+        .packet_number = 0,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .data_type = 1,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
+        .data = &packet_data
+    };
+
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+    ASSERT_EQ(spy.send_count, 1);
+    EXPECT_EQ(spy.last_packet.packet_type, XGL_PACKET_TYPE_ACK);
+    EXPECT_TRUE(spy.sent_payloads.back().empty());
+    ASSERT_FALSE(spy.sent_extensions.back().empty());
+
+    xgl_wire_ext_cursor_t cursor = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
+                                       spy.sent_extensions.back().data(),
+                                       spy.sent_extensions.back().size()),
+              XGL_OK);
+    xgl_wire_ext_t ext = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+    EXPECT_EQ(ext.type, XGL_WIRE_EXT_ACK_RANGE);
 
     xgl_transport_destroy(&ctx);
 }

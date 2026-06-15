@@ -20,6 +20,17 @@ xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
         .data = NULL,
         .owned_data = NULL
     };
+    uint8_t control_ext[4] = {0};
+    size_t control_ext_len = 0U;
+    xgl_error_t err = xgl_wire_encode_ext(control_ext,
+                                          sizeof(control_ext),
+                                          XGL_WIRE_EXT_DATA_TYPE,
+                                          &control_type,
+                                          1U,
+                                          &control_ext_len);
+    if (err != XGL_OK) {
+        return err;
+    }
 
     xgl_packet_t packet = {
         .source_id = ctx->local_id,
@@ -28,6 +39,7 @@ xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
         .connection_id = connection_id,
         .packet_number = control_packet_number,
         .session_epoch = session_epoch,
+        .packet_type = XGL_PACKET_TYPE_CONTROL,
         .data_type = control_type,
         .reliable = (control_type == XGL_TRANSPORT_CONTROL_NACK ||
                      control_type == XGL_TRANSPORT_CONTROL_SACK) ?
@@ -35,6 +47,8 @@ xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
         .fragment = false,
         .priority = 7,
         .data = &packet_data,
+        .extensions = control_ext,
+        .extensions_len = control_ext_len,
         .phy = NULL
     };
 
@@ -127,8 +141,8 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
 
     xgl_packet_data_t ack_packet_data = {
         .ref_count = 1,
-        .data_len = ack_ext_len,
-        .data = ack_ext,
+        .data_len = 0,
+        .data = NULL,
         .owned_data = NULL
     };
 
@@ -144,6 +158,8 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
         .fragment = false,
         .priority = 7,
         .data = &ack_packet_data,
+        .extensions = ack_ext,
+        .extensions_len = ack_ext_len,
         .phy = NULL
     };
 

@@ -49,6 +49,7 @@ This page maps protocol design to source directories, public headers, key functi
 | `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | Fragment metadata is not stored inside payload |
 | `SECURITY_EXT` | `xgl_wire_encode/decode_security_ext_value` | frame, datalink, network | Carries key, nonce/material, and tag length metadata |
 | `ROUTE_EXT` | `xgl_wire_encode/decode_route_ext_value` | network/routing | Carries route epoch, previous hop, next hop, and metric |
+| `DATA_TYPE_EXT` | `xgl_wire_encode_ext` | network, transport | Carries application data_type or control subtype without overloading packet_type |
 
 ## Public vs Internal API
 

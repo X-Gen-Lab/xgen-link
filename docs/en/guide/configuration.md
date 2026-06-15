@@ -26,7 +26,7 @@ The production preset enables `auth_required`. Configure:
 
 - `auth_key_id`
 - `auth_provider`
-- `auth_provider->tag_len`
+- `auth_provider->tag_len`, with `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`
 
 ## Memory
 

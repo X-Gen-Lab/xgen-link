@@ -211,9 +211,18 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     }
     
     /* Determine if fragmentation is needed */
+    size_t app_type_ext_len =
+        (tx_data->data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
+    if ((size_t)effective_max_frame_size < min_frame_size + app_type_ext_len) {
+        if (ctx->stats) {
+            ctx->stats->tx_errors++;
+        }
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
     size_t max_payload_size = (size_t)effective_max_frame_size -
                               XGL_FRAME_HEADER_SIZE -
-                              XGL_CRC16_SIZE;
+                              XGL_CRC16_SIZE -
+                              app_type_ext_len;
     bool needs_fragmentation = (tx_data->data_len > max_payload_size) && ctx->enable_fragmentation;
 
     if (tx_data->data_len > max_payload_size && !ctx->enable_fragmentation) {
@@ -534,13 +543,16 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         if ((packet->flags & XGL_WIRE_FLAG_HAS_EXTENSIONS) == 0U) {
             return XGL_ERR_INVALID_FRAME;
         }
+        if (packet->extensions == NULL || packet->extensions_len == 0U) {
+            return XGL_ERR_INVALID_FRAME;
+        }
 
         bool handled_ack_range = false;
         err = transport_try_process_ack_range_ext(ctx,
                                                   peer,
                                                   source_id,
-                                                  data,
-                                                  data_len,
+                                                  packet->extensions,
+                                                  packet->extensions_len,
                                                   &handled_ack_range);
         if (err != XGL_OK) {
             return err;
@@ -554,8 +566,8 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
                                              handle,
                                              peer,
                                              source_id,
-                                             data,
-                                             data_len,
+                                             packet->extensions,
+                                             packet->extensions_len,
                                              &handled_sack);
         if (err != XGL_OK) {
             return err;

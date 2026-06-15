@@ -87,16 +87,19 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     if ((traffic_class_bits & XGL_TRAFFIC_FRAGMENTED_MASK) != 0U) {
         flags |= XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
     }
+    if (params->extensions != NULL && params->extensions_len > 0U) {
+        flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    }
 
     uint8_t packet_type = params->packet_type;
-    if (packet_type == XGL_PACKET_TYPE_INVALID) {
-        packet_type = params->data_type;
-    }
     if (packet_type == XGL_PACKET_TYPE_INVALID) {
         packet_type = XGL_PACKET_TYPE_DATA;
     }
     if (reliable == XGL_RELIABILITY_ACK_ONLY) {
         packet_type = XGL_PACKET_TYPE_ACK;
+    }
+    if (packet_type == XGL_PACKET_TYPE_CONTROL) {
+        flags |= XGL_WIRE_FLAG_CONTROL;
     }
 
     frame->header.version = XGL_WIRE_VERSION;
@@ -106,7 +109,7 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.ttl = params->ttl;
     frame->header.traffic_class = (params->traffic_class != 0U) ?
                                   params->traffic_class :
-                                  (uint8_t)(traffic_class_bits & XGL_TRAFFIC_PRIORITY_MASK);
+                                  traffic_class_bits;
     frame->header.source_id = params->source_id;
     frame->header.target_id = params->target_id;
     frame->header.connection_id = (params->connection_id != 0U) ?
@@ -269,7 +272,7 @@ xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    if (provider->tag_len == 0U || provider->tag_len > UINT8_MAX) {
+    if (provider->tag_len == 0U || provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -337,9 +340,13 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     if (buffer == NULL || frame_len == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
-    /* Validate buffer layout */
-    if (data_offset < XGL_FRAME_HEADER_SIZE) {
+    if (data_len > UINT16_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    size_t app_type_ext_len = (data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
+    size_t header_len = XGL_WIRE_BASE_HEADER_SIZE + app_type_ext_len;
+    if (header_len > UINT8_MAX || data_offset != header_len) {
         return XGL_ERR_INVALID_PARAM;
     }
     
@@ -347,20 +354,32 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     if (buffer_size < required_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    
-    /* Calculate header position (before data) */
-    size_t header_offset = data_offset - XGL_FRAME_HEADER_SIZE;
 
     uint8_t flags = reliable ? XGL_WIRE_FLAG_ACK_ELICITING : 0U;
-    uint8_t packet_type = (data_type != XGL_PACKET_TYPE_INVALID) ?
-                          data_type : XGL_PACKET_TYPE_DATA;
+    if (app_type_ext_len > 0U) {
+        flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
+        size_t app_ext_written = 0U;
+        xgl_error_t ext_err = xgl_wire_encode_ext(&buffer[XGL_WIRE_BASE_HEADER_SIZE],
+                                                  buffer_size - XGL_WIRE_BASE_HEADER_SIZE,
+                                                  XGL_WIRE_EXT_DATA_TYPE,
+                                                  &data_type,
+                                                  1U,
+                                                  &app_ext_written);
+        if (ext_err != XGL_OK) {
+            return ext_err;
+        }
+        if (app_ext_written != app_type_ext_len) {
+            return XGL_ERR_INVALID_FRAME;
+        }
+    }
     xgl_wire_header_t wire = {
         .version = XGL_WIRE_VERSION,
-        .header_len = XGL_WIRE_BASE_HEADER_SIZE,
-        .packet_type = packet_type,
+        .header_len = (uint8_t)header_len,
+        .packet_type = XGL_PACKET_TYPE_DATA,
         .flags = flags,
         .ttl = XGL_FRAME_DEFAULT_TTL,
-        .traffic_class = (uint8_t)(priority & XGL_TRAFFIC_PRIORITY_MASK),
+        .traffic_class = (uint8_t)((reliable ? XGL_RELIABILITY_ACK_ELICITING : 0U) |
+                                   (priority & XGL_TRAFFIC_PRIORITY_MASK)),
         .source_id = source_id,
         .target_id = target_id,
         .connection_id = 0,
@@ -369,7 +388,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
         .header_crc16 = 0
     };
 
-    xgl_error_t err = xgl_wire_encode_header(&buffer[header_offset],
+    xgl_error_t err = xgl_wire_encode_header(buffer,
                                              XGL_WIRE_BASE_HEADER_SIZE,
                                              &wire);
     if (err != XGL_OK) {
@@ -378,7 +397,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     
     /* Calculate and write frame CRC16 */
     size_t crc_offset = data_offset + data_len;
-    uint16_t crc16 = xgl_crc16_modbus(&buffer[header_offset], crc_offset - header_offset);
+    uint16_t crc16 = xgl_crc16_modbus(buffer, crc_offset);
     xgl_serialize_u16_le(&buffer[crc_offset], crc16);
     
     *frame_len = required_size;

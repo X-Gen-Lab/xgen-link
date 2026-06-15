@@ -13,7 +13,7 @@
 
 ## 安全
 
-- auth provider 的 `tag_len` 固定且大于 0。
+- auth provider 的 `tag_len` 固定，且满足 `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`。
 - `sign` 和 `verify` 对 header/extensions/payload 使用相同 AAD 边界。
 - key id、nonce/material id 的生成和轮换由应用或安全模块管理。
 - replay window 容量满足最大乱序窗口。

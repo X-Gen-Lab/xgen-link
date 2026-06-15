@@ -13,7 +13,7 @@ Use this page as an engineering review checklist before deploying XGL on an MCU 
 
 ## Security
 
-- Auth provider `tag_len` is fixed and greater than zero.
+- Auth provider `tag_len` is fixed and satisfies `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`.
 - `sign` and `verify` use the same AAD boundary for header/extensions/payload.
 - Key id and nonce/material id generation and rotation are handled by the application or secure module.
 - Replay window capacity is sufficient for the maximum reorder window.

@@ -21,6 +21,7 @@ target_id + connection_id + session_epoch
 
 - ACK_RANGE_EXT 可以一次释放多个已发送包。
 - SACK_EXT 描述缺口，保留未确认包并触发快速重传。
+- ACK_RANGE_EXT 和 SACK_EXT 放在 header TLV 区，不占用 payload。
 - ACK-only 包不再依赖基础头中的单字节 ack 字段。
 
 ## 发送端状态

@@ -15,6 +15,7 @@
 
 #define XGL_SEND_DEFAULT_TTL 8U
 #define XGL_SEND_SECURITY_EXT_LEN (XGL_WIRE_EXT_HEADER_SIZE + 13U)
+#define XGL_SEND_DATA_TYPE_EXT_LEN XGL_DATA_TYPE_EXT_SIZE
 
 /*---------------------------------------------------------------------------*/
 /* Parameter Validation Helpers                                              */
@@ -186,30 +187,57 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
         } else if (handle->config.auth_required &&
                    (handle->config.auth_provider == NULL ||
                     handle->config.auth_provider->sign == NULL ||
-                    handle->config.auth_provider->tag_len == 0U)) {
+                    handle->config.auth_provider->tag_len == 0U ||
+                    handle->config.auth_provider->tag_len > XGL_AUTH_TAG_MAX_LEN)) {
             err = XGL_ERR_INVALID_PARAM;
-        } else if (!handle->config.auth_required &&
-                   xgl_frame_calculate_size(tx_data->data_len) > route->max_frame_size) {
-            err = XGL_ERR_BUFFER_TOO_SMALL;
-        } else if (handle->config.auth_required &&
-                   XGL_WIRE_BASE_HEADER_SIZE + XGL_SEND_SECURITY_EXT_LEN +
-                   tx_data->data_len + handle->config.auth_provider->tag_len +
-                   XGL_CRC16_SIZE > route->max_frame_size) {
-            err = XGL_ERR_BUFFER_TOO_SMALL;
         } else {
+            size_t app_type_ext_len =
+                (tx_data->data_type != 0U) ? XGL_SEND_DATA_TYPE_EXT_LEN : 0U;
+            size_t unauth_header_len = XGL_WIRE_BASE_HEADER_SIZE + app_type_ext_len;
+            size_t serialized_len = unauth_header_len + tx_data->data_len + XGL_CRC16_SIZE;
+            if (handle->config.auth_required) {
+                serialized_len += XGL_SEND_SECURITY_EXT_LEN +
+                                  handle->config.auth_provider->tag_len;
+            }
+            if (serialized_len > route->max_frame_size) {
+                err = XGL_ERR_BUFFER_TOO_SMALL;
+                goto zerocopy_done;
+            }
+
             size_t frame_len = 0;
             if (handle->config.auth_required) {
                 size_t auth_header_len = XGL_WIRE_BASE_HEADER_SIZE +
+                                         app_type_ext_len +
                                          XGL_SEND_SECURITY_EXT_LEN;
                 if (tx_data->data_offset != auth_header_len) {
                     err = XGL_ERR_INVALID_PARAM;
                 } else {
                     xgl_frame_t frame;
+                    uint8_t app_type_ext[XGL_SEND_DATA_TYPE_EXT_LEN] = {0};
+                    size_t app_type_ext_written = 0U;
+                    const uint8_t* frame_extensions = NULL;
+                    size_t frame_extensions_len = 0U;
+                    if (tx_data->data_type != 0U) {
+                        err = xgl_wire_encode_ext(app_type_ext,
+                                                  sizeof(app_type_ext),
+                                                  XGL_WIRE_EXT_DATA_TYPE,
+                                                  &tx_data->data_type,
+                                                  1U,
+                                                  &app_type_ext_written);
+                        if (err != XGL_OK) {
+                            goto zerocopy_done;
+                        }
+                        frame_extensions = app_type_ext;
+                        frame_extensions_len = app_type_ext_written;
+                    }
+
                     xgl_frame_params_t params = {
                         .source_id = handle->config.source_id,
                         .target_id = tx_data->target_id,
                         .data_type = tx_data->data_type,
                         .packet_type = XGL_PACKET_TYPE_DATA,
+                        .extensions = frame_extensions,
+                        .extensions_len = frame_extensions_len,
                         .payload = &tx_data->buffer[tx_data->data_offset],
                         .payload_len = tx_data->data_len,
                         .reliable = false,
@@ -252,6 +280,8 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
                 handle->stats.network.tx_packets++;
                 handle->stats.network.tx_bytes += tx_data->data_len;
             }
+zerocopy_done:
+            ;
         }
     }
     

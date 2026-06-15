@@ -18,6 +18,7 @@
 | FRAGMENT_EXT | `message_id`, `fragment_offset`, `message_len` | 分片重组 |
 | SECURITY_EXT | `key_id`, nonce/material metadata | 认证 trailer 元数据 |
 | ROUTE_EXT | previous hop、next hop、route epoch、metric | 路由信息 |
+| DATA_TYPE_EXT | `data_type` | 应用 payload 分类或 transport control 子类型 |
 
 ## Value 格式
 
@@ -29,8 +30,10 @@
 | FRAGMENT_EXT | 12 | `message_id u32`, `fragment_offset u32`, `message_len u32` |
 | SECURITY_EXT | 13 | `key_id u32`, `nonce_id u64`, `tag_len u8` |
 | ROUTE_EXT | 10 | `previous_hop u16`, `next_hop u16`, `route_epoch u32`, `metric u16` |
+| DATA_TYPE_EXT | 1 | `data_type u8` |
 
 ACK range 的 `gap` 和 `length` 表示从 `largest_ack` 反向描述的确认区间。SACK bitmap 的 bit 表示 `base_packet + bit_index` 的接收状态。
+ACK_RANGE_EXT 和 SACK_EXT 位于 header TLV 区，不放在 payload 中。
 
 ## 失败规则
 

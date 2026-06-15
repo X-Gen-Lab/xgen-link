@@ -8,10 +8,10 @@ Production configuration requires authentication by default. Tests and debug bui
 
 - `sign`
 - `verify`
-- `tag_len`
+- `tag_len`, capped by `XGL_AUTH_TAG_MAX_LEN`
 - `user_data`
 
-Initialization must fail when `auth_required=true` and the provider is missing or `tag_len == 0`.
+Initialization must fail when `auth_required=true` and the provider is missing, `tag_len == 0`, or `tag_len > XGL_AUTH_TAG_MAX_LEN`.
 
 ## AAD and Payload
 

@@ -65,6 +65,11 @@ typedef struct {
  */
 #define XGL_FRAME_HEADER_SIZE       24
 
+/**
+ * \brief           Header TLV bytes required when data_type is non-zero
+ */
+#define XGL_DATA_TYPE_EXT_SIZE      3U
+
 /*---------------------------------------------------------------------------*/
 /* Production Traffic-Class Bit Definitions                                  */
 /*---------------------------------------------------------------------------*/
@@ -89,6 +94,8 @@ typedef struct {
 
 #define XGL_TRAFFIC_PRIORITY_SHIFT      0
 #define XGL_TRAFFIC_PRIORITY_MASK       0x07
+
+#define XGL_AUTH_TAG_MAX_LEN            32U
 
 /**
  * \brief           Compression-class bits for negotiated payload handling
@@ -209,7 +216,7 @@ typedef xgl_error_t (*xgl_auth_verify_fn)(uint32_t key_id,
 typedef struct {
     xgl_auth_sign_fn sign;          /**< Generate authentication tag */
     xgl_auth_verify_fn verify;      /**< Verify authentication tag */
-    size_t tag_len;                 /**< Fixed authentication tag length; must be non-zero */
+    size_t tag_len;                 /**< Fixed tag length; 0 < tag_len <= XGL_AUTH_TAG_MAX_LEN */
     void* user_data;                /**< Provider user data */
 } xgl_auth_provider_t;
 
@@ -332,7 +339,7 @@ typedef struct {
  */
 typedef struct {
     uint16_t target_id;             /**< Target node ID */
-    uint8_t data_type;              /**< Data type */
+    uint8_t data_type;              /**< Application payload class encoded as DATA_TYPE_EXT when non-zero */
     const uint8_t* data;            /**< Data buffer */
     size_t data_len;                /**< Data length */
     bool reliable;                  /**< Enable reliable transmission */
@@ -348,12 +355,12 @@ typedef struct {
 typedef struct {
     uint8_t* buffer;                /**< Buffer with pre-allocated header space */
     size_t buffer_size;             /**< Total buffer size */
-    size_t data_offset;             /**< Data start offset (= XGL_FRAME_HEADER_SIZE) */
+    size_t data_offset;             /**< Data start offset; add XGL_DATA_TYPE_EXT_SIZE when data_type is non-zero */
     size_t data_len;                /**< Actual data length */
     
     /* Transmission parameters */
     uint16_t target_id;             /**< Target node ID */
-    uint8_t data_type;              /**< Data type */
+    uint8_t data_type;              /**< Application payload class encoded as DATA_TYPE_EXT when non-zero */
     bool reliable;                  /**< Enable reliable transmission */
     uint8_t priority;               /**< Priority level (0-7) */
     uint32_t timeout_ms;            /**< Timeout in ms (0 = use default) */

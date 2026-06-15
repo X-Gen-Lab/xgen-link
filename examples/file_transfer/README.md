@@ -464,25 +464,28 @@ config.window_size = 16;  /* More in-flight packets */
 ### Use Zero-Copy API
 
 ```c
-/* Allocate buffer with header space */
-uint8_t buffer[XGL_FRAME_HEADER_SIZE + FILE_CHUNK_SIZE];
+/* Allocate buffer with header and DATA_TYPE_EXT space */
+uint8_t buffer[XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE + FILE_CHUNK_SIZE];
+size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE;
 
 /* Read chunk after header space */
-fread(buffer + XGL_FRAME_HEADER_SIZE, 1, FILE_CHUNK_SIZE, fp);
+fread(buffer + data_offset, 1, FILE_CHUNK_SIZE, fp);
 
 /* Send without copying */
 xgl_tx_data_zerocopy_t tx_data = {
     .buffer = buffer,
     .buffer_size = sizeof(buffer),
-    .data_offset = XGL_FRAME_HEADER_SIZE,
+    .data_offset = data_offset,
     .data_len = FILE_CHUNK_SIZE,
     .target_id = 2,
     .data_type = 0x01,
-    .reliable = true,
+    .reliable = false,
     .priority = 5
 };
 xgl_send_zerocopy(handle, &tx_data);
 ```
+
+Use `xgl_send()` for reliable file chunks that require ACK/retry.
 
 ### Increase Processing Frequency
 

@@ -33,4 +33,4 @@ Application callbacks receive only payloads that passed CRC, authentication, rou
 
 ## Application `data_type`
 
-`data_type` classifies application payload. It is not the reliability ordering primitive. Protocol control semantics use packet type and TLV extensions.
+`data_type` classifies application payload. It is not the reliability ordering primitive and is not written into wire `packet_type`. When non-zero, it is encoded as DATA_TYPE_EXT in the header TLV area. Protocol control semantics use packet type and TLV extensions.

@@ -33,4 +33,4 @@ payload 超过 route MTU 时，如果 fragmentation 开启，会使用 FRAGMENT_
 
 ## 应用层 data_type
 
-`data_type` 是应用 payload 分类，不参与可靠性排序。协议控制语义使用 packet type 和 TLV 扩展表达。
+`data_type` 是应用 payload 分类，不参与可靠性排序，也不会写入 wire `packet_type`。当非零时，它通过 DATA_TYPE_EXT 写入 header TLV 区；协议控制语义使用 packet type 和 TLV 扩展表达。

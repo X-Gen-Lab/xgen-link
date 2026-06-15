@@ -16,7 +16,7 @@
 
 ## Offset Rules
 
-Unauthenticated single-frame sends usually place payload at `XGL_FRAME_HEADER_SIZE`. Authenticated paths need an additional SECURITY_EXT, so data offset must match the current frame builder requirements. Do not write magic or CRC manually; let the protocol stack fill them.
+Unauthenticated single-frame sends place payload at `XGL_FRAME_HEADER_SIZE` when `data_type == 0`. When `data_type != 0`, reserve DATA_TYPE_EXT as well, so the offset is `XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE`. Authenticated paths also reserve SECURITY_EXT, adding 15 bytes. Do not write magic or CRC manually; let the protocol stack fill them.
 
 ## Ownership
 

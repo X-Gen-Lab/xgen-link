@@ -209,6 +209,27 @@ TEST(XglFrameTest, SerializeFrame) {
     EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 3], 0xDD);
 }
 
+TEST(XglFrameTest, BuildFrameKeepsApplicationTypeOutOfPacketType) {
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0xAA};
+
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .data_type = XGL_PACKET_TYPE_ACK,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 3
+    };
+
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    EXPECT_EQ(frame.header.packet_type, XGL_PACKET_TYPE_DATA);
+    EXPECT_EQ(frame.header.traffic_class & XGL_RELIABILITY_CLASS_MASK,
+              XGL_RELIABILITY_ACK_ELICITING);
+    EXPECT_EQ(frame.header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK, 3U);
+}
+
 TEST(XglFrameTest, SerializeFramePreserves16BitNodeIds) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0xAA};
@@ -438,7 +459,7 @@ TEST(XglFrameTest, SerializeFrameNullPointers) {
 TEST(XglFrameTest, BuildZeroCopyFrame) {
     /* Allocate buffer with space for header */
     uint8_t buffer[256];
-    size_t data_offset = XGL_FRAME_HEADER_SIZE;  /* Header includes production magic */
+    size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
     size_t data_len = 8;
     size_t frame_len;
     
@@ -458,11 +479,29 @@ TEST(XglFrameTest, BuildZeroCopyFrame) {
     
     EXPECT_EQ(result, XGL_OK);
     
-    /* Expected: Header(24) + Data(8) + CRC16(2) = 34 */
-    EXPECT_EQ(frame_len, 34);
+    /* Expected: Header(27) + Data(8) + CRC16(2) = 37 */
+    EXPECT_EQ(frame_len, 37);
     
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
+
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, buffer, frame_len), XGL_OK);
+    EXPECT_EQ(header.packet_type, XGL_PACKET_TYPE_DATA);
+    EXPECT_EQ(header.header_len, data_offset);
+    EXPECT_EQ(header.traffic_class & XGL_RELIABILITY_CLASS_MASK,
+              XGL_RELIABILITY_ACK_ELICITING);
+
+    xgl_wire_ext_cursor_t cursor = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
+                                       buffer + XGL_WIRE_BASE_HEADER_SIZE,
+                                       header.header_len - XGL_WIRE_BASE_HEADER_SIZE),
+              XGL_OK);
+    xgl_wire_ext_t ext = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+    EXPECT_EQ(ext.type, XGL_WIRE_EXT_DATA_TYPE);
+    ASSERT_EQ(ext.len, 1U);
+    EXPECT_EQ(ext.value[0], 0x05U);
     
     /* Check payload is intact */
     for (size_t i = 0; i < data_len; i++) {
@@ -489,7 +528,7 @@ TEST(XglFrameTest, ZeroCopyInvalidOffset) {
 
 TEST(XglFrameTest, ZeroCopyBufferTooSmall) {
     uint8_t buffer[20];
-    size_t data_offset = XGL_FRAME_HEADER_SIZE;
+    size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
     size_t frame_len;
     
     /* Buffer too small for data + CRC16 */
@@ -589,4 +628,3 @@ TEST(XglFrameTest, FrameSizeCalculation) {
     EXPECT_EQ(xgl_frame_calculate_size(10), 36);
     EXPECT_EQ(xgl_frame_calculate_size(100), 126);
 }
-

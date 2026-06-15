@@ -8,10 +8,10 @@
 
 - `sign`
 - `verify`
-- `tag_len`
+- `tag_len`，最大为 `XGL_AUTH_TAG_MAX_LEN`
 - `user_data`
 
-当 `auth_required=true` 且 provider 缺失或 `tag_len == 0` 时，初始化必须失败。
+当 `auth_required=true` 且 provider 缺失、`tag_len == 0` 或 `tag_len > XGL_AUTH_TAG_MAX_LEN` 时，初始化必须失败。
 
 ## AAD 和 Payload
 

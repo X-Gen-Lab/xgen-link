@@ -20,16 +20,20 @@ XGL v2 uses a fixed 24-byte base header. The wire path does not depend on packed
 
 ## CRC Coverage
 
-`header_crc16` covers the base header and extensions with the CRC field treated as zero. Payload integrity is covered by the frame CRC and authentication tag.
+`header_crc16` covers only the 24-byte base header with the CRC field treated as zero. TLV extensions, payload, and the authentication trailer are covered by the frame CRC; authenticated frames are also covered by the auth tag.
+
+## Traffic Class
+
+The top two `traffic_class` bits carry the reliability class: `NONE(0x00)`, `ACK_ELICITING(0x40)`, and `ACK_ONLY(0x80)`. `0x20` marks fragments, and the low three bits carry priority. ACK/FRAGMENT/CONTROL flags are fast-path markers and redundant validation hints; they do not replace the `traffic_class` category.
 
 ## Packet Type
 
 | Value | Name | Description |
 | ---: | --- | --- |
 | 0 | INVALID | Invalid type, not valid on production wire |
-| 1 | DATA | Application payload |
+| 1 | DATA | Application payload; application `data_type` is carried in DATA_TYPE_EXT |
 | 2 | ACK | ACK range or SACK control packet |
-| 3 | CONTROL | RESET, NACK, and other control semantics |
+| 3 | CONTROL | RESET, NACK, and other control semantics; control subtype is carried in DATA_TYPE_EXT |
 | 4 | HANDSHAKE | Reserved for session/capability negotiation |
 | 5 | ROUTE | Reserved routing control |
 | 6 | PROBE | Reserved probing |
