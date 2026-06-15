@@ -4,7 +4,7 @@ XGL v2 的基础头固定 24 bytes。wire path 不依赖 packed struct 或 `memc
 
 | Offset | Size | 字段 | 编码 | 说明 |
 | --- | ---: | --- | --- | --- |
-| 0 | 2 | `magic` | bytes | 固定 `"XG"` |
+| 0 | 2 | `magic` | bytes | 固定 `A5 5A` |
 | 2 | 1 | `version` | u8 | 固定 `2` |
 | 3 | 1 | `header_len` | u8 | 基础头 + TLV 扩展长度 |
 | 4 | 1 | `packet_type` | u8 | DATA、ACK、CONTROL 等 |
@@ -60,8 +60,8 @@ frame crc16
 
 ## Parser 行为
 
-- parser 通过双 magic `"XG"` 重同步。
-- 支持重叠 magic，例如噪声末尾 `X` 后接合法 `XG`。
+- parser 通过双字节二进制 magic `A5 5A` 重同步。
+- 支持重叠 magic，例如噪声末尾 `A5` 后接合法 `A5 5A`。
 - `header_len < 24`、扩展越界、payload 超限、CRC 错误都会丢弃并计数。
 - 认证要求开启时，未认证或认证失败的帧不会交付上层。
 

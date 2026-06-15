@@ -8,7 +8,7 @@ This page describes the core XGL v2 state machines. They are the shared language
 stateDiagram-v2
   [*] --> SearchMagic
   SearchMagic --> SearchMagic: noise byte
-  SearchMagic --> BaseHeader: "XG"
+  SearchMagic --> BaseHeader: A5 5A
   BaseHeader --> SearchMagic: version/header_len/crc invalid
   BaseHeader --> Extensions: header_len > 24
   BaseHeader --> Body: header_len == 24

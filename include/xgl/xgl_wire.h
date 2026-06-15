@@ -20,8 +20,8 @@ extern "C" {
 /* Wire Header Constants                                                      */
 /*---------------------------------------------------------------------------*/
 
-#define XGL_WIRE_MAGIC_0            ((uint8_t)'X')
-#define XGL_WIRE_MAGIC_1            ((uint8_t)'G')
+#define XGL_WIRE_MAGIC_0            ((uint8_t)0xA5U)
+#define XGL_WIRE_MAGIC_1            ((uint8_t)0x5AU)
 #define XGL_WIRE_VERSION            2U
 #define XGL_WIRE_BASE_HEADER_SIZE   24U
 #define XGL_WIRE_EXT_HEADER_SIZE    2U

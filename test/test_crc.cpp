@@ -187,7 +187,7 @@ TEST(XglCrc16Test, DifferentLengths) {
  */
 TEST(XglCrc16Test, FrameHeaderSimulation) {
     uint8_t header[24] = {
-        0x58, 0x47,        /* magic "XG" */
+        0xA5, 0x5A,        /* binary magic */
         0x02,              /* version */
         0x18,              /* header_len */
         0x01,              /* packet_type */

@@ -4,7 +4,7 @@ XGL v2 uses a fixed 24-byte base header. The wire path does not depend on packed
 
 | Offset | Size | Field | Encoding | Description |
 | --- | ---: | --- | --- | --- |
-| 0 | 2 | `magic` | bytes | Fixed `"XG"` |
+| 0 | 2 | `magic` | bytes | Fixed `A5 5A` |
 | 2 | 1 | `version` | u8 | Fixed `2` |
 | 3 | 1 | `header_len` | u8 | Base header plus TLV extensions |
 | 4 | 1 | `packet_type` | u8 | DATA, ACK, CONTROL, and others |
@@ -60,8 +60,8 @@ frame crc16
 
 ## Parser Behavior
 
-- The parser resynchronizes on the two-byte `"XG"` magic.
-- Overlapping magic is supported, such as noise ending in `X` followed by a valid `XG`.
+- The parser resynchronizes on the two-byte binary magic `A5 5A`.
+- Overlapping magic is supported, such as noise ending in `A5` followed by a valid `A5 5A`.
 - `header_len < 24`, extension overrun, payload limit overflow, and CRC errors are dropped and counted.
 - When authentication is required, unauthenticated or invalid frames are not delivered upward.
 

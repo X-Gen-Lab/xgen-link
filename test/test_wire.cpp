@@ -111,8 +111,8 @@ TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     uint8_t buffer[XGL_WIRE_BASE_HEADER_SIZE] = {};
     ASSERT_EQ(xgl_wire_encode_header(buffer, sizeof(buffer), &header), XGL_OK);
 
-    EXPECT_EQ(buffer[0], 'X');
-    EXPECT_EQ(buffer[1], 'G');
+    EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
+    EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
     EXPECT_EQ(buffer[2], XGL_WIRE_VERSION);
     EXPECT_EQ(buffer[3], XGL_WIRE_BASE_HEADER_SIZE);
     EXPECT_EQ(buffer[4], XGL_PACKET_TYPE_DATA);
