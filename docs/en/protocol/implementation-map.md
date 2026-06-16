@@ -6,7 +6,7 @@ This page maps protocol design to source directories, public headers, key functi
 
 | Layer | Source directory | Public/advanced headers | Main implementation | Invariant |
 | --- | --- | --- | --- | --- |
-| API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | Users enter through handle, config, send, run, and stats APIs |
+| API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_runtime.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | Users enter through handle, config, send, run, and stats APIs |
 | Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | Wire encoding is offset-based, not packed-struct based |
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | Replay windows are scoped by source, connection, session, and packet |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | Frames that fail CRC/auth/replay do not enter network |
@@ -37,7 +37,7 @@ This page maps protocol design to source directories, public headers, key functi
 | Local or forward | `src/network/xgl_network_receive.c` | Deliver locally or decrement TTL and forward | drop on TTL, route, MTU, or resign failure |
 | Reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | Process ACK/SACK, buffer out-of-order packets, filter duplicates | wrong connection/session does not pollute other peers |
 | Reassembly | `src/transport/xgl_fragment.c` | Reassemble by source, connection, session, and message | clean up on budget, timeout, or invalid overlap |
-| App callback | `src/api/xgl_instance.c` | Deliver ordered complete payload | callback must not block the protocol loop |
+| App callback | `src/api/xgl_runtime.c`, `src/transport/xgl_transport_receive.c` | Deliver ordered complete payload | callback must not block the protocol loop |
 
 ## Extension Ownership
 

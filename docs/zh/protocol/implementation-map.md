@@ -6,7 +6,7 @@
 
 | 协议层 | 源码目录 | 公共/高级头 | 主要实现 | 关键不变量 |
 | --- | --- | --- | --- | --- |
-| API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | 用户只通过 handle、config、send、run、stats 进入协议栈 |
+| API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_runtime.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | 用户只通过 handle、config、send、run、stats 进入协议栈 |
 | Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | wire 编解码按 offset 手写，不依赖 packed struct |
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | replay window 按 source、connection、session、packet 隔离 |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | 未通过 CRC/auth/replay 的 frame 不进入 network |
@@ -37,7 +37,7 @@
 | local or forward | `src/network/xgl_network_receive.c` | 本地交付或 TTL 递减后转发 | TTL/route/MTU/auth 重签失败则丢弃 |
 | reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | 处理 ACK/SACK、乱序缓存、重复包过滤 | 错误 connection/session 不污染其他 peer |
 | reassembly | `src/transport/xgl_fragment.c` | 按 `(source, connection, session, message)` 重组 | 超预算、超时、重叠异常则清理 |
-| app callback | `src/api/xgl_instance.c` | 将有序完整 payload 交付应用 | callback 不应阻塞协议主循环 |
+| app callback | `src/api/xgl_runtime.c`, `src/transport/xgl_transport_receive.c` | 将有序完整 payload 交付应用 | callback 不应阻塞协议主循环 |
 
 ## Wire 扩展归属
 
