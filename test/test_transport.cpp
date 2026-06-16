@@ -9,6 +9,8 @@
 #include <xgl/internal/xgl_transport.h>
 #include <xgl/internal/xgl_reliable.h>
 #include <xgl/internal/xgl_wire.h>
+#include <xgl/internal/xgl_window.h>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -63,6 +65,15 @@ static xgl_error_t spy_send(void* ctx, xgl_handle_t handle, void* data) {
         spy->sent_extensions.emplace_back();
     }
     return XGL_OK;
+}
+
+static void* always_fail_malloc(size_t size) {
+    (void)size;
+    return nullptr;
+}
+
+static void always_fail_free(void* ptr) {
+    std::free(ptr);
 }
 
 static void spy_receive(xgl_handle_t handle,
@@ -240,6 +251,54 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
     EXPECT_EQ(xgl_reliable_get_count(&find_peer(&ctx, 2)->reliable_queue), 0);
     EXPECT_TRUE(xgl_transport_can_send(&ctx));
 
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, ReliableSendDoesNotTransmitWhenQueueAdmissionFails) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.window_size = 8;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+
+    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    ASSERT_NE(peer, nullptr);
+    ASSERT_EQ(xgl_reliable_remove_packet_number(&peer->reliable_queue, 0, 2), XGL_OK);
+    xgl_window_reset(&peer->tx_window);
+    xgl_window_reset(&ctx.window);
+
+    xgl_allocator_t failing_allocator = {
+        .malloc = always_fail_malloc,
+        .free = always_fail_free,
+        .user_data = nullptr
+    };
+    peer->reliable_queue.allocator = &failing_allocator;
+    const int send_count_before = spy.send_count;
+
+    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(spy.send_count, send_count_before);
+    EXPECT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 0U);
+    EXPECT_TRUE(xgl_window_can_send_packet_number(&peer->tx_window));
+
+    peer->reliable_queue.allocator = nullptr;
     xgl_transport_destroy(&ctx);
 }
 
@@ -1344,6 +1403,52 @@ TEST(XglTransportTest, AckRangeUsesHeaderExtensionNotPayload) {
     xgl_wire_ext_t ext = {};
     ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
     EXPECT_EQ(ext.type, XGL_WIRE_EXT_ACK_RANGE);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, ReliableReceiveAckPreservesConnectionScope) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    RxTracker rx_tracker;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &rx_tracker;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'s', 'c'};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = sizeof(payload),
+        .data = payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .session_id = 5,
+        .connection_id = 0x11223344U,
+        .packet_number = 0,
+        .session_epoch = 0x01020304U,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .data_type = 1,
+        .reliable = XGL_RELIABILITY_ACK_ELICITING,
+        .data = &packet_data
+    };
+
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+
+    ASSERT_EQ(spy.send_count, 1);
+    EXPECT_EQ(spy.last_packet.packet_type, XGL_PACKET_TYPE_ACK);
+    EXPECT_EQ(spy.last_packet.connection_id, packet.connection_id);
+    EXPECT_EQ(spy.last_packet.session_epoch, packet.session_epoch);
+    EXPECT_EQ(spy.last_packet.session_id, packet.session_id);
 
     xgl_transport_destroy(&ctx);
 }

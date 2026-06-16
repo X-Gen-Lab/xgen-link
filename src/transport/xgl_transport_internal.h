@@ -31,8 +31,8 @@ xgl_transport_peer_state_t* transport_get_or_create_peer_scope(
     uint32_t connection_id,
     uint32_t session_epoch);
 void transport_destroy_peers(xgl_transport_ctx_t* ctx);
-uint32_t transport_allocate_packet_number(xgl_transport_ctx_t* ctx,
-                                          xgl_transport_peer_state_t* peer);
+void transport_commit_packet_number(xgl_transport_ctx_t* ctx,
+                                    xgl_transport_peer_state_t* peer);
 uint32_t transport_receive_packet_number(const xgl_packet_t* packet);
 void transport_reset_peer_state(xgl_transport_ctx_t* ctx,
                                 xgl_transport_peer_state_t* peer,
@@ -54,7 +54,9 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                xgl_handle_t handle,
                                uint32_t packet_number,
                                uint16_t source_id,
-                               uint16_t session_id);
+                               uint16_t session_id,
+                               uint32_t connection_id,
+                               uint32_t session_epoch);
 xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
                                 xgl_handle_t handle,
                                 const xgl_transport_peer_state_t* peer,

@@ -245,7 +245,9 @@ xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
                                  handle,
                                  packet_number,
                                  buffered->packet.source_id,
-                                 buffered->packet.session_id);
+                                 buffered->packet.session_id,
+                                 buffered->packet.connection_id,
+                                 buffered->packet.session_epoch);
         transport_free_rx_buffered_packet(ctx, buffered);
         if (err != XGL_OK) {
             return err;

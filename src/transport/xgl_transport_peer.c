@@ -186,13 +186,14 @@ static void transport_advance_packet_window_if_possible(xgl_transport_ctx_t* ctx
     }
 }
 
-uint32_t transport_allocate_packet_number(xgl_transport_ctx_t* ctx,
-                                                 xgl_transport_peer_state_t* peer) {
-    uint32_t packet_number = xgl_window_get_next_packet_number(&peer->tx_window);
+void transport_commit_packet_number(xgl_transport_ctx_t* ctx,
+                                     xgl_transport_peer_state_t* peer) {
+    if (peer == NULL) {
+        return;
+    }
+
     xgl_window_advance_next_packet_number(&peer->tx_window);
     transport_advance_packet_window_if_possible(ctx);
-
-    return packet_number;
 }
 
 uint32_t transport_receive_packet_number(const xgl_packet_t* packet) {

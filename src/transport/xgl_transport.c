@@ -265,8 +265,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             }
 
             uint32_t packet_number = 0;
+            xgl_reliable_packet_t* rel_packet = NULL;
             if (tx_data->reliable && peer != NULL) {
-                packet_number = transport_allocate_packet_number(ctx, peer);
+                packet_number = xgl_window_get_next_packet_number(&peer->tx_window);
             }
 
             /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
@@ -321,15 +322,13 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                     return err;
                 }
 
-                xgl_reliable_packet_t* rel_packet =
-                    xgl_reliable_find_packet_number(&peer->reliable_queue,
-                                                    packet_number,
-                                                    tx_data->target_id);
+                rel_packet = xgl_reliable_find_packet_number(&peer->reliable_queue,
+                                                             packet_number,
+                                                             tx_data->target_id);
                 if (rel_packet != NULL) {
                     rel_packet->session_id = peer->session_id;
                     rel_packet->connection_id = tx_data->connection_id;
                     rel_packet->session_epoch = tx_data->session_epoch;
-                    rel_packet->send_timestamp = xgl_time_ms();
                     rel_packet->packet_type = XGL_PACKET_TYPE_DATA;
                     rel_packet->flags = XGL_WIRE_FLAG_FRAGMENTED |
                                         XGL_WIRE_FLAG_HAS_EXTENSIONS;
@@ -388,7 +387,19 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 if (ctx->stats) {
                     ctx->stats->tx_errors++;
                 }
+                if (tx_data->reliable && peer != NULL) {
+                    (void)xgl_reliable_remove_packet_number(&peer->reliable_queue,
+                                                            packet_number,
+                                                            tx_data->target_id);
+                }
                 return err;
+            }
+
+            if (tx_data->reliable && peer != NULL) {
+                transport_commit_packet_number(ctx, peer);
+                if (rel_packet != NULL) {
+                    rel_packet->send_timestamp = xgl_time_ms();
+                }
             }
         }
 
@@ -397,8 +408,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
 
         /* Allocate packet number */
         uint32_t packet_number = 0;
+        xgl_reliable_packet_t* rel_packet = NULL;
         if (tx_data->reliable && peer != NULL) {
-            packet_number = transport_allocate_packet_number(ctx, peer);
+            packet_number = xgl_window_get_next_packet_number(&peer->tx_window);
         }
 
         /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
@@ -411,6 +423,28 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 if (timeout_ms == 0) {
                     timeout_ms = (int32_t)ctx->default_timeout_ms;
                 }
+        }
+
+        if (tx_data->reliable) {
+            err = xgl_reliable_add_packet_number(&peer->reliable_queue,
+                                                 tx_data->data, tx_data->data_len,
+                                                 ctx->local_id, tx_data->target_id,
+                                                 packet_number, tx_data->data_type,
+                                                 tx_data->priority, timeout_ms, NULL);
+            if (err != XGL_OK) {
+                return err;
+            }
+
+            rel_packet = xgl_reliable_find_packet_number(&peer->reliable_queue,
+                                                         packet_number,
+                                                         tx_data->target_id);
+            if (rel_packet != NULL) {
+                rel_packet->session_id = peer->session_id;
+                rel_packet->connection_id = tx_data->connection_id;
+                rel_packet->session_epoch = tx_data->session_epoch;
+                rel_packet->packet_type = XGL_PACKET_TYPE_DATA;
+                rel_packet->fragment = false;
+            }
         }
 
         /* Create packet data structure for network layer */
@@ -452,31 +486,19 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             if (ctx->stats) {
                 ctx->stats->tx_errors++;
             }
+            if (tx_data->reliable) {
+                (void)xgl_reliable_remove_packet_number(&peer->reliable_queue,
+                                                        packet_number,
+                                                        tx_data->target_id);
+            }
             return err;
         }
 
-        /* Add to reliable queue if needed */
         if (tx_data->reliable) {
-            err = xgl_reliable_add_packet_number(&peer->reliable_queue,
-                                                 tx_data->data, tx_data->data_len,
-                                                 ctx->local_id, tx_data->target_id,
-                                                 packet_number, tx_data->data_type,
-                                                 tx_data->priority, timeout_ms, packet.phy);
-            if (err != XGL_OK) {
-                return err;
-            }
-
-            xgl_reliable_packet_t* rel_packet =
-                xgl_reliable_find_packet_number(&peer->reliable_queue,
-                                                packet_number,
-                                                tx_data->target_id);
+            transport_commit_packet_number(ctx, peer);
             if (rel_packet != NULL) {
-                rel_packet->session_id = peer->session_id;
-                rel_packet->connection_id = tx_data->connection_id;
-                rel_packet->session_epoch = tx_data->session_epoch;
                 rel_packet->send_timestamp = xgl_time_ms();
-                rel_packet->packet_type = XGL_PACKET_TYPE_DATA;
-                rel_packet->fragment = false;
+                rel_packet->phy = packet.phy;
             }
         }
     }
@@ -639,7 +661,13 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
 
         if (packet_number < rx_peer->rx_next_packet_number) {
             /* Sender may have missed our previous ACK. */
-            transport_send_ack(ctx, handle, packet_number, source_id, packet->session_id);
+            transport_send_ack(ctx,
+                               handle,
+                               packet_number,
+                               source_id,
+                               packet->session_id,
+                               packet->connection_id,
+                               packet->session_epoch);
             return XGL_OK;
         }
 
@@ -660,7 +688,13 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             return err;
         }
 
-        transport_send_ack(ctx, handle, packet_number, source_id, packet->session_id);
+        transport_send_ack(ctx,
+                           handle,
+                           packet_number,
+                           source_id,
+                           packet->session_id,
+                           packet->connection_id,
+                           packet->session_epoch);
     }
 
     err = transport_deliver_packet(ctx, handle, packet, data, data_len);

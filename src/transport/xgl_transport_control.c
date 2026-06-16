@@ -203,7 +203,9 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,
                                      uint32_t packet_number,
                                      uint16_t source_id,
-                                     uint16_t session_id) {
+                                     uint16_t session_id,
+                                     uint32_t connection_id,
+                                     uint32_t session_epoch) {
     uint8_t ack_value[16] = {0};
     size_t ack_value_len = 0;
     const xgl_wire_ack_range_t ranges[] = {
@@ -244,7 +246,9 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
         .source_id = ctx->local_id,
         .target_id = source_id,
         .session_id = session_id,
+        .connection_id = connection_id,
         .packet_number = packet_number,
+        .session_epoch = session_epoch,
         .packet_type = XGL_PACKET_TYPE_ACK,
         .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
         .data_type = 0,
