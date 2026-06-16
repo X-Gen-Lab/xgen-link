@@ -558,7 +558,8 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle);
  * \param[in]       handle: Instance handle
  * \param[in]       freq_hz: Calling frequency in Hz
  * \note            Handles timeouts, retransmissions, and RX processing
- * \note            Should be called from main loop or timer interrupt
+ * \note            Call from a main loop or protocol task. PHY/timer ISRs
+ *                  should only enqueue bytes or signal that work is due.
  * \note            Typical frequencies: 10-1000 Hz depending on requirements
  * \note            Higher frequency = lower latency, higher CPU usage
  * \warning         Must be called regularly for protocol to function
@@ -571,11 +572,19 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle);
  * }
  * \endcode
  *
- * \par Example - Timer Interrupt (RTOS)
+ * \par Example - RTOS Timer Wakes Protocol Task
  * \code{.c}
  * void timer_callback(void* arg) {
  *     xgl_handle_t handle = (xgl_handle_t)arg;
- *     xgl_run(handle, 1000);  // Called at 1000 Hz
+ *     signal_protocol_task(handle);
+ * }
+ *
+ * void protocol_task(void* arg) {
+ *     xgl_handle_t handle = (xgl_handle_t)arg;
+ *     while (1) {
+ *         wait_for_protocol_signal();
+ *         xgl_run(handle, 1000);  // Task context, 1000 Hz timer source
+ *     }
  * }
  *
  * // Setup 1ms timer
@@ -664,11 +673,11 @@ uint32_t xgl_next_deadline_ms(xgl_handle_t handle);
  *      - UART/SPI/I2C/CAN communication
  *
  * \par Further Reading
- *      - User Guide: docs/zh/getting-started/quick-start.md
- *      - Architecture: docs/architecture.md
- *      - Porting Guide: docs/porting.md
+ *      - User Guide: docs/en/getting-started/quick-start.md
+ *      - Architecture: docs/en/protocol/architecture.md
+ *      - Porting Guide: docs/en/guide/porting.md
  *      - Examples: examples/
- *      - API Reference: https://nexus-team.github.io/xgen-link/
+ *      - API Reference: https://x-gen-lab.github.io/xgen-link/
  */
 
 #ifdef __cplusplus

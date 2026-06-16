@@ -501,7 +501,8 @@ uint32_t xgl_next_deadline_ms(xgl_handle_t handle) {
  * \details         Handles timeouts, retransmissions, and RX processing
  * \param[in]       handle: Instance handle
  * \param[in]       freq_hz: Calling frequency in Hz
- * \note            Should be called from main loop or timer interrupt
+ * \note            Call from a main loop or protocol task; ISRs should only
+ *                  enqueue bytes or signal that protocol work is due.
  * \note            Typical frequencies: 10-1000 Hz depending on requirements
  */
 void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
