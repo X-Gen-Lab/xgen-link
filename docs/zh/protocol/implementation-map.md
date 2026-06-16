@@ -11,7 +11,7 @@
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | replay window 按 source、connection、session、packet 隔离 |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | 未通过 CRC/auth/replay 的 frame 不进入 network |
 | Network | `src/network` | `xgl/internal/xgl_network.h`, `xgl/internal/xgl_route.h` | `xgl_network.c`, `xgl_network_send.c`, `xgl_network_receive.c`, `xgl_network_metadata.c`, `xgl_route.c` | route、TTL、MTU 和 forwarding 在 network 层闭环 |
-| Transport | `src/transport` | `xgl/internal/xgl_transport.h`, `xgl/internal/xgl_reliable.h`, `xgl/internal/xgl_window.h`, `xgl/internal/xgl_fragment.h`, `xgl/internal/xgl_rtt.h` | `xgl_transport.c`, `xgl_transport_send.c`, `xgl_transport_send_plan.c`, `xgl_transport_send_fragment.c`, `xgl_transport_receive.c`, `xgl_transport_peer.c`, `xgl_transport_control.c`, `xgl_transport_ack.c`, `xgl_transport_retransmit.c`, `xgl_transport_rx_order.c`, `xgl_reliable.c`, `xgl_reliable_ack.c`, `xgl_window.c`, `xgl_fragment.c`, `xgl_rtt.c` | 可靠状态按 peer key 隔离，有序交付给应用 |
+| Transport | `src/transport` | `xgl/internal/xgl_transport.h`, `xgl/internal/xgl_reliable.h`, `xgl/internal/xgl_window.h`, `xgl/internal/xgl_fragment.h`, `xgl/internal/xgl_rtt.h` | `xgl_transport.c`, `xgl_transport_send.c`, `xgl_transport_send_plan.c`, `xgl_transport_send_fragment.c`, `xgl_transport_receive.c`, `xgl_transport_peer.c`, `xgl_transport_control.c`, `xgl_transport_ack.c`, `xgl_transport_retransmit.c`, `xgl_transport_rx_order.c`, `xgl_reliable.c`, `xgl_reliable_ack.c`, `xgl_window.c`, `xgl_fragment.c`, `xgl_fragment_range.c`, `xgl_rtt.c` | 可靠状态按 peer key 隔离，有序交付给应用 |
 | Memory | `src/memory` | allocator/pool 头 | allocator、mempool、packet_pool、tiered_pool | production/noheap profile 不应隐式回退到堆 |
 | Platform | `src/platform` | time/mutex/atomic/platform 头 | time、mutex、atomic、platform hooks | ISR 只入队，协议处理在 task/main loop |
 
@@ -36,7 +36,7 @@
 | auth/replay | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | 验证 tag，将 replay 分类为新包、可靠重复包或拒绝 | 拒绝坏包；可靠重复包仅用于 transport ACK 恢复 |
 | local or forward | `src/network/xgl_network_receive.c` | 本地交付或 TTL 递减后转发 | TTL/route/MTU/auth 重签失败则丢弃 |
 | reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | 处理 ACK/SACK、乱序缓存、重复包过滤 | 错误 connection/session 不污染其他 peer |
-| reassembly | `src/transport/xgl_fragment.c` | 按 `(source, connection, session, message)` 重组 | 超预算、超时、重叠异常则清理 |
+| reassembly | `src/transport/xgl_fragment.c`, `src/transport/xgl_fragment_range.c` | 按 `(source, connection, session, message)` 重组 | 超预算、超时、重叠异常则清理 |
 | app callback | `src/api/xgl_runtime.c`, `src/transport/xgl_transport_receive.c` | 将有序完整 payload 交付应用 | callback 不应阻塞协议主循环 |
 
 ## Wire 扩展归属

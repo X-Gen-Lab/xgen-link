@@ -11,7 +11,7 @@ This page maps protocol design to source directories, public headers, key functi
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | Replay windows are scoped by source, connection, session, and packet |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | Frames that fail CRC/auth/replay do not enter network |
 | Network | `src/network` | `xgl/internal/xgl_network.h`, `xgl/internal/xgl_route.h` | `xgl_network.c`, `xgl_network_send.c`, `xgl_network_receive.c`, `xgl_network_metadata.c`, `xgl_route.c` | Routing, TTL, MTU, and forwarding are resolved here |
-| Transport | `src/transport` | `xgl/internal/xgl_transport.h`, `xgl/internal/xgl_reliable.h`, `xgl/internal/xgl_window.h`, `xgl/internal/xgl_fragment.h`, `xgl/internal/xgl_rtt.h` | `xgl_transport.c`, `xgl_transport_send.c`, `xgl_transport_send_plan.c`, `xgl_transport_send_fragment.c`, `xgl_transport_receive.c`, `xgl_transport_peer.c`, `xgl_transport_control.c`, `xgl_transport_ack.c`, `xgl_transport_retransmit.c`, `xgl_transport_rx_order.c`, `xgl_reliable.c`, `xgl_reliable_ack.c`, `xgl_window.c`, `xgl_fragment.c`, `xgl_rtt.c` | Reliable state is scoped by peer key and delivered in order |
+| Transport | `src/transport` | `xgl/internal/xgl_transport.h`, `xgl/internal/xgl_reliable.h`, `xgl/internal/xgl_window.h`, `xgl/internal/xgl_fragment.h`, `xgl/internal/xgl_rtt.h` | `xgl_transport.c`, `xgl_transport_send.c`, `xgl_transport_send_plan.c`, `xgl_transport_send_fragment.c`, `xgl_transport_receive.c`, `xgl_transport_peer.c`, `xgl_transport_control.c`, `xgl_transport_ack.c`, `xgl_transport_retransmit.c`, `xgl_transport_rx_order.c`, `xgl_reliable.c`, `xgl_reliable_ack.c`, `xgl_window.c`, `xgl_fragment.c`, `xgl_fragment_range.c`, `xgl_rtt.c` | Reliable state is scoped by peer key and delivered in order |
 | Memory | `src/memory` | allocator/pool headers | allocator, mempool, packet pool, tiered pool | Production/no-heap profiles must not silently fall back to heap |
 | Platform | `src/platform` | time/mutex/atomic/platform headers | time, mutex, atomic, platform hooks | ISRs enqueue only; protocol work runs in task/main loop |
 
@@ -36,7 +36,7 @@ This page maps protocol design to source directories, public headers, key functi
 | Auth/replay | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | Verify tag and classify replay as new, reliable duplicate, or reject | reject bad frames; allow reliable duplicates only for transport ACK recovery |
 | Local or forward | `src/network/xgl_network_receive.c` | Deliver locally or decrement TTL and forward | drop on TTL, route, MTU, or resign failure |
 | Reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | Process ACK/SACK, buffer out-of-order packets, filter duplicates | wrong connection/session does not pollute other peers |
-| Reassembly | `src/transport/xgl_fragment.c` | Reassemble by source, connection, session, and message | clean up on budget, timeout, or invalid overlap |
+| Reassembly | `src/transport/xgl_fragment.c`, `src/transport/xgl_fragment_range.c` | Reassemble by source, connection, session, and message | clean up on budget, timeout, or invalid overlap |
 | App callback | `src/api/xgl_runtime.c`, `src/transport/xgl_transport_receive.c` | Deliver ordered complete payload | callback must not block the protocol loop |
 
 ## Extension Ownership
