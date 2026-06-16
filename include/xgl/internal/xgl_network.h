@@ -1,7 +1,7 @@
 /**
  * \file            xgl_network.h
  * \brief           Network layer packet handling and routing
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_NETWORK_H
@@ -61,11 +61,11 @@ struct xgl_datalink_ctx_s;
 typedef struct xgl_network_ctx_s {
     uint16_t local_id;              /**< Local node ID */
     xgl_route_table_t* route_table; /**< Route table */
-    
+
     /* Layer interfaces for decoupled communication */
     xgl_layer_interface_t* upper_layer;  /**< Upper layer interface (transport) */
     xgl_layer_interface_t* lower_layer;  /**< Lower layer interface (datalink) */
-    
+
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;       /**< User data for callbacks */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */

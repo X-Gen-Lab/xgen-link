@@ -1,7 +1,7 @@
 /**
  * \file            xgl_datalink.h
  * \brief           Data link layer interface
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_DATALINK_H
@@ -55,7 +55,7 @@ typedef struct xgl_datalink_ctx_s {
     xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
     xgl_replay_window_t replay_windows[XGL_DATALINK_REPLAY_WINDOW_COUNT]; /**< Anti-replay windows */
     bool replay_window_used[XGL_DATALINK_REPLAY_WINDOW_COUNT]; /**< Replay window occupancy */
-    
+
     /* Layer interface for decoupled communication */
     xgl_layer_interface_t* upper_layer; /**< Upper layer interface (network) */
 } xgl_datalink_ctx_t;

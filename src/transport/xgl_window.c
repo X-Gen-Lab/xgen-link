@@ -1,7 +1,7 @@
 /**
  * \file            xgl_window.c
  * \brief           Sliding Window Implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "xgl/internal/xgl_window.h"

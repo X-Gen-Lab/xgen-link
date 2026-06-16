@@ -1,7 +1,7 @@
 /**
  * \file            xgl_config.c
  * \brief           Configuration management implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <xgl/xgl.h>
@@ -39,10 +39,10 @@ void xgl_config_get_default(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
-    
+
     /* Use medium preset as default */
     xgl_config_t default_config = XGL_CONFIG_PRESET_MEDIUM;
-    
+
     /* Copy to output */
     memcpy(config, &default_config, sizeof(xgl_config_t));
 }
@@ -56,7 +56,7 @@ void xgl_config_get_preset_tiny(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
-    
+
     xgl_config_t preset = XGL_CONFIG_PRESET_TINY;
     memcpy(config, &preset, sizeof(xgl_config_t));
 }
@@ -70,7 +70,7 @@ void xgl_config_get_preset_small(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
-    
+
     xgl_config_t preset = XGL_CONFIG_PRESET_SMALL;
     memcpy(config, &preset, sizeof(xgl_config_t));
 }
@@ -85,7 +85,7 @@ void xgl_config_get_preset_medium(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
-    
+
     xgl_config_t preset = XGL_CONFIG_PRESET_MEDIUM;
     memcpy(config, &preset, sizeof(xgl_config_t));
 }
@@ -99,7 +99,7 @@ void xgl_config_get_preset_large(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
-    
+
     xgl_config_t preset = XGL_CONFIG_PRESET_LARGE;
     memcpy(config, &preset, sizeof(xgl_config_t));
 }
@@ -131,48 +131,48 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     if (config == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Validate memory configuration */
     if (config->source_id == 0 || config->source_id == XGL_BROADCAST_ID) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (config->memory.tx_pool_size < XGL_MIN_TX_POOL_SIZE || 
+    if (config->memory.tx_pool_size < XGL_MIN_TX_POOL_SIZE ||
         config->memory.tx_pool_size > XGL_MAX_TX_POOL_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
-    if (config->memory.rx_buffer_size < XGL_MIN_RX_BUFFER_SIZE || 
+
+    if (config->memory.rx_buffer_size < XGL_MIN_RX_BUFFER_SIZE ||
         config->memory.rx_buffer_size > XGL_MAX_RX_BUFFER_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Validate protocol parameters */
-    if (config->protocol.ack_timeout_ms < XGL_MIN_ACK_TIMEOUT_MS || 
+    if (config->protocol.ack_timeout_ms < XGL_MIN_ACK_TIMEOUT_MS ||
         config->protocol.ack_timeout_ms > XGL_MAX_ACK_TIMEOUT_MS) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
-    if (config->protocol.max_retry_count < XGL_MIN_RETRY_COUNT || 
+
+    if (config->protocol.max_retry_count < XGL_MIN_RETRY_COUNT ||
         config->protocol.max_retry_count > XGL_MAX_RETRY_COUNT) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
-    if (config->protocol.window_size < XGL_MIN_WINDOW_SIZE || 
+
+    if (config->protocol.window_size < XGL_MIN_WINDOW_SIZE ||
         config->protocol.window_size > XGL_MAX_WINDOW_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
-    if (config->protocol.max_frame_size < XGL_MIN_FRAME_SIZE || 
+
+    if (config->protocol.max_frame_size < XGL_MIN_FRAME_SIZE ||
         config->protocol.max_frame_size > XGL_MAX_FRAME_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Validate frame size is larger than header */
     if (config->protocol.max_frame_size < XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     if (config->features.enable_compression || config->features.enable_encryption) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -209,37 +209,37 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     if (config->memory.rx_buffer_size < required_rx_buffer_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    
+
     /* Validate routing configuration */
     if (config->route_table_len > 0 && config->route_table == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Validate route table entries */
     for (size_t i = 0; i < config->route_table_len; i++) {
         const xgl_route_item_t* route = &config->route_table[i];
-        
+
         /* Check PHY operations */
         if (route->phy == NULL) {
             return XGL_ERR_INVALID_PARAM;
         }
-        
+
         if (route->phy->tx == NULL || route->phy->rx == NULL) {
             return XGL_ERR_INVALID_PARAM;
         }
-        
+
         /* Check max frame size */
-        if (route->max_frame_size < XGL_MIN_FRAME_SIZE || 
+        if (route->max_frame_size < XGL_MIN_FRAME_SIZE ||
             route->max_frame_size > XGL_MAX_FRAME_SIZE) {
             return XGL_ERR_INVALID_PARAM;
         }
-        
+
         /* Check read frequency */
         if (route->read_freq_hz == 0) {
             return XGL_ERR_INVALID_PARAM;
         }
     }
-    
+
     /* All validation passed */
     return XGL_OK;
 }

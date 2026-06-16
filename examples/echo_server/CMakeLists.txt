@@ -1,6 +1,6 @@
 # Echo Server Example
 # Simple echo server demonstrating basic send/receive
-# Author: Nexus Team
+# Author: X-Gen Lab
 
 add_executable(echo_server
     main.c

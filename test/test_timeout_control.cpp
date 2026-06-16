@@ -1,7 +1,7 @@
 /**
  * \file            test_timeout_control.cpp
  * \brief           Unit tests for custom timeout control
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -16,7 +16,7 @@ protected:
     void SetUp() override {
         // Test setup if needed
     }
-    
+
     void TearDown() override {
         // Test cleanup if needed
     }
@@ -35,7 +35,7 @@ TEST_F(XglTimeoutControlTest, TimeoutFieldExists) {
         .priority = 0,
         .timeout_ms = 5000  // Custom 5 second timeout
     };
-    
+
     EXPECT_EQ(tx_data.timeout_ms, 5000);
 }
 
@@ -52,7 +52,7 @@ TEST_F(XglTimeoutControlTest, ZeroTimeoutMeansDefault) {
         .priority = 0,
         .timeout_ms = 0  // Use default timeout
     };
-    
+
     EXPECT_EQ(tx_data.timeout_ms, 0);
 }
 
@@ -72,7 +72,7 @@ TEST_F(XglTimeoutControlTest, ZeroCopyTimeoutField) {
         .priority = 0,
         .timeout_ms = 3000  // Custom 3 second timeout
     };
-    
+
     EXPECT_EQ(tx_data.timeout_ms, 3000);
 }
 
@@ -91,7 +91,7 @@ TEST_F(XglTimeoutControlTest, VariousTimeoutValues) {
         .timeout_ms = 100  // 100ms timeout
     };
     EXPECT_EQ(critical.timeout_ms, 100);
-    
+
     // Long timeout for important but not urgent messages
     xgl_tx_data_t important = {
         .target_id = 2,
@@ -103,7 +103,7 @@ TEST_F(XglTimeoutControlTest, VariousTimeoutValues) {
         .timeout_ms = 10000  // 10 second timeout
     };
     EXPECT_EQ(important.timeout_ms, 10000);
-    
+
     // Default timeout
     xgl_tx_data_t normal = {
         .target_id = 2,

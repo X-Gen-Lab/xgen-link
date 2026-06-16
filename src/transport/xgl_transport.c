@@ -1,7 +1,7 @@
 /**
  * \file            xgl_transport.c
  * \brief           Transport Layer Main Interface Implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "xgl_transport_internal.h"
@@ -24,15 +24,15 @@
 xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
                                const xgl_transport_config_t* config) {
     xgl_error_t err;
-    
+
     if (!ctx || !config) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!config->stats) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));
     ctx->local_id = config->local_id;
@@ -53,10 +53,10 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->stats = config->stats;
     ctx->tx_retries = config->tx_retries;
     ctx->allocator = config->allocator;
-    
+
     /* Initialize RTT estimator */
     xgl_rtt_init(&ctx->rtt_est);
-    
+
     /* Initialize sliding window */
     err = xgl_window_init_with_allocator(&ctx->window,
                                          config->window_size,
@@ -64,24 +64,24 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     if (err != XGL_OK) {
         return err;
     }
-    
+
     /* Initialize reliable transmission queue */
     err = xgl_reliable_init(&ctx->reliable_queue, config->max_retry_count, config->allocator);
     if (err != XGL_OK) {
         xgl_window_destroy(&ctx->window);
         return err;
     }
-    
+
     /* Initialize fragmentation manager if enabled */
     if (config->enable_fragmentation) {
-        ctx->fragment_mgr = (xgl_fragment_manager_t*)transport_malloc(config->allocator, 
+        ctx->fragment_mgr = (xgl_fragment_manager_t*)transport_malloc(config->allocator,
                                                                        sizeof(xgl_fragment_manager_t));
         if (!ctx->fragment_mgr) {
             xgl_reliable_destroy(&ctx->reliable_queue);
             xgl_window_destroy(&ctx->window);
             return XGL_ERR_NO_MEMORY;
         }
-        
+
         err = xgl_fragment_init(ctx->fragment_mgr, 8, XGL_FRAGMENT_TIMEOUT_MS, config->allocator);
         if (err != XGL_OK) {
             transport_free(config->allocator, ctx->fragment_mgr);
@@ -91,7 +91,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
             return err;
         }
     }
-    
+
     return XGL_OK;
 }
 
@@ -102,22 +102,22 @@ void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
     if (!ctx) {
         return;
     }
-    
+
     /* Destroy fragmentation manager if allocated */
     if (ctx->fragment_mgr) {
         xgl_fragment_destroy(ctx->fragment_mgr);
         transport_free(ctx->allocator, ctx->fragment_mgr);
         ctx->fragment_mgr = NULL;
     }
-    
+
     /* Destroy reliable transmission queue */
     xgl_reliable_destroy(&ctx->reliable_queue);
-    
+
     /* Destroy sliding window */
     xgl_window_destroy(&ctx->window);
 
     transport_destroy_peers(ctx);
-    
+
     /* Clear context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));
 }
@@ -133,17 +133,17 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                                xgl_handle_t handle,
                                const xgl_tx_data_t* tx_data) {
     xgl_error_t err;
-    
+
     (void)handle;  /* Unused parameter */
-    
+
     if (!ctx || !tx_data || !tx_data->data) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (tx_data->data_len == 0) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Check if lower layer is connected */
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         if (ctx->error_callback) {
@@ -153,7 +153,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         }
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     xgl_transport_peer_state_t* peer = NULL;
     bool has_tx_scope =
         (tx_data->connection_id != 0U || tx_data->session_epoch != 0U);
@@ -187,7 +187,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             peer->hello_sent = true;
         }
     }
-    
+
     uint16_t effective_max_frame_size = ctx->max_frame_size;
     if (ctx->route_table != NULL) {
         const xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
@@ -213,7 +213,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         }
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Determine if fragmentation is needed */
     size_t app_type_ext_len =
         (tx_data->data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
@@ -234,7 +234,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         }
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    
+
     if (needs_fragmentation) {
         if (!ctx->fragment_mgr) {
             return XGL_ERR_INVALID_PARAM;
@@ -268,7 +268,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             if (tx_data->reliable && peer != NULL) {
                 packet_number = transport_allocate_packet_number(ctx, peer);
             }
-            
+
             /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
             int32_t timeout_ms;
             if (tx_data->timeout_ms > 0) {
@@ -280,7 +280,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                     timeout_ms = (int32_t)ctx->default_timeout_ms;
                 }
             }
-            
+
             /* Note: Route lookup is now handled by network layer */
             /* The PHY will be determined when the packet reaches network layer */
             xgl_phy_ops_t* phy = NULL;  /* Will be set by network layer */
@@ -308,7 +308,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             if (err != XGL_OK) {
                 return err;
             }
-            
+
             /* Add to reliable queue if needed */
             if (tx_data->reliable) {
                 err = xgl_reliable_add_packet_number(&peer->reliable_queue,
@@ -346,7 +346,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                     }
                 }
             }
-            
+
             /* Send fragment through network layer via interface */
             xgl_packet_data_t packet_data = {
                 .ref_count = 1,
@@ -354,7 +354,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 .data = &tx_data->data[fragment_offset],
                 .owned_data = NULL
             };
-            
+
             xgl_packet_t packet = {
                 .source_id = ctx->local_id,
                 .target_id = tx_data->target_id,
@@ -371,7 +371,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 .extensions_len = encoded_ext_len,
                 .phy = NULL  /* Will be set by network layer */
             };
-            
+
             /* Send packet through network layer via interface */
             if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
                 /* Update error statistics */
@@ -380,9 +380,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 }
                 return XGL_ERR_INVALID_PARAM;
             }
-            
+
             err = xgl_layer_send(ctx->lower_layer, handle, &packet);
-            
+
             if (err != XGL_OK) {
                 /* Update error statistics */
                 if (ctx->stats) {
@@ -391,16 +391,16 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 return err;
             }
         }
-        
+
     } else {
         /* Send without fragmentation */
-        
+
         /* Allocate packet number */
         uint32_t packet_number = 0;
         if (tx_data->reliable && peer != NULL) {
             packet_number = transport_allocate_packet_number(ctx, peer);
         }
-        
+
         /* Get timeout - use custom timeout if provided, otherwise use RTT estimate or default */
         int32_t timeout_ms;
         if (tx_data->timeout_ms > 0) {
@@ -412,7 +412,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                     timeout_ms = (int32_t)ctx->default_timeout_ms;
                 }
         }
-        
+
         /* Create packet data structure for network layer */
         xgl_packet_data_t packet_data = {
             .ref_count = 1,
@@ -420,7 +420,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             .data = tx_data->data,
             .owned_data = NULL
         };
-        
+
         xgl_packet_t packet = {
             .source_id = ctx->local_id,
             .target_id = tx_data->target_id,
@@ -435,7 +435,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             .data = &packet_data,
             .phy = NULL  /* Will be set by network layer */
         };
-        
+
         /* Send packet through network layer via interface */
         if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
             /* Update error statistics */
@@ -444,9 +444,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             }
             return XGL_ERR_INVALID_PARAM;
         }
-        
+
         err = xgl_layer_send(ctx->lower_layer, handle, &packet);
-        
+
         if (err != XGL_OK) {
             /* Update error statistics */
             if (ctx->stats) {
@@ -454,7 +454,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             }
             return err;
         }
-        
+
         /* Add to reliable queue if needed */
         if (tx_data->reliable) {
             err = xgl_reliable_add_packet_number(&peer->reliable_queue,
@@ -480,11 +480,11 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             }
         }
     }
-    
+
     /* Update statistics */
     ctx->stats->tx_packets++;
     ctx->stats->tx_bytes += tx_data->data_len;
-    
+
     return XGL_OK;
 }
 
@@ -499,11 +499,11 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
                                   xgl_handle_t handle,
                                   const xgl_packet_t* packet) {
     xgl_error_t err;
-    
+
     if (!ctx || !packet) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Extract packet fields */
     uint16_t source_id = packet->source_id;
     uint8_t reliable = packet->reliable;
@@ -513,7 +513,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     if (packet->packet_type == XGL_PACKET_TYPE_CONTROL) {
         return transport_process_control_packet(ctx, packet);
     }
-    
+
     /* Extract payload data from packet */
     const uint8_t* data = NULL;
     size_t data_len = 0;
@@ -521,7 +521,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         data = packet->data->data;
         data_len = packet->data->data_len;
     }
-    
+
     /* Check if this is an ACK packet */
     if (packet->packet_type == XGL_PACKET_TYPE_ACK ||
         reliable == XGL_RELIABILITY_ACK_ONLY) {
@@ -583,7 +583,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
 
         return XGL_ERR_INVALID_FRAME;
     }
-    
+
     /* Validate data pointer for non-ACK packets */
     if (data == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -616,7 +616,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
             return XGL_ERR_SEQUENCE_ERROR;
         }
     }
-    
+
     /* Check for duplicate reliable packet */
     if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
         if (rx_peer == NULL) {
@@ -690,14 +690,14 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
     if (!ctx) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     uint32_t retransmit_count = transport_process_retransmissions(ctx, handle, current_time_ms);
-    
+
     /* Update retransmission statistics */
     if (retransmit_count > 0 && ctx->tx_retries != NULL) {
         (*ctx->tx_retries) += retransmit_count;
     }
-    
+
     /* Process fragment reassembly timeouts */
     if (ctx->fragment_mgr) {
         uint32_t timeout_count = xgl_fragment_process_timeouts(ctx->fragment_mgr,
@@ -709,12 +709,12 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
                                   "Fragment reassembly timeout",
                                   ctx->callback_user_data);
             }
-            
+
             /* Update statistics */
             ctx->stats->rx_dropped += timeout_count;
         }
     }
-    
+
     return XGL_OK;
 }
 
@@ -752,7 +752,7 @@ void xgl_transport_report_error(xgl_transport_ctx_t* ctx,
     if (!ctx) {
         return;
     }
-    
+
     if (ctx->error_callback) {
         ctx->error_callback(handle, error, message, ctx->callback_user_data);
     }
@@ -787,11 +787,11 @@ static xgl_error_t transport_receive_impl(void* ctx,
                                          void* data) {
     xgl_transport_ctx_t* trans_ctx = (xgl_transport_ctx_t*)ctx;
     const xgl_packet_t* packet = (const xgl_packet_t*)data;
-    
+
     if (trans_ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Forward to transport receive function */
     return xgl_transport_receive(trans_ctx, handle, packet);
 }
@@ -805,18 +805,18 @@ static xgl_error_t transport_report_error_impl(void* ctx,
                                               void* data) {
     xgl_transport_ctx_t* trans_ctx = (xgl_transport_ctx_t*)ctx;
     xgl_layer_error_info_t* error_info = (xgl_layer_error_info_t*)data;
-    
+
     if (trans_ctx == NULL || error_info == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Forward error to callback if available */
     if (trans_ctx->error_callback != NULL) {
         trans_ctx->error_callback(handle, error_info->error,
                                  error_info->message,
                                  trans_ctx->callback_user_data);
     }
-    
+
     return XGL_OK;
 }
 
@@ -832,12 +832,12 @@ xgl_error_t xgl_transport_get_interface(xgl_transport_ctx_t* ctx,
     if (ctx == NULL || iface == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     xgl_layer_interface_init(iface,
                             ctx,
                             transport_send_impl,
                             transport_receive_impl,
                             transport_report_error_impl);
-    
+
     return XGL_OK;
 }

@@ -1,7 +1,7 @@
 /**
  * \file            test_tiered_pool.cpp
  * \brief           Unit tests for tiered memory pool
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -15,11 +15,11 @@
 class XglTieredPoolTest : public ::testing::Test {
 protected:
     xgl_tiered_pool_t pool;
-    
+
     void SetUp() override {
         memset(&pool, 0, sizeof(pool));
     }
-    
+
     void TearDown() override {
         xgl_tiered_pool_destroy(&pool);
     }
@@ -234,21 +234,21 @@ TEST_F(XglTieredPoolTest, FreesFallbackAllocationToOwningPool) {
 
 TEST_F(XglTieredPoolTest, SmartAllocationSelectsSmallest) {
     xgl_tiered_pool_init(&pool, 10, 5, 2);
-    
+
     /* Request 32 bytes - should use small pool */
     void* ptr1 = xgl_tiered_pool_alloc(&pool, 32);
     EXPECT_NE(ptr1, nullptr);
     size_t used_small = xgl_tiered_pool_get_used_memory(&pool);
     EXPECT_EQ(used_small, XGL_TIERED_POOL_SMALL_SIZE);
     xgl_tiered_pool_free(&pool, ptr1, 32);
-    
+
     /* Request 128 bytes - should use medium pool */
     void* ptr2 = xgl_tiered_pool_alloc(&pool, 128);
     EXPECT_NE(ptr2, nullptr);
     size_t used_medium = xgl_tiered_pool_get_used_memory(&pool);
     EXPECT_EQ(used_medium, XGL_TIERED_POOL_MEDIUM_SIZE);
     xgl_tiered_pool_free(&pool, ptr2, 128);
-    
+
     /* Request 512 bytes - should use large pool */
     void* ptr3 = xgl_tiered_pool_alloc(&pool, 512);
     EXPECT_NE(ptr3, nullptr);
@@ -304,11 +304,11 @@ TEST_F(XglTieredPoolTest, GetFreeMemory) {
 TEST_F(XglTieredPoolTest, GetUsedMemory) {
     xgl_tiered_pool_init(&pool, 10, 5, 2);
     EXPECT_EQ(xgl_tiered_pool_get_used_memory(&pool), 0);
-    
+
     void* ptr = xgl_tiered_pool_alloc(&pool, 32);
     EXPECT_EQ(xgl_tiered_pool_get_used_memory(&pool),
               XGL_TIERED_POOL_SMALL_SIZE);
-    
+
     xgl_tiered_pool_free(&pool, ptr, 32);
     EXPECT_EQ(xgl_tiered_pool_get_used_memory(&pool), 0);
 }
@@ -316,15 +316,15 @@ TEST_F(XglTieredPoolTest, GetUsedMemory) {
 TEST_F(XglTieredPoolTest, GetPeakMemory) {
     xgl_tiered_pool_init(&pool, 10, 5, 2);
     EXPECT_EQ(xgl_tiered_pool_get_peak_memory(&pool), 0);
-    
+
     void* ptr1 = xgl_tiered_pool_alloc(&pool, 32);
     void* ptr2 = xgl_tiered_pool_alloc(&pool, 128);
     size_t peak = XGL_TIERED_POOL_SMALL_SIZE + XGL_TIERED_POOL_MEDIUM_SIZE;
     EXPECT_EQ(xgl_tiered_pool_get_peak_memory(&pool), peak);
-    
+
     xgl_tiered_pool_free(&pool, ptr1, 32);
     EXPECT_EQ(xgl_tiered_pool_get_peak_memory(&pool), peak);
-    
+
     xgl_tiered_pool_free(&pool, ptr2, 128);
     EXPECT_EQ(xgl_tiered_pool_get_peak_memory(&pool), peak);
 }
@@ -333,9 +333,9 @@ TEST_F(XglTieredPoolTest, ResetStats) {
     xgl_tiered_pool_init(&pool, 10, 5, 2);
     void* ptr = xgl_tiered_pool_alloc(&pool, 32);
     xgl_tiered_pool_free(&pool, ptr, 32);
-    
+
     EXPECT_GT(xgl_tiered_pool_get_peak_memory(&pool), 0);
-    
+
     xgl_tiered_pool_reset_stats(&pool);
     EXPECT_EQ(xgl_tiered_pool_get_peak_memory(&pool), 0);
 }
@@ -362,7 +362,7 @@ TEST_F(XglTieredPoolTest, ResetStatsNull) {
 
 TEST_F(XglTieredPoolTest, WriteToAllocatedMemory) {
     xgl_tiered_pool_init(&pool, 10, 5, 2);
-    
+
     /* Test small block */
     uint8_t* small = (uint8_t*)xgl_tiered_pool_alloc(&pool, 32);
     ASSERT_NE(small, nullptr);
@@ -371,7 +371,7 @@ TEST_F(XglTieredPoolTest, WriteToAllocatedMemory) {
         EXPECT_EQ(small[i], 0xAA);
     }
     xgl_tiered_pool_free(&pool, small, 32);
-    
+
     /* Test medium block */
     uint8_t* medium = (uint8_t*)xgl_tiered_pool_alloc(&pool, 128);
     ASSERT_NE(medium, nullptr);
@@ -380,7 +380,7 @@ TEST_F(XglTieredPoolTest, WriteToAllocatedMemory) {
         EXPECT_EQ(medium[i], 0xBB);
     }
     xgl_tiered_pool_free(&pool, medium, 128);
-    
+
     /* Test large block */
     uint8_t* large = (uint8_t*)xgl_tiered_pool_alloc(&pool, 512);
     ASSERT_NE(large, nullptr);
@@ -397,10 +397,10 @@ TEST_F(XglTieredPoolTest, WriteToAllocatedMemory) {
 
 TEST_F(XglTieredPoolTest, StressMixedAllocations) {
     xgl_tiered_pool_init(&pool, 20, 10, 5);
-    
+
     void* ptrs[35];
     size_t sizes[35];
-    
+
     /* Allocate mixed sizes */
     for (int i = 0; i < 35; i++) {
         if (i < 20) {
@@ -413,12 +413,12 @@ TEST_F(XglTieredPoolTest, StressMixedAllocations) {
         ptrs[i] = xgl_tiered_pool_alloc(&pool, sizes[i]);
         EXPECT_NE(ptrs[i], nullptr);
     }
-    
+
     /* Free all */
     for (int i = 0; i < 35; i++) {
         xgl_tiered_pool_free(&pool, ptrs[i], sizes[i]);
     }
-    
+
     /* Verify all memory is free */
     size_t expected_free = 20 * XGL_TIERED_POOL_SMALL_SIZE +
                           10 * XGL_TIERED_POOL_MEDIUM_SIZE +

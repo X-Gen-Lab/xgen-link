@@ -1,7 +1,7 @@
 /**
  * \file            xgl_reliable.h
  * \brief           Reliable Transmission Queue Management
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_RELIABLE_H
@@ -31,11 +31,11 @@ extern "C" {
 typedef struct xgl_reliable_packet_s {
     xgl_list_node_t node;           /**< List node for queue */
     struct xgl_reliable_packet_s* index_next; /**< Hash bucket link */
-    
+
     /* Packet data */
     uint8_t* data;                  /**< Packet data buffer */
     size_t data_len;                /**< Data length in bytes */
-    
+
     /* Addressing */
     uint16_t source_id;             /**< Source node ID */
     uint16_t target_id;             /**< Target node ID */
@@ -44,7 +44,7 @@ typedef struct xgl_reliable_packet_s {
     uint32_t connection_id;         /**< Production connection context ID */
     uint32_t session_epoch;         /**< Production session epoch */
     uint8_t data_type;              /**< Data type */
-    
+
     /* Attributes */
     uint8_t packet_type;            /**< Production packet type */
     uint8_t flags;                  /**< Production wire flags */
@@ -52,16 +52,16 @@ typedef struct xgl_reliable_packet_s {
     uint8_t priority;               /**< Priority level (0-7) */
     uint8_t* extensions;            /**< Owned TLV extension bytes */
     size_t extensions_len;          /**< Length of TLV extension bytes */
-    
+
     /* Retransmission state */
     uint8_t retry_count;            /**< Current retry count */
     uint32_t send_timestamp;        /**< Last send timestamp in ms */
     int32_t timeout_ms;             /**< Current timeout value in ms */
     int32_t initial_timeout_ms;     /**< Initial timeout value in ms */
-    
+
     /* Routing */
     xgl_phy_ops_t* phy;             /**< Physical layer for this packet */
-    
+
 } xgl_reliable_packet_t;
 
 /*---------------------------------------------------------------------------*/

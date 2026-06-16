@@ -1,7 +1,7 @@
 /**
  * \file            xgl_transport.h
  * \brief           Transport Layer Main Interface
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_TRANSPORT_H
@@ -77,29 +77,29 @@ typedef struct xgl_transport_ctx_s {
     uint8_t auth_tag_len;           /**< Authentication tag length reserved per frame */
     xgl_route_table_t* route_table; /**< Optional route table for route MTU lookup */
     uint16_t next_session_id;       /**< Next local session/epoch ID */
-    
+
     /* Transport components */
     xgl_rtt_estimator_t rtt_est;    /**< RTT estimator */
     xgl_sliding_window_t window;    /**< Sliding window */
     xgl_reliable_queue_t reliable_queue; /**< Reliable transmission queue */
     xgl_fragment_manager_t* fragment_mgr; /**< Fragmentation manager (optional) */
     xgl_transport_peer_state_t* peers; /**< Peer-specific reliable transport state */
-    
+
     /* Layer interface for decoupled communication */
     xgl_layer_interface_t* lower_layer; /**< Lower layer interface (network) */
-    
+
     /* Callbacks */
     xgl_rx_callback_t rx_callback;  /**< Receive callback */
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;       /**< User data for callbacks */
-    
+
     /* Statistics */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* tx_retries;           /**< Retransmission counter pointer */
-    
+
     /* Memory management */
     xgl_allocator_t* allocator;     /**< Memory allocator */
-    
+
 } xgl_transport_ctx_t;
 
 /**

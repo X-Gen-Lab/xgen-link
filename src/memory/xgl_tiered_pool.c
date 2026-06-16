@@ -1,7 +1,7 @@
 /**
  * \file            xgl_tiered_pool.c
  * \brief           Tiered memory pool implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "xgl/internal/xgl_tiered_pool.h"
@@ -60,15 +60,15 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
     if (pool == NULL) {
         return -1;
     }
-    
+
     /* Initialize structure */
     memset(pool, 0, sizeof(xgl_tiered_pool_t));
     pool->owns_buffers = true;
-    
+
     pool->small_count = small_count;
     pool->medium_count = medium_count;
     pool->large_count = large_count;
-    
+
     /* Allocate small pool buffer */
     if (small_count > 0) {
         size_t small_buffer_size = small_count * XGL_TIERED_POOL_SMALL_SIZE;
@@ -76,14 +76,14 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
         if (pool->small_buffer == NULL) {
             goto error_cleanup;
         }
-        
+
         if (xgl_mempool_init(&pool->small_pool, pool->small_buffer,
                             small_buffer_size,
                             XGL_TIERED_POOL_SMALL_SIZE) != 0) {
             goto error_cleanup;
         }
     }
-    
+
     /* Allocate medium pool buffer */
     if (medium_count > 0) {
         size_t medium_buffer_size = medium_count * XGL_TIERED_POOL_MEDIUM_SIZE;
@@ -91,14 +91,14 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
         if (pool->medium_buffer == NULL) {
             goto error_cleanup;
         }
-        
+
         if (xgl_mempool_init(&pool->medium_pool, pool->medium_buffer,
                             medium_buffer_size,
                             XGL_TIERED_POOL_MEDIUM_SIZE) != 0) {
             goto error_cleanup;
         }
     }
-    
+
     /* Allocate large pool buffer */
     if (large_count > 0) {
         size_t large_buffer_size = large_count * XGL_TIERED_POOL_LARGE_SIZE;
@@ -106,16 +106,16 @@ int xgl_tiered_pool_init(xgl_tiered_pool_t* pool, size_t small_count,
         if (pool->large_buffer == NULL) {
             goto error_cleanup;
         }
-        
+
         if (xgl_mempool_init(&pool->large_pool, pool->large_buffer,
                             large_buffer_size,
                             XGL_TIERED_POOL_LARGE_SIZE) != 0) {
             goto error_cleanup;
         }
     }
-    
+
     return 0;
-    
+
 error_cleanup:
     xgl_tiered_pool_destroy(pool);
     return -1;
@@ -182,7 +182,7 @@ void xgl_tiered_pool_destroy(xgl_tiered_pool_t* pool) {
     if (pool == NULL) {
         return;
     }
-    
+
     /* Destroy pools */
     if (pool->small_count > 0) {
         xgl_mempool_destroy(&pool->small_pool);
@@ -193,7 +193,7 @@ void xgl_tiered_pool_destroy(xgl_tiered_pool_t* pool) {
     if (pool->large_count > 0) {
         xgl_mempool_destroy(&pool->large_pool);
     }
-    
+
     /* Free buffers */
     if (pool->owns_buffers && pool->small_buffer != NULL) {
         xgl_free(NULL, pool->small_buffer);
@@ -207,7 +207,7 @@ void xgl_tiered_pool_destroy(xgl_tiered_pool_t* pool) {
         xgl_free(NULL, pool->large_buffer);
         pool->large_buffer = NULL;
     }
-    
+
     /* Clear structure */
     memset(pool, 0, sizeof(xgl_tiered_pool_t));
 }
@@ -222,11 +222,11 @@ void xgl_tiered_pool_destroy(xgl_tiered_pool_t* pool) {
  */
 void* xgl_tiered_pool_alloc(xgl_tiered_pool_t* pool, size_t size) {
     void* ptr = NULL;
-    
+
     if (pool == NULL || size == 0) {
         return NULL;
     }
-    
+
     /* Try small pool first if size fits */
     if (size <= XGL_TIERED_POOL_SMALL_SIZE && pool->small_count > 0) {
         ptr = xgl_mempool_alloc(&pool->small_pool);
@@ -234,7 +234,7 @@ void* xgl_tiered_pool_alloc(xgl_tiered_pool_t* pool, size_t size) {
             return ptr;
         }
     }
-    
+
     /* Try medium pool if size fits */
     if (size <= XGL_TIERED_POOL_MEDIUM_SIZE && pool->medium_count > 0) {
         ptr = xgl_mempool_alloc(&pool->medium_pool);
@@ -242,7 +242,7 @@ void* xgl_tiered_pool_alloc(xgl_tiered_pool_t* pool, size_t size) {
             return ptr;
         }
     }
-    
+
     /* Try large pool if size fits */
     if (size <= XGL_TIERED_POOL_LARGE_SIZE && pool->large_count > 0) {
         ptr = xgl_mempool_alloc(&pool->large_pool);
@@ -250,7 +250,7 @@ void* xgl_tiered_pool_alloc(xgl_tiered_pool_t* pool, size_t size) {
             return ptr;
         }
     }
-    
+
     /* All pools exhausted or size too large */
     return NULL;
 }
@@ -282,26 +282,26 @@ void xgl_tiered_pool_free(xgl_tiered_pool_t* pool, void* ptr, size_t size) {
  */
 size_t xgl_tiered_pool_get_free_memory(const xgl_tiered_pool_t* pool) {
     size_t free_memory = 0;
-    
+
     if (pool == NULL) {
         return 0;
     }
-    
+
     if (pool->small_count > 0) {
         free_memory += xgl_mempool_get_free_count(&pool->small_pool) *
                       XGL_TIERED_POOL_SMALL_SIZE;
     }
-    
+
     if (pool->medium_count > 0) {
         free_memory += xgl_mempool_get_free_count(&pool->medium_pool) *
                       XGL_TIERED_POOL_MEDIUM_SIZE;
     }
-    
+
     if (pool->large_count > 0) {
         free_memory += xgl_mempool_get_free_count(&pool->large_pool) *
                       XGL_TIERED_POOL_LARGE_SIZE;
     }
-    
+
     return free_memory;
 }
 
@@ -310,26 +310,26 @@ size_t xgl_tiered_pool_get_free_memory(const xgl_tiered_pool_t* pool) {
  */
 size_t xgl_tiered_pool_get_used_memory(const xgl_tiered_pool_t* pool) {
     size_t used_memory = 0;
-    
+
     if (pool == NULL) {
         return 0;
     }
-    
+
     if (pool->small_count > 0) {
         used_memory += xgl_mempool_get_used_count(&pool->small_pool) *
                       XGL_TIERED_POOL_SMALL_SIZE;
     }
-    
+
     if (pool->medium_count > 0) {
         used_memory += xgl_mempool_get_used_count(&pool->medium_pool) *
                       XGL_TIERED_POOL_MEDIUM_SIZE;
     }
-    
+
     if (pool->large_count > 0) {
         used_memory += xgl_mempool_get_used_count(&pool->large_pool) *
                       XGL_TIERED_POOL_LARGE_SIZE;
     }
-    
+
     return used_memory;
 }
 
@@ -338,26 +338,26 @@ size_t xgl_tiered_pool_get_used_memory(const xgl_tiered_pool_t* pool) {
  */
 size_t xgl_tiered_pool_get_peak_memory(const xgl_tiered_pool_t* pool) {
     size_t peak_memory = 0;
-    
+
     if (pool == NULL) {
         return 0;
     }
-    
+
     if (pool->small_count > 0) {
         peak_memory += xgl_mempool_get_peak_used(&pool->small_pool) *
                       XGL_TIERED_POOL_SMALL_SIZE;
     }
-    
+
     if (pool->medium_count > 0) {
         peak_memory += xgl_mempool_get_peak_used(&pool->medium_pool) *
                       XGL_TIERED_POOL_MEDIUM_SIZE;
     }
-    
+
     if (pool->large_count > 0) {
         peak_memory += xgl_mempool_get_peak_used(&pool->large_pool) *
                       XGL_TIERED_POOL_LARGE_SIZE;
     }
-    
+
     return peak_memory;
 }
 
@@ -368,15 +368,15 @@ void xgl_tiered_pool_reset_stats(xgl_tiered_pool_t* pool) {
     if (pool == NULL) {
         return;
     }
-    
+
     if (pool->small_count > 0) {
         xgl_mempool_reset_stats(&pool->small_pool);
     }
-    
+
     if (pool->medium_count > 0) {
         xgl_mempool_reset_stats(&pool->medium_pool);
     }
-    
+
     if (pool->large_count > 0) {
         xgl_mempool_reset_stats(&pool->large_pool);
     }

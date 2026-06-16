@@ -1,6 +1,6 @@
 # File Transfer Example
 # Demonstrates reliable file transfer with fragmentation
-# Author: Nexus Team
+# Author: X-Gen Lab
 
 add_executable(file_transfer
     main.c

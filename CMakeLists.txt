@@ -1,6 +1,6 @@
 # xgen-link Protocol Stack
 # Modern embedded communication protocol implementation
-# Author: Nexus Team
+# Author: X-Gen Lab
 
 cmake_minimum_required(VERSION 3.21)
 

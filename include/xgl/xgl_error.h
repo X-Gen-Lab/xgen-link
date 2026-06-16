@@ -1,7 +1,7 @@
 /**
  * \file            xgl_error.h
  * \brief           xgen-link Protocol Error Codes and Handling
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_ERROR_H
@@ -18,7 +18,7 @@ extern "C" {
  */
 typedef enum {
     XGL_OK = 0,                     /**< Success */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Parameter errors (1-99)                                               */
     /*-----------------------------------------------------------------------*/
@@ -27,14 +27,14 @@ typedef enum {
     XGL_ERR_NOT_INITIALIZED = 3,    /**< Not initialized */
     XGL_ERR_ALREADY_INITIALIZED = 4,/**< Already initialized */
     XGL_ERR_NOT_FOUND = 5,          /**< Requested item not found */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Memory errors (100-199)                                               */
     /*-----------------------------------------------------------------------*/
     XGL_ERR_NO_MEMORY = 100,        /**< Out of memory */
     XGL_ERR_POOL_EXHAUSTED = 101,   /**< Memory pool exhausted */
     XGL_ERR_BUFFER_TOO_SMALL = 102, /**< Buffer too small */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Network errors (200-299)                                              */
     /*-----------------------------------------------------------------------*/
@@ -43,7 +43,7 @@ typedef enum {
     XGL_ERR_TIMEOUT = 202,          /**< Operation timeout */
     XGL_ERR_ACK_TIMEOUT = 203,      /**< ACK timeout */
     XGL_ERR_TTL_EXPIRED = 204,      /**< Packet TTL expired */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Protocol errors (300-399)                                             */
     /*-----------------------------------------------------------------------*/
@@ -52,14 +52,14 @@ typedef enum {
     XGL_ERR_INVALID_VERSION = 302,  /**< Invalid version */
     XGL_ERR_INVALID_DATA_TYPE = 303,/**< Invalid data type */
     XGL_ERR_SEQUENCE_ERROR = 304,   /**< Packet number/window error */
-    
+
     /*-----------------------------------------------------------------------*/
     /* State errors (400-499)                                                */
     /*-----------------------------------------------------------------------*/
     XGL_ERR_BUSY = 400,             /**< Resource busy */
     XGL_ERR_QUEUE_FULL = 401,       /**< Queue full */
     XGL_ERR_WINDOW_FULL = 402,      /**< Sliding window full */
-    
+
 } xgl_error_t;
 
 /**

@@ -1,7 +1,7 @@
 /**
  * \file            xgl_list.h
  * \brief           Intrusive doubly-linked list data structure
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_LIST_H
@@ -91,7 +91,7 @@ void xgl_list_insert_tail(xgl_list_t* list, xgl_list_node_t* node);
  * \param[in]       pos: Pointer to position node
  * \param[in]       node: Pointer to node to insert
  */
-void xgl_list_insert_after(xgl_list_t* list, xgl_list_node_t* pos, 
+void xgl_list_insert_after(xgl_list_t* list, xgl_list_node_t* pos,
                           xgl_list_node_t* node);
 
 /**

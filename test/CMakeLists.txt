@@ -1,6 +1,6 @@
 # Test Configuration
 # Google Test and Google Mock integration
-# Author: Nexus Team
+# Author: X-Gen Lab
 
 #-----------------------------------------------------------------------------
 # Google Test Setup
@@ -42,21 +42,21 @@ set(TEST_SOURCES
     test_send.cpp
     test_stats.cpp
     test_security.cpp
-    
+
     # Architecture improvement tests
     test_layered_stats.cpp
     test_time_provider.cpp
-    
+
     # Data link tests
     test_frame.cpp
     test_wire.cpp
     test_parser.cpp
     test_datalink.cpp
-    
+
     # Network tests
     test_route.cpp
     test_network.cpp
-    
+
     # Transport tests
     test_rtt.cpp
     test_window.cpp
@@ -64,16 +64,16 @@ set(TEST_SOURCES
     test_fragment.cpp
     test_transport.cpp
     test_timeout_control.cpp
-    
+
     # Platform tests
     test_mutex.cpp
     test_time.cpp
     test_atomic.cpp
     test_platform.cpp
-    
+
     # Integration tests
     integration/test_integration.cpp
-    
+
     # Property tests
     property/test_memory_properties.cpp
     property/test_crc_properties.cpp

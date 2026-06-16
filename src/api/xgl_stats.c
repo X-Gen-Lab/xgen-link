@@ -1,7 +1,7 @@
 /**
  * \file            xgl_stats.c
  * \brief           Statistics collection implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <xgl/xgl.h>
@@ -28,16 +28,16 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
     if (stats == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* The thread-safe path locks inst->mutex, so this handle must stay mutable. */
     // cppcheck-suppress constVariablePointer
     struct xgl_instance* inst = (struct xgl_instance*)handle;
-    
+
     /* Check if instance is initialized */
     if (!inst->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
 #ifdef XGL_THREAD_SAFE
     /* Lock mutex for thread-safe access */
     xgl_error_t err = xgl_mutex_lock(&inst->mutex);
@@ -45,15 +45,15 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
         return err;
     }
 #endif
-    
+
     /* Copy statistics structure */
     memcpy(stats, &inst->stats, sizeof(xgl_statistics_t));
-    
+
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex */
     xgl_mutex_unlock(&inst->mutex);
 #endif
-    
+
     return XGL_OK;
 }
 
@@ -68,14 +68,14 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     struct xgl_instance* inst = (struct xgl_instance*)handle;
-    
+
     /* Check if instance is initialized */
     if (!inst->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
 #ifdef XGL_THREAD_SAFE
     /* Lock mutex for thread-safe access */
     xgl_error_t err = xgl_mutex_lock(&inst->mutex);
@@ -83,14 +83,14 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
         return err;
     }
 #endif
-    
+
     /* Reset all statistics to zero */
     memset(&inst->stats, 0, sizeof(xgl_statistics_t));
-    
+
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex */
     xgl_mutex_unlock(&inst->mutex);
 #endif
-    
+
     return XGL_OK;
 }

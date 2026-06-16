@@ -1,7 +1,7 @@
 /**
  * \file            main.c
  * \brief           Two-node echo example
- * \author          Nexus Team
+ * \author          X-Gen Lab
  * \date            2026-02-28
  *
  * \details         This example demonstrates:

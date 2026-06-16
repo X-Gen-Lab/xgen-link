@@ -1,7 +1,7 @@
 /**
  * \file            xgl_route.h
  * \brief           Route table management for network layer
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_ROUTE_H

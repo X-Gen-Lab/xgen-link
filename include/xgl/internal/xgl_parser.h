@@ -1,7 +1,7 @@
 /**
  * \file            xgl_parser.h
  * \brief           Frame parser state machine
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_PARSER_H

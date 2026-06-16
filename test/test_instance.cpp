@@ -1,7 +1,7 @@
 /**
  * \file            test_instance.cpp
  * \brief           Unit tests for protocol instance management
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -28,11 +28,11 @@ protected:
         xgl_config_get_default(&config);
         config.source_id = 1;
     }
-    
+
     void TearDown() override {
         /* Cleanup handled by individual tests */
     }
-    
+
     xgl_config_t config;
 };
 
@@ -45,9 +45,9 @@ protected:
  */
 TEST_F(XglInstanceTest, CreateWithValidConfig) {
     xgl_handle_t handle = xgl_create(&config);
-    
+
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_destroy(handle);
 }
 
@@ -56,7 +56,7 @@ TEST_F(XglInstanceTest, CreateWithValidConfig) {
  */
 TEST_F(XglInstanceTest, CreateWithNullConfig) {
     xgl_handle_t handle = xgl_create(NULL);
-    
+
     EXPECT_EQ(handle, nullptr);
 }
 
@@ -65,9 +65,9 @@ TEST_F(XglInstanceTest, CreateWithNullConfig) {
  */
 TEST_F(XglInstanceTest, CreateWithInvalidTxPoolSize) {
     config.memory.tx_pool_size = 0;
-    
+
     xgl_handle_t handle = xgl_create(&config);
-    
+
     EXPECT_EQ(handle, nullptr);
 }
 
@@ -76,9 +76,9 @@ TEST_F(XglInstanceTest, CreateWithInvalidTxPoolSize) {
  */
 TEST_F(XglInstanceTest, CreateWithInvalidRxBufferSize) {
     config.memory.rx_buffer_size = 0;
-    
+
     xgl_handle_t handle = xgl_create(&config);
-    
+
     EXPECT_EQ(handle, nullptr);
 }
 
@@ -87,9 +87,9 @@ TEST_F(XglInstanceTest, CreateWithInvalidRxBufferSize) {
  */
 TEST_F(XglInstanceTest, CreateWithInvalidAckTimeout) {
     config.protocol.ack_timeout_ms = 0;
-    
+
     xgl_handle_t handle = xgl_create(&config);
-    
+
     EXPECT_EQ(handle, nullptr);
 }
 
@@ -98,9 +98,9 @@ TEST_F(XglInstanceTest, CreateWithInvalidAckTimeout) {
  */
 TEST_F(XglInstanceTest, CreateWithInvalidMaxFrameSize) {
     config.protocol.max_frame_size = 0;
-    
+
     xgl_handle_t handle = xgl_create(&config);
-    
+
     EXPECT_EQ(handle, nullptr);
 }
 
@@ -109,9 +109,9 @@ TEST_F(XglInstanceTest, CreateWithInvalidMaxFrameSize) {
  */
 TEST_F(XglInstanceTest, CreateWithFrameSizeTooSmall) {
     config.protocol.max_frame_size = 10;  /* Less than header + CRC */
-    
+
     xgl_handle_t handle = xgl_create(&config);
-    
+
     EXPECT_EQ(handle, nullptr);
 }
 
@@ -125,10 +125,10 @@ TEST_F(XglInstanceTest, CreateWithFrameSizeTooSmall) {
 TEST_F(XglInstanceTest, InitializeInstance) {
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err = xgl_init(handle);
     EXPECT_EQ(err, XGL_OK);
-    
+
     xgl_destroy(handle);
 }
 
@@ -137,7 +137,7 @@ TEST_F(XglInstanceTest, InitializeInstance) {
  */
 TEST_F(XglInstanceTest, InitializeNullHandle) {
     xgl_error_t err = xgl_init(NULL);
-    
+
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
@@ -147,13 +147,13 @@ TEST_F(XglInstanceTest, InitializeNullHandle) {
 TEST_F(XglInstanceTest, DoubleInitialization) {
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err1 = xgl_init(handle);
     EXPECT_EQ(err1, XGL_OK);
-    
+
     xgl_error_t err2 = xgl_init(handle);
     EXPECT_EQ(err2, XGL_ERR_ALREADY_INITIALIZED);
-    
+
     xgl_destroy(handle);
 }
 
@@ -167,10 +167,10 @@ TEST_F(XglInstanceTest, DoubleInitialization) {
 TEST_F(XglInstanceTest, DestroyInstance) {
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err = xgl_init(handle);
     ASSERT_EQ(err, XGL_OK);
-    
+
     /* Should not crash */
     xgl_destroy(handle);
 }
@@ -189,7 +189,7 @@ TEST_F(XglInstanceTest, DestroyNullHandle) {
 TEST_F(XglInstanceTest, DestroyWithoutInit) {
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
-    
+
     /* Should not crash even if not initialized */
     xgl_destroy(handle);
 }
@@ -204,13 +204,13 @@ TEST_F(XglInstanceTest, DestroyWithoutInit) {
 TEST_F(XglInstanceTest, TinyConfigPreset) {
     xgl_config_t tiny_config = XGL_CONFIG_PRESET_TINY;
     tiny_config.source_id = 1;
-    
+
     xgl_handle_t handle = xgl_create(&tiny_config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err = xgl_init(handle);
     EXPECT_EQ(err, XGL_OK);
-    
+
     xgl_destroy(handle);
 }
 
@@ -220,13 +220,13 @@ TEST_F(XglInstanceTest, TinyConfigPreset) {
 TEST_F(XglInstanceTest, SmallConfigPreset) {
     xgl_config_t small_config = XGL_CONFIG_PRESET_SMALL;
     small_config.source_id = 1;
-    
+
     xgl_handle_t handle = xgl_create(&small_config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err = xgl_init(handle);
     EXPECT_EQ(err, XGL_OK);
-    
+
     xgl_destroy(handle);
 }
 
@@ -236,13 +236,13 @@ TEST_F(XglInstanceTest, SmallConfigPreset) {
 TEST_F(XglInstanceTest, MediumConfigPreset) {
     xgl_config_t medium_config = XGL_CONFIG_PRESET_MEDIUM;
     medium_config.source_id = 1;
-    
+
     xgl_handle_t handle = xgl_create(&medium_config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err = xgl_init(handle);
     EXPECT_EQ(err, XGL_OK);
-    
+
     xgl_destroy(handle);
 }
 
@@ -252,13 +252,13 @@ TEST_F(XglInstanceTest, MediumConfigPreset) {
 TEST_F(XglInstanceTest, LargeConfigPreset) {
     xgl_config_t large_config = XGL_CONFIG_PRESET_LARGE;
     large_config.source_id = 1;
-    
+
     xgl_handle_t handle = xgl_create(&large_config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err = xgl_init(handle);
     EXPECT_EQ(err, XGL_OK);
-    
+
     xgl_destroy(handle);
 }
 
@@ -272,23 +272,23 @@ TEST_F(XglInstanceTest, LargeConfigPreset) {
 TEST_F(XglInstanceTest, MultipleInstances) {
     xgl_config_t config1 = config;
     xgl_config_t config2 = config;
-    
+
     config1.source_id = 1;
     config2.source_id = 2;
-    
+
     xgl_handle_t handle1 = xgl_create(&config1);
     xgl_handle_t handle2 = xgl_create(&config2);
-    
+
     ASSERT_NE(handle1, nullptr);
     ASSERT_NE(handle2, nullptr);
     EXPECT_NE(handle1, handle2);
-    
+
     xgl_error_t err1 = xgl_init(handle1);
     xgl_error_t err2 = xgl_init(handle2);
-    
+
     EXPECT_EQ(err1, XGL_OK);
     EXPECT_EQ(err2, XGL_OK);
-    
+
     xgl_destroy(handle1);
     xgl_destroy(handle2);
 }
@@ -384,7 +384,7 @@ TEST_F(XglInstanceTest, InstanceWithRouteTable) {
         },
         .user_data = NULL
     };
-    
+
     xgl_route_item_t routes[] = {
         {
             .target_id = 2,
@@ -401,16 +401,16 @@ TEST_F(XglInstanceTest, InstanceWithRouteTable) {
             .metric = 100
         }
     };
-    
+
     config.route_table = routes;
     config.route_table_len = 2;
-    
+
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
-    
+
     xgl_error_t err = xgl_init(handle);
     EXPECT_EQ(err, XGL_OK);
-    
+
     xgl_destroy(handle);
 }
 
@@ -420,8 +420,8 @@ TEST_F(XglInstanceTest, InstanceWithRouteTable) {
 TEST_F(XglInstanceTest, InstanceWithInvalidRouteTable) {
     config.route_table = NULL;
     config.route_table_len = 5;  /* Non-zero length but NULL pointer */
-    
+
     xgl_handle_t handle = xgl_create(&config);
-    
+
     EXPECT_EQ(handle, nullptr);
 }

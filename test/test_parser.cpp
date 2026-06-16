@@ -1,7 +1,7 @@
 /**
  * \file            test_parser.cpp
  * \brief           Frame parser unit tests
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -49,20 +49,20 @@ protected:
     void SetUp() override {
         /* Initialize cache buffer */
         cache_buffer.resize(1024);
-        
+
         /* Initialize parser */
         xgl_error_t err = xgl_parser_init(&parser, cache_buffer.data(), cache_buffer.size());
         ASSERT_EQ(err, XGL_OK);
     }
-    
+
     void TearDown() override {
         /* Cleanup */
     }
-    
+
     /* Helper: Create a valid frame */
     std::vector<uint8_t> create_valid_frame(const std::vector<uint8_t>& payload) {
         std::vector<uint8_t> frame;
-        
+
         /* Build frame structure */
         xgl_frame_t xgl_frame;
         xgl_frame_params_t params = {
@@ -74,16 +74,16 @@ protected:
             .reliable = true,
             .priority = 5
         };
-        
+
         xgl_error_t err = xgl_frame_build(&xgl_frame, &params);
         EXPECT_EQ(err, XGL_OK);
-        
+
         /* Serialize to buffer */
         std::vector<uint8_t> buffer(1024);
         size_t bytes_written = 0;
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &xgl_frame, &bytes_written);
         EXPECT_EQ(err, XGL_OK);
-        
+
         /* Copy to result */
         frame.assign(buffer.begin(), buffer.begin() + bytes_written);
         return frame;
@@ -125,7 +125,7 @@ protected:
         xgl_serialize_u16_le(&frame[offset], crc16);
         return frame;
     }
-    
+
     xgl_parser_t parser;
     std::vector<uint8_t> cache_buffer;
 };
@@ -137,7 +137,7 @@ protected:
 TEST_F(XglParserTest, InitSuccess) {
     xgl_parser_t test_parser;
     std::vector<uint8_t> buffer(256);
-    
+
     xgl_error_t err = xgl_parser_init(&test_parser, buffer.data(), buffer.size());
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(test_parser.state, XGL_PARSE_MAGIC);
@@ -146,10 +146,10 @@ TEST_F(XglParserTest, InitSuccess) {
 
 TEST_F(XglParserTest, InitNullPointer) {
     std::vector<uint8_t> buffer(256);
-    
+
     xgl_error_t err = xgl_parser_init(nullptr, buffer.data(), buffer.size());
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
-    
+
     xgl_parser_t test_parser;
     err = xgl_parser_init(&test_parser, nullptr, buffer.size());
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
@@ -158,7 +158,7 @@ TEST_F(XglParserTest, InitNullPointer) {
 TEST_F(XglParserTest, InitBufferTooSmall) {
     xgl_parser_t test_parser;
     std::vector<uint8_t> buffer(10);  /* Too small */
-    
+
     xgl_error_t err = xgl_parser_init(&test_parser, buffer.data(), buffer.size());
     EXPECT_EQ(err, XGL_ERR_BUFFER_TOO_SMALL);
 }
@@ -173,10 +173,10 @@ TEST_F(XglParserTest, ResetParser) {
     parser.cache_len = 5;
     parser.index = 3;
     parser.timestamp = 1000;
-    
+
     /* Reset */
     xgl_parser_reset(&parser);
-    
+
     /* Verify reset state */
     EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     EXPECT_EQ(parser.cache_len, 0);
@@ -199,11 +199,11 @@ TEST_F(XglParserTest, FindMagic) {
     result = xgl_parser_feed_byte(&parser, 0x00, 0);
     EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
     EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
-    
+
     result = xgl_parser_feed_byte(&parser, 0xFF, 0);
     EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
     EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
-    
+
     /* Feed production magic */
     result = xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 0);
     EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
@@ -240,7 +240,7 @@ TEST_F(XglParserTest, ParseCompleteFrameNoPayload) {
     /* Create frame with no payload */
     std::vector<uint8_t> payload;
     std::vector<uint8_t> frame = create_valid_frame(payload);
-    
+
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     for (size_t i = 0; i < frame.size(); ++i) {
@@ -249,10 +249,10 @@ TEST_F(XglParserTest, ParseCompleteFrameNoPayload) {
             EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
         }
     }
-    
+
     /* Last byte should complete the frame */
     EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
-    
+
     /* Verify we can get the frame */
     uint8_t* frame_buffer = nullptr;
     size_t frame_len = 0;
@@ -265,7 +265,7 @@ TEST_F(XglParserTest, ParseCompleteFrameWithPayload) {
     /* Create frame with payload */
     std::vector<uint8_t> payload = {0x01, 0x02, 0x03, 0x04, 0x05};
     std::vector<uint8_t> frame = create_valid_frame(payload);
-    
+
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     for (size_t i = 0; i < frame.size(); ++i) {
@@ -274,17 +274,17 @@ TEST_F(XglParserTest, ParseCompleteFrameWithPayload) {
             EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
         }
     }
-    
+
     /* Last byte should complete the frame */
     EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
-    
+
     /* Verify frame data */
     uint8_t* frame_buffer = nullptr;
     size_t frame_len = 0;
     xgl_error_t err = xgl_parser_get_frame(&parser, &frame_buffer, &frame_len);
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(frame_len, frame.size());
-    
+
     /* Verify frame content matches */
     for (size_t i = 0; i < frame.size(); ++i) {
         EXPECT_EQ(frame_buffer[i], frame[i]);
@@ -407,13 +407,13 @@ TEST_F(XglParserTest, ParseCompleteFrameLargePayload) {
         payload[i] = static_cast<uint8_t>(i);
     }
     std::vector<uint8_t> frame = create_valid_frame(payload);
-    
+
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     for (size_t i = 0; i < frame.size(); ++i) {
         result = xgl_parser_feed_byte(&parser, frame[i], 0);
     }
-    
+
     /* Should complete successfully */
     EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
 }
@@ -426,16 +426,16 @@ TEST_F(XglParserTest, InvalidHeaderCRC16) {
     /* Create valid frame */
     std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
     std::vector<uint8_t> frame = create_valid_frame(payload);
-    
+
     /* Corrupt header CRC16 */
     frame[22] ^= 0xFF;
-    
+
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     bool error_detected = false;
     for (size_t i = 0; i < frame.size(); ++i) {
         result = xgl_parser_feed_byte(&parser, frame[i], 0);
-        
+
         /* Parser validates header CRC16 when the fixed header is complete. */
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
@@ -451,16 +451,16 @@ TEST_F(XglParserTest, InvalidCRC16) {
     /* Create valid frame */
     std::vector<uint8_t> payload = {0x01, 0x02, 0x03};
     std::vector<uint8_t> frame = create_valid_frame(payload);
-    
+
     /* Corrupt CRC16 (last 2 bytes) */
     frame[frame.size() - 1] ^= 0xFF;
-    
+
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     for (size_t i = 0; i < frame.size(); ++i) {
         result = xgl_parser_feed_byte(&parser, frame[i], 0);
     }
-    
+
     /* Should detect CRC16 error */
     EXPECT_EQ(result, XGL_PARSE_RESULT_ERROR);
     EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);  /* Reset to magic search */
@@ -472,17 +472,17 @@ TEST_F(XglParserTest, FrameTooLarge) {
     std::vector<uint8_t> small_buffer(50);  /* Small buffer */
     xgl_error_t err = xgl_parser_init(&small_parser, small_buffer.data(), small_buffer.size());
     ASSERT_EQ(err, XGL_OK);
-    
+
     /* Create frame with payload that won't fit */
     std::vector<uint8_t> payload(100);  /* Too large */
     std::vector<uint8_t> frame = create_valid_frame(payload);
-    
+
     /* Feed frame byte by byte */
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     bool error_detected = false;
     for (size_t i = 0; i < frame.size() && i < XGL_FRAME_HEADER_SIZE; ++i) {
         result = xgl_parser_feed_byte(&small_parser, frame[i], 0);
-        
+
         /* Parser detects frame too large when header is complete (after byte 11) */
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
@@ -502,11 +502,11 @@ TEST_F(XglParserTest, TimeoutDetection) {
     /* Start parsing */
     xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 1000);
     EXPECT_EQ(parser.state, XGL_PARSE_HEADER);
-    
+
     /* Check timeout - not expired */
     bool timeout = xgl_parser_check_timeout(&parser, 1500, XGL_PARSER_TIMEOUT_MS);
     EXPECT_FALSE(timeout);
-    
+
     /* Check timeout - expired */
     timeout = xgl_parser_check_timeout(&parser, 2500, XGL_PARSER_TIMEOUT_MS);
     EXPECT_TRUE(timeout);
@@ -515,7 +515,7 @@ TEST_F(XglParserTest, TimeoutDetection) {
 TEST_F(XglParserTest, NoTimeoutWhenIdle) {
     /* Parser in magic-search state (idle) */
     EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
-    
+
     /* Should never timeout when idle */
     bool timeout = xgl_parser_check_timeout(&parser, 999999, XGL_PARSER_TIMEOUT_MS);
     EXPECT_FALSE(timeout);
@@ -528,28 +528,28 @@ TEST_F(XglParserTest, NoTimeoutWhenIdle) {
 TEST_F(XglParserTest, StateTransitions) {
     /* Initial state */
     EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
-    
+
     /* Feed magic -> HEADER */
     xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 0);
     EXPECT_EQ(parser.state, XGL_PARSE_HEADER);
-    
+
     /* Create valid frame to continue */
     std::vector<uint8_t> payload = {0x01, 0x02};
     std::vector<uint8_t> frame = create_valid_frame(payload);
-    
+
     /* Feed header bytes (first magic byte already fed) */
     for (size_t i = 1; i < XGL_FRAME_HEADER_SIZE; ++i) {
         xgl_parser_feed_byte(&parser, frame[i], 0);
     }
-    
+
     /* Should transition to PAYLOAD */
     EXPECT_EQ(parser.state, XGL_PARSE_PAYLOAD);
-    
+
     /* Feed payload bytes */
     for (size_t i = 0; i < payload.size(); ++i) {
         xgl_parser_feed_byte(&parser, frame[XGL_FRAME_HEADER_SIZE + i], 0);
     }
-    
+
     /* Should transition to CRC */
     EXPECT_EQ(parser.state, XGL_PARSE_CRC);
 }
@@ -562,20 +562,20 @@ TEST_F(XglParserTest, MultipleFrames) {
     /* Parse first frame */
     std::vector<uint8_t> payload1 = {0x01, 0x02};
     std::vector<uint8_t> frame1 = create_valid_frame(payload1);
-    
+
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     for (size_t i = 0; i < frame1.size(); ++i) {
         result = xgl_parser_feed_byte(&parser, frame1[i], 0);
     }
     EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
-    
+
     /* Reset for next frame */
     xgl_parser_reset(&parser);
-    
+
     /* Parse second frame */
     std::vector<uint8_t> payload2 = {0x03, 0x04, 0x05};
     std::vector<uint8_t> frame2 = create_valid_frame(payload2);
-    
+
     result = XGL_PARSE_RESULT_INCOMPLETE;
     for (size_t i = 0; i < frame2.size(); ++i) {
         result = xgl_parser_feed_byte(&parser, frame2[i], 0);
@@ -594,7 +594,7 @@ TEST_F(XglParserTest, GetFrameBeforeComplete) {
 TEST_F(XglParserTest, GetFrameNullPointers) {
     xgl_error_t err = xgl_parser_get_frame(nullptr, nullptr, nullptr);
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
-    
+
     uint8_t* frame_buffer = nullptr;
     err = xgl_parser_get_frame(&parser, &frame_buffer, nullptr);
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);

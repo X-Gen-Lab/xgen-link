@@ -1,7 +1,7 @@
 /**
  * \file            xgl_mutex.c
  * \brief           Thread safety abstraction implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "xgl/internal/xgl_mutex.h"
@@ -20,23 +20,23 @@ xgl_error_t xgl_mutex_init(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (mutex->initialized) {
         return XGL_ERR_ALREADY_INITIALIZED;
     }
-    
+
     /* Initialize mutex with default attributes */
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    
+
     int result = pthread_mutex_init(&mutex->mutex, &attr);
     pthread_mutexattr_destroy(&attr);
-    
+
     if (result != 0) {
         return XGL_ERR_NO_MEMORY;
     }
-    
+
     mutex->initialized = true;
     return XGL_OK;
 }
@@ -48,16 +48,16 @@ xgl_error_t xgl_mutex_lock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     int result = pthread_mutex_lock(&mutex->mutex);
     if (result != 0) {
         return XGL_ERR_BUSY;
     }
-    
+
     return XGL_OK;
 }
 
@@ -68,11 +68,11 @@ xgl_error_t xgl_mutex_trylock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     int result = pthread_mutex_trylock(&mutex->mutex);
     if (result == 0) {
         return XGL_OK;
@@ -88,16 +88,16 @@ xgl_error_t xgl_mutex_unlock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     int result = pthread_mutex_unlock(&mutex->mutex);
     if (result != 0) {
         return XGL_ERR_BUSY;
     }
-    
+
     return XGL_OK;
 }
 
@@ -108,7 +108,7 @@ void xgl_mutex_destroy(xgl_mutex_t* mutex) {
     if (mutex == NULL || !mutex->initialized) {
         return;
     }
-    
+
     pthread_mutex_destroy(&mutex->mutex);
     mutex->initialized = false;
 }
@@ -126,15 +126,15 @@ xgl_error_t xgl_mutex_init(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (mutex->initialized) {
         return XGL_ERR_ALREADY_INITIALIZED;
     }
-    
+
     /* Initialize critical section (recursive by default) */
     InitializeCriticalSection(&mutex->cs);
     mutex->initialized = true;
-    
+
     return XGL_OK;
 }
 
@@ -145,11 +145,11 @@ xgl_error_t xgl_mutex_lock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     EnterCriticalSection(&mutex->cs);
     return XGL_OK;
 }
@@ -161,11 +161,11 @@ xgl_error_t xgl_mutex_trylock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     BOOL result = TryEnterCriticalSection(&mutex->cs);
     if (result) {
         return XGL_OK;
@@ -181,11 +181,11 @@ xgl_error_t xgl_mutex_unlock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     LeaveCriticalSection(&mutex->cs);
     return XGL_OK;
 }
@@ -197,7 +197,7 @@ void xgl_mutex_destroy(xgl_mutex_t* mutex) {
     if (mutex == NULL || !mutex->initialized) {
         return;
     }
-    
+
     DeleteCriticalSection(&mutex->cs);
     mutex->initialized = false;
 }
@@ -215,17 +215,17 @@ xgl_error_t xgl_mutex_init(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (mutex->initialized) {
         return XGL_ERR_ALREADY_INITIALIZED;
     }
-    
+
     /* Create recursive mutex using static allocation */
     mutex->handle = xSemaphoreCreateRecursiveMutexStatic(&mutex->buffer);
     if (mutex->handle == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
-    
+
     mutex->initialized = true;
     return XGL_OK;
 }
@@ -237,17 +237,17 @@ xgl_error_t xgl_mutex_lock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     /* Wait indefinitely for mutex */
     BaseType_t result = xSemaphoreTakeRecursive(mutex->handle, portMAX_DELAY);
     if (result != pdTRUE) {
         return XGL_ERR_BUSY;
     }
-    
+
     return XGL_OK;
 }
 
@@ -258,11 +258,11 @@ xgl_error_t xgl_mutex_trylock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     /* Try to take mutex without blocking */
     BaseType_t result = xSemaphoreTakeRecursive(mutex->handle, 0);
     if (result == pdTRUE) {
@@ -279,16 +279,16 @@ xgl_error_t xgl_mutex_unlock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (!mutex->initialized) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     BaseType_t result = xSemaphoreGiveRecursive(mutex->handle);
     if (result != pdTRUE) {
         return XGL_ERR_BUSY;
     }
-    
+
     return XGL_OK;
 }
 
@@ -299,7 +299,7 @@ void xgl_mutex_destroy(xgl_mutex_t* mutex) {
     if (mutex == NULL || !mutex->initialized) {
         return;
     }
-    
+
     /* FreeRTOS static semaphores don't need explicit deletion */
     /* Just mark as uninitialized */
     mutex->initialized = false;
@@ -319,7 +319,7 @@ xgl_error_t xgl_mutex_init(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* No-op for bare-metal */
     (void)mutex;
     return XGL_OK;
@@ -332,7 +332,7 @@ xgl_error_t xgl_mutex_lock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* No-op for bare-metal */
     (void)mutex;
     return XGL_OK;
@@ -345,7 +345,7 @@ xgl_error_t xgl_mutex_trylock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* No-op for bare-metal - always succeeds */
     (void)mutex;
     return XGL_OK;
@@ -358,7 +358,7 @@ xgl_error_t xgl_mutex_unlock(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* No-op for bare-metal */
     (void)mutex;
     return XGL_OK;
@@ -385,13 +385,13 @@ xgl_mutex_guard_t xgl_mutex_guard_lock(xgl_mutex_t* mutex) {
     xgl_mutex_guard_t guard;
     guard.mutex = mutex;
     guard.locked = false;
-    
+
     if (mutex != NULL) {
         if (xgl_mutex_lock(mutex) == XGL_OK) {
             guard.locked = true;
         }
     }
-    
+
     return guard;
 }
 

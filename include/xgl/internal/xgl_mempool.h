@@ -1,7 +1,7 @@
 /**
  * \file            xgl_mempool.h
  * \brief           Fixed-size block memory pool
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_MEMPOOL_H

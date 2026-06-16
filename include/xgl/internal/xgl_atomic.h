@@ -1,7 +1,7 @@
 /**
  * \file            xgl_atomic.h
  * \brief           Atomic operations abstraction layer
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_ATOMIC_H
@@ -218,8 +218,8 @@ static inline uint32_t xgl_atomic_fetch_sub(xgl_atomic_t* ptr, uint32_t value) {
  * \param[in]       desired: Desired value to set
  * \return          true if swap succeeded, false otherwise
  */
-static inline bool xgl_atomic_compare_exchange(xgl_atomic_t* ptr, 
-                                               uint32_t* expected, 
+static inline bool xgl_atomic_compare_exchange(xgl_atomic_t* ptr,
+                                               uint32_t* expected,
                                                uint32_t desired) {
 #if defined(XGL_THREAD_SAFE) && defined(XGL_HAS_C11_ATOMICS)
     return atomic_compare_exchange_strong(ptr, expected, desired);
@@ -232,7 +232,7 @@ static inline bool xgl_atomic_compare_exchange(xgl_atomic_t* ptr,
         return false;
     }
 #elif defined(XGL_THREAD_SAFE) && (defined(__GNUC__) || defined(__clang__))
-    return __atomic_compare_exchange_n(ptr, expected, desired, false, 
+    return __atomic_compare_exchange_n(ptr, expected, desired, false,
                                        __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 #else
     if (*ptr == *expected) {

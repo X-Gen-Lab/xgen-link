@@ -1,7 +1,7 @@
 /**
  * \file            xgl_time.h
  * \brief           Time abstraction layer
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_TIME_H

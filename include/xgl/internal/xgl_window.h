@@ -1,7 +1,7 @@
 /**
  * \file            xgl_window.h
  * \brief           Sliding Window for Flow Control
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_WINDOW_H

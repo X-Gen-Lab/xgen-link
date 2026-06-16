@@ -1,7 +1,7 @@
 /**
  * \file            mock_allocator.h
  * \brief           Allocator mock interface
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef MOCK_ALLOCATOR_H
@@ -18,17 +18,17 @@
 class MockAllocator {
 public:
     MockAllocator() : total_allocated_(0), total_freed_(0) {}
-    
+
     /**
      * \brief           Mock malloc function
      */
     MOCK_METHOD(void*, malloc_impl, (size_t size));
-    
+
     /**
      * \brief           Mock free function
      */
     MOCK_METHOD(void, free_impl, (void* ptr));
-    
+
     /**
      * \brief           Get C-style allocator interface
      */
@@ -43,7 +43,7 @@ public:
         current_instance_ = this;
         return &allocator_;
     }
-    
+
     /**
      * \brief           Get allocation statistics
      */
@@ -51,7 +51,7 @@ public:
     size_t get_total_freed() const { return total_freed_; }
     size_t get_current_allocated() const { return total_allocated_ - total_freed_; }
     size_t get_alloc_count() const { return allocations_.size(); }
-    
+
 private:
     void* malloc_wrapper(size_t size) {
         void* ptr = malloc_impl(size);
@@ -61,7 +61,7 @@ private:
         }
         return ptr;
     }
-    
+
     void free_wrapper(void* ptr) {
         if (ptr != nullptr) {
             auto it = allocations_.find(ptr);
@@ -72,12 +72,12 @@ private:
             free_impl(ptr);
         }
     }
-    
+
     xgl_allocator_t allocator_;
     std::map<void*, size_t> allocations_;
     size_t total_allocated_;
     size_t total_freed_;
-    
+
     static thread_local MockAllocator* current_instance_;
 };
 

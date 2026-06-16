@@ -1,7 +1,7 @@
 /**
  * \file            xgl_platform.h
  * \brief           Platform detection and configuration
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_PLATFORM_H
@@ -142,7 +142,7 @@ extern "C" {
     defined(__aarch64__) || defined(_M_ARM) || defined(_M_ARM64)
     #define XGL_ARCH_ARM
     #define XGL_ARCH_NAME "ARM"
-    
+
     /* ARM Cortex-M series */
     #if defined(__ARM_ARCH_6M__) || defined(__ARM_ARCH_6SM__)
         #define XGL_ARCH_ARM_CORTEX_M0
@@ -160,7 +160,7 @@ extern "C" {
         #define XGL_ARCH_ARM_CORTEX_M33
         #define XGL_ARCH_SUBNAME "Cortex-M33"
     #endif
-    
+
     /* ARM 64-bit */
     #if defined(__aarch64__) || defined(_M_ARM64)
         #define XGL_ARCH_ARM64
@@ -446,7 +446,7 @@ static inline void xgl_platform_get_info(xgl_platform_info_t* info) {
     if (info == NULL) {
         return;
     }
-    
+
     info->compiler_name = XGL_COMPILER_NAME;
     info->compiler_version = XGL_COMPILER_VERSION;
     info->os_name = XGL_OS_NAME;
@@ -457,7 +457,7 @@ static inline void xgl_platform_get_info(xgl_platform_info_t* info) {
     info->pointer_size = (uint8_t)sizeof(void*);
     info->alignment_required = XGL_ALIGNMENT_REQUIRED;
     info->is_little_endian = (uint8_t)xgl_is_little_endian();
-    
+
 #if defined(XGL_ARCH_64BIT)
     info->is_64bit = 1;
 #else

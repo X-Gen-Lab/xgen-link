@@ -1,7 +1,7 @@
 /**
  * \file            mock_phy.cpp
  * \brief           Physical layer mock implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "mock_phy.h"
@@ -26,15 +26,15 @@ xgl_error_t MockPhy::tx_wrapper(const uint8_t* data, size_t len, void* user_data
     if (instance == nullptr) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     /* Store transmitted data */
     instance->tx_data_.insert(
-        instance->tx_data_.end(), 
-        data, 
+        instance->tx_data_.end(),
+        data,
         data + len
     );
     instance->tx_count_++;
-    
+
     /* Call mock implementation */
     return instance->tx_impl(data, len);
 }
@@ -44,9 +44,9 @@ xgl_error_t MockPhy::rx_wrapper(uint8_t* buffer, size_t* len, void* user_data) {
     if (instance == nullptr) {
         return XGL_ERR_NOT_INITIALIZED;
     }
-    
+
     instance->rx_count_++;
-    
+
     /* Return queued data if available */
     if (!instance->rx_queue_.empty()) {
         size_t copy_len = std::min(*len, instance->rx_queue_.size());
@@ -58,7 +58,7 @@ xgl_error_t MockPhy::rx_wrapper(uint8_t* buffer, size_t* len, void* user_data) {
         *len = copy_len;
         return XGL_OK;
     }
-    
+
     /* Call mock implementation */
     return instance->rx_impl(buffer, len);
 }

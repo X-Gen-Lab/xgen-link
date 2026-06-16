@@ -66,4 +66,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Copyright (c) 2026 Nexus Team
+Copyright (c) 2026 X-Gen Lab

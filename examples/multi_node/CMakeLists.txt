@@ -1,6 +1,6 @@
 # Multi-Node Network Example
 # Three-node network demonstrating routing
-# Author: Nexus Team
+# Author: X-Gen Lab
 
 add_executable(multi_node
     main.c

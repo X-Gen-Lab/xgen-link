@@ -1,7 +1,7 @@
 /**
  * \file            test_frame.cpp
  * \brief           Frame encapsulation unit tests
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -78,7 +78,7 @@ static xgl_error_t frame_test_auth_verify(uint32_t key_id,
 TEST(XglFrameTest, BuildBasicFrame) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0x01, 0x02, 0x03, 0x04};
-    
+
     xgl_frame_params_t params = {
         .source_id = 0x10,
         .target_id = 0x20,
@@ -90,9 +90,9 @@ TEST(XglFrameTest, BuildBasicFrame) {
         .reliable = true,
         .priority = 3
     };
-    
+
     xgl_error_t result = xgl_frame_build(&frame, &params);
-    
+
     EXPECT_EQ(result, XGL_OK);
     EXPECT_EQ(frame.header.version, XGL_WIRE_VERSION);
     EXPECT_EQ(frame.header.header_len, XGL_WIRE_BASE_HEADER_SIZE);
@@ -104,14 +104,14 @@ TEST(XglFrameTest, BuildBasicFrame) {
     EXPECT_EQ(frame.header.payload_len, sizeof(payload));
     EXPECT_EQ(frame.payload, payload);
     EXPECT_EQ(frame.payload_len, sizeof(payload));
-    
+
     EXPECT_NE(frame.header.flags & XGL_WIRE_FLAG_ACK_ELICITING, 0);
     EXPECT_EQ(frame.header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK, 3);
 }
 
 TEST(XglFrameTest, BuildFrameNullPointer) {
     const uint8_t payload[] = {0x01, 0x02};
-    
+
     xgl_frame_params_t params = {
         .source_id = 0x10,
         .target_id = 0x20,
@@ -121,10 +121,10 @@ TEST(XglFrameTest, BuildFrameNullPointer) {
         .reliable = false,
         .priority = 0
     };
-    
+
     xgl_error_t result = xgl_frame_build(nullptr, &params);
     EXPECT_EQ(result, XGL_ERR_NULL_POINTER);
-    
+
     xgl_frame_t frame;
     result = xgl_frame_build(&frame, nullptr);
     EXPECT_EQ(result, XGL_ERR_NULL_POINTER);
@@ -132,7 +132,7 @@ TEST(XglFrameTest, BuildFrameNullPointer) {
 
 TEST(XglFrameTest, BuildFrameEmptyPayload) {
     xgl_frame_t frame;
-    
+
     xgl_frame_params_t params = {
         .source_id = 0x10,
         .target_id = 0x20,
@@ -142,9 +142,9 @@ TEST(XglFrameTest, BuildFrameEmptyPayload) {
         .reliable = false,
         .priority = 0
     };
-    
+
     xgl_error_t result = xgl_frame_build(&frame, &params);
-    
+
     EXPECT_EQ(result, XGL_OK);
     EXPECT_EQ(frame.payload, nullptr);
     EXPECT_EQ(frame.payload_len, 0);
@@ -176,7 +176,7 @@ TEST(XglFrameTest, SerializeFrame) {
     const uint8_t payload[] = {0xAA, 0xBB, 0xCC, 0xDD};
     uint8_t buffer[256];
     size_t bytes_written;
-    
+
     /* Build frame */
     xgl_frame_params_t params = {
         .source_id = 0x10,
@@ -188,21 +188,21 @@ TEST(XglFrameTest, SerializeFrame) {
         .priority = 3
     };
     xgl_frame_build(&frame, &params);
-    
+
     /* Serialize */
     xgl_error_t result = xgl_frame_serialize(buffer, sizeof(buffer),
                                              &frame, &bytes_written);
-    
+
     EXPECT_EQ(result, XGL_OK);
-    
+
     /* Expected size: Header(24) + Payload(4) + CRC16(2) = 30 */
     size_t expected_size = xgl_frame_calculate_size(sizeof(payload));
     EXPECT_EQ(bytes_written, expected_size);
     EXPECT_EQ(bytes_written, 30);
-    
+
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
-    
+
     EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 0], 0xAA);
     EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 1], 0xBB);
     EXPECT_EQ(buffer[XGL_FRAME_HEADER_SIZE + 2], 0xCC);
@@ -416,7 +416,7 @@ TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
     const uint8_t payload[] = {0x01, 0x02, 0x03, 0x04};
     uint8_t buffer[10];  /* Too small */
     size_t bytes_written;
-    
+
     xgl_frame_params_t params = {
         .source_id = 0x10,
         .target_id = 0x20,
@@ -427,10 +427,10 @@ TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
         .priority = 0
     };
     xgl_frame_build(&frame, &params);
-    
+
     xgl_error_t result = xgl_frame_serialize(buffer, sizeof(buffer),
                                              &frame, &bytes_written);
-    
+
     EXPECT_EQ(result, XGL_ERR_BUFFER_TOO_SMALL);
 }
 
@@ -438,15 +438,15 @@ TEST(XglFrameTest, SerializeFrameNullPointers) {
     xgl_frame_t frame;
     uint8_t buffer[256];
     size_t bytes_written;
-    
+
     /* Null buffer */
     EXPECT_EQ(xgl_frame_serialize(nullptr, 256, &frame, &bytes_written),
               XGL_ERR_NULL_POINTER);
-    
+
     /* Null frame */
     EXPECT_EQ(xgl_frame_serialize(buffer, 256, nullptr, &bytes_written),
               XGL_ERR_NULL_POINTER);
-    
+
     /* Null bytes_written */
     EXPECT_EQ(xgl_frame_serialize(buffer, 256, &frame, nullptr),
               XGL_ERR_NULL_POINTER);
@@ -462,12 +462,12 @@ TEST(XglFrameTest, BuildZeroCopyFrame) {
     size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
     size_t data_len = 8;
     size_t frame_len;
-    
+
     /* Write payload data */
     for (size_t i = 0; i < data_len; i++) {
         buffer[data_offset + i] = (uint8_t)(0x10 + i);
     }
-    
+
     /* Build frame in zero-copy mode */
     xgl_error_t result = xgl_frame_build_zerocopy(
         buffer, sizeof(buffer),
@@ -476,12 +476,12 @@ TEST(XglFrameTest, BuildZeroCopyFrame) {
         true, 3,
         &frame_len
     );
-    
+
     EXPECT_EQ(result, XGL_OK);
-    
+
     /* Expected: Header(27) + Data(8) + CRC16(2) = 37 */
     EXPECT_EQ(frame_len, 37);
-    
+
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
 
@@ -502,7 +502,7 @@ TEST(XglFrameTest, BuildZeroCopyFrame) {
     EXPECT_EQ(ext.type, XGL_WIRE_EXT_DATA_TYPE);
     ASSERT_EQ(ext.len, 1U);
     EXPECT_EQ(ext.value[0], 0x05U);
-    
+
     /* Check payload is intact */
     for (size_t i = 0; i < data_len; i++) {
         EXPECT_EQ(buffer[data_offset + i], (uint8_t)(0x10 + i));
@@ -512,7 +512,7 @@ TEST(XglFrameTest, BuildZeroCopyFrame) {
 TEST(XglFrameTest, ZeroCopyInvalidOffset) {
     uint8_t buffer[256];
     size_t frame_len;
-    
+
     /* Offset too small (no room for fixed header) */
     xgl_error_t result = xgl_frame_build_zerocopy(
         buffer, sizeof(buffer),
@@ -522,7 +522,7 @@ TEST(XglFrameTest, ZeroCopyInvalidOffset) {
         false, 0,
         &frame_len
     );
-    
+
     EXPECT_EQ(result, XGL_ERR_INVALID_PARAM);
 }
 
@@ -530,7 +530,7 @@ TEST(XglFrameTest, ZeroCopyBufferTooSmall) {
     uint8_t buffer[20];
     size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
     size_t frame_len;
-    
+
     /* Buffer too small for data + CRC16 */
     xgl_error_t result = xgl_frame_build_zerocopy(
         buffer, sizeof(buffer),
@@ -540,7 +540,7 @@ TEST(XglFrameTest, ZeroCopyBufferTooSmall) {
         false, 0,
         &frame_len
     );
-    
+
     EXPECT_EQ(result, XGL_ERR_BUFFER_TOO_SMALL);
 }
 
@@ -551,7 +551,7 @@ TEST(XglFrameTest, ZeroCopyBufferTooSmall) {
 TEST(XglFrameTest, ValidateHeaderCRC) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0x01, 0x02};
-    
+
     /* Build frame (header CRC16 is calculated automatically) */
     xgl_frame_params_t params = {
         .source_id = 0x10,
@@ -563,7 +563,7 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
         .priority = 0
     };
     xgl_frame_build(&frame, &params);
-    
+
     uint8_t buffer[256] = {};
     size_t bytes_written = 0;
     ASSERT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &bytes_written), XGL_OK);
@@ -576,7 +576,7 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
 TEST(XglFrameTest, InvalidHeaderCRC) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0x01, 0x02};
-    
+
     /* Build frame */
     xgl_frame_params_t params = {
         .source_id = 0x10,
@@ -588,7 +588,7 @@ TEST(XglFrameTest, InvalidHeaderCRC) {
         .priority = 0
     };
     xgl_frame_build(&frame, &params);
-    
+
     uint8_t buffer[256] = {};
     size_t bytes_written = 0;
     ASSERT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &bytes_written), XGL_OK);
@@ -607,16 +607,16 @@ TEST(XglFrameTest, InvalidHeaderCRC) {
 
 TEST(XglFrameTest, TrafficClassHelpers) {
     uint8_t traffic_class_bits = 0;
-    
+
     /* Set reliability */
     xgl_frame_set_reliability(&traffic_class_bits, true);
     EXPECT_EQ(xgl_frame_get_reliability(traffic_class_bits),
               XGL_RELIABILITY_ACK_ELICITING >> XGL_RELIABILITY_CLASS_SHIFT);
-    
+
     /* Set priority */
     xgl_frame_set_priority(&traffic_class_bits, 5);
     EXPECT_EQ(xgl_frame_get_priority(traffic_class_bits), 5);
-    
+
     /* Verify reliable is still set */
     EXPECT_EQ(xgl_frame_get_reliability(traffic_class_bits),
               XGL_RELIABILITY_ACK_ELICITING >> XGL_RELIABILITY_CLASS_SHIFT);

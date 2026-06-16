@@ -1,6 +1,6 @@
 # xgen-link Protocol Configuration
 # Compile-time configuration options
-# Author: Nexus Team
+# Author: X-Gen Lab
 
 menu "xgen-link Protocol Configuration"
 

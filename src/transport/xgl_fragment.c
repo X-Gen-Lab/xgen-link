@@ -1,7 +1,7 @@
 /**
  * \file            xgl_fragment.c
  * \brief           Packet Fragmentation and Reassembly Implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <xgl/internal/xgl_fragment.h>
@@ -41,19 +41,19 @@ static void free_reassembly_buffer(xgl_fragment_manager_t* manager,
     if (manager != NULL && buffer->reserved_size <= manager->current_reassembly_bytes) {
         manager->current_reassembly_bytes -= buffer->reserved_size;
     }
-    
+
     /* Free data buffer */
     if (buffer->data != NULL) {
         fragment_free(manager->allocator, buffer->data);
         buffer->data = NULL;
     }
-    
+
     /* Free received bitmap */
     if (buffer->received_bitmap != NULL) {
         fragment_free(manager->allocator, buffer->received_bitmap);
         buffer->received_bitmap = NULL;
     }
-    
+
     /* Free buffer structure */
     fragment_free(manager->allocator, buffer);
 }
@@ -169,12 +169,12 @@ xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
     if (manager == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Initialize reassembly list */
     xgl_list_init(&manager->reassembly_list);
-    
+
     manager->next_message_id = 0;
-    
+
     /* Store configuration */
     manager->max_reassembly_buffers = max_reassembly_buffers;
     manager->reassembly_timeout_ms = reassembly_timeout_ms;
@@ -182,7 +182,7 @@ xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
     manager->max_message_size = 0;
     manager->max_reassembly_bytes = 0;
     manager->current_reassembly_bytes = 0;
-    
+
     return XGL_OK;
 }
 
@@ -210,7 +210,7 @@ void xgl_fragment_destroy(xgl_fragment_manager_t* manager) {
     if (manager == NULL) {
         return;
     }
-    
+
     /* Clear all reassembly buffers */
     xgl_fragment_clear_reassembly(manager);
 }
@@ -350,36 +350,36 @@ uint32_t xgl_fragment_process_timeouts(xgl_fragment_manager_t* manager,
     if (manager == NULL) {
         return 0;
     }
-    
+
     uint32_t timeout_count = 0;
-    
+
     /* Iterate through reassembly buffers */
     xgl_list_node_t* node;
     xgl_list_node_t* tmp;
     XGL_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
-        xgl_reassembly_buffer_t* buffer = 
+        xgl_reassembly_buffer_t* buffer =
             XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
-        
+
         /* Skip if first fragment hasn't been received yet */
         if (buffer->first_fragment_time == 0) {
             continue;
         }
-        
+
         /* Calculate elapsed time */
         uint32_t elapsed_ms = current_time_ms - buffer->first_fragment_time;
-        
+
         /* Check if timeout occurred */
         if (elapsed_ms >= buffer->timeout_ms) {
             /* Remove from list */
             xgl_list_remove(&manager->reassembly_list, node);
-            
+
             /* Free buffer */
             free_reassembly_buffer(manager, buffer);
-            
+
             timeout_count++;
         }
     }
-    
+
     return timeout_count;
 }
 
@@ -390,7 +390,7 @@ size_t xgl_fragment_get_reassembly_count(const xgl_fragment_manager_t* manager) 
     if (manager == NULL) {
         return 0;
     }
-    
+
     return xgl_list_count(&manager->reassembly_list);
 }
 
@@ -401,11 +401,11 @@ void xgl_fragment_clear_reassembly(xgl_fragment_manager_t* manager) {
     if (manager == NULL) {
         return;
     }
-    
+
     /* Remove and free all reassembly buffers */
     xgl_list_node_t* node;
     while ((node = xgl_list_remove_head(&manager->reassembly_list)) != NULL) {
-        xgl_reassembly_buffer_t* buffer = 
+        xgl_reassembly_buffer_t* buffer =
             XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
         free_reassembly_buffer(manager, buffer);
     }
@@ -446,6 +446,6 @@ void xgl_fragment_free_data(xgl_fragment_manager_t* manager,
     if (manager == NULL || data == NULL) {
         return;
     }
-    
+
     fragment_free(manager->allocator, data);
 }

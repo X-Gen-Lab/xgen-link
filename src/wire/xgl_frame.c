@@ -1,7 +1,7 @@
 /**
  * \file            xgl_frame.c
  * \brief           Frame encapsulation implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <xgl/internal/xgl_frame.h>
@@ -64,10 +64,10 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     if (params->payload_len > UINT16_MAX) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    
+
     /* Initialize frame */
     memset(frame, 0, sizeof(xgl_frame_t));
-    
+
     uint8_t traffic_class_bits = 0;
     if (params->reliability_class != XGL_RELIABILITY_NONE) {
         xgl_frame_set_reliability_class(&traffic_class_bits, params->reliability_class);
@@ -118,16 +118,16 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.packet_number = params->packet_number;
     frame->header.payload_len = (uint16_t)params->payload_len;
     frame->header.header_crc16 = 0;
-    
+
     /* Set payload */
     frame->payload = params->payload;
     frame->payload_len = params->payload_len;
     frame->extensions = params->extensions;
     frame->extensions_len = params->extensions_len;
-    
+
     /* CRC16 will be calculated during serialization */
     frame->crc16 = 0;
-    
+
     return XGL_OK;
 }
 
@@ -145,7 +145,7 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
     if (buffer == NULL || frame == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Calculate required buffer size */
     if (frame->extensions_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
@@ -156,9 +156,9 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
     if (buffer_size < required_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    
+
     size_t offset = 0;
-    
+
     size_t header_len = 0;
     xgl_error_t err = encode_frame_wire_header(buffer,
                                                buffer_size,
@@ -176,18 +176,18 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
                frame->extensions,
                frame->extensions_len);
     }
-    
+
     /* Write payload */
     if (frame->payload != NULL && frame->payload_len > 0) {
         memcpy(&buffer[offset], frame->payload, frame->payload_len);
         offset += frame->payload_len;
     }
-    
+
     /* Calculate and write CRC16 (entire frame except CRC16 itself) */
     uint16_t crc16 = xgl_crc16_modbus(buffer, offset);
     xgl_serialize_u16_le(&buffer[offset], crc16);
     offset += XGL_CRC16_SIZE;
-    
+
     *bytes_written = offset;
     return XGL_OK;
 }
@@ -349,7 +349,7 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     if (header_len > UINT8_MAX || data_offset != header_len) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     size_t required_size = data_offset + data_len + XGL_CRC16_SIZE;
     if (buffer_size < required_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
@@ -394,12 +394,12 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
     if (err != XGL_OK) {
         return err;
     }
-    
+
     /* Calculate and write frame CRC16 */
     size_t crc_offset = data_offset + data_len;
     uint16_t crc16 = xgl_crc16_modbus(buffer, crc_offset);
     xgl_serialize_u16_le(&buffer[crc_offset], crc16);
-    
+
     *frame_len = required_size;
     return XGL_OK;
 }

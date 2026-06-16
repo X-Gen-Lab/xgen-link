@@ -1,7 +1,7 @@
 /**
  * \file            test_rtt.cpp
  * \brief           RTT estimator unit tests
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -17,7 +17,7 @@
 TEST(XglRttTest, Initialization) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     EXPECT_FALSE(xgl_rtt_is_initialized(&est));
     EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_DEFAULT_RTO_MS);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 0);
@@ -50,14 +50,14 @@ TEST(XglRttTest, IsInitializedNullPointer) {
 TEST(XglRttTest, FirstMeasurement) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* First measurement: 100ms */
     xgl_rtt_update(&est, 100);
-    
+
     EXPECT_TRUE(xgl_rtt_is_initialized(&est));
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 100);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 50);  /* R/2 */
-    
+
     /* RTO = SRTT + 4 * RTTVAR = 100 + 4*50 = 300 */
     EXPECT_EQ(xgl_rtt_get_rto(&est), 300);
 }
@@ -67,21 +67,21 @@ TEST(XglRttTest, FirstMeasurement) {
  */
 TEST(XglRttTest, FirstMeasurementVariousValues) {
     xgl_rtt_estimator_t est;
-    
+
     /* Test with 50ms */
     xgl_rtt_init(&est);
     xgl_rtt_update(&est, 50);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 50);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 25);
     EXPECT_EQ(xgl_rtt_get_rto(&est), 150);  /* 50 + 4*25 */
-    
+
     /* Test with 200ms */
     xgl_rtt_init(&est);
     xgl_rtt_update(&est, 200);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 200);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 100);
     EXPECT_EQ(xgl_rtt_get_rto(&est), 600);  /* 200 + 4*100 */
-    
+
     /* Test with 1000ms */
     xgl_rtt_init(&est);
     xgl_rtt_update(&est, 1000);
@@ -101,12 +101,12 @@ TEST(XglRttTest, FirstMeasurementVariousValues) {
 TEST(XglRttTest, SubsequentMeasurements) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* First measurement: 100ms */
     xgl_rtt_update(&est, 100);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 100);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 50);
-    
+
     /* Second measurement: 120ms */
     /* error = 120 - 100 = 20 */
     /* SRTT = 100 + 20/8 = 100 + 2 = 102 */
@@ -114,7 +114,7 @@ TEST(XglRttTest, SubsequentMeasurements) {
     xgl_rtt_update(&est, 120);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 102);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 42);  /* Integer division: 50 + (-30 >> 2) = 50 - 7 = 43, but -30 >> 2 = -8, so 50 - 8 = 42 */
-    
+
     /* RTO = 102 + 4*42 = 102 + 168 = 270 */
     EXPECT_EQ(xgl_rtt_get_rto(&est), 270);
 }
@@ -125,18 +125,18 @@ TEST(XglRttTest, SubsequentMeasurements) {
 TEST(XglRttTest, StableMeasurements) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* All measurements are 100ms */
     for (int i = 0; i < 10; i++) {
         xgl_rtt_update(&est, 100);
     }
-    
+
     /* SRTT should converge to 100ms */
     EXPECT_NEAR(xgl_rtt_get_srtt(&est), 100, 5);
-    
+
     /* RTTVAR should converge to 0 (no variation) */
     EXPECT_LT(xgl_rtt_get_rttvar(&est), 10);
-    
+
     /* RTO should be close to minimum */
     int32_t rto = xgl_rtt_get_rto(&est);
     EXPECT_GE(rto, XGL_MIN_RTO_MS);
@@ -149,15 +149,15 @@ TEST(XglRttTest, StableMeasurements) {
 TEST(XglRttTest, IncreasingMeasurements) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Measurements increase from 100ms to 200ms */
     for (int i = 0; i < 10; i++) {
         xgl_rtt_update(&est, 100 + i * 10);
     }
-    
+
     /* SRTT should be higher than initial */
     EXPECT_GT(xgl_rtt_get_srtt(&est), 100);
-    
+
     /* RTTVAR should reflect variation */
     EXPECT_GT(xgl_rtt_get_rttvar(&est), 0);
 }
@@ -168,15 +168,15 @@ TEST(XglRttTest, IncreasingMeasurements) {
 TEST(XglRttTest, DecreasingMeasurements) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Measurements decrease from 200ms to 100ms */
     for (int i = 0; i < 10; i++) {
         xgl_rtt_update(&est, 200 - i * 10);
     }
-    
+
     /* SRTT should be lower than initial */
     EXPECT_LT(xgl_rtt_get_srtt(&est), 200);
-    
+
     /* RTTVAR should reflect variation */
     EXPECT_GT(xgl_rtt_get_rttvar(&est), 0);
 }
@@ -191,10 +191,10 @@ TEST(XglRttTest, DecreasingMeasurements) {
 TEST(XglRttTest, RtoMinimumClamping) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Very small RTT measurement */
     xgl_rtt_update(&est, 10);
-    
+
     /* RTO should be clamped to minimum */
     EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_MIN_RTO_MS);
 }
@@ -205,10 +205,10 @@ TEST(XglRttTest, RtoMinimumClamping) {
 TEST(XglRttTest, RtoMaximumClamping) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Very large RTT measurement */
     xgl_rtt_update(&est, 10000);
-    
+
     /* RTO should be clamped to maximum */
     EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_MAX_RTO_MS);
 }
@@ -219,12 +219,12 @@ TEST(XglRttTest, RtoMaximumClamping) {
 TEST(XglRttTest, RtoWithinBounds) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Test with various measurements */
     for (int rtt = 50; rtt <= 2000; rtt += 50) {
         xgl_rtt_init(&est);
         xgl_rtt_update(&est, rtt);
-        
+
         int32_t rto = xgl_rtt_get_rto(&est);
         EXPECT_GE(rto, XGL_MIN_RTO_MS);
         EXPECT_LE(rto, XGL_MAX_RTO_MS);
@@ -241,9 +241,9 @@ TEST(XglRttTest, RtoWithinBounds) {
 TEST(XglRttTest, ZeroRttMeasurement) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     xgl_rtt_update(&est, 0);
-    
+
     EXPECT_TRUE(xgl_rtt_is_initialized(&est));
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 0);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 0);
@@ -256,10 +256,10 @@ TEST(XglRttTest, ZeroRttMeasurement) {
 TEST(XglRttTest, NegativeRttMeasurement) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Negative RTT should be clamped to 0 */
     xgl_rtt_update(&est, -100);
-    
+
     EXPECT_TRUE(xgl_rtt_is_initialized(&est));
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 0);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 0);
@@ -288,17 +288,17 @@ TEST(XglRttTest, GetFunctionsNullPointer) {
 TEST(XglRttTest, Reset) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Add some measurements */
     xgl_rtt_update(&est, 100);
     xgl_rtt_update(&est, 120);
     xgl_rtt_update(&est, 110);
-    
+
     EXPECT_TRUE(xgl_rtt_is_initialized(&est));
-    
+
     /* Reset */
     xgl_rtt_reset(&est);
-    
+
     EXPECT_FALSE(xgl_rtt_is_initialized(&est));
     EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_DEFAULT_RTO_MS);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 0);
@@ -315,23 +315,23 @@ TEST(XglRttTest, Reset) {
 TEST(XglRttTest, RealisticNetworkConditions) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Simulate realistic RTT measurements with some jitter */
     int32_t measurements[] = {
         100, 105, 98, 102, 110, 95, 103, 108, 97, 101,
         99, 104, 106, 100, 102, 98, 105, 103, 100, 99
     };
-    
+
     for (size_t i = 0; i < sizeof(measurements) / sizeof(measurements[0]); i++) {
         xgl_rtt_update(&est, measurements[i]);
     }
-    
+
     /* SRTT should be around 100ms */
     EXPECT_NEAR(xgl_rtt_get_srtt(&est), 100, 10);
-    
+
     /* RTTVAR should be small (low jitter) */
     EXPECT_LT(xgl_rtt_get_rttvar(&est), 20);
-    
+
     /* RTO should be reasonable */
     int32_t rto = xgl_rtt_get_rto(&est);
     EXPECT_GT(rto, 100);
@@ -344,20 +344,20 @@ TEST(XglRttTest, RealisticNetworkConditions) {
 TEST(XglRttTest, HighJitterNetwork) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Simulate high jitter: RTT varies between 50ms and 200ms */
     int32_t measurements[] = {
         100, 150, 75, 180, 60, 170, 90, 160, 80, 140,
         110, 130, 95, 155, 85, 145, 105, 135, 100, 125
     };
-    
+
     for (size_t i = 0; i < sizeof(measurements) / sizeof(measurements[0]); i++) {
         xgl_rtt_update(&est, measurements[i]);
     }
-    
+
     /* RTTVAR should be significant (high jitter) */
     EXPECT_GT(xgl_rtt_get_rttvar(&est), 15);
-    
+
     /* RTO should be larger to accommodate jitter */
     int32_t rto = xgl_rtt_get_rto(&est);
     EXPECT_GT(rto, 180);
@@ -369,19 +369,19 @@ TEST(XglRttTest, HighJitterNetwork) {
 TEST(XglRttTest, SuddenRttIncrease) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Stable at 100ms */
     for (int i = 0; i < 10; i++) {
         xgl_rtt_update(&est, 100);
     }
-    
+
     int32_t rto_before = xgl_rtt_get_rto(&est);
-    
+
     /* Sudden increase to 500ms */
     xgl_rtt_update(&est, 500);
-    
+
     int32_t rto_after = xgl_rtt_get_rto(&est);
-    
+
     /* RTO should increase */
     EXPECT_GT(rto_after, rto_before);
 }
@@ -392,17 +392,17 @@ TEST(XglRttTest, SuddenRttIncrease) {
 TEST(XglRttTest, SuddenRttDecrease) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Stable at 500ms */
     for (int i = 0; i < 10; i++) {
         xgl_rtt_update(&est, 500);
     }
-    
+
     /* Sudden decrease to 100ms */
     xgl_rtt_update(&est, 100);
-    
+
     int32_t rto_after = xgl_rtt_get_rto(&est);
-    
+
     /* RTO should still be reasonable (doesn't drop too fast) */
     EXPECT_GT(rto_after, XGL_MIN_RTO_MS);
 }
@@ -417,13 +417,13 @@ TEST(XglRttTest, SuddenRttDecrease) {
 TEST(XglRttTest, Rfc6298AlgorithmVerification) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* First measurement: R = 100 */
     xgl_rtt_update(&est, 100);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 100);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 50);  /* R/2 */
     EXPECT_EQ(xgl_rtt_get_rto(&est), 300);    /* 100 + 4*50 */
-    
+
     /* Second measurement: R = 120 */
     /* error = 120 - 100 = 20 */
     /* SRTT = 100 + 20/8 = 102 */
@@ -434,7 +434,7 @@ TEST(XglRttTest, Rfc6298AlgorithmVerification) {
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 102);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 42);
     EXPECT_EQ(xgl_rtt_get_rto(&est), 270);
-    
+
     /* Third measurement: R = 90 */
     /* error = 90 - 102 = -12 */
     /* SRTT = 102 + (-12)/8 = 102 - 1 = 101 */
@@ -453,15 +453,15 @@ TEST(XglRttTest, Rfc6298AlgorithmVerification) {
 TEST(XglRttTest, ExponentialMovingAverage) {
     xgl_rtt_estimator_t est;
     xgl_rtt_init(&est);
-    
+
     /* Start with 100ms */
     xgl_rtt_update(&est, 100);
-    
+
     /* Add many 200ms measurements */
     for (int i = 0; i < 50; i++) {
         xgl_rtt_update(&est, 200);
     }
-    
+
     /* SRTT should converge towards 200ms but not reach it immediately */
     int32_t srtt = xgl_rtt_get_srtt(&est);
     EXPECT_GT(srtt, 180);  /* Should be close to 200 */

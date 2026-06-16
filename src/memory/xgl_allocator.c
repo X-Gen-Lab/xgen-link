@@ -1,7 +1,7 @@
 /**
  * \file            xgl_allocator.c
  * \brief           Custom allocator support implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <xgl/internal/xgl_allocator.h>
@@ -67,7 +67,7 @@ void* xgl_alloc(xgl_allocator_t* allocator, size_t size) {
     if (size == 0) {
         return NULL;
     }
-    
+
     /* Use default allocator if none provided */
     if (allocator == NULL) {
 #if XGL_ALLOW_FALLBACK_MALLOC
@@ -76,7 +76,7 @@ void* xgl_alloc(xgl_allocator_t* allocator, size_t size) {
         return NULL;
 #endif
     }
-    
+
     /* Validate allocator has malloc function */
     if (allocator->malloc == NULL) {
         return NULL;
@@ -85,7 +85,7 @@ void* xgl_alloc(xgl_allocator_t* allocator, size_t size) {
     if (allocator->malloc == tracking_malloc && allocator->user_data != NULL) {
         return tracking_malloc_impl((xgl_tracking_allocator_t*)allocator->user_data, size);
     }
-    
+
     /* Allocate memory */
     return allocator->malloc(size);
 }
@@ -100,7 +100,7 @@ void xgl_free(xgl_allocator_t* allocator, void* ptr) {
     if (ptr == NULL) {
         return;
     }
-    
+
     /* Use default allocator if none provided */
     if (allocator == NULL) {
 #if XGL_ALLOW_FALLBACK_MALLOC
@@ -109,7 +109,7 @@ void xgl_free(xgl_allocator_t* allocator, void* ptr) {
         return;
 #endif
     }
-    
+
     /* Validate allocator has free function */
     if (allocator->free == NULL) {
         return;
@@ -119,7 +119,7 @@ void xgl_free(xgl_allocator_t* allocator, void* ptr) {
         tracking_free_impl((xgl_tracking_allocator_t*)allocator->user_data, ptr);
         return;
     }
-    
+
     /* Free memory */
     allocator->free(ptr);
 }
@@ -177,30 +177,30 @@ static void* tracking_malloc_impl(xgl_tracking_allocator_t* tracker, size_t size
     xgl_alloc_header_t* header;
     void* ptr;
     size_t total_size;
-    
+
     if (tracker == NULL || tracker->underlying == NULL || size == 0) {
         return NULL;
     }
-    
+
     /* Allocate extra space for header */
     total_size = size + sizeof(xgl_alloc_header_t);
-    
+
     /* Allocate from underlying allocator */
     ptr = xgl_alloc(tracker->underlying, total_size);
     if (ptr == NULL) {
         return NULL;
     }
-    
+
     /* Fill in header */
     header = (xgl_alloc_header_t*)ptr;
     header->size = size;
     header->magic = XGL_ALLOC_MAGIC;
     header->phase = tracker->current_phase;
-    
+
     /* Update statistics */
     update_alloc_stats(&tracker->stats, size);
     update_alloc_stats(&tracker->phase_stats.phase[tracker->current_phase], size);
-    
+
     /* Return pointer after header */
     return (uint8_t*)ptr + sizeof(xgl_alloc_header_t);
 }
@@ -222,34 +222,34 @@ static void* tracking_malloc(size_t size) {
 static void tracking_free_impl(xgl_tracking_allocator_t* tracker, void* ptr) {
     xgl_alloc_header_t* header;
     void* actual_ptr;
-    
+
     if (ptr == NULL) {
         return;
     }
-    
+
     if (tracker == NULL || tracker->underlying == NULL) {
         return;
     }
-    
+
     /* Get header */
     actual_ptr = (uint8_t*)ptr - sizeof(xgl_alloc_header_t);
     header = (xgl_alloc_header_t*)actual_ptr;
-    
+
     /* Validate magic number */
     if (header->magic != XGL_ALLOC_MAGIC) {
         /* Invalid pointer or corruption */
         return;
     }
-    
+
     /* Update statistics */
     update_free_stats(&tracker->stats, header->size);
     if (header->phase < XGL_ALLOCATOR_PHASE_COUNT) {
         update_free_stats(&tracker->phase_stats.phase[header->phase], header->size);
     }
-    
+
     /* Clear magic to detect double-free */
     header->magic = 0;
-    
+
     /* Free from underlying allocator */
     xgl_free(tracker->underlying, actual_ptr);
 }
@@ -272,7 +272,7 @@ int xgl_tracking_allocator_init(xgl_tracking_allocator_t* tracker,
     if (tracker == NULL) {
         return -1;
     }
-    
+
     if (underlying == NULL) {
 #if XGL_ALLOW_FALLBACK_MALLOC
         underlying = &default_allocator;
@@ -280,17 +280,17 @@ int xgl_tracking_allocator_init(xgl_tracking_allocator_t* tracker,
         return -1;
 #endif
     }
-    
+
     /* Initialize tracker structure */
     memset(tracker, 0, sizeof(xgl_tracking_allocator_t));
     tracker->underlying = underlying;
     tracker->current_phase = XGL_ALLOCATOR_PHASE_INIT;
-    
+
     /* Set up base allocator interface */
     tracker->base.malloc = tracking_malloc;
     tracker->base.free = tracking_free;
     tracker->base.user_data = tracker;
-    
+
     return 0;
 }
 
@@ -303,7 +303,7 @@ void xgl_tracking_allocator_get_stats(const xgl_tracking_allocator_t* tracker,
     if (tracker == NULL || stats == NULL) {
         return;
     }
-    
+
     /* Copy statistics */
     *stats = tracker->stats;
 }
@@ -316,7 +316,7 @@ void xgl_tracking_allocator_reset_stats(xgl_tracking_allocator_t* tracker) {
     if (tracker == NULL) {
         return;
     }
-    
+
     /* Reset statistics (keep current_allocated) */
     tracker->stats.total_allocated = tracker->stats.current_allocated;
     tracker->stats.total_freed = 0;
@@ -367,7 +367,7 @@ xgl_allocator_t* xgl_tracking_allocator_get_interface(
     if (tracker == NULL) {
         return NULL;
     }
-    
+
     return &tracker->base;
 }
 

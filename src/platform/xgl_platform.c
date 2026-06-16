@@ -1,7 +1,7 @@
 /**
  * \file            xgl_platform.c
  * \brief           Platform detection implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "xgl/internal/xgl_platform.h"
@@ -44,13 +44,13 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     if (buffer == NULL || size == 0) {
         return 0;
     }
-    
+
     xgl_platform_info_t info;
     xgl_platform_get_info(&info);
-    
+
     size_t written = 0;
     int ret;
-    
+
     /* Compiler information */
     ret = append_platform_info(buffer, size, &written,
                                "Compiler: %s (version %u)\n",
@@ -58,7 +58,7 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     if (ret != 0) {
         return (int)written;
     }
-    
+
     /* Operating system */
     ret = append_platform_info(buffer, size, &written,
                                "OS: %s\n",
@@ -66,7 +66,7 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     if (ret != 0) {
         return (int)written;
     }
-    
+
     /* Architecture */
     if (info.arch_subname[0] != '\0') {
         ret = append_platform_info(buffer, size, &written,
@@ -80,7 +80,7 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     if (ret != 0) {
         return (int)written;
     }
-    
+
     /* Pointer size */
     ret = append_platform_info(buffer, size, &written,
                                "Pointer Size: %u-bit\n",
@@ -88,7 +88,7 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     if (ret != 0) {
         return (int)written;
     }
-    
+
     /* Endianness */
     ret = append_platform_info(buffer, size, &written,
                                "Endianness: %s\n",
@@ -96,7 +96,7 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     if (ret != 0) {
         return (int)written;
     }
-    
+
     /* Alignment */
     ret = append_platform_info(buffer, size, &written,
                                "Alignment: %s (%u-byte required)\n",
@@ -104,6 +104,6 @@ int xgl_platform_info_string(char* buffer, size_t size) {
     if (ret != 0) {
         return (int)written;
     }
-    
+
     return (int)written;
 }

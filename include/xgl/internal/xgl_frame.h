@@ -1,7 +1,7 @@
 /**
  * \file            xgl_frame.h
  * \brief           Frame encapsulation and structure definitions
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_FRAME_H

@@ -1,11 +1,11 @@
 /**
  * \file            xgl.h
  * \brief           xgen-link Protocol Stack - Main Public API
- * \author          Nexus Team
+ * \author          X-Gen Lab
  * \version         2.0.0
  * \date            2026-02-28
  *
- * \copyright       Copyright (c) 2026 Nexus Team
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  *
  * \details         xgen-link is a modern, robust, and highly configurable
  *                  communication protocol stack designed for resource-constrained
@@ -497,7 +497,7 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
  * }
  * \endcode
  */
-xgl_error_t xgl_send_zerocopy(xgl_handle_t handle, 
+xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
                               const xgl_tx_data_zerocopy_t* tx_data);
 
 /*---------------------------------------------------------------------------*/

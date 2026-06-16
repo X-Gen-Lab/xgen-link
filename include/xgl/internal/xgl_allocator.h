@@ -1,7 +1,7 @@
 /**
  * \file            xgl_allocator.h
  * \brief           Custom allocator support and memory tracking
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_ALLOCATOR_H

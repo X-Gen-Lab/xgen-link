@@ -1,7 +1,7 @@
 /**
  * \file            xgl_fragment.h
  * \brief           Packet Fragmentation and Reassembly
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_FRAGMENT_H
@@ -42,30 +42,30 @@ typedef struct {
  */
 typedef struct {
     xgl_list_node_t node;           /**< List node for reassembly queue */
-    
+
     /* Fragment identification */
     uint16_t source_id;             /**< Source node ID */
     uint8_t data_type;              /**< Data type */
     uint32_t connection_id;         /**< Production connection ID */
     uint32_t session_epoch;         /**< Production session epoch */
     uint32_t message_id;            /**< Production message ID */
-    
+
     /* Reassembly state */
     size_t received_bytes;          /**< Number of unique payload bytes received */
     uint8_t* received_bitmap;       /**< Reserved; range tracking replaces byte bitmap */
     xgl_fragment_received_range_t received_ranges[XGL_FRAGMENT_MAX_RECEIVED_RANGES];
     size_t received_range_count;    /**< Number of active received ranges */
-    
+
     /* Data buffer */
     uint8_t* data;                  /**< Reassembly data buffer */
     size_t data_len;                /**< Total data length */
     size_t buffer_size;             /**< Allocated buffer size */
     size_t reserved_size;           /**< Bytes reserved against manager budget */
-    
+
     /* Timeout tracking */
     uint32_t first_fragment_time;   /**< Timestamp of first fragment */
     uint32_t timeout_ms;            /**< Reassembly timeout */
-    
+
 } xgl_reassembly_buffer_t;
 
 /*---------------------------------------------------------------------------*/
@@ -79,20 +79,20 @@ typedef struct {
 typedef struct {
     /* Fragment ID tracking */
     uint32_t next_message_id;       /**< Next production message ID to assign */
-    
+
     /* Reassembly buffers */
     xgl_list_t reassembly_list;     /**< List of active reassembly buffers */
     size_t max_reassembly_buffers;  /**< Maximum concurrent reassembly buffers */
-    
+
     /* Memory management */
     xgl_allocator_t* allocator;     /**< Memory allocator */
-    
+
     /* Configuration */
     uint32_t reassembly_timeout_ms; /**< Reassembly timeout */
     size_t max_message_size;        /**< Maximum reassembled message bytes (0 = unlimited) */
     size_t max_reassembly_bytes;    /**< Maximum aggregate reserved bytes (0 = unlimited) */
     size_t current_reassembly_bytes;/**< Current aggregate reserved bytes */
-    
+
 } xgl_fragment_manager_t;
 
 /*---------------------------------------------------------------------------*/

@@ -1,7 +1,7 @@
 /**
  * \file            xgl_tiered_pool.h
  * \brief           Tiered memory pool for efficient allocation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_TIERED_POOL_H
@@ -45,11 +45,11 @@ typedef struct {
     xgl_mempool_t small_pool;   /**< Small pool (<=64 bytes) */
     xgl_mempool_t medium_pool;  /**< Medium pool (<=256 bytes) */
     xgl_mempool_t large_pool;   /**< Large pool (<=1024 bytes) */
-    
+
     uint8_t* small_buffer;      /**< Buffer for small pool */
     uint8_t* medium_buffer;     /**< Buffer for medium pool */
     uint8_t* large_buffer;      /**< Buffer for large pool */
-    
+
     size_t small_count;         /**< Number of small blocks */
     size_t medium_count;        /**< Number of medium blocks */
     size_t large_count;         /**< Number of large blocks */

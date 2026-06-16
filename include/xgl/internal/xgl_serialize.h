@@ -1,7 +1,7 @@
 /**
  * \file            xgl_serialize.h
  * \brief           Serialization and deserialization utilities
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_SERIALIZE_H

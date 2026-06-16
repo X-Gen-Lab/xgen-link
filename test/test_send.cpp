@@ -1,7 +1,7 @@
 /**
  * \file            test_send.cpp
  * \brief           Unit tests for send API
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -119,44 +119,44 @@ protected:
         /* Create mock PHY */
         mock_phy = new MockPhy();
         g_mock_phy = mock_phy;
-        
+
         /* Setup PHY operations */
         phy_ops.tx = mock_phy_tx;
         phy_ops.rx = mock_phy_rx;
         phy_ops.user_data = nullptr;
-        
+
         /* Setup route */
         route.target_id = 2;
         route.phy = &phy_ops;
         route.max_frame_size = 256;
         route.read_freq_hz = 100;
         route.metric = 100;
-        
+
         /* Get default configuration */
         xgl_config_get_default(&config);
         config.source_id = 1;
         config.route_table = &route;
         config.route_table_len = 1;
-        
+
         /* Create and initialize instance */
         handle = xgl_create(&config);
         ASSERT_NE(handle, nullptr);
-        
+
         xgl_error_t err = xgl_init(handle);
         ASSERT_EQ(err, XGL_OK);
     }
-    
+
     void TearDown() override {
         if (handle) {
             xgl_destroy(handle);
             handle = nullptr;
         }
-        
+
         g_mock_phy = nullptr;
         delete mock_phy;
         mock_phy = nullptr;
     }
-    
+
     xgl_config_t config;
     xgl_handle_t handle = nullptr;
     xgl_phy_ops_t phy_ops;
@@ -181,9 +181,9 @@ TEST_F(XglSendTest, SendWithNullHandle) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send(nullptr, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
@@ -192,7 +192,7 @@ TEST_F(XglSendTest, SendWithNullHandle) {
  */
 TEST_F(XglSendTest, SendWithNullTxData) {
     xgl_error_t err = xgl_send(handle, nullptr);
-    
+
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
@@ -209,9 +209,9 @@ TEST_F(XglSendTest, SendWithNullDataPointer) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send(handle, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
@@ -228,9 +228,9 @@ TEST_F(XglSendTest, SendWithZeroDataLength) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send(handle, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
 
@@ -247,9 +247,9 @@ TEST_F(XglSendTest, SendWithInvalidPriority) {
         .priority = 8,  /* Invalid: must be 0-7 */
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send(handle, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
 
@@ -271,14 +271,14 @@ TEST_F(XglSendTest, BasicSendSuccess) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     /* Expect PHY TX to be called */
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_))
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
-    
+
     xgl_error_t err = xgl_send(handle, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_OK);
 }
 
@@ -332,9 +332,9 @@ TEST_F(XglSendTest, SendToNonExistentRoute) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send(handle, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_ROUTE_NOT_FOUND);
 }
 
@@ -358,9 +358,9 @@ TEST_F(XglSendTest, ZeroCopySendWithNullHandle) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send_zerocopy(nullptr, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
@@ -369,7 +369,7 @@ TEST_F(XglSendTest, ZeroCopySendWithNullHandle) {
  */
 TEST_F(XglSendTest, ZeroCopySendWithNullTxData) {
     xgl_error_t err = xgl_send_zerocopy(handle, nullptr);
-    
+
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
@@ -389,9 +389,9 @@ TEST_F(XglSendTest, ZeroCopySendWithInvalidDataOffset) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send_zerocopy(handle, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
 
@@ -411,9 +411,9 @@ TEST_F(XglSendTest, ZeroCopySendWithBufferTooSmall) {
         .priority = 0,
         .timeout_ms = 0
     };
-    
+
     xgl_error_t err = xgl_send_zerocopy(handle, &tx_data);
-    
+
     EXPECT_EQ(err, XGL_ERR_BUFFER_TOO_SMALL);
 }
 

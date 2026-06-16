@@ -1,7 +1,7 @@
 /**
  * \file            test_config.cpp
  * \brief           Configuration API unit tests
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -52,7 +52,7 @@ static xgl_error_t mock_auth_verify(uint32_t /*key_id*/,
 class XglConfigTest : public ::testing::Test {
 protected:
     xgl_config_t config;
-    
+
     void SetUp() override {
         /* Initialize config to zero */
         memset(&config, 0, sizeof(xgl_config_t));
@@ -66,7 +66,7 @@ protected:
 TEST_F(XglConfigTest, GetDefaultConfig) {
     /* Get default configuration */
     xgl_config_get_default(&config);
-    
+
     /* Verify default values (medium preset) */
     EXPECT_STREQ(config.name, "medium");
     EXPECT_EQ(config.source_id, 1);
@@ -93,7 +93,7 @@ TEST_F(XglConfigTest, GetDefaultConfigNullPointer) {
 
 TEST_F(XglConfigTest, GetPresetTiny) {
     xgl_config_get_preset_tiny(&config);
-    
+
     EXPECT_STREQ(config.name, "tiny");
     EXPECT_EQ(config.memory.tx_pool_size, 1024);
     EXPECT_EQ(config.memory.rx_buffer_size, 160);
@@ -107,7 +107,7 @@ TEST_F(XglConfigTest, GetPresetTiny) {
 
 TEST_F(XglConfigTest, GetPresetSmall) {
     xgl_config_get_preset_small(&config);
-    
+
     EXPECT_STREQ(config.name, "small");
     EXPECT_EQ(config.memory.tx_pool_size, 2048);
     EXPECT_EQ(config.memory.rx_buffer_size, 288);
@@ -121,7 +121,7 @@ TEST_F(XglConfigTest, GetPresetSmall) {
 
 TEST_F(XglConfigTest, GetPresetMedium) {
     xgl_config_get_preset_medium(&config);
-    
+
     EXPECT_STREQ(config.name, "medium");
     EXPECT_EQ(config.memory.tx_pool_size, 4096);
     EXPECT_EQ(config.memory.rx_buffer_size, 544);
@@ -135,7 +135,7 @@ TEST_F(XglConfigTest, GetPresetMedium) {
 
 TEST_F(XglConfigTest, GetPresetLarge) {
     xgl_config_get_preset_large(&config);
-    
+
     EXPECT_STREQ(config.name, "large");
     EXPECT_EQ(config.memory.tx_pool_size, 8192);
     EXPECT_EQ(config.memory.rx_buffer_size, 1056);
@@ -341,44 +341,44 @@ TEST_F(XglConfigTest, ValidateRouteTableLengthWithoutTable) {
 
 TEST_F(XglConfigTest, ValidateRouteTableWithNullPhy) {
     xgl_config_get_default(&config);
-    
+
     xgl_route_item_t routes[1];
     routes[0].target_id = 1;
     routes[0].phy = NULL;  /* NULL PHY */
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
     routes[0].metric = 1;
-    
+
     config.route_table = routes;
     config.route_table_len = 1;
-    
+
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableWithNullPhyOps) {
     xgl_config_get_default(&config);
-    
+
     xgl_phy_ops_t phy;
     phy.tx = NULL;  /* NULL TX function */
     phy.rx = NULL;  /* NULL RX function */
     phy.user_data = NULL;
-    
+
     xgl_route_item_t routes[1];
     routes[0].target_id = 1;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
     routes[0].metric = 1;
-    
+
     config.route_table = routes;
     config.route_table_len = 1;
-    
+
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableWithInvalidFrameSize) {
     xgl_config_get_default(&config);
-    
+
     /* Mock PHY operations */
     auto mock_tx = [](const uint8_t* /*data*/, size_t /*len*/, void* /*user_data*/) -> xgl_error_t {
         return XGL_OK;
@@ -386,28 +386,28 @@ TEST_F(XglConfigTest, ValidateRouteTableWithInvalidFrameSize) {
     auto mock_rx = [](uint8_t* /*buffer*/, size_t* /*len*/, void* /*user_data*/) -> xgl_error_t {
         return XGL_OK;
     };
-    
+
     xgl_phy_ops_t phy;
     phy.tx = mock_tx;
     phy.rx = mock_rx;
     phy.user_data = NULL;
-    
+
     xgl_route_item_t routes[1];
     routes[0].target_id = 1;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 32;  /* Too small */
     routes[0].read_freq_hz = 100;
     routes[0].metric = 1;
-    
+
     config.route_table = routes;
     config.route_table_len = 1;
-    
+
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableWithZeroFrequency) {
     xgl_config_get_default(&config);
-    
+
     /* Mock PHY operations */
     auto mock_tx = [](const uint8_t* /*data*/, size_t /*len*/, void* /*user_data*/) -> xgl_error_t {
         return XGL_OK;
@@ -415,28 +415,28 @@ TEST_F(XglConfigTest, ValidateRouteTableWithZeroFrequency) {
     auto mock_rx = [](uint8_t* /*buffer*/, size_t* /*len*/, void* /*user_data*/) -> xgl_error_t {
         return XGL_OK;
     };
-    
+
     xgl_phy_ops_t phy;
     phy.tx = mock_tx;
     phy.rx = mock_rx;
     phy.user_data = NULL;
-    
+
     xgl_route_item_t routes[1];
     routes[0].target_id = 1;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 0;  /* Zero frequency */
     routes[0].metric = 1;
-    
+
     config.route_table = routes;
     config.route_table_len = 1;
-    
+
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateValidRouteTable) {
     xgl_config_get_default(&config);
-    
+
     /* Mock PHY operations */
     auto mock_tx = [](const uint8_t* /*data*/, size_t /*len*/, void* /*user_data*/) -> xgl_error_t {
         return XGL_OK;
@@ -444,22 +444,22 @@ TEST_F(XglConfigTest, ValidateValidRouteTable) {
     auto mock_rx = [](uint8_t* /*buffer*/, size_t* /*len*/, void* /*user_data*/) -> xgl_error_t {
         return XGL_OK;
     };
-    
+
     xgl_phy_ops_t phy;
     phy.tx = mock_tx;
     phy.rx = mock_rx;
     phy.user_data = NULL;
-    
+
     xgl_route_item_t routes[1];
     routes[0].target_id = 1;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
     routes[0].metric = 1;
-    
+
     config.route_table = routes;
     config.route_table_len = 1;
-    
+
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 }
 
@@ -469,17 +469,17 @@ TEST_F(XglConfigTest, ValidateValidRouteTable) {
 
 TEST_F(XglConfigTest, CreateInstanceWithValidConfig) {
     xgl_config_get_default(&config);
-    
+
     xgl_handle_t handle = xgl_create(&config);
     EXPECT_NE(handle, nullptr);
-    
+
     xgl_destroy(handle);
 }
 
 TEST_F(XglConfigTest, CreateInstanceWithInvalidConfig) {
     xgl_config_get_default(&config);
     config.memory.tx_pool_size = 0;  /* Invalid */
-    
+
     xgl_handle_t handle = xgl_create(&config);
     EXPECT_EQ(handle, nullptr);
 }

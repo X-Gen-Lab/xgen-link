@@ -1,6 +1,6 @@
 # Examples Configuration
 # Example applications demonstrating xgen-link usage
-# Author: Nexus Team
+# Author: X-Gen Lab
 
 #-----------------------------------------------------------------------------
 # Echo Server Example

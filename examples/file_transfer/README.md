@@ -241,13 +241,13 @@ config.rx_buffer_size = 1024;         // Larger RX buffer
 static xgl_error_t uart_tx(const uint8_t* data, size_t len, void* user_data)
 {
     UART_Handle* uart = (UART_Handle*)user_data;
-    
+
     /* Send data via UART */
     size_t sent = UART_Write(uart, data, len);
     if (sent != len) {
         return XGL_ERR_TX_FAILED;
     }
-    
+
     return XGL_OK;
 }
 
@@ -255,10 +255,10 @@ static xgl_error_t uart_tx(const uint8_t* data, size_t len, void* user_data)
 static xgl_error_t uart_rx(uint8_t* buffer, size_t* len, void* user_data)
 {
     UART_Handle* uart = (UART_Handle*)user_data;
-    
+
     /* Read available data from UART */
     *len = UART_Read(uart, buffer, *len);
-    
+
     return XGL_OK;
 }
 
@@ -317,7 +317,7 @@ static void receiver_on_receive(xgl_handle_t handle,
                                 void* user_data)
 {
     FILE* fp = (FILE*)user_data;
-    
+
     if (data_type == 0x01) {  /* File data */
         /* Write chunk to file */
         size_t written = fwrite(data, 1, len, fp);
@@ -325,13 +325,13 @@ static void receiver_on_receive(xgl_handle_t handle,
             printf("Failed to write to file\n");
             return;
         }
-        
+
         receiver_ctx.bytes_received += len;
-        
+
         /* Display progress */
         float progress = (float)receiver_ctx.bytes_received / expected_size * 100.0f;
         printf("Progress: %.1f%%\n", progress);
-        
+
         /* Check if complete */
         if (receiver_ctx.bytes_received >= expected_size) {
             fclose(fp);
@@ -352,39 +352,39 @@ config.callback_user_data = output_file;
 int main(void)
 {
     /* ... initialization ... */
-    
+
     /* Open file to transfer */
     FILE* fp = fopen("firmware.bin", "rb");
     /* ... read file ... */
-    
+
     /* Start transfer */
     transfer_file(sender, target_id);
-    
+
     /* Main loop */
     while (sender_ctx.state == TRANSFER_IN_PROGRESS ||
            receiver_ctx.state != TRANSFER_COMPLETE) {
-        
+
         /* Process protocol at 100 Hz */
         xgl_run(sender, 100);
         xgl_run(receiver, 100);
-        
+
         /* Delay 10ms (100 Hz) */
         delay_ms(10);
-        
+
         /* Optional: Update display, check for user abort, etc. */
     }
-    
+
     /* Verify transfer */
     if (receiver_ctx.state == TRANSFER_COMPLETE) {
         printf("Transfer successful\n");
     } else {
         printf("Transfer failed\n");
     }
-    
+
     /* Cleanup */
     xgl_destroy(sender);
     xgl_destroy(receiver);
-    
+
     return 0;
 }
 ```
@@ -542,4 +542,4 @@ After understanding this example, explore:
 
 ## License
 
-Copyright (c) 2026 Nexus Team
+Copyright (c) 2026 X-Gen Lab

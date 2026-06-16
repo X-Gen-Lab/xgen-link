@@ -1,7 +1,7 @@
 /**
  * \file            xgl_time_provider.c
  * \brief           Time provider implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "xgl/internal/xgl_time_provider.h"

@@ -1,7 +1,7 @@
 /**
  * \file            test_integration.cpp
  * \brief           Integration tests for end-to-end functionality
- * \author          Nexus Team
+ * \author          X-Gen Lab
  * \note            Validates: Requirements 19.2
  */
 
@@ -38,7 +38,7 @@ protected:
         config1_.protocol.window_size = 4;
         config1_.protocol.max_retry_count = 3;
         config1_.protocol.ack_timeout_ms = 100;
-        
+
         xgl_config_get_default(&config2_);
         config2_.source_id = 2;
         config2_.protocol.max_frame_size = 256;
@@ -46,7 +46,7 @@ protected:
         config2_.protocol.max_retry_count = 3;
         config2_.protocol.ack_timeout_ms = 100;
     }
-    
+
     void TearDown() override {
         /* Cleanup any created instances */
         if (handle1_ != nullptr) {
@@ -58,7 +58,7 @@ protected:
             handle2_ = nullptr;
         }
     }
-    
+
     xgl_config_t config1_;
     xgl_config_t config2_;
     xgl_route_item_t route1_;
@@ -79,20 +79,20 @@ TEST_F(XglIntegrationTest, BasicInstanceLifecycle) {
     /* Create instance */
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    
+
     /* Initialize instance */
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-    
+
     /* Get statistics */
     xgl_statistics_t stats;
     ASSERT_EQ(xgl_stats_get(handle1_, &stats), XGL_OK);
-    
+
     /* Verify initial statistics */
     EXPECT_EQ(stats.datalink.tx_packets, 0);
     EXPECT_EQ(stats.datalink.rx_packets, 0);
     EXPECT_EQ(stats.datalink.tx_errors, 0);
     EXPECT_EQ(stats.datalink.rx_errors, 0);
-    
+
     /* Destroy instance */
     xgl_destroy(handle1_);
     handle1_ = nullptr;
@@ -107,24 +107,24 @@ TEST_F(XglIntegrationTest, MultipleIndependentInstances) {
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-    
+
     /* Create second instance */
     handle2_ = xgl_create(&config2_);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
-    
+
     /* Verify both instances have independent statistics */
     xgl_statistics_t stats1, stats2;
     ASSERT_EQ(xgl_stats_get(handle1_, &stats1), XGL_OK);
     ASSERT_EQ(xgl_stats_get(handle2_, &stats2), XGL_OK);
-    
+
     /* Reset statistics on first instance */
     ASSERT_EQ(xgl_stats_reset(handle1_), XGL_OK);
-    
+
     /* Verify only first instance was reset */
     ASSERT_EQ(xgl_stats_get(handle1_, &stats1), XGL_OK);
     ASSERT_EQ(xgl_stats_get(handle2_, &stats2), XGL_OK);
-    
+
     EXPECT_EQ(stats1.datalink.tx_packets, 0);
     EXPECT_EQ(stats2.datalink.tx_packets, 0);
 }
@@ -135,16 +135,16 @@ TEST_F(XglIntegrationTest, MultipleIndependentInstances) {
  */
 TEST_F(XglIntegrationTest, ConfigurationValidation) {
     xgl_config_t config;
-    
+
     /* Test valid configuration */
     xgl_config_get_default(&config);
     config.source_id = 1;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    
+
     /* Test invalid configuration - zero pool size */
     config.memory.tx_pool_size = 0;
     EXPECT_NE(xgl_config_validate(&config), XGL_OK);
-    
+
     /* Test invalid configuration - zero window size */
     xgl_config_get_default(&config);
     config.source_id = 1;
@@ -158,7 +158,7 @@ TEST_F(XglIntegrationTest, ConfigurationValidation) {
  */
 TEST_F(XglIntegrationTest, ConfigurationPresets) {
     xgl_config_t config;
-    
+
     /* Test tiny preset */
     xgl_config_get_preset_tiny(&config);
     config.source_id = 1;
@@ -166,7 +166,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     EXPECT_EQ(config.memory.tx_pool_size, 1024);
     EXPECT_EQ(config.protocol.max_frame_size, 128);
     EXPECT_FALSE(config.features.enable_fragmentation);
-    
+
     /* Test small preset */
     xgl_config_get_preset_small(&config);
     config.source_id = 1;
@@ -174,7 +174,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     EXPECT_EQ(config.memory.tx_pool_size, 2048);
     EXPECT_EQ(config.protocol.max_frame_size, 256);
     EXPECT_TRUE(config.features.enable_fragmentation);
-    
+
     /* Test medium preset */
     xgl_config_get_preset_medium(&config);
     config.source_id = 1;
@@ -182,7 +182,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     EXPECT_EQ(config.memory.tx_pool_size, 4096);
     EXPECT_EQ(config.protocol.max_frame_size, 512);
     EXPECT_FALSE(config.features.enable_compression);
-    
+
     /* Test large preset */
     xgl_config_get_preset_large(&config);
     config.source_id = 1;
@@ -205,12 +205,12 @@ TEST_F(XglIntegrationTest, RuntimeProcessing) {
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-    
+
     /* Call xgl_run multiple times - should not crash */
     for (int i = 0; i < 10; ++i) {
         xgl_run(handle1_, 100);
     }
-    
+
     /* Verify instance is still valid */
     xgl_statistics_t stats;
     ASSERT_EQ(xgl_stats_get(handle1_, &stats), XGL_OK);
@@ -225,17 +225,17 @@ TEST_F(XglIntegrationTest, MultiInstanceRuntimeProcessing) {
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-    
+
     handle2_ = xgl_create(&config2_);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
-    
+
     /* Process both instances */
     for (int i = 0; i < 10; ++i) {
         xgl_run(handle1_, 100);
         xgl_run(handle2_, 100);
     }
-    
+
     /* Verify both instances are still valid */
     xgl_statistics_t stats1, stats2;
     ASSERT_EQ(xgl_stats_get(handle1_, &stats1), XGL_OK);
@@ -252,14 +252,14 @@ TEST_F(XglIntegrationTest, MultiInstanceRuntimeProcessing) {
  */
 TEST_F(XglIntegrationTest, NullHandleErrorHandling) {
     xgl_statistics_t stats;
-    
+
     /* Test with null handle */
     EXPECT_NE(xgl_stats_get(nullptr, &stats), XGL_OK);
     EXPECT_NE(xgl_stats_reset(nullptr), XGL_OK);
-    
+
     /* xgl_run should handle null gracefully */
     xgl_run(nullptr, 100);  /* Should not crash */
-    
+
     /* xgl_destroy should handle null gracefully */
     xgl_destroy(nullptr);  /* Should not crash */
 }
@@ -273,7 +273,7 @@ TEST_F(XglIntegrationTest, InitializationErrors) {
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-    
+
     /* Second init should fail */
     EXPECT_EQ(xgl_init(handle1_), XGL_ERR_ALREADY_INITIALIZED);
 }
@@ -288,7 +288,7 @@ TEST_F(XglIntegrationTest, MemoryAllocationFailure) {
     xgl_config_get_default(&config);
     config.source_id = 1;
     config.memory.tx_pool_size = 1024 * 1024 * 1024;  /* 1GB - likely to fail */
-    
+
     xgl_handle_t handle = xgl_create(&config);
     if (handle != nullptr) {
         /* If creation succeeded, initialization might fail */
@@ -313,7 +313,7 @@ TEST_F(XglIntegrationTest, VersionInformation) {
     const char* version_str = xgl_version_string();
     ASSERT_NE(version_str, nullptr);
     EXPECT_STREQ(version_str, XGL_VERSION_STRING);
-    
+
     /* Test version integer */
     uint32_t version_int = xgl_version_int();
     EXPECT_EQ(version_int, XGL_VERSION_INT);
@@ -330,14 +330,14 @@ TEST_F(XglIntegrationTest, VersionInformation) {
  */
 TEST_F(XglIntegrationTest, RapidInstanceLifecycle) {
     const int iterations = 100;
-    
+
     for (int i = 0; i < iterations; ++i) {
         xgl_handle_t handle = xgl_create(&config1_);
         ASSERT_NE(handle, nullptr);
         ASSERT_EQ(xgl_init(handle), XGL_OK);
         xgl_destroy(handle);
     }
-    
+
     /* Test passes if no memory leaks */
 }
 
@@ -349,9 +349,9 @@ TEST_F(XglIntegrationTest, StatisticsUnderLoad) {
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-    
+
     xgl_statistics_t stats;
-    
+
     /* Rapidly get and reset statistics */
     for (int i = 0; i < 1000; ++i) {
         ASSERT_EQ(xgl_stats_get(handle1_, &stats), XGL_OK);

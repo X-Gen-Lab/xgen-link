@@ -1,7 +1,7 @@
 /**
  * \file            xgl_time_provider.h
  * \brief           Time provider abstraction for testability
- * \author          Nexus Team
+ * \author          X-Gen Lab
  * \details         Provides an injectable time source interface to enable
  *                  deterministic testing and simulation of time-dependent
  *                  protocol behavior

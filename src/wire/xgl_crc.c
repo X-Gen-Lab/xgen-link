@@ -1,7 +1,7 @@
 /**
  * \file            xgl_crc.c
  * \brief           CRC calculation implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <xgl/internal/xgl_crc.h>
@@ -114,11 +114,11 @@ uint8_t xgl_crc8_maxim_update(uint8_t crc, const uint8_t* data, size_t len) {
     if (data == NULL) {
         return crc;
     }
-    
+
     for (size_t i = 0; i < len; i++) {
         crc = crc8_maxim_table[crc ^ data[i]];
     }
-    
+
     return crc;
 }
 
@@ -140,11 +140,11 @@ uint16_t xgl_crc16_modbus_update(uint16_t crc, const uint8_t* data, size_t len) 
     if (data == NULL) {
         return crc;
     }
-    
+
     for (size_t i = 0; i < len; i++) {
         uint8_t index = (uint8_t)(crc ^ data[i]);
         crc = (crc >> 8) ^ crc16_modbus_table[index];
     }
-    
+
     return crc;
 }

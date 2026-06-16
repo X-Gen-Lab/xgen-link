@@ -1,7 +1,7 @@
 /**
  * \file            xgl_layer_interface.h
  * \brief           Layer interface definitions for decoupling
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_LAYER_INTERFACE_H
@@ -36,7 +36,7 @@ typedef struct xgl_packet xgl_packet_t;
  * \param[in]       handle: Protocol instance handle
  * \param[in]       data: Operation-specific data (opaque)
  * \return          XGL_OK on success, error code otherwise
- * 
+ *
  * \note            The 'data' parameter interpretation depends on operation:
  *                  - For send/receive: points to xgl_packet_t
  *                  - For error: points to xgl_layer_error_info_t
@@ -170,12 +170,12 @@ static inline xgl_error_t xgl_layer_report_error(const xgl_layer_interface_t* if
     if (iface == NULL || iface->report_error == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     xgl_layer_error_info_t error_info = {
         .error = error,
         .message = message
     };
-    
+
     return iface->report_error(iface->ctx, handle, &error_info);
 }
 

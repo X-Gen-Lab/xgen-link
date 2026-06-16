@@ -1,7 +1,7 @@
 /**
  * \file            test_types.cpp
  * \brief           Unit tests for core data types and structures
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -60,7 +60,7 @@ TEST(XglTypesTest, HandleType) {
 TEST(XglTypesTest, ConfigStructure) {
     xgl_config_t config;
     std::memset(&config, 0, sizeof(config));
-    
+
     /* Set basic fields */
     config.name = "test";
     config.source_id = 0x1234;
@@ -70,7 +70,7 @@ TEST(XglTypesTest, ConfigStructure) {
     config.protocol.max_retry_count = 5;
     config.protocol.window_size = 4;
     config.protocol.max_frame_size = 256;
-    
+
     /* Verify fields */
     EXPECT_STREQ(config.name, "test");
     EXPECT_EQ(config.source_id, 0x1234);
@@ -93,7 +93,7 @@ TEST(XglTypesTest, ConfigPresets) {
     EXPECT_EQ(tiny.protocol.window_size, 2);
     EXPECT_EQ(tiny.protocol.max_frame_size, 128);
     EXPECT_FALSE(tiny.features.enable_fragmentation);
-    
+
     /* Test small preset */
     xgl_config_t small = XGL_CONFIG_PRESET_SMALL;
     EXPECT_EQ(small.memory.tx_pool_size, 2048);
@@ -101,7 +101,7 @@ TEST(XglTypesTest, ConfigPresets) {
     EXPECT_EQ(small.protocol.window_size, 4);
     EXPECT_EQ(small.protocol.max_frame_size, 256);
     EXPECT_TRUE(small.features.enable_fragmentation);
-    
+
     /* Test medium preset */
     xgl_config_t medium = XGL_CONFIG_PRESET_MEDIUM;
     EXPECT_EQ(medium.memory.tx_pool_size, 4096);
@@ -110,7 +110,7 @@ TEST(XglTypesTest, ConfigPresets) {
     EXPECT_EQ(medium.protocol.max_frame_size, 512);
     EXPECT_TRUE(medium.features.enable_fragmentation);
     EXPECT_FALSE(medium.features.enable_compression);
-    
+
     /* Test large preset */
     xgl_config_t large = XGL_CONFIG_PRESET_LARGE;
     EXPECT_EQ(large.memory.tx_pool_size, 8192);
@@ -132,14 +132,14 @@ TEST(XglTypesTest, ConfigPresets) {
 TEST(XglTypesTest, StatisticsStructure) {
     xgl_statistics_t stats;
     std::memset(&stats, 0, sizeof(stats));
-    
+
     /* Set some values */
     stats.datalink.tx_packets = 100;
     stats.datalink.tx_bytes = 5000;
     stats.datalink.rx_packets = 95;
     stats.datalink.rx_bytes = 4800;
     stats.avg_rtt_ms = 50;
-    
+
     /* Verify fields */
     EXPECT_EQ(stats.datalink.tx_packets, 100);
     EXPECT_EQ(stats.datalink.tx_bytes, 5000);
@@ -157,7 +157,7 @@ TEST(XglTypesTest, StatisticsStructure) {
  */
 TEST(XglTypesTest, TxDataStructure) {
     uint8_t data[] = {1, 2, 3, 4, 5};
-    
+
     xgl_tx_data_t tx_data;
     tx_data.target_id = 0x1234;
     tx_data.data_type = 1;
@@ -165,7 +165,7 @@ TEST(XglTypesTest, TxDataStructure) {
     tx_data.data_len = sizeof(data);
     tx_data.reliable = true;
     tx_data.priority = 3;
-    
+
     /* Verify fields */
     EXPECT_EQ(tx_data.target_id, 0x1234);
     EXPECT_EQ(tx_data.data_type, 1);
@@ -180,7 +180,7 @@ TEST(XglTypesTest, TxDataStructure) {
  */
 TEST(XglTypesTest, TxDataZeroCopyStructure) {
     uint8_t buffer[256];
-    
+
     xgl_tx_data_zerocopy_t tx_data;
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
@@ -190,7 +190,7 @@ TEST(XglTypesTest, TxDataZeroCopyStructure) {
     tx_data.data_type = 2;
     tx_data.reliable = false;
     tx_data.priority = 5;
-    
+
     /* Verify fields */
     EXPECT_EQ(tx_data.buffer, buffer);
     EXPECT_EQ(tx_data.buffer_size, 256);
@@ -216,19 +216,19 @@ TEST(XglTypesTest, TrafficClassBitDefinitions) {
     EXPECT_EQ(XGL_RELIABILITY_NONE, 0x00);
     EXPECT_EQ(XGL_RELIABILITY_ACK_ELICITING, 0x40);
     EXPECT_EQ(XGL_RELIABILITY_ACK_ONLY, 0x80);
-    
+
     /* Test fragmentation bit */
     EXPECT_EQ(XGL_TRAFFIC_FRAGMENTED_SHIFT, 5);
     EXPECT_EQ(XGL_TRAFFIC_FRAGMENTED_MASK, 0x20);
-    
+
     /* Test encryption class */
     EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_SHIFT, 3);
     EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_MASK, 0x18);
-    
+
     /* Test priority class */
     EXPECT_EQ(XGL_TRAFFIC_PRIORITY_SHIFT, 0);
     EXPECT_EQ(XGL_TRAFFIC_PRIORITY_MASK, 0x07);
-    
+
     /* Test compression class */
     EXPECT_EQ(XGL_COMPRESSION_SHIFT, 6);
     EXPECT_EQ(XGL_COMPRESSION_MASK, 0xC0);
@@ -239,15 +239,15 @@ TEST(XglTypesTest, TrafficClassBitDefinitions) {
  */
 TEST(XglTypesTest, TrafficClassEncoding) {
     uint8_t traffic_class_bits = 0;
-    
+
     /* Set ACK-eliciting reliability */
     traffic_class_bits |= XGL_RELIABILITY_ACK_ELICITING;
     EXPECT_EQ(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK, XGL_RELIABILITY_ACK_ELICITING);
-    
+
     /* Set fragment */
     traffic_class_bits |= XGL_TRAFFIC_FRAGMENTED_MASK;
     EXPECT_NE(traffic_class_bits & XGL_TRAFFIC_FRAGMENTED_MASK, 0);
-    
+
     /* Set priority 5 */
     traffic_class_bits |= (5 << XGL_TRAFFIC_PRIORITY_SHIFT);
     EXPECT_EQ(traffic_class_bits & XGL_TRAFFIC_PRIORITY_MASK, 5);
@@ -262,14 +262,14 @@ TEST(XglTypesTest, TrafficClassEncoding) {
  */
 TEST(XglTypesTest, RouteTableEntry) {
     xgl_phy_ops_t phy_ops;
-    
+
     xgl_route_item_t route;
     route.target_id = 0x3456;
     route.phy = &phy_ops;
     route.max_frame_size = 512;
     route.read_freq_hz = 1000;
     route.metric = 10;
-    
+
     /* Verify fields */
     EXPECT_EQ(route.target_id, 0x3456);
     EXPECT_EQ(route.phy, &phy_ops);
@@ -287,12 +287,12 @@ TEST(XglTypesTest, RouteTableEntry) {
  */
 TEST(XglTypesTest, PacketDataStructure) {
     uint8_t data[] = {0xAA, 0xBB, 0xCC, 0xDD};
-    
+
     xgl_packet_data_t packet_data;
     packet_data.ref_count = 1;
     packet_data.data_len = sizeof(data);
     packet_data.data = data;
-    
+
     /* Verify fields */
     EXPECT_EQ(packet_data.ref_count, 1);
     EXPECT_EQ(packet_data.data_len, 4);

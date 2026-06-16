@@ -1,7 +1,7 @@
 /**
  * \file            xgl_network.c
  * \brief           Network layer implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <xgl/internal/xgl_network.h>
@@ -150,12 +150,12 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
     if (frame_len < XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
-    
+
     xgl_wire_header_t wire_header;
     if (xgl_wire_decode_header(&wire_header, frame_buf, frame_len) != XGL_OK) {
         return XGL_ERR_INVALID_FRAME;
     }
-    
+
     /* Extract addressing */
     *source_id = wire_header.source_id;
     *target_id = wire_header.target_id;
@@ -172,16 +172,16 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
     if (err != XGL_OK) {
         return err;
     }
-    
+
     /* Extract payload */
     *payload = frame_buf + wire_header.header_len;
     *payload_len = wire_header.payload_len;
-    
+
     /* Validate payload length */
     if (frame_len < wire_header.header_len + *payload_len + XGL_CRC16_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
-    
+
     return XGL_OK;
 }
 
@@ -295,11 +295,11 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     if (ctx == NULL || config == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     if (config->route_table == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_network_ctx_t));
     ctx->local_id = config->local_id;
@@ -312,7 +312,7 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     ctx->auth_required = config->auth_required;
     ctx->auth_key_id = config->auth_key_id;
     ctx->auth_provider = config->auth_provider;
-    
+
     return XGL_OK;
 }
 
@@ -327,49 +327,49 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
     if (ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Validate packet data */
     if (packet->data == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Lookup route for target ID */
     xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
                                                      packet->target_id);
-    
+
     if (route == NULL) {
         /* Route not found - report error */
         char error_msg[64];
         snprintf(error_msg, sizeof(error_msg),
                 "Route not found for target ID: %u", (unsigned int)packet->target_id);
-        
+
         if (ctx->error_callback != NULL) {
             ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
                               error_msg, ctx->callback_user_data);
         }
-        
+
         /* Update statistics */
         if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
-        
+
         return XGL_ERR_ROUTE_NOT_FOUND;
     }
-    
+
     /* Store PHY operations in packet for transmission */
     packet->phy = route->phy;
-    
+
     /* Set source ID if not already set */
     if (packet->source_id == 0) {
         packet->source_id = ctx->local_id;
     }
-    
+
     /* Set protocol version */
     packet->version = XGL_PROTOCOL_VERSION;
-    
+
     /* Packet number assignment is handled by transport layer. */
     (void)assign_packet_number;  /* Unused in this layer */
-    
+
     /* Update statistics */
     if (ctx->stats != NULL) {
         ctx->stats->tx_packets++;
@@ -377,7 +377,7 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
             ctx->stats->tx_bytes += packet->data->data_len;
         }
     }
-    
+
     /* Build frame from packet for datalink transmission */
     xgl_frame_t frame;
     uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
@@ -421,9 +421,9 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         .session_id = packet->session_id,
         .ttl = XGL_DEFAULT_TTL
     };
-    
+
     err = xgl_frame_build(&frame, &params);
-    
+
     if (err != XGL_OK) {
         if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
@@ -452,7 +452,7 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         }
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    
+
     /* Send frame through data link layer via interface */
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         /* No datalink interface available, cannot send */
@@ -461,22 +461,22 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         }
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Prepare frame data for lower layer */
     xgl_frame_tx_message_t send_data = {
         .frame = &frame,
         .phy = packet->phy
     };
-    
+
     err = ctx->lower_layer->send(ctx->lower_layer->ctx, handle, &send_data);
-    
+
     if (err != XGL_OK) {
         if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
         return err;
     }
-    
+
     return XGL_OK;
 }
 
@@ -497,13 +497,13 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
     if (ctx == NULL || frame_buf == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Extract packet information from frame */
     uint16_t source_id, target_id;
     uint8_t data_type;
     const uint8_t* payload;
     size_t payload_len;
-    
+
     xgl_error_t err = xgl_network_extract_packet_info(frame_buf, frame_len,
                                                       &source_id, &target_id,
                                                       &data_type,
@@ -515,7 +515,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
         }
         return err;
     }
-    
+
     /* Validate addressing */
     if (!xgl_network_validate_address(ctx, target_id, source_id)) {
         /* Invalid address - drop packet */
@@ -524,17 +524,17 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
         }
         return XGL_ERR_INVALID_PARAM;
     }
-    
+
     /* Check if packet is addressed to local node */
     if (xgl_network_is_local(ctx, target_id)) {
         /* Packet is for this node - forward to transport layer */
-        
+
         /* Update statistics */
         if (ctx->stats != NULL) {
             ctx->stats->rx_packets++;
             ctx->stats->rx_bytes += payload_len;
         }
-        
+
         /* Forward to transport layer via interface */
         if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
             xgl_wire_header_t wire_header;
@@ -552,7 +552,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                        (wire_header.flags & XGL_WIRE_FLAG_CONTROL) != 0U) {
                 reliable = XGL_RELIABILITY_ACK_ONLY;
             }
-            
+
             /* Build packet data structure for payload */
             xgl_packet_data_t packet_data = {
                 .ref_count = 1,
@@ -567,7 +567,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 extensions = frame_buf + XGL_WIRE_BASE_HEADER_SIZE;
                 extensions_len = wire_header.header_len - XGL_WIRE_BASE_HEADER_SIZE;
             }
-            
+
             /* Build complete packet structure for transport layer */
             xgl_packet_t packet = {
                 .source_id = source_id,
@@ -589,7 +589,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .extensions_len = extensions_len,
                 .phy = NULL    /* Not needed for receive path */
             };
-            
+
             /* Call transport layer receive via interface */
             err = ctx->upper_layer->receive(ctx->upper_layer->ctx, handle, &packet);
             if (err != XGL_OK) {
@@ -597,29 +597,29 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 return err;
             }
         }
-        
+
         return XGL_OK;
     } else {
         /* Packet is for another node - forward it */
         /* Lookup route for forwarding */
         xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
                                                          target_id);
-        
+
         if (route == NULL) {
             /* No route for forwarding - drop packet */
             char error_msg[64];
             snprintf(error_msg, sizeof(error_msg),
                     "No route for forwarding to target ID: %u", (unsigned int)target_id);
-            
+
             if (ctx->error_callback != NULL) {
                 ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
                                   error_msg, ctx->callback_user_data);
             }
-            
+
             if (ctx->stats != NULL) {
                 ctx->stats->rx_dropped++;
             }
-            
+
             return XGL_ERR_ROUTE_NOT_FOUND;
         }
 
@@ -642,17 +642,17 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             }
             return XGL_ERR_TTL_EXPIRED;
         }
-        
+
         /* Forward packet through the appropriate PHY */
         /* Note: In a full implementation, this would re-transmit the frame */
         /* For now, we just acknowledge that forwarding would occur */
-        
+
         /* Update statistics for forwarded packet */
         if (ctx->stats != NULL) {
             ctx->stats->tx_packets++;
             ctx->stats->tx_bytes += payload_len;
         }
-        
+
         if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
             if (ctx->stats != NULL) {
                 ctx->stats->rx_dropped++;
@@ -701,7 +701,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 return XGL_ERR_TX_FAILED;
             }
         }
-        
+
         return XGL_OK;
     }
 }
@@ -716,24 +716,24 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
     if (ctx == NULL) {
         return false;
     }
-    
+
     /* Source ID should not be broadcast */
     if (source_id == XGL_BROADCAST_ID) {
         return false;
     }
-    
+
     /* Source ID should not be zero (reserved) */
     if (source_id == 0) {
         return false;
     }
-    
+
     /* Target ID can be broadcast or specific node */
     /* Zero is reserved but we allow it for special cases */
-    
+
     if (source_id == target_id && target_id != XGL_BROADCAST_ID) {
         return false;
     }
-    
+
     return true;
 }
 
@@ -748,11 +748,11 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx,
     if (ctx == NULL) {
         return;
     }
-    
+
     if (ctx->error_callback != NULL) {
         ctx->error_callback(handle, error, message, ctx->callback_user_data);
     }
-    
+
     /* Update error statistics */
     if (ctx->stats != NULL) {
         ctx->stats->tx_errors++;
@@ -772,11 +772,11 @@ static xgl_error_t network_send_impl(void* ctx,
                                     void* data) {
     xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
     xgl_packet_t* packet = (xgl_packet_t*)data;
-    
+
     if (net_ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Forward to network send function */
     return xgl_network_send_with_handle(net_ctx, handle, packet, false);
 }
@@ -790,14 +790,14 @@ static xgl_error_t network_receive_impl(void* ctx,
                                        // cppcheck-suppress constParameterCallback
                                        void* data) {
     xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
-    
+
     if (net_ctx == NULL || data == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Extract frame buffer and length from data */
     const xgl_frame_rx_message_t* frame_data = (const xgl_frame_rx_message_t*)data;
-    
+
     /* Forward to network receive function */
     return xgl_network_receive(net_ctx, handle, frame_data->frame_buf, frame_data->frame_len);
 }
@@ -811,18 +811,18 @@ static xgl_error_t network_report_error_impl(void* ctx,
                                             void* data) {
     xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
     xgl_layer_error_info_t* error_info = (xgl_layer_error_info_t*)data;
-    
+
     if (net_ctx == NULL || error_info == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     /* Forward error to callback if available */
     if (net_ctx->error_callback != NULL) {
         net_ctx->error_callback(handle, error_info->error,
                                error_info->message,
                                net_ctx->callback_user_data);
     }
-    
+
     return XGL_OK;
 }
 
@@ -838,12 +838,12 @@ xgl_error_t xgl_network_get_interface(xgl_network_ctx_t* ctx,
     if (ctx == NULL || iface == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     xgl_layer_interface_init(iface,
                             ctx,
                             network_send_impl,
                             network_receive_impl,
                             network_report_error_impl);
-    
+
     return XGL_OK;
 }

@@ -1,7 +1,7 @@
 /**
  * \file            mock_callbacks.cpp
  * \brief           Callback mock implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include "mock_callbacks.h"
@@ -24,18 +24,18 @@ void MockCallbacks::rx_callback_wrapper(xgl_handle_t handle, uint16_t source_id,
                                        const uint8_t* data, size_t len,
                                        void* user_data) {
     (void)user_data;  /* Unused parameter */
-    
+
     if (current_instance_ == nullptr) {
         return;
     }
-    
+
     /* Record the received data */
     RxRecord record;
     record.source_id = source_id;
     record.data_type = data_type;
     record.data.assign(data, data + len);
     current_instance_->rx_records_.push_back(record);
-    
+
     /* Call mock implementation */
     current_instance_->rx_callback_impl(handle, source_id,
                                        data_type, data, len);
@@ -44,17 +44,17 @@ void MockCallbacks::rx_callback_wrapper(xgl_handle_t handle, uint16_t source_id,
 void MockCallbacks::error_callback_wrapper(xgl_handle_t handle, xgl_error_t error,
                                           const char* message, void* user_data) {
     (void)user_data;  /* Unused parameter */
-    
+
     if (current_instance_ == nullptr) {
         return;
     }
-    
+
     /* Record the error */
     ErrorRecord record;
     record.error = error;
     record.message = message ? message : "";
     current_instance_->error_records_.push_back(record);
-    
+
     /* Call mock implementation */
     current_instance_->error_callback_impl(handle, error, message);
 }

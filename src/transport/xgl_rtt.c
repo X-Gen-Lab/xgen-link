@@ -1,11 +1,11 @@
 /**
  * \file            xgl_rtt.c
  * \brief           RTT estimator implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  * \version         2.0.0
  * \date            2026-02-28
  *
- * \copyright       Copyright (c) 2026 Nexus Team
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  *
  * \details         Implements RFC 6298 RTT estimation algorithm for adaptive
  *                  retransmission timeout calculation. Uses exponential moving
@@ -58,7 +58,7 @@ void xgl_rtt_init(xgl_rtt_estimator_t* est) {
     if (est == NULL) {
         return;
     }
-    
+
     est->srtt = 0;
     est->rttvar = 0;
     est->rto = XGL_DEFAULT_RTO_MS;
@@ -81,12 +81,12 @@ void xgl_rtt_update(xgl_rtt_estimator_t* est, int32_t measured_rtt) {
     if (est == NULL) {
         return;
     }
-    
+
     /* Clamp measured RTT to non-negative value */
     if (measured_rtt < 0) {
         measured_rtt = 0;
     }
-    
+
     if (!est->initialized) {
         /* First measurement (RFC 6298 Section 2.2) */
         est->srtt = measured_rtt;
@@ -95,19 +95,19 @@ void xgl_rtt_update(xgl_rtt_estimator_t* est, int32_t measured_rtt) {
     } else {
         /* Subsequent measurements (RFC 6298 Section 2.3) */
         int32_t error = measured_rtt - est->srtt;
-        
+
         /* SRTT = SRTT + error/8 (alpha = 1/8) */
         est->srtt += (error >> XGL_RTT_ALPHA_SHIFT);
-        
+
         /* RTTVAR = RTTVAR + (|error| - RTTVAR)/4 (beta = 1/4) */
         int32_t abs_error = abs_int32(error);
         int32_t rttvar_delta = abs_error - est->rttvar;
         est->rttvar += (rttvar_delta >> XGL_RTT_BETA_SHIFT);
     }
-    
+
     /* Calculate RTO = SRTT + 4 * RTTVAR (RFC 6298 Section 2.4) */
     est->rto = est->srtt + (XGL_RTO_K_FACTOR * est->rttvar);
-    
+
     /* Clamp RTO to [MIN_RTO, MAX_RTO] (RFC 6298 Section 2.4) */
     est->rto = clamp_int32(est->rto, XGL_MIN_RTO_MS, XGL_MAX_RTO_MS);
 }
@@ -120,7 +120,7 @@ int32_t xgl_rtt_get_rto(const xgl_rtt_estimator_t* est) {
     if (est == NULL) {
         return XGL_DEFAULT_RTO_MS;
     }
-    
+
     return est->rto;
 }
 
@@ -132,7 +132,7 @@ int32_t xgl_rtt_get_srtt(const xgl_rtt_estimator_t* est) {
     if (est == NULL || !est->initialized) {
         return 0;
     }
-    
+
     return est->srtt;
 }
 
@@ -144,7 +144,7 @@ int32_t xgl_rtt_get_rttvar(const xgl_rtt_estimator_t* est) {
     if (est == NULL || !est->initialized) {
         return 0;
     }
-    
+
     return est->rttvar;
 }
 
@@ -164,6 +164,6 @@ bool xgl_rtt_is_initialized(const xgl_rtt_estimator_t* est) {
     if (est == NULL) {
         return false;
     }
-    
+
     return est->initialized;
 }

@@ -1,7 +1,7 @@
 /**
  * \file            test_frame_properties.cpp
  * \brief           Frame handling property tests
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -27,7 +27,7 @@
  */
 TEST(XglFrameProperties, CrcErrorDetection) {
     PropertyTestGenerator gen;
-    
+
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame parameters */
         uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
@@ -36,11 +36,11 @@ TEST(XglFrameProperties, CrcErrorDetection) {
         uint32_t packet_number = gen.random_uint32();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07;  /* 3 bits */
-        
+
         /* Generate random payload (0 to 256 bytes) */
         size_t payload_len = gen.random_uint32() % 257;
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
-        
+
         /* Build frame */
         xgl_frame_t frame;
         xgl_frame_params_t params = {
@@ -53,21 +53,21 @@ TEST(XglFrameProperties, CrcErrorDetection) {
             .reliable = reliable,
             .priority = priority
         };
-        
+
         xgl_error_t err = xgl_frame_build(&frame, &params);
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Serialize frame to buffer */
         std::vector<uint8_t> buffer(xgl_frame_calculate_size(payload_len));
         size_t bytes_written = 0;
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &bytes_written);
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Test header CRC16 corruption detection */
         {
             std::vector<uint8_t> corrupted = buffer;
             corrupted[22] ^= 0x01;  /* Flip one bit in header CRC16 */
-            
+
             xgl_wire_header_t header = {};
             EXPECT_EQ(xgl_wire_decode_header(&header,
                                              corrupted.data(),
@@ -75,20 +75,20 @@ TEST(XglFrameProperties, CrcErrorDetection) {
                       XGL_ERR_CRC_FAILED)
                 << "Header CRC16 corruption not detected at iteration " << iteration;
         }
-        
+
         /* Test CRC16 corruption detection */
         {
             std::vector<uint8_t> corrupted = buffer;
             /* Corrupt the CRC16 bytes (last 2 bytes) */
             size_t crc16_offset = bytes_written - 2;
             corrupted[crc16_offset] ^= 0x01;  /* Flip one bit in CRC16 */
-            
+
             /* Parse the corrupted frame */
             xgl_parser_t parser;
             std::vector<uint8_t> cache(1024);
             err = xgl_parser_init(&parser, cache.data(), cache.size());
             ASSERT_EQ(err, XGL_OK);
-            
+
             /* Feed all bytes to parser */
             xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
             for (size_t i = 0; i < bytes_written; ++i) {
@@ -97,12 +97,12 @@ TEST(XglFrameProperties, CrcErrorDetection) {
                     break;
                 }
             }
-            
+
             /* Parser should detect CRC16 error */
             EXPECT_EQ(result, XGL_PARSE_RESULT_ERROR)
                 << "CRC16 corruption not detected at iteration " << iteration;
         }
-        
+
         /* Test that valid frame passes both CRC checks */
         {
             xgl_wire_header_t header = {};
@@ -111,13 +111,13 @@ TEST(XglFrameProperties, CrcErrorDetection) {
                                              XGL_FRAME_HEADER_SIZE),
                       XGL_OK)
                 << "Valid header CRC16 rejected at iteration " << iteration;
-            
+
             /* Parse the valid frame */
             xgl_parser_t parser;
             std::vector<uint8_t> cache(1024);
             err = xgl_parser_init(&parser, cache.data(), cache.size());
             ASSERT_EQ(err, XGL_OK);
-            
+
             /* Feed all bytes to parser */
             xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
             for (size_t i = 0; i < bytes_written; ++i) {
@@ -126,7 +126,7 @@ TEST(XglFrameProperties, CrcErrorDetection) {
                     break;
                 }
             }
-            
+
             /* Parser should accept valid frame */
             EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE)
                 << "Valid frame rejected at iteration " << iteration;
@@ -146,7 +146,7 @@ TEST(XglFrameProperties, CrcErrorDetection) {
  */
 TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
     PropertyTestGenerator gen;
-    
+
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame parameters */
         uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
@@ -155,11 +155,11 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
         uint32_t packet_number = gen.random_uint32();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07;  /* 3 bits */
-        
+
         /* Generate random payload (0 to 512 bytes) */
         size_t payload_len = gen.random_uint32() % 513;
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
-        
+
         /* Build frame */
         xgl_frame_t frame;
         xgl_frame_params_t params = {
@@ -172,22 +172,22 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
             .reliable = reliable,
             .priority = priority
         };
-        
+
         xgl_error_t err = xgl_frame_build(&frame, &params);
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Serialize frame to buffer */
         std::vector<uint8_t> buffer(xgl_frame_calculate_size(payload_len));
         size_t bytes_written = 0;
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &bytes_written);
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Parse the serialized frame */
         xgl_parser_t parser;
         std::vector<uint8_t> cache(2048);
         err = xgl_parser_init(&parser, cache.data(), cache.size());
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Feed all bytes to parser */
         xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
         for (size_t i = 0; i < bytes_written; ++i) {
@@ -196,24 +196,24 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
                 break;
             }
         }
-        
+
         /* Parser should complete successfully */
         ASSERT_EQ(result, XGL_PARSE_RESULT_COMPLETE)
             << "Frame parsing failed at iteration " << iteration;
-        
+
         /* Get parsed frame data */
         uint8_t* parsed_buffer = nullptr;
         size_t parsed_len = 0;
         err = xgl_parser_get_frame(&parser, &parsed_buffer, &parsed_len);
         ASSERT_EQ(err, XGL_OK);
         ASSERT_EQ(parsed_len, bytes_written);
-        
+
         xgl_wire_header_t parsed_header = {};
         ASSERT_EQ(xgl_wire_decode_header(&parsed_header,
                                          parsed_buffer,
                                          XGL_FRAME_HEADER_SIZE),
                   XGL_OK);
-        
+
         /* Verify all header fields match */
         EXPECT_EQ(parsed_buffer[0], XGL_WIRE_MAGIC_0)
             << "Magic byte 0 mismatch at iteration " << iteration;
@@ -231,14 +231,14 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
             << "Packet number mismatch at iteration " << iteration;
         EXPECT_EQ(parsed_header.payload_len, payload_len)
             << "Payload length mismatch at iteration " << iteration;
-        
+
         uint8_t expected_reliable = reliable ? XGL_WIRE_FLAG_ACK_ELICITING : 0U;
         EXPECT_EQ(parsed_header.flags & XGL_WIRE_FLAG_ACK_ELICITING, expected_reliable)
             << "Reliable flag mismatch at iteration " << iteration;
-        
+
         EXPECT_EQ(parsed_header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK, priority)
             << "Priority mismatch at iteration " << iteration;
-        
+
         /* Verify payload data */
         if (payload_len > 0) {
             const uint8_t* parsed_payload = parsed_buffer + XGL_FRAME_HEADER_SIZE;
@@ -260,7 +260,7 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
  */
 TEST(XglFrameProperties, FieldValidation) {
     PropertyTestGenerator gen;
-    
+
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random but valid frame parameters */
         uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
@@ -270,11 +270,11 @@ TEST(XglFrameProperties, FieldValidation) {
         uint8_t ack_range = gen.random_uint8();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07;  /* Valid: 3 bits (0-7) */
-        
+
         /* Generate random payload */
         size_t payload_len = gen.random_uint32() % 257;
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
-        
+
         /* Build and serialize frame */
         xgl_frame_t frame;
         xgl_frame_params_t params = {
@@ -286,48 +286,48 @@ TEST(XglFrameProperties, FieldValidation) {
             .reliable = reliable,
             .priority = priority
         };
-        
+
         xgl_error_t err = xgl_frame_build(&frame, &params);
         ASSERT_EQ(err, XGL_OK);
-        
+
         std::vector<uint8_t> buffer(xgl_frame_calculate_size(payload_len));
         size_t bytes_written = 0;
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &bytes_written);
         ASSERT_EQ(err, XGL_OK);
-        
+
         xgl_wire_header_t header = {};
         ASSERT_EQ(xgl_wire_decode_header(&header,
                                          buffer.data(),
                                          XGL_FRAME_HEADER_SIZE),
                   XGL_OK);
-        
+
         EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0)
             << "Magic byte 0 validation failed at iteration " << iteration;
         EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1)
             << "Magic byte 1 validation failed at iteration " << iteration;
-        
+
         EXPECT_EQ(header.version, XGL_WIRE_VERSION)
             << "Version out of range at iteration " << iteration;
-        
+
         EXPECT_LE(header.packet_type, 0x7F)
             << "Data type out of range at iteration " << iteration;
         EXPECT_EQ(header.packet_type, data_type)
             << "Data type mismatch at iteration " << iteration;
-        
+
         uint8_t parsed_priority = (uint8_t)(header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK);
         EXPECT_LE(parsed_priority, 0x07)
             << "Priority out of range at iteration " << iteration;
         EXPECT_EQ(parsed_priority, priority)
             << "Priority mismatch at iteration " << iteration;
-        
+
         uint8_t expected_reliable = reliable ? XGL_WIRE_FLAG_ACK_ELICITING : 0U;
         EXPECT_EQ(header.flags & XGL_WIRE_FLAG_ACK_ELICITING, expected_reliable)
             << "Reliable flag mismatch at iteration " << iteration;
-        
+
         /* Validate data length matches payload */
         EXPECT_EQ(header.payload_len, payload_len)
             << "Data length validation failed at iteration " << iteration;
-        
+
         /* Validate CRC16 */
         size_t crc16_offset = bytes_written - 2;
         uint16_t calculated_crc16 = xgl_crc16_modbus(buffer.data(), crc16_offset);
@@ -348,20 +348,20 @@ TEST(XglFrameProperties, FieldValidation) {
  */
 TEST(XglFrameProperties, FrameSizeCalculation) {
     PropertyTestGenerator gen;
-    
+
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random payload length */
         size_t payload_len = gen.random_uint32() % 1024;
-        
+
         /* Calculate expected frame size */
         size_t expected_size = xgl_frame_calculate_size(payload_len);
-        
+
         /* Verify calculation */
         size_t manual_size = XGL_FRAME_HEADER_SIZE + payload_len + XGL_CRC16_SIZE;
         EXPECT_EQ(expected_size, manual_size)
             << "Frame size calculation mismatch at iteration " << iteration
             << " with payload_len=" << payload_len;
-        
+
         /* Build and serialize a frame to verify actual size */
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
         xgl_frame_t frame;
@@ -374,15 +374,15 @@ TEST(XglFrameProperties, FrameSizeCalculation) {
             .reliable = false,
             .priority = 0
         };
-        
+
         xgl_error_t err = xgl_frame_build(&frame, &params);
         ASSERT_EQ(err, XGL_OK);
-        
+
         std::vector<uint8_t> buffer(expected_size + 10);  /* Extra space */
         size_t bytes_written = 0;
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &bytes_written);
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Verify actual serialized size matches calculation */
         EXPECT_EQ(bytes_written, expected_size)
             << "Serialized size mismatch at iteration " << iteration
@@ -401,7 +401,7 @@ TEST(XglFrameProperties, FrameSizeCalculation) {
  */
 TEST(XglFrameProperties, ParserByteByByteRobustness) {
     PropertyTestGenerator gen;
-    
+
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random frame */
         uint16_t source_id = static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
@@ -409,7 +409,7 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
         size_t payload_len = gen.random_uint32() % 256;
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
-        
+
         /* Build and serialize frame */
         xgl_frame_t frame;
         xgl_frame_params_t params = {
@@ -424,23 +424,23 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
         };
         xgl_error_t err = xgl_frame_build(&frame, &params);
         ASSERT_EQ(err, XGL_OK);
-        
+
         std::vector<uint8_t> buffer(xgl_frame_calculate_size(payload_len));
         size_t bytes_written = 0;
         err = xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &bytes_written);
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Initialize parser */
         xgl_parser_t parser;
         std::vector<uint8_t> cache(1024);
         err = xgl_parser_init(&parser, cache.data(), cache.size());
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Feed bytes one at a time */
         xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
         for (size_t i = 0; i < bytes_written; ++i) {
             result = xgl_parser_feed_byte(&parser, buffer[i], static_cast<uint32_t>(i));
-            
+
             /* Should be incomplete until last byte */
             if (i < bytes_written - 1) {
                 EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE)
@@ -448,7 +448,7 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
                     << " byte " << i << "/" << bytes_written;
             }
         }
-        
+
         /* Final result should be complete */
         EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE)
             << "Parser did not complete at iteration " << iteration;
@@ -466,35 +466,35 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
  */
 TEST(XglFrameProperties, ParserRejectsGarbageData) {
     PropertyTestGenerator gen;
-    
+
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS; ++iteration) {
         /* Generate random garbage data (no production magic start byte) */
         size_t garbage_len = 10 + (gen.random_uint32() % 100);
         std::vector<uint8_t> garbage = gen.random_bytes(garbage_len);
-        
+
         /* Ensure no magic start byte in garbage */
         for (size_t i = 0; i < garbage.size(); ++i) {
             if (garbage[i] == XGL_WIRE_MAGIC_0) {
                 garbage[i] ^= 0x01;  /* Change it to something else */
             }
         }
-        
+
         /* Initialize parser */
         xgl_parser_t parser;
         std::vector<uint8_t> cache(1024);
         xgl_error_t err = xgl_parser_init(&parser, cache.data(), cache.size());
         ASSERT_EQ(err, XGL_OK);
-        
+
         /* Feed garbage bytes */
         for (size_t i = 0; i < garbage.size(); ++i) {
             xgl_parse_result_t result = xgl_parser_feed_byte(&parser, garbage[i], static_cast<uint32_t>(i));
-            
+
             /* Should always be incomplete (searching for production magic) */
             EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE)
                 << "Parser accepted garbage at iteration " << iteration
                 << " byte " << i;
         }
-        
+
         /* Parser should still be in magic-search state */
         EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_MAGIC)
             << "Parser left magic-search state after garbage at iteration " << iteration;

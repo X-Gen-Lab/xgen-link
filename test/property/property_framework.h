@@ -1,7 +1,7 @@
 /**
  * \file            property_framework.h
  * \brief           Property-based testing framework utilities
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef PROPERTY_FRAMEWORK_H
@@ -25,42 +25,42 @@
 class PropertyTestGenerator {
 public:
     PropertyTestGenerator() : rng_(std::random_device{}()) {}
-    
+
     /**
      * \brief           Generate random uint8_t
      */
     uint8_t random_uint8() {
         return static_cast<uint8_t>(rng_() % 256);
     }
-    
+
     /**
      * \brief           Generate random uint8_t in range
      */
     uint8_t random_uint8(uint8_t min, uint8_t max) {
         return min + (rng_() % (max - min + 1));
     }
-    
+
     /**
      * \brief           Generate random uint16_t
      */
     uint16_t random_uint16() {
         return static_cast<uint16_t>(rng_() % 65536);
     }
-    
+
     /**
      * \brief           Generate random uint16_t in range
      */
     uint16_t random_uint16(uint16_t min, uint16_t max) {
         return min + (rng_() % (max - min + 1));
     }
-    
+
     /**
      * \brief           Generate random uint32_t
      */
     uint32_t random_uint32() {
         return rng_();
     }
-    
+
     /**
      * \brief           Generate random uint32_t in range
      */
@@ -68,7 +68,7 @@ public:
         if (max <= min) return min;
         return min + (rng_() % (max - min + 1));
     }
-    
+
     /**
      * \brief           Generate random byte array
      */
@@ -79,50 +79,50 @@ public:
         }
         return data;
     }
-    
+
     /**
      * \brief           Generate random byte array with length in range
      */
     std::vector<uint8_t> random_bytes(size_t min_len, size_t max_len) {
         size_t len = static_cast<size_t>(random_uint32(
-            static_cast<uint32_t>(min_len), 
+            static_cast<uint32_t>(min_len),
             static_cast<uint32_t>(max_len)
         ));
         return random_bytes(len);
     }
-    
+
     /**
      * \brief           Generate random boolean
      */
     bool random_bool() {
         return (rng_() % 2) == 0;
     }
-    
+
     /**
      * \brief           Generate random data type (0-15)
      */
     uint8_t random_data_type() {
         return random_uint8(0, 15);
     }
-    
+
     /**
      * \brief           Generate random priority (0-7)
      */
     uint8_t random_priority() {
         return random_uint8(0, 7);
     }
-    
+
     /**
      * \brief           Generate random node ID (1-254, avoiding 0 and 255)
      */
     uint8_t random_node_id() {
         return random_uint8(1, 254);
     }
-    
+
     uint32_t random_packet_number() {
         return random_uint32();
     }
-    
+
     /**
      * \brief           Corrupt random byte in data
      */
@@ -131,7 +131,7 @@ public:
         size_t index = rng_() % data.size();
         data[index] ^= 0xFF;  /* Flip all bits */
     }
-    
+
     /**
      * \brief           Corrupt random bit in data
      */
@@ -141,7 +141,7 @@ public:
         uint8_t bit_index = rng_() % 8;
         data[byte_index] ^= (1 << bit_index);
     }
-    
+
     /**
      * \brief           Generate random frame header
      */
@@ -156,7 +156,7 @@ public:
         uint8_t traffic_class;
         uint16_t data_len;
     };
-    
+
     RandomFrameHeader random_frame_header() {
         RandomFrameHeader header;
         header.version = XGL_WIRE_VERSION;
@@ -170,7 +170,7 @@ public:
         header.data_len = random_uint16(0, 1024);
         return header;
     }
-    
+
     /**
      * \brief           Generate random packet data
      */
@@ -178,7 +178,7 @@ public:
         size_t len = static_cast<size_t>(random_uint32(1, static_cast<uint32_t>(max_size)));
         return random_bytes(len);
     }
-    
+
     /**
      * \brief           Shuffle vector elements
      */
@@ -186,7 +186,7 @@ public:
     void shuffle(std::vector<T>& vec) {
         std::shuffle(vec.begin(), vec.end(), rng_);
     }
-    
+
 private:
     std::mt19937 rng_;
 };

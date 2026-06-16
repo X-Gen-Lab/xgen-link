@@ -1,7 +1,7 @@
 /**
  * \file            xgl_crc.h
  * \brief           CRC calculation functions
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_CRC_H

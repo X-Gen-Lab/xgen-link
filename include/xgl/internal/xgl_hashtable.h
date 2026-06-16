@@ -1,7 +1,7 @@
 /**
  * \file            xgl_hashtable.h
  * \brief           Hash table for O(1) route lookup
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_HASHTABLE_H

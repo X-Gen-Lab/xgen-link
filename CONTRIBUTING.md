@@ -93,11 +93,11 @@ Use **backslash style** for all Doxygen comments:
 /**
  * \file            xgl_transport.h
  * \brief           Transport layer interface
- * \author          Nexus Team
+ * \author          X-Gen Lab
  * \version         2.0.0
  * \date            2026-01-XX
  *
- * \copyright       Copyright (c) 2026 Nexus Team
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 /**
@@ -232,13 +232,13 @@ protected:
         handle = xgl_create(&config);
         ASSERT_NE(nullptr, handle);
     }
-    
+
     void TearDown() override {
         if (handle != nullptr) {
             xgl_destroy(handle);
         }
     }
-    
+
     xgl_config_t config;
     xgl_handle_t handle = nullptr;
 };

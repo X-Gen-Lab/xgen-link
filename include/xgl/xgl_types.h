@@ -1,7 +1,7 @@
 /**
  * \file            xgl_types.h
  * \brief           xgen-link Protocol Core Data Types and Structures
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_TYPES_H
@@ -239,7 +239,7 @@ typedef struct {
     /*-----------------------------------------------------------------------*/
     const char* name;               /**< Instance name (for debugging) */
     uint16_t source_id;             /**< Local node ID */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Grouped Configuration                                                 */
     /*-----------------------------------------------------------------------*/
@@ -253,20 +253,20 @@ typedef struct {
     bool auth_required;             /**< Require authentication for packets */
     uint32_t auth_key_id;           /**< Active authentication key id */
     xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Routing Configuration                                                 */
     /*-----------------------------------------------------------------------*/
     xgl_route_item_t* route_table;  /**< Route table array */
     size_t route_table_len;         /**< Number of routes in table */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Callbacks                                                             */
     /*-----------------------------------------------------------------------*/
     xgl_rx_callback_t rx_callback;  /**< Receive callback */
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;       /**< User data for callbacks */
-    
+
 } xgl_config_t;
 
 /*---------------------------------------------------------------------------*/
@@ -285,7 +285,7 @@ typedef struct {
     uint64_t tx_packets;            /**< Total transmitted packets */
     uint64_t tx_bytes;              /**< Total transmitted bytes */
     uint64_t tx_errors;             /**< Transmission errors */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Reception Statistics                                                  */
     /*-----------------------------------------------------------------------*/
@@ -307,27 +307,27 @@ typedef struct {
     xgl_layer_stats_t datalink;     /**< Data link layer statistics */
     xgl_layer_stats_t network;      /**< Network layer statistics */
     xgl_layer_stats_t transport;    /**< Transport layer statistics */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Protocol-Specific Counters                                            */
     /*-----------------------------------------------------------------------*/
     uint64_t tx_retries;            /**< Retransmission count (transport) */
     uint64_t rx_header_crc_errors;  /**< Header CRC errors (datalink) */
     uint64_t rx_crc16_errors;       /**< Frame CRC16 errors (datalink) */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Performance Metrics                                                   */
     /*-----------------------------------------------------------------------*/
     uint32_t avg_rtt_ms;            /**< Average RTT in milliseconds */
     uint32_t max_rtt_ms;            /**< Maximum RTT in milliseconds */
     uint32_t min_rtt_ms;            /**< Minimum RTT in milliseconds */
-    
+
     /*-----------------------------------------------------------------------*/
     /* Memory Usage                                                          */
     /*-----------------------------------------------------------------------*/
     size_t memory_used;             /**< Current memory usage in bytes */
     size_t memory_peak;             /**< Peak memory usage in bytes */
-    
+
 } xgl_statistics_t;
 
 /*---------------------------------------------------------------------------*/
@@ -357,7 +357,7 @@ typedef struct {
     size_t buffer_size;             /**< Total buffer size */
     size_t data_offset;             /**< Data start offset; add XGL_DATA_TYPE_EXT_SIZE when data_type is non-zero */
     size_t data_len;                /**< Actual data length */
-    
+
     /* Transmission parameters */
     uint16_t target_id;             /**< Target node ID */
     uint8_t data_type;              /**< Application payload class encoded as DATA_TYPE_EXT when non-zero */

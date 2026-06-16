@@ -1,7 +1,7 @@
 /**
  * \file            test_transport.cpp
  * \brief           Transport layer unit tests
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #include <gtest/gtest.h>

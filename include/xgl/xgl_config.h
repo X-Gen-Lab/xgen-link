@@ -1,7 +1,7 @@
 /**
  * \file            xgl_config.h
  * \brief           Configuration constants and tunable parameters
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_CONFIG_H

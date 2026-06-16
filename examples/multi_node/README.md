@@ -29,7 +29,7 @@ This example demonstrates a three-node network with routing and packet forwardin
 
 1. **Node 1 → Node 3**: Node 1 sends messages to Node 3
    - Packet travels: Node 1 → Node 2 → Node 3
-   
+
 2. **Node 3 → Node 1**: Node 3 sends replies back to Node 1
    - Packet travels: Node 3 → Node 2 → Node 1
 
@@ -421,22 +421,22 @@ int main(void)
     /* Initialize hardware */
     UART_Init(...);
     Radio_Init(...);
-    
+
     /* Create and initialize protocol instances */
     xgl_handle_t node = xgl_create(&config);
     xgl_init(node);
-    
+
     /* Main loop */
     while (1) {
         /* Process protocol at 100 Hz */
         xgl_run(node, 100);
-        
+
         /* Delay 10ms */
         delay_ms(10);
-        
+
         /* Optional: Handle user input, update display, etc. */
     }
-    
+
     return 0;
 }
 ```
@@ -577,4 +577,4 @@ After understanding this example, explore:
 
 ## License
 
-Copyright (c) 2026 Nexus Team
+Copyright (c) 2026 X-Gen Lab

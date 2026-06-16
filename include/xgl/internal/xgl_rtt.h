@@ -1,7 +1,7 @@
 /**
  * \file            xgl_rtt.h
  * \brief           RTT estimator interface
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_RTT_H

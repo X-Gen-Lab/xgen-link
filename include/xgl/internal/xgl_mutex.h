@@ -1,7 +1,7 @@
 /**
  * \file            xgl_mutex.h
  * \brief           Thread safety abstraction layer
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_MUTEX_H

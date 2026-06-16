@@ -1,7 +1,7 @@
 /**
  * \file            xgl_time.c
  * \brief           Time abstraction implementation
- * \author          Nexus Team
+ * \author          X-Gen Lab
  */
 
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
@@ -43,7 +43,7 @@ uint32_t xgl_time_ms(void) {
     if (custom_time_source != NULL) {
         return custom_time_source();
     }
-    
+
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
@@ -110,12 +110,12 @@ uint32_t xgl_time_ms(void) {
     if (custom_time_source != NULL) {
         return custom_time_source();
     }
-    
+
     xgl_time_init_windows();
-    
+
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);
-    
+
     /* Calculate elapsed time in milliseconds */
     uint64_t elapsed = (uint64_t)(current_time.QuadPart - start_time.QuadPart);
     return (uint32_t)((elapsed * 1000U) / (uint64_t)frequency.QuadPart);
@@ -126,10 +126,10 @@ uint32_t xgl_time_ms(void) {
  */
 uint32_t xgl_time_us(void) {
     xgl_time_init_windows();
-    
+
     LARGE_INTEGER current_time;
     QueryPerformanceCounter(&current_time);
-    
+
     /* Calculate elapsed time in microseconds */
     uint64_t elapsed = (uint64_t)(current_time.QuadPart - start_time.QuadPart);
     return (uint32_t)((elapsed * 1000000U) / (uint64_t)frequency.QuadPart);
@@ -170,7 +170,7 @@ uint32_t xgl_time_ms(void) {
     if (custom_time_source != NULL) {
         return custom_time_source();
     }
-    
+
     /* Convert ticks to milliseconds */
     return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
 }
@@ -216,7 +216,7 @@ __attribute__((weak)) uint32_t xgl_time_ms(void) {
     if (custom_time_source != NULL) {
         return custom_time_source();
     }
-    
+
     /* Default: return 0 (user must provide implementation) */
     return 0;
 }
@@ -277,20 +277,20 @@ xgl_timer_handle_t xgl_timer_create(const xgl_timer_config_t* config) {
     if (config == NULL || config->callback == NULL) {
         return NULL;
     }
-    
+
     /* Allocate timer structure */
     xgl_timer_freertos_t* timer = (xgl_timer_freertos_t*)pvPortMalloc(sizeof(xgl_timer_freertos_t));
     if (timer == NULL) {
         return NULL;
     }
-    
+
     timer->callback = config->callback;
     timer->user_data = config->user_data;
-    
+
     /* Create FreeRTOS timer */
     TickType_t period = pdMS_TO_TICKS(config->period_ms);
     UBaseType_t auto_reload = config->auto_reload ? pdTRUE : pdFALSE;
-    
+
     timer->handle = xTimerCreateStatic(
         "xgl_timer",
         period,
@@ -299,12 +299,12 @@ xgl_timer_handle_t xgl_timer_create(const xgl_timer_config_t* config) {
         xgl_timer_freertos_callback,
         &timer->buffer
     );
-    
+
     if (timer->handle == NULL) {
         vPortFree(timer);
         return NULL;
     }
-    
+
     return (xgl_timer_handle_t)timer;
 }
 
@@ -315,10 +315,10 @@ xgl_error_t xgl_timer_start(const xgl_timer_handle_t handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     xgl_timer_freertos_t* timer = (xgl_timer_freertos_t*)handle;
     BaseType_t result = xTimerStart(timer->handle, 0);
-    
+
     return (result == pdPASS) ? XGL_OK : XGL_ERR_BUSY;
 }
 
@@ -329,10 +329,10 @@ xgl_error_t xgl_timer_stop(const xgl_timer_handle_t handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    
+
     xgl_timer_freertos_t* timer = (xgl_timer_freertos_t*)handle;
     BaseType_t result = xTimerStop(timer->handle, 0);
-    
+
     return (result == pdPASS) ? XGL_OK : XGL_ERR_BUSY;
 }
 
@@ -343,15 +343,15 @@ void xgl_timer_destroy(xgl_timer_handle_t handle) {
     if (handle == NULL) {
         return;
     }
-    
+
     xgl_timer_freertos_t* timer = (xgl_timer_freertos_t*)handle;
-    
+
     /* Stop timer if running */
     xTimerStop(timer->handle, 0);
-    
+
     /* Delete timer */
     xTimerDelete(timer->handle, 0);
-    
+
     /* Free memory */
     vPortFree(timer);
 }
