@@ -7,7 +7,7 @@
 | 协议层 | 源码目录 | 公共/高级头 | 主要实现 | 关键不变量 |
 | --- | --- | --- | --- | --- |
 | API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_runtime.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | 用户只通过 handle、config、send、run、stats 进入协议栈 |
-| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | wire 编解码按 offset 手写，不依赖 packed struct |
+| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_frame_zerocopy.c`, `xgl_parser.c`, `xgl_crc.c` | wire 编解码按 offset 手写，不依赖 packed struct |
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | replay window 按 source、connection、session、packet 隔离 |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | 未通过 CRC/auth/replay 的 frame 不进入 network |
 | Network | `src/network` | `xgl/internal/xgl_network.h`, `xgl/internal/xgl_route.h` | `xgl_network.c`, `xgl_network_send.c`, `xgl_network_receive.c`, `xgl_network_metadata.c`, `xgl_route.c` | route、TTL、MTU 和 forwarding 在 network 层闭环 |
@@ -24,7 +24,7 @@
 | 分片 | `src/transport/xgl_fragment.c` | 为超 MTU payload 生成 `FRAGMENT_EXT` 元数据 | message 过大、预算不足 |
 | reliable queue | `src/transport/xgl_reliable.c` | 保存待 ACK 包，支持 ACK range/SACK 查找和重传 | reliable 队列满、内存不足 |
 | route lookup | `src/network/xgl_network_send.c`, `src/network/xgl_route.c` | 查找目标 route，检查 route MTU | 无路由、MTU 不足、TTL 无效 |
-| frame build | `src/wire/xgl_frame.c` | 构造 v2 header、TLV、payload、CRC/auth trailer | header/ext 长度越界、auth provider 缺失 |
+| frame build | `src/wire/xgl_frame.c`, `src/wire/xgl_frame_zerocopy.c` | 构造 v2 header、TLV、payload、CRC/auth trailer | header/ext 长度越界、auth provider 缺失 |
 | PHY send | `src/datalink/xgl_datalink_send.c` | 发送 serialized frame | PHY 返回错误 |
 
 ## RX 主路径

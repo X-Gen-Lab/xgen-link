@@ -7,7 +7,7 @@ This page maps protocol design to source directories, public headers, key functi
 | Layer | Source directory | Public/advanced headers | Main implementation | Invariant |
 | --- | --- | --- | --- | --- |
 | API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_runtime.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | Users enter through handle, config, send, run, and stats APIs |
-| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | Wire encoding is offset-based, not packed-struct based |
+| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_frame_zerocopy.c`, `xgl_parser.c`, `xgl_crc.c` | Wire encoding is offset-based, not packed-struct based |
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | Replay windows are scoped by source, connection, session, and packet |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | Frames that fail CRC/auth/replay do not enter network |
 | Network | `src/network` | `xgl/internal/xgl_network.h`, `xgl/internal/xgl_route.h` | `xgl_network.c`, `xgl_network_send.c`, `xgl_network_receive.c`, `xgl_network_metadata.c`, `xgl_route.c` | Routing, TTL, MTU, and forwarding are resolved here |
@@ -24,7 +24,7 @@ This page maps protocol design to source directories, public headers, key functi
 | Fragmentation | `src/transport/xgl_fragment.c` | Create `FRAGMENT_EXT` metadata for oversized payloads | message too large, budget exceeded |
 | Reliable queue | `src/transport/xgl_reliable.c` | Retain packets until ACKed and support ACK/SACK lookup | queue full, allocation failure |
 | Route lookup | `src/network/xgl_network_send.c`, `src/network/xgl_route.c` | Find egress route and enforce route MTU | no route, MTU exceeded, invalid TTL |
-| Frame build | `src/wire/xgl_frame.c` | Build v2 header, TLVs, payload, CRC/auth trailer | header/ext overflow, missing auth provider |
+| Frame build | `src/wire/xgl_frame.c`, `src/wire/xgl_frame_zerocopy.c` | Build v2 header, TLVs, payload, CRC/auth trailer | header/ext overflow, missing auth provider |
 | PHY send | `src/datalink/xgl_datalink_send.c` | Send serialized frame | PHY error |
 
 ## RX Path
