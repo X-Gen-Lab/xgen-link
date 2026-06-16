@@ -749,6 +749,132 @@ TEST_F(XglNetworkTest, ReceiveRejectsDuplicateDataTypeExtension) {
     EXPECT_EQ(stats.rx_errors, 1);
 }
 
+TEST_F(XglNetworkTest, ReceiveLocalPacketPropagatesSessionExtensionEpoch) {
+    uint8_t session_value[12] = {};
+    size_t session_value_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_session_ext_value(session_value,
+                                                sizeof(session_value),
+                                                0x01020304U,
+                                                0xAABBCCDDEEFF0011ULL,
+                                                &session_value_len),
+              XGL_OK);
+
+    uint8_t session_ext[16] = {};
+    size_t session_ext_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(session_ext,
+                                  sizeof(session_ext),
+                                  XGL_WIRE_EXT_SESSION,
+                                  session_value,
+                                  session_value_len,
+                                  &session_ext_len),
+              XGL_OK);
+
+    const uint8_t payload[] = {'s'};
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = REMOTE_ID,
+        .target_id = LOCAL_ID,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .connection_id = 0x11223344U,
+        .packet_number = 9U,
+        .extensions = session_ext,
+        .extensions_len = session_ext_len,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .ttl = XGL_DEFAULT_TTL
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> frame_buf(
+        xgl_frame_serialized_size(sizeof(payload), session_ext_len, 0U));
+    size_t frame_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(),
+                                  frame_buf.size(),
+                                  &frame,
+                                  &frame_len),
+              XGL_OK);
+
+    struct CapturedPacket {
+        bool called = false;
+        xgl_packet_t packet = {};
+    } capture;
+    xgl_layer_interface_t upper_layer = {};
+    upper_layer.ctx = &capture;
+    upper_layer.receive = [](void* ctx, xgl_handle_t handle, void* data) -> xgl_error_t {
+        (void)handle;
+        auto* capture = static_cast<CapturedPacket*>(ctx);
+        auto* packet = static_cast<xgl_packet_t*>(data);
+        if (capture == nullptr || packet == nullptr) {
+            return XGL_ERR_NULL_POINTER;
+        }
+        capture->called = true;
+        capture->packet = *packet;
+        return XGL_OK;
+    };
+    network_ctx.upper_layer = &upper_layer;
+
+    ASSERT_EQ(xgl_network_receive(&network_ctx,
+                                  nullptr,
+                                  frame_buf.data(),
+                                  frame_len),
+              XGL_OK);
+    ASSERT_TRUE(capture.called);
+    EXPECT_EQ(capture.packet.connection_id, 0x11223344U);
+    EXPECT_EQ(capture.packet.session_epoch, 0x01020304U);
+}
+
+TEST_F(XglNetworkTest, ReceiveLocalDataPacketDoesNotTreatControlFlagAsAckOnly) {
+    const uint8_t payload[] = {'f'};
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = REMOTE_ID,
+        .target_id = LOCAL_ID,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .flags = XGL_WIRE_FLAG_CONTROL,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .ttl = XGL_DEFAULT_TTL
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> frame_buf(xgl_frame_serialized_size(sizeof(payload), 0U, 0U));
+    size_t frame_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(),
+                                  frame_buf.size(),
+                                  &frame,
+                                  &frame_len),
+              XGL_OK);
+
+    struct CapturedPacket {
+        bool called = false;
+        xgl_packet_t packet = {};
+    } capture;
+    xgl_layer_interface_t upper_layer = {};
+    upper_layer.ctx = &capture;
+    upper_layer.receive = [](void* ctx, xgl_handle_t handle, void* data) -> xgl_error_t {
+        (void)handle;
+        auto* capture = static_cast<CapturedPacket*>(ctx);
+        auto* packet = static_cast<xgl_packet_t*>(data);
+        if (capture == nullptr || packet == nullptr) {
+            return XGL_ERR_NULL_POINTER;
+        }
+        capture->called = true;
+        capture->packet = *packet;
+        return XGL_OK;
+    };
+    network_ctx.upper_layer = &upper_layer;
+
+    ASSERT_EQ(xgl_network_receive(&network_ctx,
+                                  nullptr,
+                                  frame_buf.data(),
+                                  frame_len),
+              XGL_OK);
+    ASSERT_TRUE(capture.called);
+    EXPECT_EQ(capture.packet.packet_type, XGL_PACKET_TYPE_DATA);
+    EXPECT_EQ(capture.packet.reliable, XGL_RELIABILITY_NONE);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Error Callback Tests                                                      */
 /*---------------------------------------------------------------------------*/

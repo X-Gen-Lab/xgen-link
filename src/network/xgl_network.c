@@ -19,10 +19,60 @@
 /* Private Helper Functions                                                  */
 /*---------------------------------------------------------------------------*/
 
-static xgl_error_t network_decode_data_type_ext(const uint8_t* extensions,
-                                                size_t extensions_len,
-                                                uint8_t* data_type,
-                                                bool* found);
+typedef struct {
+    uint8_t data_type;
+    bool data_type_found;
+    uint32_t session_epoch;
+    bool session_epoch_found;
+} network_ext_metadata_t;
+
+static xgl_error_t network_decode_ext_metadata(const uint8_t* extensions,
+                                               size_t extensions_len,
+                                               network_ext_metadata_t* metadata) {
+    if (metadata == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    memset(metadata, 0, sizeof(*metadata));
+    if (extensions == NULL || extensions_len == 0U) {
+        return XGL_OK;
+    }
+
+    xgl_wire_ext_cursor_t cursor;
+    xgl_error_t err = xgl_wire_ext_cursor_init(&cursor, extensions, extensions_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    xgl_wire_ext_t ext;
+    while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
+        if (ext.type == XGL_WIRE_EXT_DATA_TYPE) {
+            if (metadata->data_type_found || ext.len != 1U || ext.value == NULL) {
+                return XGL_ERR_INVALID_FRAME;
+            }
+            metadata->data_type = ext.value[0];
+            metadata->data_type_found = true;
+            continue;
+        }
+        if (ext.type == XGL_WIRE_EXT_SESSION) {
+            if (metadata->session_epoch_found) {
+                return XGL_ERR_INVALID_FRAME;
+            }
+            uint64_t incarnation_id = 0U;
+            err = xgl_wire_decode_session_ext_value(ext.value,
+                                                    ext.len,
+                                                    &metadata->session_epoch,
+                                                    &incarnation_id);
+            if (err != XGL_OK) {
+                return err;
+            }
+            (void)incarnation_id;
+            metadata->session_epoch_found = true;
+        }
+    }
+
+    return (err == XGL_ERR_NOT_FOUND) ? XGL_OK : err;
+}
 
 static xgl_error_t network_append_data_type_ext(uint8_t* extensions,
                                                 size_t extensions_capacity,
@@ -69,17 +119,15 @@ static xgl_error_t network_copy_packet_extensions(uint8_t* extensions,
         *extensions_len = packet->extensions_len;
     }
 
-    uint8_t existing_data_type = 0U;
-    bool data_type_found = false;
-    xgl_error_t err = network_decode_data_type_ext(extensions,
-                                                   *extensions_len,
-                                                   &existing_data_type,
-                                                   &data_type_found);
+    network_ext_metadata_t metadata;
+    xgl_error_t err = network_decode_ext_metadata(extensions,
+                                                  *extensions_len,
+                                                  &metadata);
     if (err != XGL_OK) {
         return err;
     }
-    if (data_type_found) {
-        if (packet->data_type != 0U && packet->data_type != existing_data_type) {
+    if (metadata.data_type_found) {
+        if (packet->data_type != 0U && packet->data_type != metadata.data_type) {
             return XGL_ERR_INVALID_PARAM;
         }
         return XGL_OK;
@@ -91,50 +139,6 @@ static xgl_error_t network_copy_packet_extensions(uint8_t* extensions,
                                         packet->data_type);
 }
 
-static xgl_error_t network_decode_data_type_ext(const uint8_t* extensions,
-                                                size_t extensions_len,
-                                                uint8_t* data_type,
-                                                bool* found) {
-    if (data_type == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    *data_type = 0U;
-    if (found != NULL) {
-        *found = false;
-    }
-    if (extensions == NULL || extensions_len == 0U) {
-        return XGL_OK;
-    }
-
-    xgl_wire_ext_cursor_t cursor;
-    xgl_error_t err = xgl_wire_ext_cursor_init(&cursor, extensions, extensions_len);
-    if (err != XGL_OK) {
-        return err;
-    }
-
-    bool seen = false;
-    xgl_wire_ext_t ext;
-    while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
-        if (ext.type != XGL_WIRE_EXT_DATA_TYPE) {
-            continue;
-        }
-        if (ext.len != 1U || ext.value == NULL) {
-            return XGL_ERR_INVALID_FRAME;
-        }
-        if (seen) {
-            return XGL_ERR_INVALID_FRAME;
-        }
-        *data_type = ext.value[0];
-        seen = true;
-        if (found != NULL) {
-            *found = true;
-        }
-    }
-
-    return (err == XGL_ERR_NOT_FOUND) ? XGL_OK : err;
-}
-
 /**
  * \brief           Extract packet information from frame buffer
  * \details         Parses frame header and extracts packet metadata
@@ -144,6 +148,7 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
                                                    uint16_t* source_id,
                                                    uint16_t* target_id,
                                                    uint8_t* data_type,
+                                                   uint32_t* session_epoch,
                                                    const uint8_t** payload,
                                                    size_t* payload_len) {
     /* Validate minimum frame size */
@@ -165,13 +170,15 @@ static xgl_error_t xgl_network_extract_packet_info(const uint8_t* frame_buf,
         extensions = frame_buf + XGL_WIRE_BASE_HEADER_SIZE;
         extensions_len = wire_header.header_len - XGL_WIRE_BASE_HEADER_SIZE;
     }
-    xgl_error_t err = network_decode_data_type_ext(extensions,
-                                                   extensions_len,
-                                                   data_type,
-                                                   NULL);
+    network_ext_metadata_t metadata;
+    xgl_error_t err = network_decode_ext_metadata(extensions,
+                                                  extensions_len,
+                                                  &metadata);
     if (err != XGL_OK) {
         return err;
     }
+    *data_type = metadata.data_type;
+    *session_epoch = metadata.session_epoch;
 
     /* Extract payload */
     *payload = frame_buf + wire_header.header_len;
@@ -501,12 +508,14 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
     /* Extract packet information from frame */
     uint16_t source_id, target_id;
     uint8_t data_type;
+    uint32_t session_epoch;
     const uint8_t* payload;
     size_t payload_len;
 
     xgl_error_t err = xgl_network_extract_packet_info(frame_buf, frame_len,
                                                       &source_id, &target_id,
                                                       &data_type,
+                                                      &session_epoch,
                                                       &payload, &payload_len);
     if (err != XGL_OK) {
         /* Invalid frame - update statistics and return error */
@@ -548,8 +557,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 (wire_header.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
                 reliable = XGL_RELIABILITY_ACK_ELICITING;
             } else if (traffic_reliability == XGL_RELIABILITY_ACK_ONLY ||
-                       wire_header.packet_type == XGL_PACKET_TYPE_ACK ||
-                       (wire_header.flags & XGL_WIRE_FLAG_CONTROL) != 0U) {
+                       wire_header.packet_type == XGL_PACKET_TYPE_ACK) {
                 reliable = XGL_RELIABILITY_ACK_ONLY;
             }
 
@@ -567,7 +575,6 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 extensions = frame_buf + XGL_WIRE_BASE_HEADER_SIZE;
                 extensions_len = wire_header.header_len - XGL_WIRE_BASE_HEADER_SIZE;
             }
-
             /* Build complete packet structure for transport layer */
             xgl_packet_t packet = {
                 .source_id = source_id,
@@ -575,7 +582,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
                 .session_id = (uint16_t)(wire_header.connection_id & UINT16_MAX),
                 .connection_id = wire_header.connection_id,
                 .packet_number = wire_header.packet_number,
-                .session_epoch = 0,
+                .session_epoch = session_epoch,
                 .packet_type = wire_header.packet_type,
                 .flags = wire_header.flags,
                 .data_type = data_type,

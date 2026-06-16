@@ -109,6 +109,30 @@ TEST(XglFrameTest, BuildBasicFrame) {
     EXPECT_EQ(frame.header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK, 3);
 }
 
+TEST(XglFrameTest, AckOnlyFrameDoesNotSetControlFlag) {
+    xgl_frame_t frame;
+
+    xgl_frame_params_t params = {
+        .source_id = 0x10,
+        .target_id = 0x20,
+        .packet_type = XGL_PACKET_TYPE_ACK,
+        .connection_id = 0x01020304,
+        .packet_number = 0x11223344,
+        .payload = nullptr,
+        .payload_len = 0,
+        .reliable = false,
+        .reliability_class = XGL_RELIABILITY_ACK_ONLY,
+        .priority = 7
+    };
+
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    EXPECT_EQ(frame.header.packet_type, XGL_PACKET_TYPE_ACK);
+    EXPECT_EQ(frame.header.traffic_class & XGL_RELIABILITY_CLASS_MASK,
+              XGL_RELIABILITY_ACK_ONLY);
+    EXPECT_EQ(frame.header.flags & XGL_WIRE_FLAG_CONTROL, 0U);
+}
+
 TEST(XglFrameTest, BuildFrameNullPointer) {
     const uint8_t payload[] = {0x01, 0x02};
 

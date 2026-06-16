@@ -81,8 +81,6 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     uint8_t reliable = (uint8_t)(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK);
     if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
         flags |= XGL_WIRE_FLAG_ACK_ELICITING;
-    } else if (reliable == XGL_RELIABILITY_ACK_ONLY) {
-        flags |= XGL_WIRE_FLAG_CONTROL;
     }
     if ((traffic_class_bits & XGL_TRAFFIC_FRAGMENTED_MASK) != 0U) {
         flags |= XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
