@@ -120,6 +120,7 @@ set(XGL_SOURCES
 
     # Network Layer
     src/network/xgl_route.c
+    src/network/xgl_network_metadata.c
     src/network/xgl_network.c
 
     # Transport Layer

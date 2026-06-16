@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <xgl/internal/xgl_frame.h>
 #include <xgl/internal/xgl_network.h>
+#include <xgl/internal/xgl_network_metadata.h>
 #include <xgl/internal/xgl_route.h>
 #include <xgl/internal/xgl_wire.h>
 #include <cstring>
@@ -873,6 +874,144 @@ TEST_F(XglNetworkTest, ReceiveLocalDataPacketDoesNotTreatControlFlagAsAckOnly) {
     ASSERT_TRUE(capture.called);
     EXPECT_EQ(capture.packet.packet_type, XGL_PACKET_TYPE_DATA);
     EXPECT_EQ(capture.packet.reliable, XGL_RELIABILITY_NONE);
+}
+
+TEST_F(XglNetworkTest, FrameMetadataDecodesTransportPacketSemantics) {
+    uint8_t data_type = 0x7AU;
+    uint8_t data_type_ext[XGL_DATA_TYPE_EXT_SIZE] = {};
+    size_t data_type_ext_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(data_type_ext,
+                                  sizeof(data_type_ext),
+                                  XGL_WIRE_EXT_DATA_TYPE,
+                                  &data_type,
+                                  1U,
+                                  &data_type_ext_len),
+              XGL_OK);
+
+    uint8_t session_value[XGL_SESSION_EXT_VALUE_SIZE] = {};
+    size_t session_value_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_session_ext_value(session_value,
+                                                sizeof(session_value),
+                                                0x01020304U,
+                                                0x1122334455667788ULL,
+                                                &session_value_len),
+              XGL_OK);
+    uint8_t session_ext[XGL_SESSION_EXT_SIZE] = {};
+    size_t session_ext_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(session_ext,
+                                  sizeof(session_ext),
+                                  XGL_WIRE_EXT_SESSION,
+                                  session_value,
+                                  session_value_len,
+                                  &session_ext_len),
+              XGL_OK);
+
+    uint8_t extensions[XGL_DATA_TYPE_EXT_SIZE + XGL_SESSION_EXT_SIZE] = {};
+    memcpy(extensions, data_type_ext, data_type_ext_len);
+    memcpy(&extensions[data_type_ext_len], session_ext, session_ext_len);
+    size_t extensions_len = data_type_ext_len + session_ext_len;
+
+    const uint8_t payload[] = {'m', 'e', 't', 'a'};
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = REMOTE_ID,
+        .target_id = LOCAL_ID,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .connection_id = 0x10203040U,
+        .packet_number = 99U,
+        .session_epoch = 0x01020304U,
+        .extensions = extensions,
+        .extensions_len = extensions_len,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .fragment = true,
+        .priority = 5,
+        .ttl = 3
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> frame_buf(
+        xgl_frame_serialized_size(sizeof(payload), extensions_len, 0U));
+    size_t frame_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(),
+                                  frame_buf.size(),
+                                  &frame,
+                                  &frame_len),
+              XGL_OK);
+
+    xgl_network_frame_metadata_t metadata = {};
+    ASSERT_EQ(xgl_network_decode_frame_metadata(frame_buf.data(),
+                                                frame_len,
+                                                &metadata),
+              XGL_OK);
+
+    EXPECT_EQ(metadata.header.source_id, REMOTE_ID);
+    EXPECT_EQ(metadata.header.target_id, LOCAL_ID);
+    EXPECT_EQ(metadata.header.packet_type, XGL_PACKET_TYPE_DATA);
+    EXPECT_EQ(metadata.header.connection_id, 0x10203040U);
+    EXPECT_EQ(metadata.header.packet_number, 99U);
+    EXPECT_EQ(metadata.data_type, data_type);
+    EXPECT_EQ(metadata.session_epoch, 0x01020304U);
+    EXPECT_EQ(metadata.reliable, XGL_RELIABILITY_ACK_ELICITING);
+    EXPECT_EQ(metadata.fragment, 1U);
+    EXPECT_EQ(metadata.priority, 5U);
+    ASSERT_EQ(metadata.payload_len, sizeof(payload));
+    EXPECT_EQ(std::vector<uint8_t>(metadata.payload,
+                                   metadata.payload + metadata.payload_len),
+              std::vector<uint8_t>(payload, payload + sizeof(payload)));
+    EXPECT_EQ(metadata.extensions_len, extensions_len);
+}
+
+TEST_F(XglNetworkTest, FrameMetadataRejectsDuplicateDataTypeExtensions) {
+    uint8_t ext_buf[XGL_DATA_TYPE_EXT_SIZE * 2U] = {};
+    uint8_t first_type = 1U;
+    uint8_t second_type = 2U;
+    size_t first_len = 0U;
+    size_t second_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(ext_buf,
+                                  sizeof(ext_buf),
+                                  XGL_WIRE_EXT_DATA_TYPE,
+                                  &first_type,
+                                  1U,
+                                  &first_len),
+              XGL_OK);
+    ASSERT_EQ(xgl_wire_encode_ext(&ext_buf[first_len],
+                                  sizeof(ext_buf) - first_len,
+                                  XGL_WIRE_EXT_DATA_TYPE,
+                                  &second_type,
+                                  1U,
+                                  &second_len),
+              XGL_OK);
+
+    const uint8_t payload[] = {'d'};
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = REMOTE_ID,
+        .target_id = LOCAL_ID,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .extensions = ext_buf,
+        .extensions_len = first_len + second_len,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .ttl = XGL_DEFAULT_TTL
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> frame_buf(
+        xgl_frame_serialized_size(sizeof(payload), params.extensions_len, 0U));
+    size_t frame_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(),
+                                  frame_buf.size(),
+                                  &frame,
+                                  &frame_len),
+              XGL_OK);
+
+    xgl_network_frame_metadata_t metadata = {};
+    EXPECT_EQ(xgl_network_decode_frame_metadata(frame_buf.data(),
+                                                frame_len,
+                                                &metadata),
+              XGL_ERR_INVALID_FRAME);
 }
 
 /*---------------------------------------------------------------------------*/
