@@ -24,7 +24,7 @@ XGL v2 uses a fixed 24-byte base header. The wire path does not depend on packed
 
 ## Traffic Class
 
-The top two `traffic_class` bits carry the reliability class: `NONE(0x00)`, `ACK_ELICITING(0x40)`, and `ACK_ONLY(0x80)`. `0x20` marks fragments, and the low three bits carry priority. ACK/FRAGMENT/CONTROL flags are fast-path markers and redundant validation hints; they do not replace the `traffic_class` category.
+The top two `traffic_class` bits carry the reliability class: `NONE(0x00)`, `ACK_ELICITING(0x40)`, and `ACK_ONLY(0x80)`. `0x20` marks fragments, and the low three bits carry priority. ACK/FRAGMENT/CONTROL flags are fast-path markers and redundant validation hints; they do not replace `packet_type` or the `traffic_class` category. ACK-only packets use `packet_type=ACK` and `traffic_class=ACK_ONLY`; they do not set the CONTROL flag.
 
 ## Packet Type
 
@@ -50,7 +50,7 @@ Packet types outside `1..7` are invalid on the production wire and fail closed d
 | FRAGMENTED | `0x04` | Payload belongs to a fragmented message |
 | ENCRYPTED | `0x08` | Reserved, rejected by the current production path |
 | AUTHENTICATED | `0x10` | Frame carries an authentication trailer |
-| CONTROL | `0x20` | Control semantics |
+| CONTROL | `0x20` | Redundant marker for `packet_type=CONTROL` frames |
 
 ## Full Frame Layout
 
@@ -69,7 +69,8 @@ frame crc16
 - The parser resynchronizes on the two-byte binary magic `A5 5A`.
 - Overlapping magic is supported, such as noise ending in `A5` followed by a valid `A5 5A`.
 - `header_len < 24`, extension overrun, payload limit overflow, and CRC errors are dropped and counted.
-- When authentication is required, unauthenticated or invalid frames are not delivered upward.
+- When authentication is required, unauthenticated frames are not delivered upward.
+- When a frame declares authentication with AUTHENTICATED/SECURITY_EXT, the tag is verified even if authentication is optional for the instance.
 
 ## Design Constraints
 

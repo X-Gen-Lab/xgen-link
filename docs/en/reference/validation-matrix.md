@@ -25,7 +25,7 @@ The validation matrix links protocol capability, risk, and required tests. Befor
 | --- | --- | --- |
 | Parser random bytes | Random byte stream with legal and semi-legal frames inserted | no crash, no overrun, recover to next legal magic |
 | TLV malformed | Random ext_type/ext_len/header_len | invalid TLVs dropped, valid TLVs parsed correctly |
-| Auth tamper | Mutate header, extension, payload, or tag bytes | all rejected when auth_required is enabled |
+| Auth tamper | Mutate header, extension, payload, or tag bytes | rejected whenever a frame declares authentication; unauthenticated frames are rejected when auth_required is enabled |
 | Route storm | route changes, TTL boundary, MTU boundary | no expired TTL forwarding, no over-MTU frame send |
 | Lossy transport | Inject loss, reorder, duplicate, and delay | reliable packets delivered in order or fail by retry limit |
 | Fragment attack | Large message, overlapping ranges, missing fragments, timeout | budgets are not exceeded and timeout releases resources |

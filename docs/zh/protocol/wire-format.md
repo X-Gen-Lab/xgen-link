@@ -24,7 +24,7 @@ XGL v2 的基础头固定 24 bytes。wire path 不依赖 packed struct 或 `memc
 
 ## Traffic Class
 
-`traffic_class` 的高两位表示可靠性类别：`NONE(0x00)`、`ACK_ELICITING(0x40)`、`ACK_ONLY(0x80)`。`0x20` 表示分片，低三位表示优先级。`flags` 中的 ACK/FRAGMENT/CONTROL 位用于快速判断和冗余校验，不能替代 `traffic_class` 的类别语义。
+`traffic_class` 的高两位表示可靠性类别：`NONE(0x00)`、`ACK_ELICITING(0x40)`、`ACK_ONLY(0x80)`。`0x20` 表示分片，低三位表示优先级。`flags` 中的 ACK/FRAGMENT/CONTROL 位用于快速判断和冗余校验，不能替代 `packet_type` 或 `traffic_class` 的类别语义。ACK-only 包使用 `packet_type=ACK` 和 `traffic_class=ACK_ONLY`，不会设置 CONTROL flag。
 
 ## Packet Type
 
@@ -50,7 +50,7 @@ XGL v2 的基础头固定 24 bytes。wire path 不依赖 packed struct 或 `memc
 | FRAGMENTED | `0x04` | payload 属于分片消息 |
 | ENCRYPTED | `0x08` | 保留，当前生产路径拒绝 |
 | AUTHENTICATED | `0x10` | frame 带认证 trailer |
-| CONTROL | `0x20` | 控制语义 |
+| CONTROL | `0x20` | `packet_type=CONTROL` 帧的冗余标记 |
 
 ## 总帧布局
 
@@ -69,7 +69,8 @@ frame crc16
 - parser 通过双字节二进制 magic `A5 5A` 重同步。
 - 支持重叠 magic，例如噪声末尾 `A5` 后接合法 `A5 5A`。
 - `header_len < 24`、扩展越界、payload 超限、CRC 错误都会丢弃并计数。
-- 认证要求开启时，未认证或认证失败的帧不会交付上层。
+- 认证要求开启时，未认证帧不会交付上层。
+- 当帧通过 AUTHENTICATED/SECURITY_EXT 声明自己已认证时，即使实例未强制所有帧认证，也必须验签成功后才能交付。
 
 ## 设计约束
 

@@ -43,7 +43,7 @@ This page maps protocol design to source directories, public headers, key functi
 
 | Extension | Encoding | Semantic consumer | Main rule |
 | --- | --- | --- | --- |
-| `SESSION_EXT` | `xgl_wire_encode/decode_session_ext_value` | datalink, transport, fragment | Session epoch scopes replay, peer, and reassembly state |
+| `SESSION_EXT` | `xgl_wire_encode/decode_session_ext_value` | datalink, network, transport, fragment | Session epoch scopes replay, peer, and reassembly state |
 | `ACK_RANGE_EXT` | `xgl_wire_encode/decode_ack_range_ext_value` | transport reliable | Releases multiple packet numbers |
 | `SACK_EXT` | `xgl_wire_encode/decode_sack_ext_value` | transport reliable | Preserves holes and triggers fast retransmit |
 | `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | Fragment metadata is not stored inside payload |

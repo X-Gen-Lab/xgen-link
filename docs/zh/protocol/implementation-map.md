@@ -43,7 +43,7 @@
 
 | Extension | 编解码 | 语义消费方 | 主要规则 |
 | --- | --- | --- | --- |
-| `SESSION_EXT` | `xgl_wire_encode/decode_session_ext_value` | datalink、transport、fragment | session epoch 参与 replay、peer、reassembly 隔离 |
+| `SESSION_EXT` | `xgl_wire_encode/decode_session_ext_value` | datalink、network、transport、fragment | session epoch 参与 replay、peer、reassembly 隔离 |
 | `ACK_RANGE_EXT` | `xgl_wire_encode/decode_ack_range_ext_value` | transport reliable | 一次释放多个 packet number |
 | `SACK_EXT` | `xgl_wire_encode/decode_sack_ext_value` | transport reliable | 保留洞并触发快速重传 |
 | `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | payload 内不再放分片头 |

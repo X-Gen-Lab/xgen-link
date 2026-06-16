@@ -2,6 +2,8 @@
 
 Production configuration requires authentication by default. Tests and debug builds may explicitly disable it, but release profiles should enable `auth_required`.
 
+`auth_required=false` means unauthenticated frames are allowed. It does not mean authenticated frames are ignored: any frame carrying AUTHENTICATED/SECURITY_EXT must verify successfully before delivery.
+
 ## Auth Provider
 
 `xgl_auth_provider_t` provides:
@@ -26,8 +28,8 @@ The authentication trailer is placed after payload and before frame CRC. SECURIT
 1. Check magic, version, header_len, and payload_len.
 2. Verify header CRC.
 3. Parse SECURITY_EXT.
-4. Verify authentication trailer.
-5. Check replay window.
+4. Verify authentication trailer when authentication is required or when the frame declares authentication.
+5. Check replay window for verified authenticated frames.
 6. Enter network/transport semantic handling.
 
 Any failure prevents payload delivery.

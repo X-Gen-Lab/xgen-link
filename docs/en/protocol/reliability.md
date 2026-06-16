@@ -23,6 +23,7 @@ This key isolates:
 - SACK_EXT describes holes, keeps missing packets pending, and enables fast retransmit.
 - ACK_RANGE_EXT and SACK_EXT live in the header TLV area and do not consume payload.
 - ACK-only packets do not rely on a single-byte ACK field in the base header.
+- ACK and SACK replies preserve `connection_id`, `session_epoch`, and transport `session_id` from the received reliable packet so lost-ACK recovery targets the same peer scope.
 
 ## Sender State
 
@@ -40,6 +41,8 @@ stateDiagram-v2
 ```
 
 The sender reliable queue uses packet-number index buckets to accelerate lookup. Small windows may still tolerate list traversal, but ACK/SACK paths should not degrade to full queue scans.
+
+Reliable transmission is transactional: queue admission happens before the packet is handed to the network layer. If admission fails, nothing is transmitted. If network transmission fails, the queued record is removed. Packet numbers and window state are committed only after the network layer accepts the send.
 
 ## Receiver State
 

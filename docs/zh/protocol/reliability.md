@@ -23,6 +23,7 @@ target_id + connection_id + session_epoch
 - SACK_EXT 描述缺口，保留未确认包并触发快速重传。
 - ACK_RANGE_EXT 和 SACK_EXT 放在 header TLV 区，不占用 payload。
 - ACK-only 包不再依赖基础头中的单字节 ack 字段。
+- ACK/SACK 回复会保留收到的可靠包中的 `connection_id`、`session_epoch` 和 transport `session_id`，确保 ACK 丢失恢复仍命中同一个 peer scope。
 
 ## 发送端状态
 
@@ -40,6 +41,8 @@ stateDiagram-v2
 ```
 
 发送端 reliable queue 使用 packet number 索引桶加速查找。窗口较小时链表仍可遍历，但 ACK/SACK 主路径不应退化为全队列线性搜索。
+
+可靠发送是事务式的：先进入 reliable queue，再交给 network layer。入队失败时不得发送；network 发送失败时移除队列记录；packet number 和窗口状态只在 network 接受发送后提交。
 
 ## 接收端状态
 

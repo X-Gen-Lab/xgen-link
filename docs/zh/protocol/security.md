@@ -2,6 +2,8 @@
 
 生产配置默认要求认证。测试和调试可以显式关闭，但 release profile 应启用 `auth_required`。
 
+`auth_required=false` 表示允许未认证帧，并不表示忽略已认证帧。任何带 AUTHENTICATED/SECURITY_EXT 的帧都必须验签成功后才能交付。
+
 ## Auth Provider
 
 `xgl_auth_provider_t` 提供：
@@ -26,8 +28,8 @@
 1. 检查 magic、version、header_len、payload_len。
 2. 验证 header CRC。
 3. 解析 SECURITY_EXT。
-4. 验证 auth trailer。
-5. 检查 replay window。
+4. 当实例要求认证，或帧声明自己已认证时，验证 auth trailer。
+5. 对已通过认证的帧检查 replay window。
 6. 进入 network/transport 语义处理。
 
 任何一步失败都不得交付 payload。

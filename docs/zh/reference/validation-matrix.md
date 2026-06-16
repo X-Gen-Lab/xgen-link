@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | parser random bytes | 随机 byte stream，插入合法/半合法 frame | 不崩溃，不越界，能恢复到下一合法 magic |
 | TLV malformed | 随机 ext_type/ext_len/header_len | 非法 TLV 丢弃，合法 TLV 正确解析 |
-| auth tamper | 修改 header、extension、payload、tag 任意字节 | auth_required 下全部拒绝 |
+| auth tamper | 修改 header、extension、payload、tag 任意字节 | 帧声明认证时必须拒绝篡改；auth_required 下还会拒绝未认证帧 |
 | route storm | 多节点 route 切换、TTL 边界、MTU 边界 | 不转发 TTL 过期帧，不发送超 MTU 帧 |
 | lossy transport | loss/reorder/duplicate/delay 注入 | 可靠包最终有序交付或按 retry limit 失败 |
 | fragment attack | 大 message、重叠 range、缺片、超时 | 预算不被突破，超时释放资源 |
