@@ -135,6 +135,7 @@ set(XGL_SOURCES
     src/transport/xgl_rtt.c
     src/transport/xgl_window.c
     src/transport/xgl_reliable.c
+    src/transport/xgl_reliable_ack.c
     src/transport/xgl_fragment.c
     src/transport/xgl_transport_peer.c
     src/transport/xgl_transport_send_plan.c
