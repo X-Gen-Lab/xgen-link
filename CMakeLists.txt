@@ -91,6 +91,7 @@ set(XGL_SOURCES
     src/api/xgl_config.c
     src/api/xgl_send.c
     src/api/xgl_stats.c
+    src/api/xgl_version.c
 
     # Wire format and serialization
     src/wire/xgl_crc.c
