@@ -114,6 +114,7 @@ set(XGL_SOURCES
     src/memory/xgl_mempool.c
     src/memory/xgl_mempool_ts.c
     src/memory/xgl_tiered_pool.c
+    src/memory/xgl_tiered_pool_stats.c
     src/memory/xgl_packet_pool.c
     src/memory/xgl_allocator.c
     src/memory/xgl_tracking_allocator.c
