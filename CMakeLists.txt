@@ -154,6 +154,7 @@ set(XGL_SOURCES
 
     # Platform Abstraction
     src/platform/xgl_mutex.c
+    src/platform/xgl_mutex_windows.c
     src/platform/xgl_time.c
     src/platform/xgl_timer.c
     src/platform/xgl_time_provider.c
