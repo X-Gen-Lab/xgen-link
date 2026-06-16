@@ -37,7 +37,13 @@ extern "C" {
 
 #if defined(XGL_PLATFORM_WINDOWS)
     /* Windows mutex implementation */
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
     #include <windows.h>
+    #ifdef small
+        #undef small
+    #endif
     typedef struct {
         CRITICAL_SECTION cs;        /**< Windows critical section */
         bool initialized;           /**< Initialization flag */
@@ -170,4 +176,3 @@ void xgl_mutex_guard_unlock(xgl_mutex_guard_t* guard);
 #endif
 
 #endif /* XGL_MUTEX_H */
-

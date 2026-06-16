@@ -21,10 +21,6 @@ xgl_error_t xgl_mutex_init(xgl_mutex_t* mutex) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (mutex->initialized) {
-        return XGL_ERR_ALREADY_INITIALIZED;
-    }
-
     /* Initialize mutex with default attributes */
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
@@ -127,10 +123,6 @@ xgl_error_t xgl_mutex_init(xgl_mutex_t* mutex) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (mutex->initialized) {
-        return XGL_ERR_ALREADY_INITIALIZED;
-    }
-
     /* Initialize critical section (recursive by default) */
     InitializeCriticalSection(&mutex->cs);
     mutex->initialized = true;
@@ -214,10 +206,6 @@ void xgl_mutex_destroy(xgl_mutex_t* mutex) {
 xgl_error_t xgl_mutex_init(xgl_mutex_t* mutex) {
     if (mutex == NULL) {
         return XGL_ERR_NULL_POINTER;
-    }
-
-    if (mutex->initialized) {
-        return XGL_ERR_ALREADY_INITIALIZED;
     }
 
     /* Create recursive mutex using static allocation */

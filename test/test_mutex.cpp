@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <xgl/internal/xgl_mutex.h>
+#include <string.h>
 
 /*---------------------------------------------------------------------------*/
 /* Basic Mutex Tests                                                         */
@@ -16,6 +17,19 @@
  */
 TEST(XglMutexTest, InitSuccess) {
     xgl_mutex_t mutex;
+
+    xgl_error_t result = xgl_mutex_init(&mutex);
+    EXPECT_EQ(result, XGL_OK);
+
+    xgl_mutex_destroy(&mutex);
+}
+
+/**
+ * \brief           Test mutex initialization does not read previous storage
+ */
+TEST(XglMutexTest, InitOverwritesUninitializedStorage) {
+    xgl_mutex_t mutex;
+    memset(&mutex, 0xA5, sizeof(mutex));
 
     xgl_error_t result = xgl_mutex_init(&mutex);
     EXPECT_EQ(result, XGL_OK);
