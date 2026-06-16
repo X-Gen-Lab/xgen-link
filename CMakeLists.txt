@@ -107,6 +107,7 @@ set(XGL_SOURCES
     # Core utilities
     src/core/xgl_error.c
     src/core/xgl_list.c
+    src/core/xgl_list_ts.c
     src/core/xgl_hashtable.c
 
     # Memory management
