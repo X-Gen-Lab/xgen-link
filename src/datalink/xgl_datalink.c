@@ -5,10 +5,9 @@
  */
 
 #include <xgl/internal/xgl_datalink.h>
+#include <xgl/internal/xgl_datalink_metadata.h>
 #include <xgl/internal/xgl_frame.h>
 #include <xgl/internal/xgl_parser.h>
-#include <xgl/internal/xgl_crc.h>
-#include <xgl/internal/xgl_serialize.h>
 #include <xgl/xgl_error.h>
 #include <xgl/xgl_config.h>
 #include <xgl/internal/xgl_allocator.h>
@@ -367,119 +366,43 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    /* Minimum frame size: header + CRC16 */
-    size_t min_frame_size = XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
-    if (frame_len < min_frame_size) {
+    xgl_datalink_rx_metadata_t metadata;
+    xgl_error_t err = xgl_datalink_decode_rx_metadata(frame_buffer,
+                                                      frame_len,
+                                                      ctx->auth_required,
+                                                      ctx->auth_key_id,
+                                                      &metadata);
+    if (err != XGL_OK) {
         if (ctx->stats != NULL) {
             ctx->stats->rx_errors++;
+            if (metadata.auth_key_rejected) {
+                ctx->stats->rx_dropped++;
+            }
         }
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    /* Maximum frame size check - prevent buffer overflow attacks */
-    if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
+        if (metadata.header_crc_failed && ctx->rx_header_crc_errors != NULL) {
+            (*ctx->rx_header_crc_errors)++;
         }
-        if (ctx->error_callback != NULL) {
+        if (metadata.frame_crc_failed) {
+            if (ctx->rx_crc16_errors != NULL) {
+                (*ctx->rx_crc16_errors)++;
+            }
+            if (ctx->error_callback != NULL) {
+                ctx->error_callback(ctx->owner_handle, XGL_ERR_CRC_FAILED,
+                                  "Frame CRC16 validation failed",
+                                  ctx->callback_user_data);
+            }
+        }
+        if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE && ctx->error_callback != NULL) {
             ctx->error_callback(ctx->owner_handle, XGL_ERR_INVALID_FRAME,
                               "Frame size exceeds maximum allowed",
                               ctx->callback_user_data);
         }
-        return XGL_ERR_INVALID_FRAME;
+        return err;
     }
 
-    /* Verify production magic */
-    if (frame_buffer[0] != XGL_WIRE_MAGIC_0 ||
-        frame_buffer[1] != XGL_WIRE_MAGIC_1) {
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
-        }
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    xgl_wire_header_t wire_header;
-    if (xgl_wire_decode_header(&wire_header, frame_buffer, frame_len) != XGL_OK) {
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
-        }
-        if (ctx->rx_header_crc_errors != NULL) {
-            (*ctx->rx_header_crc_errors)++;
-        }
-        return XGL_ERR_CRC_FAILED;
-    }
-
-    uint8_t auth_tag_len = 0U;
-    bool has_security_ext = false;
-    uint32_t auth_key_id = 0U;
-    uint32_t session_epoch = 0U;
-    if (wire_header.header_len > XGL_WIRE_BASE_HEADER_SIZE) {
-        xgl_wire_ext_cursor_t cursor;
-        xgl_error_t ext_err = xgl_wire_ext_cursor_init(
-            &cursor,
-            &frame_buffer[XGL_WIRE_BASE_HEADER_SIZE],
-            wire_header.header_len - XGL_WIRE_BASE_HEADER_SIZE
-        );
-        if (ext_err != XGL_OK) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_errors++;
-            }
-            return XGL_ERR_INVALID_FRAME;
-        }
-
-        xgl_wire_ext_t ext;
-        while ((ext_err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
-            if (ext.type == XGL_WIRE_EXT_SECURITY) {
-                uint64_t nonce_id = 0;
-                uint8_t tag_len = 0;
-                if (xgl_wire_decode_security_ext_value(ext.value,
-                                                       ext.len,
-                                                       &auth_key_id,
-                                                       &nonce_id,
-                                                       &tag_len) != XGL_OK ||
-                    tag_len == 0U) {
-                    if (ctx->stats != NULL) {
-                        ctx->stats->rx_errors++;
-                    }
-                    return XGL_ERR_INVALID_FRAME;
-                }
-                (void)nonce_id;
-                if (ctx->auth_required && auth_key_id != ctx->auth_key_id) {
-                    if (ctx->stats != NULL) {
-                        ctx->stats->rx_errors++;
-                        ctx->stats->rx_dropped++;
-                    }
-                    return XGL_ERR_INVALID_FRAME;
-                }
-                auth_tag_len = tag_len;
-                has_security_ext = true;
-            } else if (ext.type == XGL_WIRE_EXT_SESSION) {
-                uint64_t incarnation_id = 0;
-                if (xgl_wire_decode_session_ext_value(ext.value,
-                                                      ext.len,
-                                                      &session_epoch,
-                                                      &incarnation_id) != XGL_OK) {
-                    if (ctx->stats != NULL) {
-                        ctx->stats->rx_errors++;
-                    }
-                    return XGL_ERR_INVALID_FRAME;
-                }
-                (void)incarnation_id;
-            }
-        }
-        if (ext_err != XGL_ERR_NOT_FOUND) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_errors++;
-            }
-            return XGL_ERR_INVALID_FRAME;
-        }
-    }
-
-    bool authenticated = (wire_header.flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U;
-    bool should_verify_auth = authenticated || has_security_ext;
-    if ((ctx->auth_required || should_verify_auth) &&
-        (!authenticated ||
-         !has_security_ext ||
+    if ((ctx->auth_required || metadata.should_verify_auth) &&
+        (!metadata.authenticated ||
+         !metadata.has_security_ext ||
          ctx->auth_provider == NULL ||
          ctx->auth_provider->verify == NULL)) {
         if (ctx->stats != NULL) {
@@ -489,45 +412,13 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    /* Validate frame CRC16 */
-    size_t crc_offset = frame_len - XGL_CRC16_SIZE;
-    uint16_t calculated_crc = xgl_crc16_modbus(frame_buffer, crc_offset);
-    uint16_t received_crc = xgl_deserialize_u16_le(&frame_buffer[crc_offset]);
-
-    if (calculated_crc != received_crc) {
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
-        }
-        if (ctx->rx_crc16_errors != NULL) {
-            (*ctx->rx_crc16_errors)++;
-        }
-        if (ctx->error_callback != NULL) {
-            ctx->error_callback(ctx->owner_handle, XGL_ERR_CRC_FAILED,
-                              "Frame CRC16 validation failed",
-                              ctx->callback_user_data);
-        }
-        return XGL_ERR_CRC_FAILED;
-    }
-
-    size_t payload_len = wire_header.payload_len;
-    size_t expected_frame_len = wire_header.header_len +
-                                payload_len +
-                                (size_t)auth_tag_len +
-                                XGL_CRC16_SIZE;
-    if (frame_len != expected_frame_len) {
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
-        }
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    if (should_verify_auth) {
+    if (metadata.should_verify_auth) {
         bool auth_valid = false;
         xgl_error_t auth_err = xgl_wire_verify_auth_trailer(frame_buffer,
                                                             frame_len - XGL_CRC16_SIZE,
-                                                            wire_header.header_len,
-                                                            payload_len,
-                                                            auth_key_id,
+                                                            metadata.header.header_len,
+                                                            metadata.payload_len,
+                                                            metadata.auth_key_id,
                                                             ctx->auth_provider,
                                                             &auth_valid);
         if (auth_err != XGL_OK || !auth_valid) {
@@ -540,13 +431,13 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
 
         xgl_replay_result_t replay_result =
             datalink_check_replay(ctx,
-                                  wire_header.source_id,
-                                  wire_header.connection_id,
-                                  session_epoch,
-                                  wire_header.packet_number);
+                                  metadata.header.source_id,
+                                  metadata.header.connection_id,
+                                  metadata.session_epoch,
+                                  metadata.header.packet_number);
         if (replay_result == XGL_REPLAY_REJECT ||
             (replay_result == XGL_REPLAY_ACCEPT_DUPLICATE &&
-             !datalink_is_ack_eliciting(&wire_header))) {
+             !datalink_is_ack_eliciting(&metadata.header))) {
             if (ctx->stats != NULL) {
                 ctx->stats->rx_errors++;
                 ctx->stats->rx_dropped++;
@@ -576,13 +467,13 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
             .frame_len = frame_len
         };
 
-        xgl_error_t err = ctx->upper_layer->receive(
+        xgl_error_t upper_err = ctx->upper_layer->receive(
             ctx->upper_layer->ctx,
             ctx->owner_handle,
             &frame_data
         );
 
-        if (err != XGL_OK) {
+        if (upper_err != XGL_OK) {
             /* Network layer processing failed, but we already validated the frame */
             /* This is not a datalink error, so we don't return error */
         }

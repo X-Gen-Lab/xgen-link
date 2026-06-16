@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <xgl/internal/xgl_datalink.h>
+#include <xgl/internal/xgl_datalink_metadata.h>
 #include <xgl/internal/xgl_frame.h>
 #include <xgl/internal/xgl_network.h>
 #include <xgl/internal/xgl_transport.h>
@@ -658,6 +659,116 @@ TEST_F(XglDatalinkTest, ProcessFrameVerifiesAuthenticatedFrameEvenWhenAuthOption
               XGL_ERR_INVALID_FRAME);
     EXPECT_EQ(optional_stats.rx_packets, 0U);
     EXPECT_EQ(optional_stats.rx_errors, 1U);
+}
+
+TEST_F(XglDatalinkTest, RxMetadataDecodesAuthenticatedSessionFrame) {
+    xgl_auth_provider_t provider = {
+        .sign = datalink_test_auth_sign,
+        .verify = datalink_test_auth_verify,
+        .tag_len = 4,
+        .user_data = nullptr
+    };
+
+    uint8_t session_value[XGL_SESSION_EXT_VALUE_SIZE] = {};
+    size_t session_value_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_session_ext_value(session_value,
+                                                sizeof(session_value),
+                                                0x01020304U,
+                                                0x1122334455667788ULL,
+                                                &session_value_len),
+              XGL_OK);
+    uint8_t session_ext[XGL_SESSION_EXT_SIZE] = {};
+    size_t session_ext_len = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(session_ext,
+                                  sizeof(session_ext),
+                                  XGL_WIRE_EXT_SESSION,
+                                  session_value,
+                                  session_value_len,
+                                  &session_ext_len),
+              XGL_OK);
+
+    xgl_frame_t frame = {};
+    const uint8_t payload[] = {0x01, 0x02, 0x03};
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .connection_id = 0x10203040U,
+        .packet_number = 77U,
+        .extensions = session_ext,
+        .extensions_len = session_ext_len,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .ttl = XGL_DEFAULT_TTL
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    uint8_t encoded[256] = {};
+    size_t encoded_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded,
+                                                sizeof(encoded),
+                                                &frame,
+                                                7U,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+
+    xgl_datalink_rx_metadata_t metadata = {};
+    ASSERT_EQ(xgl_datalink_decode_rx_metadata(encoded,
+                                              encoded_len,
+                                              true,
+                                              7U,
+                                              &metadata),
+              XGL_OK);
+
+    EXPECT_EQ(metadata.header.source_id, SOURCE_ID);
+    EXPECT_EQ(metadata.header.target_id, TARGET_ID);
+    EXPECT_EQ(metadata.header.connection_id, 0x10203040U);
+    EXPECT_EQ(metadata.header.packet_number, 77U);
+    EXPECT_EQ(metadata.auth_tag_len, 4U);
+    EXPECT_TRUE(metadata.has_security_ext);
+    EXPECT_TRUE(metadata.authenticated);
+    EXPECT_TRUE(metadata.should_verify_auth);
+    EXPECT_EQ(metadata.auth_key_id, 7U);
+    EXPECT_EQ(metadata.session_epoch, 0x01020304U);
+    EXPECT_EQ(metadata.payload_len, sizeof(payload));
+}
+
+TEST_F(XglDatalinkTest, RxMetadataRejectsWrongRequiredAuthKey) {
+    xgl_auth_provider_t provider = {
+        .sign = datalink_test_auth_sign,
+        .verify = datalink_test_auth_verify,
+        .tag_len = 4,
+        .user_data = nullptr
+    };
+    xgl_frame_t frame = {};
+    const uint8_t payload[] = {0x01};
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    uint8_t encoded[256] = {};
+    size_t encoded_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded,
+                                                sizeof(encoded),
+                                                &frame,
+                                                7U,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+
+    xgl_datalink_rx_metadata_t metadata = {};
+    EXPECT_EQ(xgl_datalink_decode_rx_metadata(encoded,
+                                              encoded_len,
+                                              true,
+                                              8U,
+                                              &metadata),
+              XGL_ERR_INVALID_FRAME);
 }
 
 /*---------------------------------------------------------------------------*/
