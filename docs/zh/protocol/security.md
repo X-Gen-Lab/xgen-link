@@ -40,7 +40,11 @@
 source_id + connection_id + session_epoch + packet_number
 ```
 
-重复包、旧 session 包和错误 connection 包不得 ACK 或交付。
+Replay 检查使用三态结果：
+
+- 新的认证包进入 network/transport 语义处理。
+- ACK-eliciting 的 reliable 重复包允许进入 transport，用于在 ACK 丢失后重新生成 ACK/SACK；transport 的重复检测不得再次交付 payload。
+- 非 reliable 重复包、旧 session 包、错误 connection 包、以及早于 replay window 的包，在进入 network/transport 前丢弃。
 
 ## 多跳转发
 

@@ -18,7 +18,7 @@ Use this page as an engineering review checklist before deploying XGL on an MCU 
 - Key id and nonce/material id generation and rotation are handled by the application or secure module.
 - Replay window capacity is sufficient for the maximum reorder window.
 - Multi-hop forwarding verifies CRC/auth behavior after TTL mutation.
-- Bad auth, replay, wrong session, and wrong connection packets are not ACKed.
+- Bad auth, rejected replay, wrong session, and wrong connection packets are not ACKed; reliable duplicates may be ACKed without re-delivery.
 
 ## Reliability
 

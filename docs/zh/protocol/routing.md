@@ -26,7 +26,7 @@ XGL 使用 16-bit 节点地址。`0` 和保留地址不能作为普通本地节�
 
 ## TTL
 
-TTL 每转发一跳递减。TTL 过期返回 `XGL_ERR_TTL_EXPIRED`，不得继续转发。
+TTL 每转发一跳递减。非本地包在 `ttl <= 1` 时返回 `XGL_ERR_TTL_EXPIRED`，不得继续转发；因此成功转发离开本节点时 `ttl >= 1`。
 
 ## 交付路径
 

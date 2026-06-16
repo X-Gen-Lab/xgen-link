@@ -26,7 +26,7 @@ Forwarding must check route MTU. Frames larger than `max_frame_size` return `XGL
 
 ## TTL
 
-TTL is decremented on every forwarded hop. Expired TTL returns `XGL_ERR_TTL_EXPIRED` and must not be forwarded.
+TTL is decremented on every forwarded hop. A remote packet with `ttl <= 1` returns `XGL_ERR_TTL_EXPIRED` and must not be forwarded; forwarded frames therefore leave the node with `ttl >= 1`.
 
 ## Delivery Path
 

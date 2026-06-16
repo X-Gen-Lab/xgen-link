@@ -45,7 +45,7 @@ flowchart TD
   ReplayOk -- yes --> Network[Pass to network]
 ```
 
-Authentication failure, replay failure, and key mismatch must not be ACKed and must not enter transport.
+Authentication failure, rejected replay, and key mismatch must not be ACKed and must not enter transport. ACK-eliciting reliable duplicates are the replay exception: they may enter transport only to regenerate ACK/SACK and must not be delivered again.
 
 ## Network Forwarding State Machine
 

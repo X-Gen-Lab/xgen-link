@@ -45,7 +45,7 @@ flowchart TD
   ReplayOk -- yes --> Network[Pass to network]
 ```
 
-认证失败、replay 失败和 key mismatch 都不得 ACK，也不得进入 transport。
+认证失败、被拒绝的 replay 和 key mismatch 都不得 ACK，也不得进入 transport。ACK-eliciting 的可靠重复包是 replay 例外：它只能进入 transport 用于重新生成 ACK/SACK，不得再次交付。
 
 ## Network 转发状态机
 

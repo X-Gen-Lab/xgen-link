@@ -33,11 +33,13 @@ XGL v2 的基础头固定 24 bytes。wire path 不依赖 packed struct 或 `memc
 | 0 | INVALID | 非法类型，不应出现在生产帧 |
 | 1 | DATA | 应用 payload；应用 `data_type` 放在 DATA_TYPE_EXT |
 | 2 | ACK | ACK range 或 SACK 控制包 |
-| 3 | CONTROL | RESET、NACK 等控制语义；控制子类型放在 DATA_TYPE_EXT |
+| 3 | CONTROL | HELLO、RESET 等会话控制语义；控制子类型放在 DATA_TYPE_EXT |
 | 4 | HANDSHAKE | 会话/能力协商预留 |
 | 5 | ROUTE | 路由控制预留 |
 | 6 | PROBE | 探测预留 |
 | 7 | CLOSE | 连接关闭 |
+
+生产 wire 上只接受 `1..7` 的 packet type；其他值在 header decode 阶段 fail closed。
 
 ## Flags
 

@@ -40,7 +40,11 @@ Anti-replay key:
 source_id + connection_id + session_epoch + packet_number
 ```
 
-Duplicate packets, old-session packets, and wrong-connection packets are not ACKed or delivered.
+Replay results are tri-state:
+
+- new authenticated packets enter network/transport handling;
+- duplicate ACK-eliciting reliable packets may enter transport so the receiver can regenerate ACK/SACK after a lost ACK, but transport duplicate detection must not deliver payload again;
+- non-reliable duplicates, old-session packets, wrong-connection packets, and packets older than the replay window are dropped before network/transport.
 
 ## Multi-Hop Forwarding
 

@@ -18,7 +18,7 @@
 - key id、nonce/material id 的生成和轮换由应用或安全模块管理。
 - replay window 容量满足最大乱序窗口。
 - 多跳 forwarding 场景已验证 TTL 修改后的 CRC/auth 处理。
-- 错误认证、重放、错误 session 和错误 connection 的包不会 ACK。
+- 错误认证、被拒绝的重放、错误 session 和错误 connection 的包不会 ACK；可靠重复包可补 ACK，但不得再次交付。
 
 ## 可靠性
 

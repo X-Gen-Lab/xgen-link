@@ -33,7 +33,7 @@ This page maps protocol design to source directories, public headers, key functi
 | --- | --- | --- | --- |
 | Byte-stream parser | `src/wire/xgl_parser.c` | Resync on magic and collect header, TLVs, payload, trailer | reset parser and continue searching |
 | Header/TLV decode | `src/wire/xgl_wire.c` | Validate offsets, lengths, CRC, extension encoding | drop, do not deliver |
-| Auth/replay | `src/datalink/xgl_datalink.c`, `src/security/xgl_security.c` | Verify tag and replay window | drop, do not ACK, do not deliver |
+| Auth/replay | `src/datalink/xgl_datalink.c`, `src/security/xgl_security.c` | Verify tag and classify replay as new, reliable duplicate, or reject | reject bad frames; allow reliable duplicates only for transport ACK recovery |
 | Local or forward | `src/network/xgl_network.c` | Deliver locally or decrement TTL and forward | drop on TTL, route, MTU, or resign failure |
 | Reliability | `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | Process ACK/SACK, buffer out-of-order packets, filter duplicates | wrong connection/session does not pollute other peers |
 | Reassembly | `src/transport/xgl_fragment.c` | Reassemble by source, connection, session, and message | clean up on budget, timeout, or invalid overlap |
@@ -49,7 +49,7 @@ This page maps protocol design to source directories, public headers, key functi
 | `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | Fragment metadata is not stored inside payload |
 | `SECURITY_EXT` | `xgl_wire_encode/decode_security_ext_value` | frame, datalink, network | Carries key, nonce/material, and tag length metadata |
 | `ROUTE_EXT` | `xgl_wire_encode/decode_route_ext_value` | network/routing | Carries route epoch, previous hop, next hop, and metric |
-| `DATA_TYPE_EXT` | `xgl_wire_encode_ext` | network, transport | Carries application data_type or control subtype without overloading packet_type |
+| `DATA_TYPE_EXT` | `xgl_wire_encode_ext` | network, transport | Carries application data_type on DATA packets or control subtype on CONTROL packets without overloading packet_type |
 
 ## Public vs Internal API
 

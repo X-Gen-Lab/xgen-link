@@ -33,11 +33,13 @@ The top two `traffic_class` bits carry the reliability class: `NONE(0x00)`, `ACK
 | 0 | INVALID | Invalid type, not valid on production wire |
 | 1 | DATA | Application payload; application `data_type` is carried in DATA_TYPE_EXT |
 | 2 | ACK | ACK range or SACK control packet |
-| 3 | CONTROL | RESET, NACK, and other control semantics; control subtype is carried in DATA_TYPE_EXT |
+| 3 | CONTROL | HELLO, RESET, and other session control semantics; control subtype is carried in DATA_TYPE_EXT |
 | 4 | HANDSHAKE | Reserved for session/capability negotiation |
 | 5 | ROUTE | Reserved routing control |
 | 6 | PROBE | Reserved probing |
 | 7 | CLOSE | Connection close |
+
+Packet types outside `1..7` are invalid on the production wire and fail closed during header decoding.
 
 ## Flags
 
