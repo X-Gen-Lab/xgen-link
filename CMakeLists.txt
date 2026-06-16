@@ -112,6 +112,7 @@ set(XGL_SOURCES
 
     # Memory management
     src/memory/xgl_mempool.c
+    src/memory/xgl_mempool_ts.c
     src/memory/xgl_tiered_pool.c
     src/memory/xgl_packet_pool.c
     src/memory/xgl_allocator.c
