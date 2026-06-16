@@ -5,15 +5,9 @@
  */
 
 #include "xgl_network_internal.h"
-#include <xgl/internal/xgl_network_metadata.h>
 #include <xgl/xgl_error.h>
-#include <xgl/internal/xgl_route.h>
-#include <xgl/internal/xgl_crc.h>
-#include <xgl/internal/xgl_serialize.h>
 #include <xgl/internal/xgl_wire.h>
-#include <xgl/xgl_config.h>
 #include <string.h>
-#include <stdio.h>
 
 /*---------------------------------------------------------------------------*/
 /* Private Helper Functions                                                  */
@@ -60,10 +54,10 @@ static xgl_error_t network_find_security_ext(const uint8_t* frame_buf,
     return err;
 }
 
-static xgl_error_t network_resign_forwarded_frame(xgl_network_ctx_t* ctx,
-                                                  uint8_t* frame_buf,
-                                                  size_t frame_len,
-                                                  const xgl_wire_header_t* header) {
+xgl_error_t network_resign_forwarded_frame(xgl_network_ctx_t* ctx,
+                                           uint8_t* frame_buf,
+                                           size_t frame_len,
+                                           const xgl_wire_header_t* header) {
     if (ctx == NULL || frame_buf == NULL || header == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -148,190 +142,6 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     ctx->auth_provider = config->auth_provider;
 
     return XGL_OK;
-}
-
-/**
- * \brief           Receive and process packet from data link layer
- * \details         Validates addressing and forwards to appropriate handler
- */
-xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
-                                xgl_handle_t handle,
-                                const uint8_t* frame_buf,
-                                size_t frame_len) {
-    if (ctx == NULL || frame_buf == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    xgl_network_frame_metadata_t metadata;
-    xgl_error_t err = xgl_network_decode_frame_metadata(frame_buf,
-                                                        frame_len,
-                                                        &metadata);
-    if (err != XGL_OK) {
-        /* Invalid frame - update statistics and return error */
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
-        }
-        return err;
-    }
-
-    /* Validate addressing */
-    if (!xgl_network_validate_address(ctx,
-                                      metadata.header.target_id,
-                                      metadata.header.source_id)) {
-        /* Invalid address - drop packet */
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_dropped++;
-        }
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    /* Check if packet is addressed to local node */
-    if (xgl_network_is_local(ctx, metadata.header.target_id)) {
-        /* Packet is for this node - forward to transport layer */
-
-        /* Update statistics */
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_packets++;
-            ctx->stats->rx_bytes += metadata.payload_len;
-        }
-
-        /* Forward to transport layer via interface */
-        if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
-            /* Build packet data structure for payload */
-            xgl_packet_data_t packet_data = {
-                .ref_count = 1,
-                .data_len = metadata.payload_len,
-                .data = metadata.payload,
-                .owned_data = NULL
-            };
-
-            /* Build complete packet structure for transport layer */
-            xgl_packet_t packet = {
-                .source_id = metadata.header.source_id,
-                .target_id = metadata.header.target_id,
-                .session_id = (uint16_t)(metadata.header.connection_id & UINT16_MAX),
-                .connection_id = metadata.header.connection_id,
-                .packet_number = metadata.header.packet_number,
-                .session_epoch = metadata.session_epoch,
-                .packet_type = metadata.header.packet_type,
-                .flags = metadata.header.flags,
-                .data_type = metadata.data_type,
-                .reliable = metadata.reliable,
-                .fragment = metadata.fragment,
-                .priority = metadata.priority,
-                .ttl = metadata.header.ttl,
-                .traffic_class = metadata.header.traffic_class,
-                .data = &packet_data,
-                .extensions = metadata.extensions,
-                .extensions_len = metadata.extensions_len,
-                .phy = NULL    /* Not needed for receive path */
-            };
-
-            /* Call transport layer receive via interface */
-            err = ctx->upper_layer->receive(ctx->upper_layer->ctx, handle, &packet);
-            if (err != XGL_OK) {
-                /* Transport layer processing failed */
-                return err;
-            }
-        }
-
-        return XGL_OK;
-    } else {
-        /* Packet is for another node - forward it */
-        /* Lookup route for forwarding */
-        xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
-                                                         metadata.header.target_id);
-
-        if (route == NULL) {
-            /* No route for forwarding - drop packet */
-            char error_msg[64];
-            snprintf(error_msg, sizeof(error_msg),
-                     "No route for forwarding to target ID: %u",
-                     (unsigned int)metadata.header.target_id);
-
-            if (ctx->error_callback != NULL) {
-                ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
-                                  error_msg, ctx->callback_user_data);
-            }
-
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped++;
-            }
-
-            return XGL_ERR_ROUTE_NOT_FOUND;
-        }
-
-        xgl_wire_header_t incoming_header = metadata.header;
-
-        if (incoming_header.ttl <= 1U) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped++;
-            }
-            if (ctx->error_callback != NULL) {
-                ctx->error_callback(handle, XGL_ERR_TTL_EXPIRED,
-                                  "Packet TTL expired",
-                                  ctx->callback_user_data);
-            }
-            return XGL_ERR_TTL_EXPIRED;
-        }
-
-        /* Update statistics for forwarded packet */
-        if (ctx->stats != NULL) {
-            ctx->stats->tx_packets++;
-            ctx->stats->tx_bytes += metadata.payload_len;
-        }
-
-        if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped++;
-            }
-            return XGL_ERR_BUFFER_TOO_SMALL;
-        }
-
-        if (frame_len > route->max_frame_size) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped++;
-            }
-            return XGL_ERR_BUFFER_TOO_SMALL;
-        }
-
-        uint8_t forward_buf[XGL_DATALINK_MAX_FRAME_SIZE];
-        memcpy(forward_buf, frame_buf, frame_len);
-        xgl_wire_header_t wire_header = incoming_header;
-        wire_header.ttl = (uint8_t)(wire_header.ttl - 1U);
-        if (xgl_wire_encode_header(forward_buf, frame_len, &wire_header) != XGL_OK) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped++;
-            }
-            return XGL_ERR_INVALID_FRAME;
-        }
-
-        if (network_resign_forwarded_frame(ctx,
-                                           forward_buf,
-                                           frame_len,
-                                           &wire_header) != XGL_OK) {
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped++;
-            }
-            return XGL_ERR_INVALID_FRAME;
-        }
-
-        uint16_t forward_crc = xgl_crc16_modbus(forward_buf, frame_len - XGL_CRC16_SIZE);
-        xgl_serialize_u16_le(&forward_buf[frame_len - XGL_CRC16_SIZE], forward_crc);
-
-        /* Forward the frame through the PHY */
-        if (route->phy != NULL && route->phy->tx != NULL) {
-            err = route->phy->tx(forward_buf, frame_len, route->phy->user_data);
-            if (err != XGL_OK) {
-                if (ctx->stats != NULL) {
-                    ctx->stats->tx_errors++;
-                }
-                return XGL_ERR_TX_FAILED;
-            }
-        }
-
-        return XGL_OK;
-    }
 }
 
 /**
