@@ -454,14 +454,6 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
 
     /* Forward to network layer via interface */
     if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
-        /* Create a temporary packet structure to pass frame data */
-        /* The frame buffer contains the complete frame with header and CRC */
-        /* Network layer will extract the necessary information */
-
-        /* For now, we pass the frame buffer directly through the interface */
-        /* The network layer's receive function expects frame_buf and frame_len */
-        /* We'll use a simple wrapper structure to pass both parameters */
-
         xgl_frame_rx_message_t frame_data = {
             .frame_buf = frame_buffer,
             .frame_len = frame_len

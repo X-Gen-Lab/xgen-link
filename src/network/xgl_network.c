@@ -511,10 +511,6 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             return XGL_ERR_TTL_EXPIRED;
         }
 
-        /* Forward packet through the appropriate PHY */
-        /* Note: In a full implementation, this would re-transmit the frame */
-        /* For now, we just acknowledge that forwarding would occur */
-
         /* Update statistics for forwarded packet */
         if (ctx->stats != NULL) {
             ctx->stats->tx_packets++;
