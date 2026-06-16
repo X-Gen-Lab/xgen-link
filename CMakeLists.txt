@@ -116,6 +116,7 @@ set(XGL_SOURCES
     src/memory/xgl_tiered_pool.c
     src/memory/xgl_packet_pool.c
     src/memory/xgl_allocator.c
+    src/memory/xgl_tracking_allocator.c
 
     # Optional Modules
     src/codec/xgl_codec.c
