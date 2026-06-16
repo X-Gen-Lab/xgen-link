@@ -7,7 +7,7 @@ This page maps protocol design to source directories, public headers, key functi
 | Layer | Source directory | Public/advanced headers | Main implementation | Invariant |
 | --- | --- | --- | --- | --- |
 | API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | Users enter through handle, config, send, run, and stats APIs |
-| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | Wire encoding is offset-based, not packed-struct based |
+| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | Wire encoding is offset-based, not packed-struct based |
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | Replay windows are scoped by source, connection, session, and packet |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | Frames that fail CRC/auth/replay do not enter network |
 | Network | `src/network` | `xgl/internal/xgl_network.h`, `xgl/internal/xgl_route.h` | `xgl_network.c`, `xgl_network_send.c`, `xgl_network_receive.c`, `xgl_network_metadata.c`, `xgl_route.c` | Routing, TTL, MTU, and forwarding are resolved here |
@@ -32,7 +32,7 @@ This page maps protocol design to source directories, public headers, key functi
 | Step | Code | Responsibility | Failure policy |
 | --- | --- | --- | --- |
 | Byte-stream parser | `src/wire/xgl_parser.c` | Resync on magic and collect header, TLVs, payload, trailer | reset parser and continue searching |
-| Header/TLV decode | `src/wire/xgl_wire.c` | Validate offsets, lengths, CRC, extension encoding | drop, do not deliver |
+| Header/TLV decode | `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c` | Validate offsets, lengths, CRC, extension encoding | drop, do not deliver |
 | Auth/replay | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | Verify tag and classify replay as new, reliable duplicate, or reject | reject bad frames; allow reliable duplicates only for transport ACK recovery |
 | Local or forward | `src/network/xgl_network_receive.c` | Deliver locally or decrement TTL and forward | drop on TTL, route, MTU, or resign failure |
 | Reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | Process ACK/SACK, buffer out-of-order packets, filter duplicates | wrong connection/session does not pollute other peers |
@@ -76,7 +76,7 @@ Internal protocol headers live under `include/xgl/internal`. Wire, parser, relia
 
 ## Maintenance Rules
 
-- Wire field changes must update `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c`, wire format docs, and offset tests.
+- Wire field changes must update `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c`, wire format docs, and offset tests.
 - Reliability semantic changes must update peer key docs, ACK/SACK docs, transport tests, and release validation.
 - Authentication boundary changes must update security docs, zero-copy docs, and datalink/network tests.
 - Config default changes must update config presets, quick start, and Doxygen public API.

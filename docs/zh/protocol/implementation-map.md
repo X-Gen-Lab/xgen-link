@@ -7,7 +7,7 @@
 | 协议层 | 源码目录 | 公共/高级头 | 主要实现 | 关键不变量 |
 | --- | --- | --- | --- | --- |
 | API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | 用户只通过 handle、config、send、run、stats 进入协议栈 |
-| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | wire 编解码按 offset 手写，不依赖 packed struct |
+| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_parser.c`, `xgl_crc.c` | wire 编解码按 offset 手写，不依赖 packed struct |
 | Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | replay window 按 source、connection、session、packet 隔离 |
 | Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | 未通过 CRC/auth/replay 的 frame 不进入 network |
 | Network | `src/network` | `xgl/internal/xgl_network.h`, `xgl/internal/xgl_route.h` | `xgl_network.c`, `xgl_network_send.c`, `xgl_network_receive.c`, `xgl_network_metadata.c`, `xgl_route.c` | route、TTL、MTU 和 forwarding 在 network 层闭环 |
@@ -32,7 +32,7 @@
 | 步骤 | 代码位置 | 责任 | 失败策略 |
 | --- | --- | --- | --- |
 | byte stream parser | `src/wire/xgl_parser.c` | magic resync、base header、TLV、payload、trailer 分阶段收包 | reset parser，继续寻找下一帧 |
-| header/TLV decode | `src/wire/xgl_wire.c` | 校验 offset、长度、CRC、扩展合法性 | 丢弃，不交付 |
+| header/TLV decode | `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c` | 校验 offset、长度、CRC、扩展合法性 | 丢弃，不交付 |
 | auth/replay | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | 验证 tag，将 replay 分类为新包、可靠重复包或拒绝 | 拒绝坏包；可靠重复包仅用于 transport ACK 恢复 |
 | local or forward | `src/network/xgl_network_receive.c` | 本地交付或 TTL 递减后转发 | TTL/route/MTU/auth 重签失败则丢弃 |
 | reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | 处理 ACK/SACK、乱序缓存、重复包过滤 | 错误 connection/session 不污染其他 peer |
@@ -76,7 +76,7 @@
 
 ## 维护规则
 
-- 修改 wire 字段时，同步更新 `include/xgl/internal/xgl_wire.h`、`src/wire/xgl_wire.c`、wire format 文档和 offset 测试。
+- 修改 wire 字段时，同步更新 `include/xgl/internal/xgl_wire.h`、`src/wire/xgl_wire.c`、`src/wire/xgl_wire_ext.c`、wire format 文档和 offset 测试。
 - 修改可靠性语义时，同步更新 peer key、ACK/SACK 文档、transport 测试和 release validation。
 - 修改认证边界时，必须更新 security 文档、zero-copy 文档、datalink/network 测试。
 - 修改配置默认值时，同步更新 config presets、quick start 和 Doxygen 公共 API。
