@@ -505,9 +505,8 @@ static xgl_error_t datalink_send_impl(void* ctx,
 }
 
 /**
- * \brief           Datalink layer receive implementation (for upper layers)
- * \details         This function is called by upper layers to receive frames
- *                  Currently not used as datalink pushes data up via callbacks
+ * \brief           Reject pull-style receive calls
+ * \details         The datalink layer receives from PHY and pushes parsed frames upward.
  */
 static xgl_error_t datalink_receive_impl(void* ctx,
                                         xgl_handle_t handle,
@@ -515,7 +514,6 @@ static xgl_error_t datalink_receive_impl(void* ctx,
     (void)ctx;
     (void)handle;
     (void)data;
-    /* Datalink pushes data up, doesn't pull */
     return XGL_ERR_INVALID_PARAM;
 }
 

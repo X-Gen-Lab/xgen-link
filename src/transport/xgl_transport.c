@@ -204,8 +204,8 @@ void xgl_transport_report_error(xgl_transport_ctx_t* ctx,
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Transport layer send implementation (not used - app calls transport_send directly)
- * \details         This function would be called by application layer if using interface pattern
+ * \brief           Reject send calls through the lower-layer interface
+ * \details         Applications enter transport TX through xgl_transport_send().
  */
 static xgl_error_t transport_send_impl(void* ctx,
                                       xgl_handle_t handle,
@@ -213,7 +213,6 @@ static xgl_error_t transport_send_impl(void* ctx,
     (void)ctx;
     (void)handle;
     (void)data;
-    /* Application calls xgl_transport_send directly, not through interface */
     return XGL_ERR_INVALID_PARAM;
 }
 
