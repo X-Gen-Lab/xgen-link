@@ -16,6 +16,11 @@ static uint16_t wire_header_crc16(const uint8_t* buffer) {
     return xgl_crc16_modbus(crc_input, XGL_WIRE_BASE_HEADER_SIZE);
 }
 
+static bool wire_packet_type_valid(uint8_t packet_type) {
+    return packet_type > XGL_PACKET_TYPE_INVALID &&
+           packet_type <= XGL_PACKET_TYPE_CLOSE;
+}
+
 static void wire_serialize_u64_le(uint8_t* buffer, uint64_t value) {
     for (size_t i = 0; i < 8U; ++i) {
         buffer[i] = (uint8_t)((value >> (8U * i)) & 0xFFU);
@@ -43,7 +48,7 @@ xgl_error_t xgl_wire_encode_header(uint8_t* buffer,
 
     if (header->version != XGL_WIRE_VERSION ||
         header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
-        header->packet_type == XGL_PACKET_TYPE_INVALID ||
+        !wire_packet_type_valid(header->packet_type) ||
         header->source_id == 0U ||
         header->target_id == 0U) {
         return XGL_ERR_INVALID_PARAM;
@@ -105,7 +110,7 @@ xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
 
     if (header->version != XGL_WIRE_VERSION ||
         header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
-        header->packet_type == XGL_PACKET_TYPE_INVALID ||
+        !wire_packet_type_valid(header->packet_type) ||
         header->source_id == 0U ||
         header->target_id == 0U) {
         return XGL_ERR_INVALID_FRAME;

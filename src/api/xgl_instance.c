@@ -214,6 +214,9 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .window_size = handle->config.protocol.window_size,
         .enable_fragmentation = handle->config.features.enable_fragmentation,
         .max_frame_size = handle->config.protocol.max_frame_size,
+        .auth_tag_len = (handle->config.auth_required &&
+                         handle->config.auth_provider != NULL) ?
+                        (uint8_t)handle->config.auth_provider->tag_len : 0U,
         .route_table = &handle->route_table,
         .lower_layer = NULL,  /* Will be set after creating network interface */
         .rx_callback = handle->config.rx_callback,

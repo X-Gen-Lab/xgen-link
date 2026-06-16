@@ -29,8 +29,6 @@ extern "C" {
  */
 #define XGL_TRANSPORT_CONTROL_HELLO 0x0E
 #define XGL_TRANSPORT_CONTROL_RESET 0x0F
-#define XGL_TRANSPORT_CONTROL_NACK  0x0D
-#define XGL_TRANSPORT_CONTROL_SACK  0x0C
 
 /*---------------------------------------------------------------------------*/
 /* Transport Layer Context                                                   */
@@ -76,6 +74,7 @@ typedef struct xgl_transport_ctx_s {
     uint32_t default_timeout_ms;    /**< Default timeout in milliseconds */
     bool enable_fragmentation;      /**< Enable fragmentation support */
     uint16_t max_frame_size;        /**< Maximum frame size */
+    uint8_t auth_tag_len;           /**< Authentication tag length reserved per frame */
     xgl_route_table_t* route_table; /**< Optional route table for route MTU lookup */
     uint16_t next_session_id;       /**< Next local session/epoch ID */
     
@@ -113,6 +112,7 @@ typedef struct {
     uint8_t window_size;            /**< Sliding window size */
     bool enable_fragmentation;      /**< Enable fragmentation support */
     uint16_t max_frame_size;        /**< Maximum frame size */
+    uint8_t auth_tag_len;           /**< Authentication tag length reserved per frame */
     xgl_route_table_t* route_table; /**< Optional route table for route MTU lookup */
     xgl_layer_interface_t* lower_layer; /**< Lower layer interface (network) */
     xgl_rx_callback_t rx_callback;  /**< Receive callback (can be NULL) */

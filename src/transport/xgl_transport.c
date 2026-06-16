@@ -40,6 +40,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->default_timeout_ms = config->default_timeout_ms;
     ctx->enable_fragmentation = config->enable_fragmentation;
     ctx->max_frame_size = config->max_frame_size;
+    ctx->auth_tag_len = config->auth_tag_len;
     ctx->route_table = config->route_table;
     ctx->next_session_id = (uint16_t)(config->local_id & XGL_SESSION_ID_MASK);
     if (ctx->next_session_id == 0U) {
@@ -197,8 +198,11 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     }
 
     /* Validate frame size before calculating payload size */
-    size_t min_frame_size = XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE;
-    if (effective_max_frame_size < min_frame_size) {
+    size_t max_payload_size = 0U;
+    if (!xgl_frame_payload_budget(effective_max_frame_size,
+                                  0U,
+                                  ctx->auth_tag_len,
+                                  &max_payload_size)) {
         if (ctx->stats) {
             ctx->stats->tx_errors++;
         }
@@ -213,16 +217,15 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
     /* Determine if fragmentation is needed */
     size_t app_type_ext_len =
         (tx_data->data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
-    if ((size_t)effective_max_frame_size < min_frame_size + app_type_ext_len) {
+    if (!xgl_frame_payload_budget(effective_max_frame_size,
+                                  app_type_ext_len,
+                                  ctx->auth_tag_len,
+                                  &max_payload_size)) {
         if (ctx->stats) {
             ctx->stats->tx_errors++;
         }
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    size_t max_payload_size = (size_t)effective_max_frame_size -
-                              XGL_FRAME_HEADER_SIZE -
-                              XGL_CRC16_SIZE -
-                              app_type_ext_len;
     bool needs_fragmentation = (tx_data->data_len > max_payload_size) && ctx->enable_fragmentation;
 
     if (tx_data->data_len > max_payload_size && !ctx->enable_fragmentation) {
@@ -503,13 +506,11 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     
     /* Extract packet fields */
     uint16_t source_id = packet->source_id;
-    uint8_t data_type = packet->data_type;
     uint8_t reliable = packet->reliable;
     bool has_connection_scope =
         (packet->connection_id != 0U || packet->session_epoch != 0U);
 
-    if (data_type == XGL_TRANSPORT_CONTROL_HELLO ||
-        data_type == XGL_TRANSPORT_CONTROL_RESET) {
+    if (packet->packet_type == XGL_PACKET_TYPE_CONTROL) {
         return transport_process_control_packet(ctx, packet);
     }
     
@@ -522,7 +523,11 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
     }
     
     /* Check if this is an ACK packet */
-    if (reliable == XGL_RELIABILITY_ACK_ONLY) {
+    if (packet->packet_type == XGL_PACKET_TYPE_ACK ||
+        reliable == XGL_RELIABILITY_ACK_ONLY) {
+        if (packet->packet_type != XGL_PACKET_TYPE_ACK) {
+            return XGL_ERR_INVALID_FRAME;
+        }
         xgl_transport_peer_state_t* peer = has_connection_scope ?
             transport_find_peer_scope(ctx,
                                       source_id,
@@ -641,14 +646,14 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         if (packet_number > rx_peer->rx_next_packet_number) {
             uint32_t expected_packet_number = rx_peer->rx_next_packet_number;
             err = transport_cache_out_of_order_packet(ctx, rx_peer, packet, packet_number);
-            (void)transport_send_control(ctx,
-                                         handle,
-                                         source_id,
-                                         XGL_TRANSPORT_CONTROL_NACK,
-                                         expected_packet_number,
-                                         packet->session_id,
-                                         packet->connection_id,
-                                         packet->session_epoch);
+            (void)transport_send_sack(ctx,
+                                      handle,
+                                      rx_peer,
+                                      source_id,
+                                      expected_packet_number,
+                                      packet->session_id,
+                                      packet->connection_id,
+                                      packet->session_epoch);
             if (err != XGL_OK && ctx->stats != NULL) {
                 ctx->stats->rx_dropped++;
             }

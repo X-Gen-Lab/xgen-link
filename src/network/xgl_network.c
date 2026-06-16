@@ -431,7 +431,22 @@ static xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         return err;
     }
 
-    if (xgl_frame_calculate_size(frame.payload_len) + frame.extensions_len > route->max_frame_size) {
+    size_t auth_tag_len = 0U;
+    if (ctx->auth_required) {
+        if (ctx->auth_provider == NULL ||
+            ctx->auth_provider->sign == NULL ||
+            ctx->auth_provider->tag_len == 0U ||
+            ctx->auth_provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
+            if (ctx->stats != NULL) {
+                ctx->stats->tx_errors++;
+            }
+            return XGL_ERR_INVALID_PARAM;
+        }
+        auth_tag_len = ctx->auth_provider->tag_len;
+    }
+    if (xgl_frame_serialized_size(frame.payload_len,
+                                  frame.extensions_len,
+                                  auth_tag_len) > route->max_frame_size) {
         if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
@@ -616,7 +631,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx,
             return XGL_ERR_INVALID_FRAME;
         }
 
-        if (incoming_header.ttl == 0U) {
+        if (incoming_header.ttl <= 1U) {
             if (ctx->stats != NULL) {
                 ctx->stats->rx_dropped++;
             }

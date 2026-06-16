@@ -15,13 +15,13 @@
 #include <xgl/internal/xgl_wire.h>
 #include <string.h>
 
-static bool datalink_accept_replay(xgl_datalink_ctx_t* ctx,
-                                   uint16_t source_id,
-                                   uint32_t connection_id,
-                                   uint32_t session_epoch,
-                                   uint32_t packet_number) {
+static xgl_replay_result_t datalink_check_replay(xgl_datalink_ctx_t* ctx,
+                                                 uint16_t source_id,
+                                                 uint32_t connection_id,
+                                                 uint32_t session_epoch,
+                                                 uint32_t packet_number) {
     if (ctx == NULL) {
-        return false;
+        return XGL_REPLAY_REJECT;
     }
 
     size_t free_index = XGL_DATALINK_REPLAY_WINDOW_COUNT;
@@ -37,16 +37,16 @@ static bool datalink_accept_replay(xgl_datalink_ctx_t* ctx,
         if (window->source_id == source_id &&
             window->connection_id == connection_id &&
             window->session_epoch == session_epoch) {
-            return xgl_replay_window_accept(window,
-                                            source_id,
-                                            connection_id,
-                                            session_epoch,
-                                            packet_number);
+            return xgl_replay_window_check(window,
+                                           source_id,
+                                           connection_id,
+                                           session_epoch,
+                                           packet_number);
         }
     }
 
     if (free_index == XGL_DATALINK_REPLAY_WINDOW_COUNT) {
-        return false;
+        return XGL_REPLAY_REJECT;
     }
 
     if (xgl_replay_window_init(&ctx->replay_windows[free_index],
@@ -54,14 +54,25 @@ static bool datalink_accept_replay(xgl_datalink_ctx_t* ctx,
                                connection_id,
                                session_epoch,
                                XGL_DATALINK_REPLAY_WINDOW_SIZE) != XGL_OK) {
-        return false;
+        return XGL_REPLAY_REJECT;
     }
     ctx->replay_window_used[free_index] = true;
-    return xgl_replay_window_accept(&ctx->replay_windows[free_index],
-                                    source_id,
-                                    connection_id,
-                                    session_epoch,
-                                    packet_number);
+    return xgl_replay_window_check(&ctx->replay_windows[free_index],
+                                   source_id,
+                                   connection_id,
+                                   session_epoch,
+                                   packet_number);
+}
+
+static bool datalink_is_ack_eliciting(const xgl_wire_header_t* wire_header) {
+    if (wire_header == NULL) {
+        return false;
+    }
+
+    uint8_t traffic_reliability =
+        (uint8_t)(wire_header->traffic_class & XGL_RELIABILITY_CLASS_MASK);
+    return traffic_reliability == XGL_RELIABILITY_ACK_ELICITING ||
+           (wire_header->flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -125,18 +136,24 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_PARAM;
     }
     
-    /* Calculate required buffer size */
-    size_t frame_size = xgl_frame_calculate_size(frame->payload_len) +
-                        frame->extensions_len;
+    size_t auth_tag_len = 0U;
     if (ctx->auth_required) {
-        if (ctx->auth_provider == NULL || ctx->auth_provider->sign == NULL) {
+        if (ctx->auth_provider == NULL ||
+            ctx->auth_provider->sign == NULL ||
+            ctx->auth_provider->tag_len == 0U ||
+            ctx->auth_provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
             if (ctx->stats != NULL) {
                 ctx->stats->tx_errors++;
             }
             return XGL_ERR_INVALID_PARAM;
         }
-        frame_size += XGL_WIRE_EXT_HEADER_SIZE + 13U + XGL_AUTH_TAG_MAX_LEN;
+        auth_tag_len = ctx->auth_provider->tag_len;
     }
+
+    /* Calculate required buffer size */
+    size_t frame_size = xgl_frame_serialized_size(frame->payload_len,
+                                                  frame->extensions_len,
+                                                  auth_tag_len);
     
     /* Use stack buffer for small frames, heap for large frames */
     uint8_t stack_buffer[XGL_DATALINK_STACK_BUFFER_SIZE];
@@ -519,11 +536,15 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
             return XGL_ERR_INVALID_FRAME;
         }
 
-        if (!datalink_accept_replay(ctx,
-                                    wire_header.source_id,
-                                    wire_header.connection_id,
-                                    session_epoch,
-                                    wire_header.packet_number)) {
+        xgl_replay_result_t replay_result =
+            datalink_check_replay(ctx,
+                                  wire_header.source_id,
+                                  wire_header.connection_id,
+                                  session_epoch,
+                                  wire_header.packet_number);
+        if (replay_result == XGL_REPLAY_REJECT ||
+            (replay_result == XGL_REPLAY_ACCEPT_DUPLICATE &&
+             !datalink_is_ack_eliciting(&wire_header))) {
             if (ctx->stats != NULL) {
                 ctx->stats->rx_errors++;
                 ctx->stats->rx_dropped++;

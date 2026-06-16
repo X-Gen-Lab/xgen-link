@@ -118,6 +118,22 @@ static xgl_error_t datalink_test_auth_verify(uint32_t key_id,
     return XGL_OK;
 }
 
+struct DatalinkUpperSpy {
+    int receive_count = 0;
+};
+
+static xgl_error_t datalink_upper_receive_spy(void* ctx,
+                                              xgl_handle_t handle,
+                                              void* data) {
+    (void)handle;
+    if (ctx == nullptr || data == nullptr) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    auto* spy = static_cast<DatalinkUpperSpy*>(ctx);
+    spy->receive_count++;
+    return XGL_OK;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */
 /*---------------------------------------------------------------------------*/
@@ -458,7 +474,7 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsTamperedAuthenticatedPayload) {
     EXPECT_EQ(auth_stats.rx_packets, 0U);
 }
 
-TEST_F(XglDatalinkTest, ProcessFrameRejectsAuthenticatedReplay) {
+TEST_F(XglDatalinkTest, ProcessFrameRejectsAuthenticatedUnreliableReplay) {
     xgl_auth_provider_t provider = {
         .sign = datalink_test_auth_sign,
         .verify = datalink_test_auth_verify,
@@ -494,7 +510,7 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsAuthenticatedReplay) {
         .data_type = XGL_PACKET_TYPE_DATA,
         .payload = payload,
         .payload_len = sizeof(payload),
-        .reliable = true,
+        .reliable = false,
         .priority = 0
     };
     ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
@@ -514,6 +530,71 @@ TEST_F(XglDatalinkTest, ProcessFrameRejectsAuthenticatedReplay) {
               XGL_ERR_INVALID_FRAME);
     EXPECT_EQ(auth_stats.rx_packets, 1U);
     EXPECT_EQ(auth_stats.rx_dropped, 1U);
+}
+
+TEST_F(XglDatalinkTest, ProcessFrameAllowsAuthenticatedReliableDuplicateForTransportAck) {
+    xgl_auth_provider_t provider = {
+        .sign = datalink_test_auth_sign,
+        .verify = datalink_test_auth_verify,
+        .tag_len = 4,
+        .user_data = nullptr
+    };
+    DatalinkUpperSpy upper_spy;
+    xgl_layer_interface_t upper_layer = {};
+    xgl_layer_interface_init(&upper_layer,
+                             &upper_spy,
+                             nullptr,
+                             datalink_upper_receive_spy,
+                             nullptr);
+
+    xgl_datalink_ctx_t auth_ctx;
+    uint8_t cache[512] = {};
+    xgl_layer_stats_t auth_stats = {};
+    uint64_t header_crc = 0;
+    uint64_t crc16 = 0;
+    xgl_datalink_config_t config = {
+        .rx_cache = cache,
+        .rx_cache_size = sizeof(cache),
+        .source_id = SOURCE_ID,
+        .stats = &auth_stats,
+        .rx_header_crc_errors = &header_crc,
+        .rx_crc16_errors = &crc16,
+        .upper_layer = &upper_layer,
+        .error_callback = nullptr,
+        .callback_user_data = nullptr,
+        .auth_required = true,
+        .auth_key_id = 7,
+        .auth_provider = &provider
+    };
+    ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
+
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x01, 0x02, 0x03};
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    uint8_t encoded[256] = {};
+    size_t encoded_len = 0;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded,
+                                                sizeof(encoded),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+
+    EXPECT_EQ(xgl_datalink_process_frame(&auth_ctx, encoded, encoded_len), XGL_OK);
+    EXPECT_EQ(xgl_datalink_process_frame(&auth_ctx, encoded, encoded_len), XGL_OK);
+    EXPECT_EQ(upper_spy.receive_count, 2);
+    EXPECT_EQ(auth_stats.rx_dropped, 0U);
 }
 
 /*---------------------------------------------------------------------------*/

@@ -133,6 +133,9 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
                                      uint8_t priority,
                                      size_t* frame_len);
 
+#define XGL_SECURITY_EXT_VALUE_SIZE 13U
+#define XGL_SECURITY_EXT_SIZE       (XGL_WIRE_EXT_HEADER_SIZE + XGL_SECURITY_EXT_VALUE_SIZE)
+
 /**
  * \brief           Calculate frame size
  * \param[in]       payload_len: Payload length in bytes
@@ -140,6 +143,41 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
  */
 static inline size_t xgl_frame_calculate_size(size_t payload_len) {
     return XGL_FRAME_HEADER_SIZE + payload_len + XGL_CRC16_SIZE;
+}
+
+static inline size_t xgl_frame_auth_overhead(size_t auth_tag_len) {
+    return (auth_tag_len > 0U) ? (XGL_SECURITY_EXT_SIZE + auth_tag_len) : 0U;
+}
+
+static inline size_t xgl_frame_serialized_size(size_t payload_len,
+                                               size_t extensions_len,
+                                               size_t auth_tag_len) {
+    return XGL_WIRE_BASE_HEADER_SIZE +
+           extensions_len +
+           xgl_frame_auth_overhead(auth_tag_len) +
+           payload_len +
+           XGL_CRC16_SIZE;
+}
+
+static inline bool xgl_frame_payload_budget(size_t max_frame_size,
+                                            size_t extensions_len,
+                                            size_t auth_tag_len,
+                                            size_t* payload_budget) {
+    if (payload_budget == NULL) {
+        return false;
+    }
+
+    size_t overhead = XGL_WIRE_BASE_HEADER_SIZE +
+                      extensions_len +
+                      xgl_frame_auth_overhead(auth_tag_len) +
+                      XGL_CRC16_SIZE;
+    if (max_frame_size < overhead) {
+        *payload_budget = 0U;
+        return false;
+    }
+
+    *payload_budget = max_frame_size - overhead;
+    return true;
 }
 
 /*---------------------------------------------------------------------------*/

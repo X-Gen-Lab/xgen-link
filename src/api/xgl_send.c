@@ -14,8 +14,6 @@
 #include <string.h>
 
 #define XGL_SEND_DEFAULT_TTL 8U
-#define XGL_SEND_SECURITY_EXT_LEN (XGL_WIRE_EXT_HEADER_SIZE + 13U)
-#define XGL_SEND_DATA_TYPE_EXT_LEN XGL_DATA_TYPE_EXT_SIZE
 
 /*---------------------------------------------------------------------------*/
 /* Parameter Validation Helpers                                              */
@@ -192,12 +190,15 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
             err = XGL_ERR_INVALID_PARAM;
         } else {
             size_t app_type_ext_len =
-                (tx_data->data_type != 0U) ? XGL_SEND_DATA_TYPE_EXT_LEN : 0U;
+                (tx_data->data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
             size_t unauth_header_len = XGL_WIRE_BASE_HEADER_SIZE + app_type_ext_len;
-            size_t serialized_len = unauth_header_len + tx_data->data_len + XGL_CRC16_SIZE;
+            size_t auth_tag_len = handle->config.auth_required ?
+                                  handle->config.auth_provider->tag_len : 0U;
+            size_t serialized_len = xgl_frame_serialized_size(tx_data->data_len,
+                                                              app_type_ext_len,
+                                                              auth_tag_len);
             if (handle->config.auth_required) {
-                serialized_len += XGL_SEND_SECURITY_EXT_LEN +
-                                  handle->config.auth_provider->tag_len;
+                unauth_header_len += XGL_SECURITY_EXT_SIZE;
             }
             if (serialized_len > route->max_frame_size) {
                 err = XGL_ERR_BUFFER_TOO_SMALL;
@@ -206,14 +207,12 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
 
             size_t frame_len = 0;
             if (handle->config.auth_required) {
-                size_t auth_header_len = XGL_WIRE_BASE_HEADER_SIZE +
-                                         app_type_ext_len +
-                                         XGL_SEND_SECURITY_EXT_LEN;
+                size_t auth_header_len = unauth_header_len;
                 if (tx_data->data_offset != auth_header_len) {
                     err = XGL_ERR_INVALID_PARAM;
                 } else {
                     xgl_frame_t frame;
-                    uint8_t app_type_ext[XGL_SEND_DATA_TYPE_EXT_LEN] = {0};
+                    uint8_t app_type_ext[XGL_DATA_TYPE_EXT_SIZE] = {0};
                     size_t app_type_ext_written = 0U;
                     const uint8_t* frame_extensions = NULL;
                     size_t frame_extensions_len = 0U;

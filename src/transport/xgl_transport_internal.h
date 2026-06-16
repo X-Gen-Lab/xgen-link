@@ -55,6 +55,14 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                uint32_t packet_number,
                                uint16_t source_id,
                                uint16_t session_id);
+xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
+                                xgl_handle_t handle,
+                                const xgl_transport_peer_state_t* peer,
+                                uint16_t source_id,
+                                uint32_t base_packet,
+                                uint16_t session_id,
+                                uint32_t connection_id,
+                                uint32_t session_epoch);
 
 xgl_error_t transport_retransmit_reliable_packet(xgl_transport_ctx_t* ctx,
                                                  xgl_handle_t handle,

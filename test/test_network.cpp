@@ -462,6 +462,49 @@ TEST_F(XglNetworkTest, SendPacketRejectsConflictingDataTypeExtension) {
     EXPECT_EQ(xgl_network_send(&network_ctx, &packet, false), XGL_ERR_INVALID_PARAM);
 }
 
+TEST_F(XglNetworkTest, SendPacketRouteMtuIncludesAuthenticationOverhead) {
+    xgl_auth_provider_t provider = {
+        .sign = network_test_auth_sign,
+        .verify = network_test_auth_verify,
+        .tag_len = 8,
+        .user_data = nullptr
+    };
+    network_ctx.auth_required = true;
+    network_ctx.auth_key_id = 7;
+    network_ctx.auth_provider = &provider;
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 60, 100, 1);
+
+    const uint8_t payload[20] = {};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = sizeof(payload),
+        .data = payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t packet = {
+        .source_id = LOCAL_ID,
+        .target_id = REMOTE_ID,
+        .data_type = 1,
+        .reliable = XGL_RELIABILITY_NONE,
+        .priority = 0,
+        .data = &packet_data
+    };
+
+    bool lower_called = false;
+    xgl_layer_interface_t lower_layer = {};
+    lower_layer.ctx = &lower_called;
+    lower_layer.send = [](void* ctx, xgl_handle_t handle, void* data) -> xgl_error_t {
+        (void)handle;
+        (void)data;
+        *static_cast<bool*>(ctx) = true;
+        return XGL_OK;
+    };
+    network_ctx.lower_layer = &lower_layer;
+
+    EXPECT_EQ(xgl_network_send(&network_ctx, &packet, false), XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_FALSE(lower_called);
+}
+
 TEST_F(XglNetworkTest, SendPacketNullPointer) {
     xgl_error_t err = xgl_network_send(nullptr, nullptr, false);
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
@@ -540,6 +583,17 @@ TEST_F(XglNetworkTest, ForwardingDropsExpiredTtl) {
     std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID, 0);
 
     EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size()), XGL_ERR_TTL_EXPIRED);
+    EXPECT_EQ(phy_tx_count, 0);
+    EXPECT_EQ(stats.rx_dropped, 1);
+}
+
+TEST_F(XglNetworkTest, ForwardingDropsPacketWithTtlOneBeforeForwarding) {
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1), XGL_OK);
+
+    std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID, 1);
+
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_buf.size()),
+              XGL_ERR_TTL_EXPIRED);
     EXPECT_EQ(phy_tx_count, 0);
     EXPECT_EQ(stats.rx_dropped, 1);
 }

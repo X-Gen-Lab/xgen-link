@@ -28,26 +28,26 @@ xgl_error_t xgl_replay_window_init(xgl_replay_window_t* window,
     return XGL_OK;
 }
 
-bool xgl_replay_window_accept(xgl_replay_window_t* window,
-                              uint16_t source_id,
-                              uint32_t connection_id,
-                              uint32_t session_epoch,
-                              uint32_t packet_number) {
+xgl_replay_result_t xgl_replay_window_check(xgl_replay_window_t* window,
+                                            uint16_t source_id,
+                                            uint32_t connection_id,
+                                            uint32_t session_epoch,
+                                            uint32_t packet_number) {
     if (window == NULL) {
-        return false;
+        return XGL_REPLAY_REJECT;
     }
 
     if (source_id != window->source_id ||
         connection_id != window->connection_id ||
         session_epoch != window->session_epoch) {
-        return false;
+        return XGL_REPLAY_REJECT;
     }
 
     if (!window->has_largest) {
         window->largest_packet_number = packet_number;
         window->received_bitmap = 1U;
         window->has_largest = true;
-        return true;
+        return XGL_REPLAY_ACCEPT_NEW;
     }
 
     if (packet_number > window->largest_packet_number) {
@@ -59,19 +59,31 @@ bool xgl_replay_window_accept(xgl_replay_window_t* window,
             window->received_bitmap |= 1U;
         }
         window->largest_packet_number = packet_number;
-        return true;
+        return XGL_REPLAY_ACCEPT_NEW;
     }
 
     uint32_t offset = window->largest_packet_number - packet_number;
     if (offset >= window->window_size || offset >= 64U) {
-        return false;
+        return XGL_REPLAY_REJECT;
     }
 
     uint64_t bit = 1ULL << offset;
     if ((window->received_bitmap & bit) != 0U) {
-        return false;
+        return XGL_REPLAY_ACCEPT_DUPLICATE;
     }
 
     window->received_bitmap |= bit;
-    return true;
+    return XGL_REPLAY_ACCEPT_NEW;
+}
+
+bool xgl_replay_window_accept(xgl_replay_window_t* window,
+                              uint16_t source_id,
+                              uint32_t connection_id,
+                              uint32_t session_epoch,
+                              uint32_t packet_number) {
+    return xgl_replay_window_check(window,
+                                   source_id,
+                                   connection_id,
+                                   session_epoch,
+                                   packet_number) == XGL_REPLAY_ACCEPT_NEW;
 }

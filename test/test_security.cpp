@@ -12,6 +12,20 @@ TEST(XglSecurityTest, ReplayWindowAcceptsNewPacketsAndRejectsDuplicates) {
     EXPECT_FALSE(xgl_replay_window_accept(&window, 0x9999, 0x01020304U, 7, 12));
 }
 
+TEST(XglSecurityTest, ReplayWindowClassifiesDuplicateWithinWindow) {
+    xgl_replay_window_t window = {};
+    ASSERT_EQ(xgl_replay_window_init(&window, 0x1234, 0x01020304U, 7, 64), XGL_OK);
+
+    EXPECT_EQ(xgl_replay_window_check(&window, 0x1234, 0x01020304U, 7, 10),
+              XGL_REPLAY_ACCEPT_NEW);
+    EXPECT_EQ(xgl_replay_window_check(&window, 0x1234, 0x01020304U, 7, 10),
+              XGL_REPLAY_ACCEPT_DUPLICATE);
+    EXPECT_EQ(xgl_replay_window_check(&window, 0x1234, 0x01020304U, 7, 11),
+              XGL_REPLAY_ACCEPT_NEW);
+    EXPECT_EQ(xgl_replay_window_check(&window, 0x1234, 0x01020304U, 8, 12),
+              XGL_REPLAY_REJECT);
+}
+
 TEST(XglSecurityTest, ReplayWindowRejectsPacketsOlderThanWindow) {
     xgl_replay_window_t window = {};
     ASSERT_EQ(xgl_replay_window_init(&window, 0x1234, 0x01020304U, 7, 64), XGL_OK);

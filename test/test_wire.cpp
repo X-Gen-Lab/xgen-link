@@ -162,6 +162,28 @@ TEST(XglWireTest, DecodesHeaderAndRejectsCorruptedCrc) {
     EXPECT_EQ(xgl_wire_decode_header(&decoded, buffer, sizeof(buffer)), XGL_ERR_CRC_FAILED);
 }
 
+TEST(XglWireTest, RejectsPacketTypeOutsideProtocolRange) {
+    xgl_wire_header_t header = {};
+    header.version = XGL_WIRE_VERSION;
+    header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
+    header.packet_type = static_cast<uint8_t>(XGL_PACKET_TYPE_CLOSE + 1U);
+    header.ttl = 8;
+    header.source_id = 7;
+    header.target_id = 8;
+
+    uint8_t buffer[XGL_WIRE_BASE_HEADER_SIZE] = {};
+    EXPECT_EQ(xgl_wire_encode_header(buffer, sizeof(buffer), &header), XGL_ERR_INVALID_PARAM);
+
+    header.packet_type = XGL_PACKET_TYPE_DATA;
+    ASSERT_EQ(xgl_wire_encode_header(buffer, sizeof(buffer), &header), XGL_OK);
+    buffer[4] = static_cast<uint8_t>(XGL_PACKET_TYPE_CLOSE + 1U);
+    xgl_serialize_u16_le(&buffer[22], 0U);
+    xgl_serialize_u16_le(&buffer[22], xgl_crc16_modbus(buffer, sizeof(buffer)));
+
+    xgl_wire_header_t decoded = {};
+    EXPECT_EQ(xgl_wire_decode_header(&decoded, buffer, sizeof(buffer)), XGL_ERR_INVALID_FRAME);
+}
+
 TEST(XglWireTest, EncodesAndWalksTlvExtensions) {
     uint8_t buffer[32] = {};
     const uint8_t session_value[] = {

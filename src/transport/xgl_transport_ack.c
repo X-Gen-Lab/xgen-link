@@ -157,7 +157,23 @@ static xgl_error_t transport_process_sack_value(xgl_transport_ctx_t* ctx,
         }
     }
     if (!has_set) {
-        return XGL_ERR_INVALID_FRAME;
+        xgl_reliable_packet_t* missing =
+            xgl_reliable_find_packet_number(&peer->reliable_queue,
+                                            base_packet,
+                                            source_id);
+        if (missing == NULL) {
+            return XGL_ERR_SEQUENCE_ERROR;
+        }
+
+        err = transport_retransmit_reliable_packet(ctx,
+                                                   handle,
+                                                   missing,
+                                                   xgl_time_ms());
+        if (err != XGL_OK) {
+            return err;
+        }
+        (*retransmitted)++;
+        return XGL_OK;
     }
 
     uint32_t now = xgl_time_ms();

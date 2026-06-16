@@ -24,6 +24,12 @@ typedef struct {
     bool has_largest;
 } xgl_replay_window_t;
 
+typedef enum {
+    XGL_REPLAY_REJECT = 0,
+    XGL_REPLAY_ACCEPT_NEW = 1,
+    XGL_REPLAY_ACCEPT_DUPLICATE = 2
+} xgl_replay_result_t;
+
 xgl_error_t xgl_replay_window_init(xgl_replay_window_t* window,
                                    uint16_t source_id,
                                    uint32_t connection_id,
@@ -35,6 +41,12 @@ bool xgl_replay_window_accept(xgl_replay_window_t* window,
                               uint32_t connection_id,
                               uint32_t session_epoch,
                               uint32_t packet_number);
+
+xgl_replay_result_t xgl_replay_window_check(xgl_replay_window_t* window,
+                                            uint16_t source_id,
+                                            uint32_t connection_id,
+                                            uint32_t session_epoch,
+                                            uint32_t packet_number);
 
 #ifdef __cplusplus
 }

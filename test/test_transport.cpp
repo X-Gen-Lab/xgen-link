@@ -37,7 +37,6 @@ struct RxTracker {
 
 constexpr uint8_t kTransportControlHello = 0x0E;
 constexpr uint8_t kTransportControlReset = 0x0F;
-constexpr uint8_t kTransportControlNack = 0x0D;
 
 static xgl_error_t spy_send(void* ctx, xgl_handle_t handle, void* data) {
     (void)handle;
@@ -124,6 +123,37 @@ static xgl_transport_peer_state_t* find_peer_scope_for_test(xgl_transport_ctx_t*
         }
     }
     return nullptr;
+}
+
+static void expect_sack_packet_for_base(const LowerLayerSpy& spy, uint32_t base_packet) {
+    ASSERT_FALSE(spy.sent_packets.empty());
+    const xgl_packet_t& packet = spy.last_packet;
+    EXPECT_EQ(packet.packet_type, XGL_PACKET_TYPE_ACK);
+    EXPECT_EQ(packet.reliable, XGL_RELIABILITY_ACK_ONLY);
+    ASSERT_FALSE(spy.sent_extensions.empty());
+    ASSERT_FALSE(spy.sent_extensions.back().empty());
+
+    xgl_wire_ext_cursor_t cursor = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
+                                       spy.sent_extensions.back().data(),
+                                       spy.sent_extensions.back().size()),
+              XGL_OK);
+    xgl_wire_ext_t ext = {};
+    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
+    ASSERT_EQ(ext.type, XGL_WIRE_EXT_SACK);
+
+    uint32_t decoded_base = 0;
+    uint8_t bitmap[8] = {};
+    size_t bitmap_len = 0;
+    ASSERT_EQ(xgl_wire_decode_sack_ext_value(ext.value,
+                                             ext.len,
+                                             &decoded_base,
+                                             bitmap,
+                                             sizeof(bitmap),
+                                             &bitmap_len),
+              XGL_OK);
+    EXPECT_EQ(decoded_base, base_packet);
+    ASSERT_GT(bitmap_len, 0U);
 }
 
 }  // namespace
@@ -382,6 +412,85 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
     xgl_transport_destroy(&ctx);
 }
 
+TEST(XglTransportTest, EmptySackBitmapRetransmitsBasePacket) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.window_size = 8;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    ASSERT_NE(peer, nullptr);
+    const int send_count_before_sack = spy.send_count;
+
+    uint8_t sack_value[16] = {};
+    size_t sack_value_len = 0;
+    const uint8_t bitmap[] = {0x00U};
+    ASSERT_EQ(xgl_wire_encode_sack_ext_value(sack_value,
+                                             sizeof(sack_value),
+                                             0,
+                                             bitmap,
+                                             sizeof(bitmap),
+                                             &sack_value_len),
+              XGL_OK);
+
+    uint8_t ext[32] = {};
+    size_t ext_len = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(ext,
+                                  sizeof(ext),
+                                  XGL_WIRE_EXT_SACK,
+                                  sack_value,
+                                  sack_value_len,
+                                  &ext_len),
+              XGL_OK);
+
+    xgl_packet_data_t sack_ext_data = {
+        .ref_count = 1,
+        .data_len = 0,
+        .data = nullptr,
+        .owned_data = nullptr
+    };
+    xgl_packet_t sack_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .session_id = peer->session_id,
+        .packet_type = XGL_PACKET_TYPE_ACK,
+        .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
+        .data_type = 0,
+        .reliable = XGL_RELIABILITY_ACK_ONLY,
+        .priority = 7,
+        .data = &sack_ext_data,
+        .extensions = ext,
+        .extensions_len = ext_len
+    };
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &sack_packet), XGL_OK);
+    EXPECT_EQ(spy.send_count, send_count_before_sack + 1);
+    EXPECT_EQ(spy.last_packet.packet_number, 0U);
+    EXPECT_EQ(tx_retries, 1U);
+    EXPECT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 1U);
+
+    xgl_transport_destroy(&ctx);
+}
+
 TEST(XglTransportTest, ProductionAckWithUnknownExtensionDoesNotUseLegacyAckNumber) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
@@ -538,6 +647,7 @@ TEST(XglTransportTest, AckFromUnexpectedSourceIsRejected) {
     xgl_packet_t ack_packet = {
         .source_id = 3,
         .target_id = 1,
+        .packet_type = XGL_PACKET_TYPE_ACK,
         .data_type = 0,
         .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
@@ -665,6 +775,7 @@ TEST(XglTransportTest, AckWithWrongSessionIsRejected) {
         .source_id = 2,
         .target_id = 1,
         .session_id = wrong_session,
+        .packet_type = XGL_PACKET_TYPE_ACK,
         .data_type = 0,
         .reliable = XGL_RELIABILITY_ACK_ONLY,
         .priority = 7,
@@ -703,6 +814,7 @@ TEST(XglTransportTest, HelloSetsPeerSessionWithoutDeliveringToApplication) {
         .source_id = 2,
         .target_id = 1,
         .session_id = 9,
+        .packet_type = XGL_PACKET_TYPE_CONTROL,
         .data_type = kTransportControlHello,
         .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
@@ -714,6 +826,48 @@ TEST(XglTransportTest, HelloSetsPeerSessionWithoutDeliveringToApplication) {
     EXPECT_EQ(find_peer(&ctx, 2)->session_id, 9U);
     EXPECT_EQ(rx_tracker.receive_count, 0);
     EXPECT_EQ(spy.send_count, 0);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, ApplicationDataTypeCollidingWithControlValueIsDelivered) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    RxTracker rx_tracker;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &rx_tracker;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'a', 'p', 'p'};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1,
+        .data_len = sizeof(payload),
+        .data = payload,
+        .owned_data = nullptr
+    };
+    xgl_packet_t data_packet = {
+        .source_id = 2,
+        .target_id = 1,
+        .session_id = 0,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .data_type = kTransportControlHello,
+        .reliable = XGL_RELIABILITY_NONE,
+        .priority = 0,
+        .data = &packet_data
+    };
+
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &data_packet), XGL_OK);
+    EXPECT_EQ(find_peer(&ctx, 2), nullptr);
+    ASSERT_EQ(rx_tracker.receive_count, 1);
+    ASSERT_EQ(rx_tracker.payloads.size(), 1U);
+    EXPECT_EQ(rx_tracker.payloads[0], std::vector<uint8_t>({'a', 'p', 'p'}));
 
     xgl_transport_destroy(&ctx);
 }
@@ -755,6 +909,7 @@ TEST(XglTransportTest, ResetUpdatesSessionAndClearsPeerReliableState) {
         .source_id = 2,
         .target_id = 1,
         .session_id = 11,
+        .packet_type = XGL_PACKET_TYPE_CONTROL,
         .data_type = kTransportControlReset,
         .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
@@ -797,6 +952,7 @@ TEST(XglTransportTest, ReliableDataWithStaleSessionIsRejectedBeforeAckOrDelivery
         .source_id = 2,
         .target_id = 1,
         .session_id = 5,
+        .packet_type = XGL_PACKET_TYPE_CONTROL,
         .data_type = kTransportControlHello,
         .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
@@ -939,6 +1095,7 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
         .source_id = 2,
         .target_id = 1,
         .session_id = 6,
+        .packet_type = XGL_PACKET_TYPE_CONTROL,
         .data_type = kTransportControlReset,
         .reliable = XGL_RELIABILITY_NONE,
         .priority = 7,
@@ -969,7 +1126,7 @@ TEST(XglTransportTest, ResetClearsInFlightFragmentReassembly) {
     xgl_transport_destroy(&ctx);
 }
 
-TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
+TEST(XglTransportTest, OutOfOrderReliablePacketSendsSackForExpectedSequence) {
     LowerLayerSpy spy;
     xgl_layer_interface_t lower_layer = {};
     xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
@@ -1005,9 +1162,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsNackForExpectedSequence) {
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_WINDOW_FULL);
     EXPECT_EQ(rx_tracker.receive_count, 0);
     ASSERT_EQ(spy.send_count, 1);
-    EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
-    EXPECT_EQ(spy.last_packet.reliable, XGL_RELIABILITY_ACK_ONLY);
-    EXPECT_EQ(spy.last_packet.packet_number, 0U);
+    expect_sack_packet_for_base(spy, 0U);
     EXPECT_EQ(spy.last_packet.session_id, 5U);
 
     xgl_transport_destroy(&ctx);
@@ -1056,8 +1211,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
     EXPECT_EQ(rx_tracker.receive_count, 1);
     ASSERT_EQ(spy.send_count, 2);
-    EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
-    EXPECT_EQ(spy.last_packet.packet_number, 1U);
+    expect_sack_packet_for_base(spy, 1U);
 
     packet.packet_number = 1;
     packet.packet_number = 1;
@@ -1294,8 +1448,7 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_WINDOW_FULL);
     EXPECT_EQ(rx_tracker.receive_count, 1);
     ASSERT_EQ(spy.send_count, 2);
-    EXPECT_EQ(spy.last_packet.data_type, kTransportControlNack);
-    EXPECT_EQ(spy.last_packet.packet_number, 1U);
+    expect_sack_packet_for_base(spy, 1U);
 
     xgl_transport_destroy(&ctx);
 }
@@ -1741,6 +1894,7 @@ TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
         .session_id = 100,
         .connection_id = 11,
         .session_epoch = 100,
+        .packet_type = XGL_PACKET_TYPE_CONTROL,
         .data_type = kTransportControlReset,
         .data = &reset_data
     };
