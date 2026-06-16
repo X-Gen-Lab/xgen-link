@@ -131,6 +131,7 @@ set(XGL_SOURCES
     src/transport/xgl_fragment.c
     src/transport/xgl_transport_peer.c
     src/transport/xgl_transport_send.c
+    src/transport/xgl_transport_receive.c
     src/transport/xgl_transport_control.c
     src/transport/xgl_transport_retransmit.c
     src/transport/xgl_transport_rx_order.c
