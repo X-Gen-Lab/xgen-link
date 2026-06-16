@@ -5,9 +5,8 @@
  */
 
 #include "xgl_transport_internal.h"
+#include "xgl/internal/xgl_transport_send.h"
 #include "xgl/internal/xgl_packet_pool.h"
-#include "xgl/internal/xgl_route.h"
-#include "xgl/internal/xgl_frame.h"
 #include "xgl/xgl_config.h"
 #include "xgl/internal/xgl_time.h"
 #include "xgl/internal/xgl_wire.h"
@@ -188,72 +187,29 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
         }
     }
 
-    uint16_t effective_max_frame_size = ctx->max_frame_size;
-    if (ctx->route_table != NULL) {
-        const xgl_route_item_t* route = xgl_route_table_lookup(ctx->route_table,
-                                                               tx_data->target_id);
-        if (route != NULL && route->max_frame_size < effective_max_frame_size) {
-            effective_max_frame_size = route->max_frame_size;
-        }
-    }
-
-    /* Validate frame size before calculating payload size */
-    size_t max_payload_size = 0U;
-    if (!xgl_frame_payload_budget(effective_max_frame_size,
-                                  0U,
-                                  ctx->auth_tag_len,
-                                  &max_payload_size)) {
+    xgl_transport_send_plan_t send_plan;
+    err = transport_build_send_plan(ctx, tx_data, &send_plan);
+    if (err != XGL_OK) {
         if (ctx->stats) {
             ctx->stats->tx_errors++;
         }
-        if (ctx->error_callback) {
+        if (err == XGL_ERR_INVALID_PARAM && ctx->error_callback) {
             ctx->error_callback(handle, XGL_ERR_INVALID_PARAM,
-                              "max_frame_size too small for headers",
-                              ctx->callback_user_data);
+                                "max_frame_size too small for headers",
+                                ctx->callback_user_data);
         }
-        return XGL_ERR_INVALID_PARAM;
+        return err;
     }
 
-    /* Determine if fragmentation is needed */
-    size_t app_type_ext_len =
-        (tx_data->data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
-    if (!xgl_frame_payload_budget(effective_max_frame_size,
-                                  app_type_ext_len,
-                                  ctx->auth_tag_len,
-                                  &max_payload_size)) {
-        if (ctx->stats) {
-            ctx->stats->tx_errors++;
-        }
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-    bool needs_fragmentation = (tx_data->data_len > max_payload_size) && ctx->enable_fragmentation;
-
-    if (tx_data->data_len > max_payload_size && !ctx->enable_fragmentation) {
-        if (ctx->stats) {
-            ctx->stats->tx_errors++;
-        }
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    if (needs_fragmentation) {
+    if (send_plan.needs_fragmentation) {
         if (!ctx->fragment_mgr) {
             return XGL_ERR_INVALID_PARAM;
         }
 
-        const size_t fragment_ext_len = XGL_WIRE_EXT_HEADER_SIZE + 12U;
-        if (max_payload_size <= fragment_ext_len) {
-            if (ctx->stats) {
-                ctx->stats->tx_errors++;
-            }
-            return XGL_ERR_BUFFER_TOO_SMALL;
-        }
-
-        size_t fragment_payload_max = max_payload_size - fragment_ext_len;
+        size_t fragment_payload_max = send_plan.fragment_payload_budget;
         uint32_t message_id = ctx->fragment_mgr->next_message_id++;
-        size_t fragment_count =
-            (tx_data->data_len + fragment_payload_max - 1U) / fragment_payload_max;
 
-        for (size_t i = 0; i < fragment_count; i++) {
+        for (size_t i = 0; i < send_plan.fragment_count; i++) {
             size_t fragment_offset = i * fragment_payload_max;
             size_t remaining = tx_data->data_len - fragment_offset;
             size_t fragment_payload_len = (remaining < fragment_payload_max) ?
@@ -286,7 +242,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
             /* The PHY will be determined when the packet reaches network layer */
             xgl_phy_ops_t* phy = NULL;  /* Will be set by network layer */
 
-            uint8_t fragment_ext_value[12] = {0};
+            uint8_t fragment_ext_value[XGL_FRAGMENT_EXT_VALUE_SIZE] = {0};
             size_t fragment_ext_value_len = 0;
             err = xgl_wire_encode_fragment_ext_value(fragment_ext_value,
                                                      sizeof(fragment_ext_value),
@@ -298,7 +254,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx,
                 return err;
             }
 
-            uint8_t fragment_ext[XGL_WIRE_EXT_HEADER_SIZE + 12U] = {0};
+            uint8_t fragment_ext[XGL_FRAGMENT_EXT_SIZE] = {0};
             size_t encoded_ext_len = 0;
             err = xgl_wire_encode_ext(fragment_ext,
                                       sizeof(fragment_ext),

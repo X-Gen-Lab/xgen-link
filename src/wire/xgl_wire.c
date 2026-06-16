@@ -360,14 +360,14 @@ xgl_error_t xgl_wire_encode_fragment_ext_value(uint8_t* buffer,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (buffer_size < 12U) {
+    if (buffer_size < XGL_FRAGMENT_EXT_VALUE_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
     xgl_serialize_u32_le(&buffer[0], message_id);
     xgl_serialize_u32_le(&buffer[4], fragment_offset);
     xgl_serialize_u32_le(&buffer[8], message_len);
-    *bytes_written = 12U;
+    *bytes_written = XGL_FRAGMENT_EXT_VALUE_SIZE;
 
     return XGL_OK;
 }
@@ -382,7 +382,7 @@ xgl_error_t xgl_wire_decode_fragment_ext_value(const uint8_t* buffer,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (buffer_size != 12U) {
+    if (buffer_size != XGL_FRAGMENT_EXT_VALUE_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
 
@@ -402,13 +402,13 @@ xgl_error_t xgl_wire_encode_session_ext_value(uint8_t* buffer,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (buffer_size < 12U) {
+    if (buffer_size < XGL_SESSION_EXT_VALUE_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
     xgl_serialize_u32_le(&buffer[0], session_epoch);
     wire_serialize_u64_le(&buffer[4], incarnation_id);
-    *bytes_written = 12U;
+    *bytes_written = XGL_SESSION_EXT_VALUE_SIZE;
 
     return XGL_OK;
 }
@@ -421,7 +421,7 @@ xgl_error_t xgl_wire_decode_session_ext_value(const uint8_t* buffer,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (buffer_size != 12U) {
+    if (buffer_size != XGL_SESSION_EXT_VALUE_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
 

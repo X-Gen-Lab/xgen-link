@@ -7,7 +7,9 @@
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
 #include <xgl/internal/xgl_transport.h>
+#include <xgl/internal/xgl_transport_send.h>
 #include <xgl/internal/xgl_reliable.h>
+#include <xgl/internal/xgl_route.h>
 #include <xgl/internal/xgl_wire.h>
 #include <xgl/internal/xgl_window.h>
 #include <cstdlib>
@@ -1554,6 +1556,82 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     EXPECT_EQ(rx_tracker.receive_count, 1);
     ASSERT_EQ(spy.send_count, 2);
     expect_sack_packet_for_base(spy, 1U);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, SendPlanUsesRouteMtuAndAuthBudget) {
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(nullptr, &stats, &tx_retries);
+    config.max_frame_size = 128;
+    config.auth_tag_len = 8;
+
+    xgl_route_table_t route_table;
+    xgl_phy_ops_t phy = {};
+    ASSERT_EQ(xgl_route_table_init(&route_table, 4, nullptr), XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, 2, &phy, 80, 100, 1), XGL_OK);
+    config.route_table = &route_table;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 7,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+
+    xgl_transport_send_plan_t plan = {};
+    ASSERT_EQ(transport_build_send_plan(&ctx, &tx_data, &plan), XGL_OK);
+
+    EXPECT_EQ(plan.max_frame_size, 80U);
+    EXPECT_EQ(plan.app_extensions_len, XGL_DATA_TYPE_EXT_SIZE);
+    EXPECT_EQ(plan.app_payload_budget,
+              80U - XGL_WIRE_BASE_HEADER_SIZE - XGL_DATA_TYPE_EXT_SIZE -
+                  XGL_SECURITY_EXT_SIZE - 8U - XGL_CRC16_SIZE);
+    EXPECT_FALSE(plan.needs_fragmentation);
+    EXPECT_EQ(plan.fragment_count, 1U);
+
+    xgl_transport_destroy(&ctx);
+    xgl_route_table_destroy(&route_table);
+}
+
+TEST(XglTransportTest, SendPlanAccountsForFragmentExtensionBudget) {
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(nullptr, &stats, &tx_retries);
+    config.enable_fragmentation = true;
+    config.max_frame_size = 48;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    const uint8_t payload[40] = {};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 1,
+        .data = payload,
+        .data_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0,
+        .timeout_ms = 100
+    };
+
+    xgl_transport_send_plan_t plan = {};
+    ASSERT_EQ(transport_build_send_plan(&ctx, &tx_data, &plan), XGL_OK);
+
+    EXPECT_TRUE(plan.needs_fragmentation);
+    EXPECT_EQ(plan.app_extensions_len, XGL_DATA_TYPE_EXT_SIZE);
+    EXPECT_EQ(plan.fragment_extensions_len,
+              XGL_DATA_TYPE_EXT_SIZE + XGL_FRAGMENT_EXT_SIZE);
+    EXPECT_EQ(plan.fragment_payload_budget, 5U);
+    EXPECT_EQ(plan.fragment_count, 8U);
 
     xgl_transport_destroy(&ctx);
 }
