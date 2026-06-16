@@ -597,6 +597,69 @@ TEST_F(XglDatalinkTest, ProcessFrameAllowsAuthenticatedReliableDuplicateForTrans
     EXPECT_EQ(auth_stats.rx_dropped, 0U);
 }
 
+TEST_F(XglDatalinkTest, ProcessFrameVerifiesAuthenticatedFrameEvenWhenAuthOptional) {
+    xgl_auth_provider_t provider = {
+        .sign = datalink_test_auth_sign,
+        .verify = datalink_test_auth_verify,
+        .tag_len = 4,
+        .user_data = nullptr
+    };
+    xgl_datalink_ctx_t optional_auth_ctx;
+    uint8_t cache[512] = {};
+    xgl_layer_stats_t optional_stats = {};
+    uint64_t header_crc = 0;
+    uint64_t crc16 = 0;
+    xgl_datalink_config_t config = {
+        .rx_cache = cache,
+        .rx_cache_size = sizeof(cache),
+        .source_id = SOURCE_ID,
+        .stats = &optional_stats,
+        .rx_header_crc_errors = &header_crc,
+        .rx_crc16_errors = &crc16,
+        .upper_layer = nullptr,
+        .error_callback = nullptr,
+        .callback_user_data = nullptr,
+        .auth_required = false,
+        .auth_key_id = 7,
+        .auth_provider = &provider
+    };
+    ASSERT_EQ(xgl_datalink_init(&optional_auth_ctx, &config), XGL_OK);
+
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x01, 0x02, 0x03};
+    xgl_frame_params_t params = {
+        .source_id = SOURCE_ID,
+        .target_id = TARGET_ID,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = true,
+        .priority = 0
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    uint8_t encoded[256] = {};
+    size_t encoded_len = 0;
+    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded,
+                                                sizeof(encoded),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &encoded_len),
+              XGL_OK);
+
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, encoded, encoded_len), XGL_OK);
+    encoded[header.header_len] ^= 0x01U;
+    uint16_t frame_crc = xgl_crc16_modbus(encoded, encoded_len - XGL_CRC16_SIZE);
+    xgl_serialize_u16_le(&encoded[encoded_len - XGL_CRC16_SIZE], frame_crc);
+
+    EXPECT_EQ(xgl_datalink_process_frame(&optional_auth_ctx, encoded, encoded_len),
+              XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(optional_stats.rx_packets, 0U);
+    EXPECT_EQ(optional_stats.rx_errors, 1U);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Statistics Tests                                                          */
 /*---------------------------------------------------------------------------*/

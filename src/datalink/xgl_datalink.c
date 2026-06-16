@@ -411,6 +411,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
 
     uint8_t auth_tag_len = 0U;
     bool has_security_ext = false;
+    uint32_t auth_key_id = 0U;
     uint32_t session_epoch = 0U;
     if (wire_header.header_len > XGL_WIRE_BASE_HEADER_SIZE) {
         xgl_wire_ext_cursor_t cursor;
@@ -429,12 +430,11 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         xgl_wire_ext_t ext;
         while ((ext_err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
             if (ext.type == XGL_WIRE_EXT_SECURITY) {
-                uint32_t key_id = 0;
                 uint64_t nonce_id = 0;
                 uint8_t tag_len = 0;
                 if (xgl_wire_decode_security_ext_value(ext.value,
                                                        ext.len,
-                                                       &key_id,
+                                                       &auth_key_id,
                                                        &nonce_id,
                                                        &tag_len) != XGL_OK ||
                     tag_len == 0U) {
@@ -444,7 +444,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
                     return XGL_ERR_INVALID_FRAME;
                 }
                 (void)nonce_id;
-                if (ctx->auth_required && key_id != ctx->auth_key_id) {
+                if (ctx->auth_required && auth_key_id != ctx->auth_key_id) {
                     if (ctx->stats != NULL) {
                         ctx->stats->rx_errors++;
                         ctx->stats->rx_dropped++;
@@ -475,8 +475,10 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         }
     }
 
-    if (ctx->auth_required &&
-        ((wire_header.flags & XGL_WIRE_FLAG_AUTHENTICATED) == 0U ||
+    bool authenticated = (wire_header.flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U;
+    bool should_verify_auth = authenticated || has_security_ext;
+    if ((ctx->auth_required || should_verify_auth) &&
+        (!authenticated ||
          !has_security_ext ||
          ctx->auth_provider == NULL ||
          ctx->auth_provider->verify == NULL)) {
@@ -519,13 +521,13 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    if (ctx->auth_required) {
+    if (should_verify_auth) {
         bool auth_valid = false;
         xgl_error_t auth_err = xgl_wire_verify_auth_trailer(frame_buffer,
                                                             frame_len - XGL_CRC16_SIZE,
                                                             wire_header.header_len,
                                                             payload_len,
-                                                            ctx->auth_key_id,
+                                                            auth_key_id,
                                                             ctx->auth_provider,
                                                             &auth_valid);
         if (auth_err != XGL_OK || !auth_valid) {
