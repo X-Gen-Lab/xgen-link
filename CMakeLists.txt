@@ -117,6 +117,7 @@ set(XGL_SOURCES
 
     # Data Link Layer
     src/datalink/xgl_datalink_metadata.c
+    src/datalink/xgl_datalink_send.c
     src/datalink/xgl_datalink.c
 
     # Network Layer
