@@ -9,7 +9,7 @@
 #include "xgl_transport_internal.h"
 #include "xgl/internal/xgl_transport_send.h"
 
-xgl_error_t transport_queue_reliable_tx(xgl_transport_ctx_t* ctx,
+xgl_error_t transport_queue_reliable_tx(const xgl_transport_ctx_t* ctx,
                                         xgl_transport_peer_state_t* peer,
                                         const xgl_tx_data_t* tx_data,
                                         const uint8_t* data,

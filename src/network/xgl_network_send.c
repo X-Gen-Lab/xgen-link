@@ -97,11 +97,12 @@ static uint8_t network_reliability_class(const xgl_packet_t* packet) {
 
 static xgl_error_t network_build_tx_frame(xgl_network_ctx_t* ctx,
                                           const xgl_packet_t* packet,
+                                          uint8_t* extensions,
+                                          size_t extensions_capacity,
                                           xgl_frame_t* frame) {
-    uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
     size_t extensions_len = 0U;
     xgl_error_t err = network_copy_packet_extensions(extensions,
-                                                     sizeof(extensions),
+                                                     extensions_capacity,
                                                      &extensions_len,
                                                      packet);
     if (err != XGL_OK) {
@@ -165,7 +166,7 @@ static xgl_error_t network_validate_auth_tx_budget(xgl_network_ctx_t* ctx,
 
 static xgl_error_t network_send_frame_to_lower(xgl_network_ctx_t* ctx,
                                                xgl_handle_t handle,
-                                               xgl_packet_t* packet,
+                                               const xgl_packet_t* packet,
                                                xgl_frame_t* frame) {
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         network_count_tx_error(ctx);
@@ -230,8 +231,13 @@ xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         ctx->stats->tx_bytes += packet->data->data_len;
     }
 
+    uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
     xgl_frame_t frame;
-    xgl_error_t err = network_build_tx_frame(ctx, packet, &frame);
+    xgl_error_t err = network_build_tx_frame(ctx,
+                                             packet,
+                                             extensions,
+                                             sizeof(extensions),
+                                             &frame);
     if (err != XGL_OK) {
         return err;
     }

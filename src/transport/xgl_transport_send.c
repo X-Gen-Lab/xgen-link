@@ -82,7 +82,7 @@ static xgl_error_t transport_prepare_reliable_send(xgl_transport_ctx_t* ctx,
     return err;
 }
 
-xgl_error_t transport_queue_reliable_tx(xgl_transport_ctx_t* ctx,
+xgl_error_t transport_queue_reliable_tx(const xgl_transport_ctx_t* ctx,
                                         xgl_transport_peer_state_t* peer,
                                         const xgl_tx_data_t* tx_data,
                                         const uint8_t* data,
