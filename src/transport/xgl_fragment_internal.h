@@ -12,7 +12,7 @@ void* fragment_malloc(xgl_allocator_t* allocator, size_t size);
 void fragment_free(xgl_allocator_t* allocator, void* ptr);
 
 xgl_reassembly_buffer_t* fragment_find_reassembly_buffer(
-    xgl_fragment_manager_t* manager,
+    const xgl_fragment_manager_t* manager,
     uint16_t source_id,
     uint32_t connection_id,
     uint32_t session_epoch,
