@@ -38,6 +38,7 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     ctx->auth_required = config->auth_required;
     ctx->auth_key_id = config->auth_key_id;
     ctx->auth_provider = config->auth_provider;
+    ctx->allocator = config->allocator;
 
     return XGL_OK;
 }

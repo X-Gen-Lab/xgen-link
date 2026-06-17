@@ -72,6 +72,7 @@ typedef struct xgl_network_ctx_s {
     bool auth_required;             /**< Require authenticated routed frames */
     uint32_t auth_key_id;           /**< Active authentication key id */
     xgl_auth_provider_t* auth_provider; /**< End-to-end authentication provider */
+    xgl_allocator_t* allocator;     /**< Allocator for forwarded frame copies */
 } xgl_network_ctx_t;
 
 /**
@@ -88,6 +89,7 @@ typedef struct {
     bool auth_required;             /**< Require authenticated routed frames */
     uint32_t auth_key_id;           /**< Active authentication key id */
     xgl_auth_provider_t* auth_provider; /**< End-to-end authentication provider */
+    xgl_allocator_t* allocator;     /**< Allocator for forwarded frame copies */
 } xgl_network_config_t;
 
 /*---------------------------------------------------------------------------*/

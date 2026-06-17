@@ -96,6 +96,16 @@ extern "C" {
 #define XGL_DEFAULT_ROUTE_TABLE_SIZE        8
 #endif
 
+/**
+ * \brief           Stack buffer size for forwarded frame rewriting
+ * \details         Forwarded frames larger than this are allocated from the
+ *                  configured network allocator to avoid reserving the maximum
+ *                  wire frame size on every forwarding call stack.
+ */
+#ifndef XGL_NETWORK_FORWARD_STACK_BUFFER_SIZE
+#define XGL_NETWORK_FORWARD_STACK_BUFFER_SIZE 512
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* Memory Pool Configuration                                                 */
 /*---------------------------------------------------------------------------*/

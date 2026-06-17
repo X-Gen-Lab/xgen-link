@@ -5,6 +5,7 @@
 
 #include "xgl_network_internal.h"
 
+#include "xgl/internal/xgl_allocator.h"
 #include "xgl/internal/xgl_crc.h"
 #include "xgl/internal/xgl_network_metadata.h"
 #include "xgl/internal/xgl_route.h"
@@ -167,13 +168,31 @@ static xgl_error_t network_forward_remote(xgl_network_ctx_t* ctx,
         return err;
     }
 
-    uint8_t forward_buf[XGL_DATALINK_MAX_FRAME_SIZE];
+    uint8_t stack_forward_buf[XGL_NETWORK_FORWARD_STACK_BUFFER_SIZE];
+    uint8_t* forward_buf = stack_forward_buf;
+    bool use_heap = false;
+
+    if (frame_len > sizeof(stack_forward_buf)) {
+        forward_buf = (uint8_t*)xgl_alloc(ctx->allocator, frame_len);
+        if (forward_buf == NULL) {
+            network_count_rx_drop(ctx);
+            if (ctx->stats != NULL) {
+                ctx->stats->tx_errors++;
+            }
+            return XGL_ERR_NO_MEMORY;
+        }
+        use_heap = true;
+    }
+
     err = network_rewrite_forward_frame(ctx,
                                         frame_buf,
                                         frame_len,
                                         &metadata->header,
                                         forward_buf);
     if (err != XGL_OK) {
+        if (use_heap) {
+            xgl_free(ctx->allocator, forward_buf);
+        }
         return err;
     }
 
@@ -183,8 +202,15 @@ static xgl_error_t network_forward_remote(xgl_network_ctx_t* ctx,
             if (ctx->stats != NULL) {
                 ctx->stats->tx_errors++;
             }
+            if (use_heap) {
+                xgl_free(ctx->allocator, forward_buf);
+            }
             return XGL_ERR_TX_FAILED;
         }
+    }
+
+    if (use_heap) {
+        xgl_free(ctx->allocator, forward_buf);
     }
 
     return XGL_OK;

@@ -156,7 +156,8 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .stats = &handle->stats.network,
         .auth_required = handle->config.auth_required,
         .auth_key_id = handle->config.auth_key_id,
-        .auth_provider = handle->config.auth_provider
+        .auth_provider = handle->config.auth_provider,
+        .allocator = handle->allocator
     };
     err = xgl_network_init(&handle->layers.network_ctx, &network_config);
     if (err != XGL_OK) {

@@ -10,6 +10,8 @@
 #include <xgl/internal/xgl_network_metadata.h>
 #include <xgl/internal/xgl_route.h>
 #include <xgl/internal/xgl_wire.h>
+#include <xgl/xgl_config.h>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -44,6 +46,27 @@ static xgl_error_t capture_phy_tx(const uint8_t* data, size_t len, void* user_da
         capture->bytes.assign(data, data + len);
     }
     return XGL_OK;
+}
+
+struct NetworkForwardAllocatorState {
+    size_t alloc_count = 0;
+    size_t free_count = 0;
+};
+
+static NetworkForwardAllocatorState* g_network_forward_allocator_state = nullptr;
+
+static void* network_forward_test_malloc(size_t size) {
+    if (g_network_forward_allocator_state != nullptr) {
+        g_network_forward_allocator_state->alloc_count++;
+    }
+    return std::malloc(size);
+}
+
+static void network_forward_test_free(void* ptr) {
+    if (g_network_forward_allocator_state != nullptr) {
+        g_network_forward_allocator_state->free_count++;
+    }
+    std::free(ptr);
 }
 
 static xgl_error_t network_test_auth_sign(uint32_t key_id,
@@ -610,6 +633,71 @@ TEST_F(XglNetworkTest, ForwardingRejectsRouteMtuOverflow) {
               XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(phy_tx_count, 0);
     EXPECT_EQ(stats.rx_dropped, 1);
+}
+
+TEST_F(XglNetworkTest, ForwardingAllocatesLargeFrameBufferFromNetworkAllocator) {
+    NetworkForwardAllocatorState allocator_state;
+    g_network_forward_allocator_state = &allocator_state;
+    xgl_allocator_t allocator = {
+        .malloc = network_forward_test_malloc,
+        .free = network_forward_test_free,
+        .user_data = nullptr
+    };
+
+    xgl_network_ctx_t ctx = {};
+    xgl_layer_stats_t local_stats = {};
+    xgl_network_config_t config = {
+        .local_id = LOCAL_ID,
+        .route_table = &route_table,
+        .stats = &local_stats,
+        .allocator = &allocator
+    };
+    ASSERT_EQ(xgl_network_init(&ctx, &config), XGL_OK);
+
+    CaptureTx capture;
+    xgl_phy_ops_t capture_phy = {
+        .tx = capture_phy_tx,
+        .rx = test_phy_rx,
+        .user_data = &capture
+    };
+    ASSERT_EQ(xgl_route_table_add(&route_table,
+                                  FORWARD_ID,
+                                  &capture_phy,
+                                  XGL_DATALINK_MAX_FRAME_SIZE,
+                                  100,
+                                  1),
+              XGL_OK);
+
+    std::vector<uint8_t> payload(XGL_NETWORK_FORWARD_STACK_BUFFER_SIZE + 1U, 0xA5U);
+    xgl_frame_t frame = {};
+    xgl_frame_params_t params = {
+        .source_id = REMOTE_ID,
+        .target_id = FORWARD_ID,
+        .data_type = 1,
+        .payload = payload.data(),
+        .payload_len = payload.size(),
+        .reliable = true,
+        .ttl = XGL_DEFAULT_TTL
+    };
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+    std::vector<uint8_t> frame_buf(xgl_frame_serialized_size(payload.size(),
+                                                             frame.extensions_len,
+                                                             0U));
+    size_t frame_len = 0U;
+    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(),
+                                  frame_buf.size(),
+                                  &frame,
+                                  &frame_len),
+              XGL_OK);
+    ASSERT_GT(frame_len, XGL_NETWORK_FORWARD_STACK_BUFFER_SIZE);
+
+    EXPECT_EQ(xgl_network_receive(&ctx, nullptr, frame_buf.data(), frame_len), XGL_OK);
+    EXPECT_EQ(capture.count, 1);
+    EXPECT_EQ(allocator_state.alloc_count, 1U);
+    EXPECT_EQ(allocator_state.free_count, 1U);
+
+    g_network_forward_allocator_state = nullptr;
 }
 
 TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
