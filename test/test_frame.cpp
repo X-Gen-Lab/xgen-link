@@ -435,6 +435,57 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameUsesConfiguredTagLengthAndSignsOnc
     EXPECT_TRUE(valid);
 }
 
+TEST(XglFrameTest, AuthenticatedFrameVerificationIgnoresHopMutableHeaderFields) {
+    xgl_auth_provider_t provider = {
+        .sign = frame_test_auth_sign,
+        .verify = frame_test_auth_verify,
+        .tag_len = 4,
+        .user_data = nullptr
+    };
+    xgl_frame_t frame;
+    const uint8_t payload[] = {0x10, 0x20};
+    uint8_t buffer[128] = {};
+    size_t bytes_written = 0;
+
+    xgl_frame_params_t params = {
+        .source_id = 1,
+        .target_id = 2,
+        .data_type = XGL_PACKET_TYPE_DATA,
+        .payload = payload,
+        .payload_len = sizeof(payload),
+        .reliable = false,
+        .priority = 0,
+        .ttl = 8
+    };
+
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    ASSERT_EQ(xgl_frame_serialize_authenticated(buffer,
+                                                sizeof(buffer),
+                                                &frame,
+                                                7,
+                                                &provider,
+                                                &bytes_written),
+              XGL_OK);
+
+    xgl_wire_header_t header = {};
+    ASSERT_EQ(xgl_wire_decode_header(&header, buffer, bytes_written), XGL_OK);
+    header.ttl = 3;
+    ASSERT_EQ(xgl_wire_encode_header(buffer, bytes_written, &header), XGL_OK);
+    uint16_t frame_crc = xgl_crc16_modbus(buffer, bytes_written - XGL_CRC16_SIZE);
+    xgl_serialize_u16_le(&buffer[bytes_written - XGL_CRC16_SIZE], frame_crc);
+
+    bool valid = false;
+    ASSERT_EQ(xgl_wire_verify_auth_trailer(buffer,
+                                           bytes_written - XGL_CRC16_SIZE,
+                                           header.header_len,
+                                           header.payload_len,
+                                           7,
+                                           &provider,
+                                           &valid),
+              XGL_OK);
+    EXPECT_TRUE(valid);
+}
+
 TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0x01, 0x02, 0x03, 0x04};

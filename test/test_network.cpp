@@ -612,7 +612,7 @@ TEST_F(XglNetworkTest, ForwardingRejectsRouteMtuOverflow) {
     EXPECT_EQ(stats.rx_dropped, 1);
 }
 
-TEST_F(XglNetworkTest, ForwardingResignsAuthenticatedFrameAfterTtlDecrement) {
+TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
     xgl_auth_provider_t provider = {
         .sign = network_test_auth_sign,
         .verify = network_test_auth_verify,
@@ -656,6 +656,12 @@ TEST_F(XglNetworkTest, ForwardingResignsAuthenticatedFrameAfterTtlDecrement) {
                                                 &encoded_len),
               XGL_OK);
     encoded.resize(encoded_len);
+    xgl_wire_header_t original = {};
+    ASSERT_EQ(xgl_wire_decode_header(&original, encoded.data(), encoded.size()), XGL_OK);
+    const size_t original_tag_offset =
+        (size_t)original.header_len + (size_t)original.payload_len;
+    std::vector<uint8_t> original_tag(encoded.begin() + original_tag_offset,
+                                      encoded.begin() + original_tag_offset + provider.tag_len);
 
     ASSERT_EQ(xgl_network_receive(&network_ctx, nullptr, encoded.data(), encoded.size()),
               XGL_OK);
@@ -668,6 +674,14 @@ TEST_F(XglNetworkTest, ForwardingResignsAuthenticatedFrameAfterTtlDecrement) {
                                      capture.bytes.size()),
               XGL_OK);
     EXPECT_EQ(forwarded.ttl, 3U);
+    const size_t forwarded_tag_offset =
+        (size_t)forwarded.header_len + (size_t)forwarded.payload_len;
+    ASSERT_LE(forwarded_tag_offset + provider.tag_len,
+              capture.bytes.size() - XGL_CRC16_SIZE);
+    EXPECT_EQ(std::vector<uint8_t>(capture.bytes.begin() + forwarded_tag_offset,
+                                   capture.bytes.begin() + forwarded_tag_offset +
+                                       provider.tag_len),
+              original_tag);
 
     bool valid = false;
     EXPECT_EQ(xgl_wire_verify_auth_trailer(capture.bytes.data(),
