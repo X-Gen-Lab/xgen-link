@@ -97,6 +97,7 @@ set(XGL_SOURCES
     # Wire format and serialization
     src/wire/xgl_crc.c
     src/wire/xgl_serialize.c
+    src/wire/xgl_wire_ack_ext.c
     src/wire/xgl_wire_ext.c
     src/wire/xgl_wire.c
     src/wire/xgl_frame.c
