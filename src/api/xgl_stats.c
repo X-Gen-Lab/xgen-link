@@ -40,9 +40,11 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
 
 #ifdef XGL_THREAD_SAFE
     /* Lock mutex for thread-safe access */
-    xgl_error_t err = xgl_mutex_lock(&inst->mutex);
-    if (err != XGL_OK) {
-        return err;
+    if (inst->config.features.thread_safe) {
+        xgl_error_t err = xgl_mutex_lock(&inst->mutex);
+        if (err != XGL_OK) {
+            return err;
+        }
     }
 #endif
 
@@ -51,7 +53,9 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
 
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex */
-    xgl_mutex_unlock(&inst->mutex);
+    if (inst->config.features.thread_safe) {
+        xgl_mutex_unlock(&inst->mutex);
+    }
 #endif
 
     return XGL_OK;
@@ -78,9 +82,11 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
 
 #ifdef XGL_THREAD_SAFE
     /* Lock mutex for thread-safe access */
-    xgl_error_t err = xgl_mutex_lock(&inst->mutex);
-    if (err != XGL_OK) {
-        return err;
+    if (inst->config.features.thread_safe) {
+        xgl_error_t err = xgl_mutex_lock(&inst->mutex);
+        if (err != XGL_OK) {
+            return err;
+        }
     }
 #endif
 
@@ -89,7 +95,9 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
 
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex */
-    xgl_mutex_unlock(&inst->mutex);
+    if (inst->config.features.thread_safe) {
+        xgl_mutex_unlock(&inst->mutex);
+    }
 #endif
 
     return XGL_OK;

@@ -91,6 +91,7 @@ set(XGL_SOURCES
     src/api/xgl_runtime.c
     src/api/xgl_config.c
     src/api/xgl_send.c
+    src/api/xgl_send_zerocopy.c
     src/api/xgl_stats.c
     src/api/xgl_version.c
 
