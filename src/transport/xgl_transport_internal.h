@@ -29,6 +29,14 @@ xgl_transport_peer_state_t *
 transport_get_or_create_peer_scope(xgl_transport_ctx_t *ctx, uint16_t peer_id,
                                    uint32_t connection_id,
                                    uint32_t session_epoch);
+xgl_transport_peer_state_t *transport_find_rx_peer(xgl_transport_ctx_t *ctx,
+                                                   const xgl_packet_t *packet);
+xgl_transport_peer_state_t *
+transport_get_or_create_rx_peer(xgl_transport_ctx_t *ctx,
+                                const xgl_packet_t *packet);
+xgl_error_t transport_prepare_rx_peer(xgl_transport_ctx_t *ctx,
+                                      const xgl_packet_t *packet,
+                                      xgl_transport_peer_state_t **peer);
 void transport_destroy_peers(xgl_transport_ctx_t *ctx);
 void transport_commit_packet_number(xgl_transport_ctx_t *ctx,
                                     xgl_transport_peer_state_t *peer);
