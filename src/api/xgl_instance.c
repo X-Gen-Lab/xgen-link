@@ -16,48 +16,6 @@
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
-/* Instance Creation                                                         */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Create a new protocol instance
- * \details         Allocates memory for instance structure and stores configuration
- */
-xgl_handle_t xgl_create(const xgl_config_t* config) {
-    xgl_handle_t handle;
-    xgl_allocator_t* allocator;
-    xgl_error_t err;
-
-    /* Validate configuration using public validation function */
-    err = xgl_config_validate(config);
-    if (err != XGL_OK) {
-        return NULL;
-    }
-
-    /* Determine allocator to use */
-    allocator = config->memory.allocator;
-    if (allocator == NULL) {
-        allocator = xgl_allocator_get_default();
-    }
-
-    /* Allocate instance structure */
-    handle = (xgl_handle_t)xgl_alloc(allocator, sizeof(struct xgl_instance));
-    if (handle == NULL) {
-        return NULL;
-    }
-
-    /* Zero-initialize the structure */
-    memset(handle, 0, sizeof(struct xgl_instance));
-
-    /* Store configuration */
-    memcpy(&handle->config, config, sizeof(xgl_config_t));
-    handle->allocator = allocator;
-    handle->initialized = false;
-
-    return handle;
-}
-
-/*---------------------------------------------------------------------------*/
 /* Instance Initialization                                                   */
 /*---------------------------------------------------------------------------*/
 
@@ -284,55 +242,4 @@ cleanup:
 #endif
 
     return err;
-}
-
-/*---------------------------------------------------------------------------*/
-/* Instance Destruction                                                      */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Destroy protocol instance and free all resources
- * \details         Cleans up all allocated resources and frees instance
- */
-void xgl_destroy(xgl_handle_t handle) {
-    /* Validate handle */
-    if (handle == NULL) {
-        return;
-    }
-
-    /* Destroy transport layer */
-    xgl_transport_destroy(&handle->layers.transport_ctx);
-
-    /* Free datalink layer's RX buffer */
-    if (handle->layers.datalink_ctx.rx_cache != NULL) {
-        xgl_free(handle->allocator, handle->layers.datalink_ctx.rx_cache);
-        handle->layers.datalink_ctx.rx_cache = NULL;
-    }
-
-    /* Network and datalink layers don't need explicit destroy */
-
-    if (handle->route_last_read_ms != NULL) {
-        xgl_free(handle->allocator, handle->route_last_read_ms);
-        handle->route_last_read_ms = NULL;
-        handle->route_last_read_count = 0;
-    }
-
-    /* Destroy route table */
-    xgl_route_table_destroy(&handle->route_table);
-
-    /* Destroy packet pool */
-    xgl_packet_pool_destroy(&handle->packet_pool);
-
-    /* Destroy tiered pool */
-    xgl_tiered_pool_destroy(&handle->tx_pool);
-
-#ifdef XGL_THREAD_SAFE
-    /* Destroy mutex if thread safety was enabled */
-    if (handle->config.features.thread_safe) {
-        xgl_mutex_destroy(&handle->mutex);
-    }
-#endif
-
-    /* Free instance structure itself */
-    xgl_free(handle->allocator, handle);
 }

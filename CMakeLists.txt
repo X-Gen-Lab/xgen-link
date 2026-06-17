@@ -87,6 +87,7 @@ include_directories(
 set(XGL_SOURCES
     # Public API orchestration
     src/api/xgl_instance.c
+    src/api/xgl_instance_lifecycle.c
     src/api/xgl_runtime.c
     src/api/xgl_config.c
     src/api/xgl_send.c
