@@ -41,6 +41,23 @@ transport_find_rx_buffered(xgl_transport_peer_state_t *peer,
     return NULL;
 }
 
+void transport_clear_rx_buffered(xgl_transport_ctx_t *ctx,
+                                 xgl_transport_peer_state_t *peer)
+{
+    if (peer == NULL) {
+        return;
+    }
+
+    xgl_transport_rx_buffered_packet_t *node = peer->rx_buffered;
+    while (node != NULL) {
+        xgl_transport_rx_buffered_packet_t *next = node->next;
+        transport_free_rx_buffered_packet(ctx, node);
+        node = next;
+    }
+    peer->rx_buffered = NULL;
+    peer->rx_buffered_count = 0U;
+}
+
 xgl_error_t transport_cache_out_of_order_packet(
     xgl_transport_ctx_t *ctx, xgl_transport_peer_state_t *peer,
     const xgl_packet_t *packet, uint32_t packet_number)

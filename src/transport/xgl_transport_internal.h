@@ -82,6 +82,8 @@ uint32_t transport_process_retransmissions(xgl_transport_ctx_t *ctx,
 xgl_error_t transport_cache_out_of_order_packet(
     xgl_transport_ctx_t *ctx, xgl_transport_peer_state_t *peer,
     const xgl_packet_t *packet, uint32_t packet_number);
+void transport_clear_rx_buffered(xgl_transport_ctx_t *ctx,
+                                 xgl_transport_peer_state_t *peer);
 xgl_error_t transport_deliver_packet(xgl_transport_ctx_t *ctx,
                                      xgl_handle_t handle,
                                      const xgl_packet_t *packet,
