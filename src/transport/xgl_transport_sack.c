@@ -3,21 +3,96 @@
  * \brief           Transport SACK processing
  */
 
-#include "xgl_transport_internal.h"
 #include "xgl/internal/xgl_time.h"
 #include "xgl/internal/xgl_wire.h"
+#include "xgl_transport_internal.h"
 
-static bool transport_sack_bit_is_set(const uint8_t* bitmap, size_t bit_index) {
-    return (bitmap[bit_index / 8U] & (uint8_t)(1U << (bit_index % 8U))) != 0U;
+xgl_error_t transport_send_sack(const xgl_transport_ctx_t *ctx,
+                                xgl_handle_t handle,
+                                const xgl_transport_peer_state_t *peer,
+                                uint16_t source_id, uint32_t base_packet,
+                                uint16_t session_id, uint32_t connection_id,
+                                uint32_t session_epoch)
+{
+    if (ctx == NULL || peer == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    uint8_t bitmap[8] = {0};
+    size_t highest_bit = 0U;
+    bool has_received = false;
+    for (const xgl_transport_rx_buffered_packet_t *node = peer->rx_buffered;
+         node != NULL; node = node->next) {
+        if (node->packet.packet_number < base_packet) {
+            continue;
+        }
+        uint32_t diff = node->packet.packet_number - base_packet;
+        if (diff >= (uint32_t) (sizeof(bitmap) * 8U)) {
+            continue;
+        }
+        bitmap[diff / 8U] |= (uint8_t) (1U << (diff % 8U));
+        if (diff > highest_bit) {
+            highest_bit = diff;
+        }
+        has_received = true;
+    }
+
+    size_t bitmap_len = has_received ? ((highest_bit / 8U) + 1U) : 1U;
+    uint8_t sack_value[16] = {0};
+    size_t sack_value_len = 0U;
+    xgl_error_t err = xgl_wire_encode_sack_ext_value(
+        sack_value, sizeof(sack_value), base_packet, bitmap, bitmap_len,
+        &sack_value_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    uint8_t sack_ext[32] = {0};
+    size_t sack_ext_len = 0U;
+    err = xgl_wire_encode_ext(sack_ext, sizeof(sack_ext), XGL_WIRE_EXT_SACK,
+                              sack_value, sack_value_len, &sack_ext_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    xgl_packet_data_t sack_packet_data = {
+        .ref_count = 1, .data_len = 0, .data = NULL, .owned_data = NULL};
+
+    xgl_packet_t sack_packet = {.source_id = ctx->local_id,
+                                .target_id = source_id,
+                                .session_id = session_id,
+                                .connection_id = connection_id,
+                                .packet_number = base_packet,
+                                .session_epoch = session_epoch,
+                                .packet_type = XGL_PACKET_TYPE_ACK,
+                                .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
+                                .data_type = 0,
+                                .reliable = XGL_RELIABILITY_ACK_ONLY,
+                                .fragment = false,
+                                .priority = 7,
+                                .data = &sack_packet_data,
+                                .extensions = sack_ext,
+                                .extensions_len = sack_ext_len,
+                                .phy = NULL};
+
+    if (ctx->lower_layer != NULL && ctx->lower_layer->send != NULL) {
+        return xgl_layer_send(ctx->lower_layer, handle, &sack_packet);
+    }
+
+    return XGL_ERR_INVALID_PARAM;
 }
 
-static xgl_error_t transport_process_sack_value(xgl_transport_ctx_t* ctx,
-                                                xgl_handle_t handle,
-                                                xgl_transport_peer_state_t* peer,
-                                                uint16_t source_id,
-                                                const uint8_t* value,
-                                                size_t value_len,
-                                                size_t* retransmitted) {
+static bool transport_sack_bit_is_set(const uint8_t *bitmap, size_t bit_index)
+{
+    return (bitmap[bit_index / 8U] & (uint8_t) (1U << (bit_index % 8U))) != 0U;
+}
+
+static xgl_error_t
+transport_process_sack_value(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
+                             xgl_transport_peer_state_t *peer,
+                             uint16_t source_id, const uint8_t *value,
+                             size_t value_len, size_t *retransmitted)
+{
     if (ctx == NULL || peer == NULL || value == NULL || retransmitted == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -25,12 +100,8 @@ static xgl_error_t transport_process_sack_value(xgl_transport_ctx_t* ctx,
     uint32_t base_packet = 0U;
     uint8_t bitmap[64] = {0};
     size_t bitmap_len = 0U;
-    xgl_error_t err = xgl_wire_decode_sack_ext_value(value,
-                                                     value_len,
-                                                     &base_packet,
-                                                     bitmap,
-                                                     sizeof(bitmap),
-                                                     &bitmap_len);
+    xgl_error_t err = xgl_wire_decode_sack_ext_value(
+        value, value_len, &base_packet, bitmap, sizeof(bitmap), &bitmap_len);
     if (err != XGL_OK) {
         return err;
     }
@@ -47,17 +118,13 @@ static xgl_error_t transport_process_sack_value(xgl_transport_ctx_t* ctx,
         }
     }
     if (!has_set) {
-        xgl_reliable_packet_t* missing =
-            xgl_reliable_find_packet_number(&peer->reliable_queue,
-                                            base_packet,
-                                            source_id);
+        xgl_reliable_packet_t *missing = xgl_reliable_find_packet_number(
+            &peer->reliable_queue, base_packet, source_id);
         if (missing == NULL) {
             return XGL_ERR_SEQUENCE_ERROR;
         }
 
-        err = transport_retransmit_reliable_packet(ctx,
-                                                   handle,
-                                                   missing,
+        err = transport_retransmit_reliable_packet(ctx, handle, missing,
                                                    xgl_time_ms());
         if (err != XGL_OK) {
             return err;
@@ -68,34 +135,31 @@ static xgl_error_t transport_process_sack_value(xgl_transport_ctx_t* ctx,
 
     uint32_t now = xgl_time_ms();
     for (size_t i = 0; i <= highest_set; ++i) {
-        uint32_t packet_number = base_packet + (uint32_t)i;
+        uint32_t packet_number = base_packet + (uint32_t) i;
         bool received = transport_sack_bit_is_set(bitmap, i);
         if (received) {
-            const xgl_reliable_packet_t* rel_packet =
+            const xgl_reliable_packet_t *rel_packet =
                 xgl_reliable_find_packet_number(&peer->reliable_queue,
-                                                packet_number,
-                                                source_id);
+                                                packet_number, source_id);
             if (rel_packet != NULL) {
-                (void)xgl_reliable_remove_packet_number(&peer->reliable_queue,
-                                                        packet_number,
-                                                        source_id);
-                (void)xgl_window_mark_ack_packet_number(&peer->tx_window,
-                                                        packet_number);
+                (void) xgl_reliable_remove_packet_number(
+                    &peer->reliable_queue, packet_number, source_id);
+                (void) xgl_window_mark_ack_packet_number(&peer->tx_window,
+                                                         packet_number);
                 if (xgl_window_is_in_window_packet_number(&ctx->window,
                                                           packet_number)) {
-                    (void)xgl_window_mark_ack_packet_number(&ctx->window,
-                                                            packet_number);
+                    (void) xgl_window_mark_ack_packet_number(&ctx->window,
+                                                             packet_number);
                 }
             }
             continue;
         }
 
-        xgl_reliable_packet_t* missing =
-            xgl_reliable_find_packet_number(&peer->reliable_queue,
-                                            packet_number,
-                                            source_id);
+        xgl_reliable_packet_t *missing = xgl_reliable_find_packet_number(
+            &peer->reliable_queue, packet_number, source_id);
         if (missing != NULL) {
-            err = transport_retransmit_reliable_packet(ctx, handle, missing, now);
+            err =
+                transport_retransmit_reliable_packet(ctx, handle, missing, now);
             if (err != XGL_OK) {
                 return err;
             }
@@ -103,19 +167,19 @@ static xgl_error_t transport_process_sack_value(xgl_transport_ctx_t* ctx,
         }
     }
 
-    (void)xgl_window_advance_base_packet_number(&peer->tx_window);
-    (void)xgl_window_advance_base_packet_number(&ctx->window);
+    (void) xgl_window_advance_base_packet_number(&peer->tx_window);
+    (void) xgl_window_advance_base_packet_number(&ctx->window);
 
     return XGL_OK;
 }
 
-xgl_error_t transport_try_process_sack_ext(xgl_transport_ctx_t* ctx,
+xgl_error_t transport_try_process_sack_ext(xgl_transport_ctx_t *ctx,
                                            xgl_handle_t handle,
-                                           xgl_transport_peer_state_t* peer,
+                                           xgl_transport_peer_state_t *peer,
                                            uint16_t source_id,
-                                           const uint8_t* data,
-                                           size_t data_len,
-                                           bool* handled) {
+                                           const uint8_t *data, size_t data_len,
+                                           bool *handled)
+{
     if (ctx == NULL || peer == NULL || handled == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -138,13 +202,8 @@ xgl_error_t transport_try_process_sack_ext(xgl_transport_ctx_t* ctx,
         }
 
         size_t retransmitted = 0U;
-        err = transport_process_sack_value(ctx,
-                                           handle,
-                                           peer,
-                                           source_id,
-                                           ext.value,
-                                           ext.len,
-                                           &retransmitted);
+        err = transport_process_sack_value(ctx, handle, peer, source_id,
+                                           ext.value, ext.len, &retransmitted);
         if (err != XGL_OK) {
             return err;
         }
