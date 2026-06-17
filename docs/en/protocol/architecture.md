@@ -68,7 +68,7 @@ flowchart LR
   TTL -- yes --> Route[Lookup egress route]
   Route --> MTU{Frame <= route MTU?}
   MTU -- no --> Reject[Drop + XGL_ERR_BUFFER_TOO_SMALL]
-  MTU -- yes --> Rewrite[Decrement TTL + rebuild CRC/auth boundary]
+  MTU -- yes --> Rewrite[Decrement TTL + recompute CRC]
   Rewrite --> TX[Egress PHY]
 ```
 

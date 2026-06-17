@@ -15,9 +15,10 @@
 
 - auth provider 的 `tag_len` 固定，且满足 `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`。
 - `sign` 和 `verify` 对 header/extensions/payload 使用相同 AAD 边界。
+- 端到端认证会规范化逐跳可变字段：TTL 和 header CRC 被排除，frame CRC 位于 tag 输入之外。
 - key id、nonce/material id 的生成和轮换由应用或安全模块管理。
 - replay window 容量满足最大乱序窗口。
-- 多跳 forwarding 场景已验证 TTL 修改后的 CRC/auth 处理。
+- 多跳 forwarding 场景已验证 TTL 修改后保留 auth tag，并重算 header/frame CRC。
 - 错误认证、被拒绝的重放、错误 session 和错误 connection 的包不会 ACK；可靠重复包可补 ACK，但不得再次交付。
 
 ## 可靠性

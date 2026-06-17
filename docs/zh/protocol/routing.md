@@ -21,12 +21,14 @@ XGL 使用 16-bit 节点地址。`0` 和保留地址不能作为普通本地节�
 3. 如果不是本地，检查 TTL。
 4. 查找 `target_id` 对应 route。
 5. 检查完整 frame 长度不超过 route MTU。
-6. 更新 TTL 和必要的 header/auth/CRC 边界。
+6. 更新 TTL，并重算 header/frame CRC。
 7. 调用 egress PHY。
 
 ## TTL
 
 TTL 每转发一跳递减。非本地包在 `ttl <= 1` 时返回 `XGL_ERR_TTL_EXPIRED`，不得继续转发；因此成功转发离开本节点时 `ttl >= 1`。
+
+认证帧在 TTL 变化时保留原始端到端 tag。转发路径只更新 TTL 和 CRC 字段；认证仍然有效，因为逐跳可变字段会从 canonical AAD 中排除。
 
 ## 交付路径
 

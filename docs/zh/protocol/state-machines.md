@@ -60,14 +60,13 @@ stateDiagram-v2
   LookupRoute --> CheckMTU: route found
   CheckMTU --> DropMTU: serialized frame > route mtu
   CheckMTU --> RewriteMutable: fits
-  RewriteMutable --> ResignIfNeeded: ttl decremented
-  ResignIfNeeded --> Forward: crc/auth boundary valid
-  ResignIfNeeded --> DropAuth: cannot resign required auth
+  RewriteMutable --> RecomputeCRC: ttl decremented
+  RecomputeCRC --> Forward: header/frame CRC updated
   Forward --> [*]
   LocalDelivery --> [*]
 ```
 
-TTL 是 mutable header 字段。转发后必须重算 header CRC；如果 frame 使用认证，转发路径必须保证下一跳校验仍可通过。
+TTL 是 mutable header 字段。转发必须重算 header CRC 和 frame CRC，但必须保留端到端认证 tag。认证帧仍能被下一跳验证，因为 TTL 和 header CRC 在端到端 AAD 中会被规范化排除。
 
 ## Transport 发送状态机
 
@@ -128,7 +127,7 @@ stateDiagram-v2
   DropMessage --> [*]
 ```
 
-重组 key 是：
+重组 key：
 
 ```text
 source_id + connection_id + session_epoch + message_id
@@ -136,7 +135,7 @@ source_id + connection_id + session_epoch + message_id
 
 该 key 防止不同节点、连接或 session 的相同 `message_id` 混淆。
 
-## Reset/CLOSE 作用域
+## RESET/CLOSE 作用域
 
 RESET 和 CLOSE 必须只清理对应 scope：
 

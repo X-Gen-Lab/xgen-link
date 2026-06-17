@@ -60,14 +60,13 @@ stateDiagram-v2
   LookupRoute --> CheckMTU: route found
   CheckMTU --> DropMTU: serialized frame > route mtu
   CheckMTU --> RewriteMutable: fits
-  RewriteMutable --> ResignIfNeeded: ttl decremented
-  ResignIfNeeded --> Forward: crc/auth boundary valid
-  ResignIfNeeded --> DropAuth: cannot resign required auth
+  RewriteMutable --> RecomputeCRC: ttl decremented
+  RecomputeCRC --> Forward: header/frame CRC updated
   Forward --> [*]
   LocalDelivery --> [*]
 ```
 
-TTL is a mutable header field. Forwarding must recompute header CRC; authenticated frames must remain verifiable by the next hop.
+TTL is a mutable header field. Forwarding must recompute header CRC and frame CRC, but it must preserve the end-to-end authentication tag. Authenticated frames remain verifiable because TTL and header CRC are canonicalized out of the end-to-end AAD.
 
 ## Transport Send State Machine
 

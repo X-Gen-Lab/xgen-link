@@ -11,7 +11,7 @@ The validation matrix links protocol capability, risk, and required tests. Befor
 | Parser resync | Noise causes lockup or false frame | Noise, overlapping magic, fragmented input, consecutive frames | `test/test_parser.cpp` |
 | Auth trailer | Unauthenticated frame bypass, tag length mismatch | missing provider, tampered header/payload/tag, authenticated zero-copy | `test/test_security.cpp`, `test/test_datalink.cpp`, `test/test_send.cpp` |
 | Replay window | Replay attack, cross-connection pollution, lost ACK recovery | source/connection/session/packet isolation, non-reliable duplicate rejection, reliable duplicate ACK recovery | `test/test_security.cpp`, `test/test_datalink.cpp` |
-| Route forwarding | TTL/auth AAD conflict, MTU overrun | TTL decrement, CRC/auth resign, route MTU reject | `test/test_network.cpp` |
+| Route forwarding | TTL/auth AAD conflict, MTU overrun | TTL decrement, CRC recompute, auth tag preserved, route MTU reject | `test/test_network.cpp` |
 | Reliable queue | Wrong ACK release, lost SACK hole | ACK range release, SACK fast retransmit, retry limit | `test/test_transport.cpp`, `test/test_reliable.cpp` |
 | Peer state | Multiple connections pollute each other | peer key isolation by node/connection/session | `test/test_transport.cpp` |
 | Ordered delivery | Out-of-order duplicate delivery | out-of-order buffering, contiguous advancement, duplicate filtering | `test/test_transport.cpp` |

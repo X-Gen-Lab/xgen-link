@@ -34,7 +34,7 @@
 | byte stream parser | `src/wire/xgl_parser.c` | magic resync、base header、TLV、payload、trailer 分阶段收包 | reset parser，继续寻找下一帧 |
 | header/TLV decode | `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c` | 校验 offset、长度、CRC、扩展合法性 | 丢弃，不交付 |
 | auth/replay | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | 验证 tag，将 replay 分类为新包、可靠重复包或拒绝 | 拒绝坏包；可靠重复包仅用于 transport ACK 恢复 |
-| local or forward | `src/network/xgl_network_receive.c` | 本地交付或 TTL 递减后转发 | TTL/route/MTU/auth 重签失败则丢弃 |
+| local or forward | `src/network/xgl_network_receive.c` | 本地交付，或 TTL 递减、重算 CRC 后转发 | TTL/route/MTU 失败则丢弃 |
 | reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | 处理 ACK/SACK、乱序缓存、重复包过滤 | 错误 connection/session 不污染其他 peer |
 | reassembly | `src/transport/xgl_fragment.c`, `src/transport/xgl_fragment_range.c` | 按 `(source, connection, session, message)` 重组 | 超预算、超时、重叠异常则清理 |
 | app callback | `src/api/xgl_runtime.c`, `src/transport/xgl_transport_receive.c` | 将有序完整 payload 交付应用 | callback 不应阻塞协议主循环 |
@@ -47,7 +47,7 @@
 | `ACK_RANGE_EXT` | `xgl_wire_encode/decode_ack_range_ext_value` | transport reliable | 一次释放多个 packet number |
 | `SACK_EXT` | `xgl_wire_encode/decode_sack_ext_value` | transport reliable | 保留洞并触发快速重传 |
 | `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | payload 内不再放分片头 |
-| `SECURITY_EXT` | `xgl_wire_encode/decode_security_ext_value` | frame、datalink、network | 标记 key、nonce/material、tag 长度 |
+| `SECURITY_EXT` | `xgl_wire_encode/decode_security_ext_value` | frame、datalink、network | 标记 key、nonce/material、tag 长度；tag 是端到端认证材料，转发不重签 |
 | `ROUTE_EXT` | `xgl_wire_encode/decode_route_ext_value` | network/routing | route epoch、上一跳、下一跳、metric |
 | `DATA_TYPE_EXT` | `xgl_wire_encode_ext` | network、transport | DATA 包携带应用 data_type，CONTROL 包携带控制子类型，避免污染 packet_type |
 

@@ -17,7 +17,45 @@ Initialization must fail when `auth_required=true` and the provider is missing, 
 
 ## AAD and Payload
 
-The base header and extensions are authenticated as AAD. Payload is authenticated but not encrypted. CRC provides fast error detection; the authentication tag prevents forgery, tampering, and replay.
+The base header and extensions are authenticated as AAD after applying the authentication-mode canonicalization rules below. Payload is authenticated but not encrypted. CRC provides fast error detection; the authentication tag prevents forgery, tampering, and replay.
+
+## Authentication Modes
+
+XGL distinguishes two security models:
+
+| Mode | Verifier | Forwarding behavior | Authentication domain |
+| --- | --- | --- | --- |
+| Hop-by-hop authentication | Every hop | Each forwarding node verifies and re-signs | May include the current wire header, including `ttl` and `header_crc16` |
+| End-to-end authentication | Final destination, after datalink checks | Forwarding nodes must not re-sign | Must exclude hop-mutable and link-check fields |
+
+Current XGL uses **end-to-end authentication** for authenticated frames. The source signs, the destination verifies, and intermediate nodes only update forwarding metadata and CRCs.
+
+### End-to-End Canonical AAD
+
+End-to-end authentication signs a canonical view of the wire AAD:
+
+- `ttl` is treated as zero because it is decremented on every forwarded hop.
+- `header_crc16` is treated as zero because it is recomputed whenever hop-mutable header bytes change.
+- `frame_crc16` is not part of the authentication input because it is placed after the authentication trailer.
+- Stable base-header fields, stable TLV extensions, and payload bytes remain authenticated.
+
+Any future extension whose value changes at each hop must either be excluded by the same canonicalization rule or be protected by a separate hop-by-hop authentication mechanism. Do not silently add hop-mutable fields to the end-to-end AAD.
+
+## Decision: End-to-End Auth
+
+The protocol chooses end-to-end authentication for the current `AUTHENTICATED`/`SECURITY_EXT` path.
+
+Reasons:
+
+- Intermediate nodes can forward without access to the originator's signing key.
+- The authentication tag continues to protect payload and stable routing/session identity across multiple hops.
+- TTL and CRC remain datalink/network maintenance fields rather than application-security fields.
+
+Consequences:
+
+- Forwarding must recompute header CRC and frame CRC after TTL changes.
+- Forwarding must preserve the original authentication tag.
+- A separate hop-by-hop tag would be needed if a deployment requires each link to authenticate the immediate previous hop.
 
 ## Authentication Trailer
 
@@ -50,7 +88,7 @@ Replay results are tri-state:
 
 ## Multi-Hop Forwarding
 
-TTL is a hop-mutable field. After forwarding changes TTL, the next hop must still validate the frame: either through regenerated hop-level authentication material or an explicit mutable-header policy. The implementation must regenerate the required CRC/auth material on forwarding paths.
+TTL is a hop-mutable field. After forwarding changes TTL, the implementation recomputes `header_crc16` and `frame_crc16` and preserves the original authentication tag. Verification remains valid because the end-to-end AAD canonicalizes TTL and header CRC before calling the provider.
 
 ## Reserved
 

@@ -11,7 +11,7 @@
 | parser resync | 噪声导致卡死或错帧 | 噪声、重叠 magic、分片输入、连续多帧 | `test/test_parser.cpp` |
 | auth trailer | 未认证帧穿透、tag 长度错配 | auth_required 缺 provider、伪造 header/payload/tag、zero-copy auth | `test/test_security.cpp`, `test/test_datalink.cpp`, `test/test_send.cpp` |
 | replay window | 重放攻击、跨连接污染、ACK 丢失恢复 | source/connection/session/packet 隔离，非可靠重复包拒绝，可靠重复包补 ACK | `test/test_security.cpp`, `test/test_datalink.cpp` |
-| route forwarding | TTL/auth AAD 冲突、MTU 超限 | TTL 递减、CRC/auth 重签、route MTU 拒绝 | `test/test_network.cpp` |
+| route forwarding | TTL/auth AAD 冲突、MTU 超限 | TTL 递减、CRC 重算、auth tag 保留、route MTU 拒绝 | `test/test_network.cpp` |
 | reliable queue | ACK 释放错误、SACK 洞丢失 | ACK range 批量释放、SACK 快速重传、retry limit | `test/test_transport.cpp`, `test/test_reliable.cpp` |
 | peer state | 多连接互相污染 | peer key 按 node/connection/session 隔离 | `test/test_transport.cpp` |
 | ordered delivery | 乱序重复交付 | out-of-order 缓存、连续推进、重复包过滤 | `test/test_transport.cpp` |

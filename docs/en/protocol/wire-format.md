@@ -20,7 +20,7 @@ XGL v2 uses a fixed 24-byte base header. The wire path does not depend on packed
 
 ## CRC Coverage
 
-`header_crc16` covers only the 24-byte base header with the CRC field treated as zero. TLV extensions, payload, and the authentication trailer are covered by the frame CRC; authenticated frames are also covered by the auth tag.
+`header_crc16` covers only the 24-byte base header with the CRC field treated as zero. TLV extensions, payload, and the authentication trailer are covered by the frame CRC; authenticated frames are also covered by the auth tag. End-to-end authentication uses a canonical AAD where hop-mutable TTL and header CRC are treated as zero before signing or verification.
 
 ## Traffic Class
 

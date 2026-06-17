@@ -20,7 +20,7 @@ XGL v2 的基础头固定 24 bytes。wire path 不依赖 packed struct 或 `memc
 
 ## CRC 范围
 
-`header_crc16` 只覆盖 24-byte 基础头，CRC 字段本身按零值参与计算。TLV 扩展、payload 和认证 trailer 的完整性由 frame CRC 覆盖；认证开启时还由 auth tag 覆盖。
+`header_crc16` 只覆盖 24-byte 基础头，CRC 字段本身按零值参与计算。TLV 扩展、payload 和认证 trailer 的完整性由 frame CRC 覆盖；认证开启时还由 auth tag 覆盖。端到端认证使用 canonical AAD：签名或验签前，逐跳可变的 TTL 和 header CRC 按零值处理。
 
 ## Traffic Class
 

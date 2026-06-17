@@ -21,12 +21,14 @@ Forwarding must check route MTU. Frames larger than `max_frame_size` return `XGL
 3. If remote, check TTL.
 4. Lookup route for `target_id`.
 5. Check complete frame length against route MTU.
-6. Update TTL and required header/auth/CRC boundaries.
+6. Update TTL and recompute header/frame CRC.
 7. Call egress PHY.
 
 ## TTL
 
 TTL is decremented on every forwarded hop. A remote packet with `ttl <= 1` returns `XGL_ERR_TTL_EXPIRED` and must not be forwarded; forwarded frames therefore leave the node with `ttl >= 1`.
+
+Authenticated frames keep their original end-to-end tag while TTL changes. The forwarding path only updates TTL and CRC fields; authentication remains valid because hop-mutable fields are excluded from the canonical AAD.
 
 ## Delivery Path
 

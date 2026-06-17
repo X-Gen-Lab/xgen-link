@@ -15,9 +15,10 @@ Use this page as an engineering review checklist before deploying XGL on an MCU 
 
 - Auth provider `tag_len` is fixed and satisfies `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`.
 - `sign` and `verify` use the same AAD boundary for header/extensions/payload.
+- End-to-end auth canonicalizes hop-mutable fields: TTL and header CRC are excluded, and frame CRC is outside the tag input.
 - Key id and nonce/material id generation and rotation are handled by the application or secure module.
 - Replay window capacity is sufficient for the maximum reorder window.
-- Multi-hop forwarding verifies CRC/auth behavior after TTL mutation.
+- Multi-hop forwarding preserves the auth tag while recomputing header/frame CRC after TTL mutation.
 - Bad auth, rejected replay, wrong session, and wrong connection packets are not ACKed; reliable duplicates may be ACKed without re-delivery.
 
 ## Reliability
