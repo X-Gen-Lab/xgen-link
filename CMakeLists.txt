@@ -157,6 +157,7 @@ set(XGL_SOURCES
     src/transport/xgl_fragment_process.c
     src/transport/xgl_fragment.c
     src/transport/xgl_transport_memory.c
+    src/transport/xgl_transport_packet_number.c
     src/transport/xgl_transport_peer.c
     src/transport/xgl_transport_send_plan.c
     src/transport/xgl_transport_send_packet.c
