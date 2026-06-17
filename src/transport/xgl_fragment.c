@@ -5,7 +5,6 @@
  */
 
 #include <xgl/internal/xgl_fragment.h>
-#include <xgl/internal/xgl_allocator.h>
 #include <xgl/internal/xgl_time.h>
 #include <xgl/internal/xgl_serialize.h>
 #include "xgl_fragment_internal.h"
@@ -15,77 +14,6 @@
 /*---------------------------------------------------------------------------*/
 /* Helper Functions                                                          */
 /*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Allocate memory using the configured allocator policy
- */
-static void* fragment_malloc(xgl_allocator_t* allocator, size_t size) {
-    return xgl_alloc(allocator, size);
-}
-
-/**
- * \brief           Free memory using the configured allocator policy
- */
-static void fragment_free(xgl_allocator_t* allocator, void* ptr) {
-    xgl_free(allocator, ptr);
-}
-
-/**
- * \brief           Free reassembly buffer and its data
- */
-static void free_reassembly_buffer(xgl_fragment_manager_t* manager,
-                                  xgl_reassembly_buffer_t* buffer) {
-    if (buffer == NULL) {
-        return;
-    }
-
-    if (manager != NULL && buffer->reserved_size <= manager->current_reassembly_bytes) {
-        manager->current_reassembly_bytes -= buffer->reserved_size;
-    }
-
-    /* Free data buffer */
-    if (buffer->data != NULL) {
-        fragment_free(manager->allocator, buffer->data);
-        buffer->data = NULL;
-    }
-
-    /* Free received bitmap */
-    if (buffer->received_bitmap != NULL) {
-        fragment_free(manager->allocator, buffer->received_bitmap);
-        buffer->received_bitmap = NULL;
-    }
-
-    /* Free buffer structure */
-    fragment_free(manager->allocator, buffer);
-}
-
-static xgl_reassembly_buffer_t* find_reassembly_buffer_ext(
-    // cppcheck-suppress constParameterPointer
-    xgl_fragment_manager_t* manager,
-    uint16_t source_id,
-    uint32_t connection_id,
-    uint32_t session_epoch,
-    uint32_t message_id) {
-
-    if (manager == NULL) {
-        return NULL;
-    }
-
-    xgl_list_node_t* node;
-    XGL_LIST_FOR_EACH(&manager->reassembly_list, node) {
-        xgl_reassembly_buffer_t* buffer =
-            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
-
-        if (buffer->source_id == source_id &&
-            buffer->connection_id == connection_id &&
-            buffer->session_epoch == session_epoch &&
-            buffer->message_id == message_id) {
-            return buffer;
-        }
-    }
-
-    return NULL;
-}
 
 static xgl_error_t fragment_validate_ext_input(uint32_t fragment_offset,
                                                uint32_t message_len,
@@ -97,88 +25,6 @@ static xgl_error_t fragment_validate_ext_input(uint32_t fragment_offset,
     }
 
     return XGL_OK;
-}
-
-static xgl_error_t fragment_create_reassembly_buffer(xgl_fragment_manager_t* manager,
-                                                     uint16_t source_id,
-                                                     uint32_t connection_id,
-                                                     uint32_t session_epoch,
-                                                     uint8_t data_type,
-                                                     uint32_t message_id,
-                                                     uint32_t message_len,
-                                                     xgl_reassembly_buffer_t** buffer_out) {
-    if (manager == NULL || buffer_out == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    *buffer_out = NULL;
-
-    if (xgl_list_count(&manager->reassembly_list) >=
-        manager->max_reassembly_buffers) {
-        return XGL_ERR_NO_MEMORY;
-    }
-
-    if (manager->max_message_size != 0U &&
-        (size_t)message_len > manager->max_message_size) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    if (manager->max_reassembly_bytes != 0U &&
-        (manager->current_reassembly_bytes > manager->max_reassembly_bytes ||
-         (size_t)message_len > manager->max_reassembly_bytes - manager->current_reassembly_bytes)) {
-        return XGL_ERR_NO_MEMORY;
-    }
-
-    xgl_reassembly_buffer_t* buffer =
-        (xgl_reassembly_buffer_t*)fragment_malloc(manager->allocator,
-                                                  sizeof(xgl_reassembly_buffer_t));
-    if (buffer == NULL) {
-        return XGL_ERR_NO_MEMORY;
-    }
-
-    memset(buffer, 0, sizeof(*buffer));
-    buffer->source_id = source_id;
-    buffer->connection_id = connection_id;
-    buffer->session_epoch = session_epoch;
-    buffer->message_id = message_id;
-    buffer->data_type = data_type;
-    buffer->timeout_ms = manager->reassembly_timeout_ms;
-    buffer->buffer_size = message_len;
-    buffer->reserved_size = message_len;
-    buffer->data_len = message_len;
-
-    buffer->data = (uint8_t*)fragment_malloc(manager->allocator,
-                                             buffer->buffer_size);
-    if (buffer->data == NULL) {
-        fragment_free(manager->allocator, buffer);
-        return XGL_ERR_NO_MEMORY;
-    }
-
-    manager->current_reassembly_bytes += buffer->reserved_size;
-
-    xgl_list_node_init(&buffer->node);
-    xgl_list_insert_tail(&manager->reassembly_list, &buffer->node);
-
-    *buffer_out = buffer;
-    return XGL_OK;
-}
-
-static void fragment_complete_reassembly(xgl_fragment_manager_t* manager,
-                                         xgl_reassembly_buffer_t* buffer,
-                                         uint8_t** complete_data,
-                                         size_t* complete_len) {
-    *complete_data = buffer->data;
-    *complete_len = buffer->data_len;
-
-    xgl_list_remove(&manager->reassembly_list, &buffer->node);
-
-    if (buffer->received_bitmap != NULL) {
-        fragment_free(manager->allocator, buffer->received_bitmap);
-    }
-    if (buffer->reserved_size <= manager->current_reassembly_bytes) {
-        manager->current_reassembly_bytes -= buffer->reserved_size;
-    }
-    fragment_free(manager->allocator, buffer);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -272,11 +118,11 @@ xgl_error_t xgl_fragment_process_ext(xgl_fragment_manager_t* manager,
         return err;
     }
 
-    xgl_reassembly_buffer_t* buffer = find_reassembly_buffer_ext(manager,
-                                                                 source_id,
-                                                                 connection_id,
-                                                                 session_epoch,
-                                                                 message_id);
+    xgl_reassembly_buffer_t* buffer = fragment_find_reassembly_buffer(manager,
+                                                                      source_id,
+                                                                      connection_id,
+                                                                      session_epoch,
+                                                                      message_id);
     if (buffer == NULL) {
         err = fragment_create_reassembly_buffer(manager,
                                                 source_id,
@@ -356,7 +202,7 @@ uint32_t xgl_fragment_process_timeouts(xgl_fragment_manager_t* manager,
             xgl_list_remove(&manager->reassembly_list, node);
 
             /* Free buffer */
-            free_reassembly_buffer(manager, buffer);
+            fragment_free_reassembly_buffer(manager, buffer);
 
             timeout_count++;
         }
@@ -389,7 +235,7 @@ void xgl_fragment_clear_reassembly(xgl_fragment_manager_t* manager) {
     while ((node = xgl_list_remove_head(&manager->reassembly_list)) != NULL) {
         xgl_reassembly_buffer_t* buffer =
             XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
-        free_reassembly_buffer(manager, buffer);
+        fragment_free_reassembly_buffer(manager, buffer);
     }
 }
 
@@ -415,7 +261,7 @@ size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
 
         if (matches_production_scope) {
             xgl_list_remove(&manager->reassembly_list, node);
-            free_reassembly_buffer(manager, buffer);
+            fragment_free_reassembly_buffer(manager, buffer);
             cleared++;
         }
     }
