@@ -71,7 +71,7 @@ typedef struct xgl_network_ctx_s {
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     bool auth_required;             /**< Require authenticated routed frames */
     uint32_t auth_key_id;           /**< Active authentication key id */
-    xgl_auth_provider_t* auth_provider; /**< Authentication provider for forwarding */
+    xgl_auth_provider_t* auth_provider; /**< End-to-end authentication provider */
 } xgl_network_ctx_t;
 
 /**
@@ -87,7 +87,7 @@ typedef struct {
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer (can be NULL) */
     bool auth_required;             /**< Require authenticated routed frames */
     uint32_t auth_key_id;           /**< Active authentication key id */
-    xgl_auth_provider_t* auth_provider; /**< Authentication provider for forwarding */
+    xgl_auth_provider_t* auth_provider; /**< End-to-end authentication provider */
 } xgl_network_config_t;
 
 /*---------------------------------------------------------------------------*/

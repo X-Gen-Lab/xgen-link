@@ -132,14 +132,6 @@ static xgl_error_t network_rewrite_forward_frame(xgl_network_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    if (network_resign_forwarded_frame(ctx,
-                                       forward_buf,
-                                       frame_len,
-                                       &wire_header) != XGL_OK) {
-        network_count_rx_drop(ctx);
-        return XGL_ERR_INVALID_FRAME;
-    }
-
     uint16_t forward_crc =
         xgl_crc16_modbus(forward_buf, frame_len - XGL_CRC16_SIZE);
     xgl_serialize_u16_le(&forward_buf[frame_len - XGL_CRC16_SIZE], forward_crc);

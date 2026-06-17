@@ -21,6 +21,39 @@ static bool wire_packet_type_valid(uint8_t packet_type) {
            packet_type <= XGL_PACKET_TYPE_CLOSE;
 }
 
+static bool wire_auth_aad_has_frame_header(const uint8_t* aad,
+                                           size_t aad_len) {
+    return aad_len >= XGL_WIRE_BASE_HEADER_SIZE &&
+           aad[0] == XGL_WIRE_MAGIC_0 &&
+           aad[1] == XGL_WIRE_MAGIC_1;
+}
+
+static xgl_error_t wire_auth_canonical_aad(const uint8_t* aad,
+                                           size_t aad_len,
+                                           uint8_t* canonical,
+                                           size_t canonical_size,
+                                           const uint8_t** prepared_aad) {
+    if (aad == NULL || canonical == NULL || prepared_aad == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    *prepared_aad = aad;
+    if (!wire_auth_aad_has_frame_header(aad, aad_len)) {
+        return XGL_OK;
+    }
+
+    if (aad_len > canonical_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    memcpy(canonical, aad, aad_len);
+    canonical[6] = 0U;
+    canonical[22] = 0U;
+    canonical[23] = 0U;
+    *prepared_aad = canonical;
+    return XGL_OK;
+}
+
 xgl_error_t xgl_wire_encode_header(uint8_t* buffer,
                                    size_t buffer_size,
                                    const xgl_wire_header_t* header) {
@@ -207,16 +240,27 @@ xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
+    uint8_t canonical_aad[UINT8_MAX] = {0};
+    const uint8_t* signing_aad = NULL;
+    xgl_error_t err = wire_auth_canonical_aad(buffer,
+                                              aad_len,
+                                              canonical_aad,
+                                              sizeof(canonical_aad),
+                                              &signing_aad);
+    if (err != XGL_OK) {
+        return err;
+    }
+
     size_t tag_len = 0U;
-    xgl_error_t err = provider->sign(key_id,
-                                     buffer,
-                                     aad_len,
-                                     &buffer[aad_len],
-                                     payload_len,
-                                     &buffer[tag_offset],
-                                     buffer_size - tag_offset,
-                                     &tag_len,
-                                     provider->user_data);
+    err = provider->sign(key_id,
+                         signing_aad,
+                         aad_len,
+                         &buffer[aad_len],
+                         payload_len,
+                         &buffer[tag_offset],
+                         buffer_size - tag_offset,
+                         &tag_len,
+                         provider->user_data);
     if (err != XGL_OK) {
         return err;
     }
@@ -257,8 +301,19 @@ xgl_error_t xgl_wire_verify_auth_trailer(const uint8_t* buffer,
         return XGL_ERR_INVALID_FRAME;
     }
 
+    uint8_t canonical_aad[UINT8_MAX] = {0};
+    const uint8_t* verifying_aad = NULL;
+    xgl_error_t err = wire_auth_canonical_aad(buffer,
+                                              aad_len,
+                                              canonical_aad,
+                                              sizeof(canonical_aad),
+                                              &verifying_aad);
+    if (err != XGL_OK) {
+        return err;
+    }
+
     return provider->verify(key_id,
-                            buffer,
+                            verifying_aad,
                             aad_len,
                             &buffer[aad_len],
                             payload_len,
