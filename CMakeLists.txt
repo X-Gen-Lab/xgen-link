@@ -101,6 +101,7 @@ set(XGL_SOURCES
     src/wire/xgl_wire_ext.c
     src/wire/xgl_wire.c
     src/wire/xgl_frame.c
+    src/wire/xgl_frame_auth.c
     src/wire/xgl_frame_zerocopy.c
     src/wire/xgl_parser_extensions.c
     src/wire/xgl_parser.c
