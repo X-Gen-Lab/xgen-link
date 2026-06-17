@@ -28,6 +28,17 @@ XGL 面向有边界的嵌入式系统。生产交付必须说明内存峰值、�
 
 这些是 SDK 起点，不是目标板认证值。最终值必须来自目标链路 MTU、负载大小、窗口、分片并发数和认证 tag 长度。
 
+## Budget 追溯
+
+| Budget | 配置/源码字段 | 验证/测试证据 |
+| --- | --- | --- |
+| TX pool | `config.memory.tx_pool_size` | `src/api/xgl_config.c`, `test/test_config.cpp` |
+| RX buffer | `config.memory.rx_buffer_size` | 必须至少等于 `config.protocol.max_frame_size`；`test/test_config.cpp` |
+| Route MTU | `xgl_route_item_t.max_frame_size` | 转发拒绝超大 frame；`test/test_network.cpp` |
+| Reliable queue | `config.protocol.window_size`, `config.protocol.max_retry_count` | `test/test_reliable.cpp`, `test/test_window.cpp` |
+| Fragment buffers | `xgl_fragment_init()`, `xgl_fragment_set_limits()` | `test/test_fragment.cpp` |
+| Auth overhead | `xgl_auth_provider_t.tag_len` 加 SECURITY_EXT | `test/test_datalink.cpp`, `test/test_send.cpp` |
+
 ## 生产 Checklist
 
 - allocator 调用计数。

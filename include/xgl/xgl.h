@@ -323,8 +323,8 @@ void xgl_destroy(xgl_handle_t handle);
  *
  * // Customize as needed
  * config.source_id = 1;
- * config.max_retry_count = 3;
- * config.thread_safe = true;  // Requires XGL_THREAD_SAFE at build time
+ * config.protocol.max_retry_count = 3;
+ * config.features.thread_safe = true;  // Requires XGL_THREAD_SAFE at build time
  * \endcode
  */
 void xgl_config_get_default(xgl_config_t* config);
@@ -517,10 +517,11 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
  * xgl_statistics_t stats;
  * xgl_error_t err = xgl_stats_get(handle, &stats);
  * if (err == XGL_OK) {
- *     printf("TX packets: %llu\n", stats.tx_packets);
- *     printf("RX packets: %llu\n", stats.rx_packets);
- *     printf("TX errors: %llu\n", stats.tx_errors);
- *     printf("RX errors: %llu\n", stats.rx_errors);
+ *     printf("Transport TX packets: %llu\n", stats.transport.tx_packets);
+ *     printf("Transport RX packets: %llu\n", stats.transport.rx_packets);
+ *     printf("Datalink TX errors: %llu\n", stats.datalink.tx_errors);
+ *     printf("Datalink RX errors: %llu\n", stats.datalink.rx_errors);
+ *     printf("TX retries: %llu\n", stats.tx_retries);
  *     printf("Avg RTT: %u ms\n", stats.avg_rtt_ms);
  *     printf("Memory used: %zu bytes\n", stats.memory_used);
  * }

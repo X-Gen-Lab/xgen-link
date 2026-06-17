@@ -26,6 +26,19 @@ Requirements:
 - `Extensions` walks TLVs with a cursor; any overrun resets the parser.
 - `Body` length is derived from `payload_len + auth_tag_len + frame_crc16`.
 
+### Parser State Table
+
+| State | Entered when | Completes when | Error/timeout behavior | Evidence |
+| --- | --- | --- | --- | --- |
+| `XGL_PARSE_MAGIC` | Parser is reset or a bad frame is dropped | `A5 5A` is found | Noise is ignored; overlapping magic is retained | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+| `XGL_PARSE_HEADER` | First magic byte has been cached | 24-byte base header decodes successfully | Bad magic/version/header CRC resets to MAGIC | `src/wire/xgl_parser.c`, `src/wire/xgl_wire.c`, `test/test_parser.cpp` |
+| `XGL_PARSE_PAYLOAD` | Header/TLVs are valid and body length is non-zero | `payload_len + auth_tag_len` bytes are cached | Cache overflow resets to MAGIC | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+| `XGL_PARSE_CRC` | Header-only frame or body bytes are complete | Frame CRC validates | CRC failure resets to MAGIC | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+
+`xgl_parser_check_timeout()` only expires non-MAGIC states. A timeout resets the
+parser to MAGIC and clears cached length, expected payload length, and expected
+authentication tag length.
+
 ## Datalink Validation State Machine
 
 ```mermaid

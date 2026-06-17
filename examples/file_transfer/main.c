@@ -5,7 +5,7 @@
  * \date            2026-02-28
  *
  * \details         This example demonstrates:
- *                  - Reliable file transfer using ACK/NACK
+ *                  - Reliable file transfer using ACK range/SACK
  *                  - Automatic fragmentation for large files
  *                  - Progress reporting during transfer
  *                  - Error handling and retry logic

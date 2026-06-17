@@ -23,6 +23,8 @@
 ## 验证
 
 ```sh
+powershell -ExecutionPolicy Bypass -File ./tools/docs_qa.ps1
+# CI 使用：pwsh ./tools/docs_qa.ps1
 mkdocs build --strict
 cmake --build build/ci --target xgl_docs
 ```
@@ -33,12 +35,26 @@ cmake --build build/ci --target xgl_docs
 - 字段规范使用表格，必须包含 size、编码和失败规则。
 - 能从代码验证的内容要使用真实常量和类型名。
 - 未实现能力必须写 reserved，不写成生产可用。
+- 如果某个协议细节无法从源码或测试确认，写
+  `TODO(xgen-link): confirm ...`，不要猜测。
 - 示例代码必须能对应公共 API 头，而不是内部测试接口。
+- peer scope、AAD、route MTU、fragment budget、ACK range、SACK 等术语必须使用
+  [术语表](../reference/glossary.md) 中的定义。
+
+## Canonical Snippets
+
+- 公共 API 片段归 `reference/public-api.md` 和 Doxygen 注释维护。
+- 端到端用户流程归 `getting-started/quick-start.md` 维护。
+- 示例特定行为归 `examples/*/README.md` 维护。
+- 协议字段布局只归 `protocol/wire-format.md` 和 `protocol/extensions.md` 维护。
+
+不要把长示例复制到多个页面。优先链接 owner 页面，或只保留足够短的本地片段。
 
 ## 变更流程
 
 1. 修改中文页。
 2. 同步英文页。
-3. 如涉及 API，检查 Doxygen 注释。
-4. 如涉及示例，更新 `examples/*/README.md`。
-5. 运行严格文档构建。
+3. 如涉及 wire 字段、TLV、状态机、路由规则、安全规则或可靠性语义，同步更新对应协议页和 `protocol/implementation-map.md` 中的追溯表。
+4. 如涉及 API，检查 Doxygen 注释。
+5. 如涉及示例，更新 `examples/*/README.md`。
+6. 运行 docs QA 和严格文档构建。

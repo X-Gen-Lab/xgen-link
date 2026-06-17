@@ -18,6 +18,7 @@
 | FRAGMENT_EXT | `message_id`, `fragment_offset`, `message_len` | 分片重组 |
 | SECURITY_EXT | `key_id`, nonce/material metadata | 认证 trailer 元数据 |
 | ROUTE_EXT | previous hop、next hop、route epoch、metric | 路由信息 |
+| TIMESTAMP_EXT | TODO | 保留/未确认的 timestamp 元数据 |
 | DATA_TYPE_EXT | `data_type` | DATA 包上的应用 payload 分类；CONTROL 包上的 transport control 子类型 |
 
 ## Value 格式
@@ -30,12 +31,26 @@
 | FRAGMENT_EXT | 12 | `message_id u32`, `fragment_offset u32`, `message_len u32` |
 | SECURITY_EXT | 13 | `key_id u32`, `nonce_id u64`, `tag_len u8` |
 | ROUTE_EXT | 10 | `previous_hop u16`, `next_hop u16`, `route_epoch u32`, `metric u16` |
+| TIMESTAMP_EXT | TODO | TODO(xgen-link): confirm TIMESTAMP_EXT value format and whether it is reserved or intentionally unimplemented. |
 | DATA_TYPE_EXT | 1 | `data_type u8` |
 
 ACK range 的 `gap` 和 `length` 表示从 `largest_ack` 反向描述的确认区间。SACK bitmap 的 bit 表示 `base_packet + bit_index` 的接收状态。
 ACK_RANGE_EXT 和 SACK_EXT 位于 header TLV 区，不放在 payload 中。
 全零 SACK bitmap 是合法编码，表示请求快速重传 `base_packet`。
 应用 `data_type` 不因 transport control 值而保留。接收端只有在 `packet_type=CONTROL` 时才把 DATA_TYPE_EXT 解释为控制子类型。
+
+## 归属与追溯
+
+| 扩展 | Type | Producer | Consumer | 失败规则 | 证据 |
+| --- | ---: | --- | --- | --- | --- |
+| SESSION_EXT | 1 | session-aware send path | datalink replay、network metadata、transport peer scope、fragment reassembly | 长度非法则 decode 失败 | `src/wire/xgl_wire_ext.c`, `test/test_wire.cpp`, `test/test_transport.cpp` |
+| ACK_RANGE_EXT | 2 | `transport_send_ack()` | reliable queue ACK removal | 长度或 range count 非法则 decode 失败 | `src/wire/xgl_wire_ack_ext.c`, `src/transport/xgl_transport_ack.c`, `test/test_reliable.cpp` |
+| SACK_EXT | 3 | `transport_send_sack()` | SACK processing 与 fast retransmit | bitmap 长度非法则 decode 失败 | `src/wire/xgl_wire_ack_ext.c`, `src/transport/xgl_transport_sack.c`, `test/test_transport.cpp` |
+| FRAGMENT_EXT | 4 | fragment send path | fragment manager 与 delivery path | 缺失或非法 value 不得重组 | `src/transport/xgl_transport_send_fragment.c`, `src/transport/xgl_transport_delivery.c`, `test/test_fragment.cpp` |
+| SECURITY_EXT | 5 | authenticated frame build | parser auth length、datalink verification | AUTHENTICATED 没有合法 SECURITY_EXT 时 fail closed | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_parser_extensions.c`, `test/test_datalink.cpp` |
+| ROUTE_EXT | 6 | route-aware internals/future route controls | network metadata/routing | 长度非法则 decode 失败 | `src/wire/xgl_wire_ext.c`, `test/test_wire.cpp`, `test/test_network.cpp` |
+| TIMESTAMP_EXT | 7 | TODO | TODO | TODO(xgen-link): confirm TIMESTAMP_EXT value format and whether it is reserved or intentionally unimplemented. | `include/xgl/internal/xgl_wire.h` |
+| DATA_TYPE_EXT | 8 | send、zero-copy、control packets | network metadata 与 transport control | value 为 1 byte；只有 `packet_type=CONTROL` 时才解释为控制子类型 | `src/network/xgl_network_send.c`, `src/network/xgl_network_metadata.c`, `src/transport/xgl_transport_control.c` |
 
 ## 失败规则
 

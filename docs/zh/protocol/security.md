@@ -14,6 +14,8 @@
 - `user_data`
 
 当 `auth_required=true` 且 provider 缺失、`tag_len == 0` 或 `tag_len > XGL_AUTH_TAG_MAX_LEN` 时，初始化必须失败。
+authenticated 配置还必须提供带 `malloc` 和 `free` 的 `memory.allocator`；
+缺少该 allocator contract 时，`xgl_config_validate()` 会拒绝 production auth。
 
 ## AAD 和 Payload
 
@@ -38,6 +40,16 @@ XGL 明确区分两种安全模型：
 - `header_crc16` 按 0 参与计算，因为逐跳修改 header 后必须重算。
 - `frame_crc16` 不参与认证输入，因为它位于认证 trailer 之后。
 - 稳定的基础头字段、稳定的 TLV 扩展和 payload 仍然被认证保护。
+
+| 字段/材料 | Auth input 处理 | 原因 | 证据 |
+| --- | --- | --- | --- |
+| 基础头 bytes | 作为 AAD 纳入 | 绑定稳定的 routing/session/packet 身份 | `src/wire/xgl_wire.c` |
+| `ttl` | 以 0 纳入 | 转发每跳递减 TTL | `src/wire/xgl_wire.c`, `src/network/xgl_network_receive.c` |
+| `header_crc16` | 以 0 纳入 | TTL 变化后 header CRC 会重算 | `src/wire/xgl_wire.c` |
+| TLV extensions | 作为 AAD 纳入 | 绑定 session、security、fragment、route 和 data-type 元数据 | `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c` |
+| Payload | 作为 payload input 纳入 | 保护应用/fragment 数据 | `src/wire/xgl_wire.c` |
+| Authentication tag | 不纳入自身输入 | tag 由 provider 生成 | `src/wire/xgl_wire.c` |
+| Frame CRC16 | 不纳入 | 它序列化在 auth trailer 之后 | `src/wire/xgl_wire.c`, `src/wire/xgl_frame_auth.c` |
 
 未来如果新增每跳都会变化的扩展字段，必须使用同样的 canonical 规则排除，或者引入独立的 hop-by-hop 认证机制。不要把逐跳可变字段静默加入端到端 AAD。
 
@@ -97,3 +109,12 @@ TTL 是每跳可变字段。转发修改 TTL 后，当前实现只重算 `header
 ## 密钥边界
 
 XGL 不持久化密钥，也不规定密钥派生方案。生产应用应在 auth provider 内部完成密钥存储、轮换、key id 映射和硬件安全模块接入。
+
+## 追溯
+
+| 规则 | 源码 | 测试 |
+| --- | --- | --- |
+| Auth provider 校验和 tag length 边界 | `src/api/xgl_config.c` | `test/test_config.cpp` |
+| SECURITY_EXT 编码和 auth trailer 位置 | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_wire_ext.c` | `test/test_wire.cpp`, `test/test_frame.cpp` |
+| TTL/header CRC 置零的 canonical AAD | `src/wire/xgl_wire.c` | `test/test_datalink.cpp`, `test/test_network.cpp` |
+| Datalink auth verification 和 replay classification | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | `test/test_datalink.cpp`, `test/test_security.cpp` |

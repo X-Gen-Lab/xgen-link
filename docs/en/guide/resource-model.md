@@ -28,6 +28,17 @@ When `XGL_ALLOW_FALLBACK_MALLOC=OFF`, a NULL allocator must fail closed. `xgl_no
 
 These are SDK starting points, not board-certified values. Final values must come from target link MTU, payload size, window, fragment concurrency, and authentication tag length.
 
+## Budget Traceability
+
+| Budget | Config/source field | Validation/test evidence |
+| --- | --- | --- |
+| TX pool | `config.memory.tx_pool_size` | `src/api/xgl_config.c`, `test/test_config.cpp` |
+| RX buffer | `config.memory.rx_buffer_size` | must be at least `config.protocol.max_frame_size`; `test/test_config.cpp` |
+| Route MTU | `xgl_route_item_t.max_frame_size` | forwarding rejects oversized frames; `test/test_network.cpp` |
+| Reliable queue | `config.protocol.window_size`, `config.protocol.max_retry_count` | `test/test_reliable.cpp`, `test/test_window.cpp` |
+| Fragment buffers | `xgl_fragment_init()`, `xgl_fragment_set_limits()` | `test/test_fragment.cpp` |
+| Auth overhead | `xgl_auth_provider_t.tag_len` plus SECURITY_EXT | `test/test_datalink.cpp`, `test/test_send.cpp` |
+
 ## Production Checklist
 
 - allocator call counts

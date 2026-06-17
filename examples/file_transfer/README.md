@@ -6,7 +6,7 @@ This example demonstrates reliable file transfer using the xgen-link protocol st
 
 ## What This Example Demonstrates
 
-1. **Reliable File Transfer**: Using ACK/NACK for guaranteed delivery
+1. **Reliable File Transfer**: Using ACK range and SACK for guaranteed delivery
 2. **Automatic Fragmentation**: Breaking large files into manageable chunks
 3. **Progress Reporting**: Real-time progress updates during transfer
 4. **Error Handling**: Comprehensive error detection and recovery
@@ -18,7 +18,7 @@ This example demonstrates reliable file transfer using the xgen-link protocol st
 
 ### Reliable Transmission
 - Every chunk is sent with `reliable = true`
-- Automatic ACK/NACK handling by protocol stack
+- Automatic ACK range/SACK handling by the protocol stack
 - Configurable retry count (default: 5 retries)
 - Exponential backoff on retransmission
 
@@ -99,7 +99,7 @@ cmake --build build --target file_transfer --config Release
 ```c
 /* Configuration */
 xgl_config_get_default(&config);
-config.enable_fragmentation = true;  // Enable fragmentation support
+config.features.enable_fragmentation = true;  /* Enable fragmentation support */
 
 /* Reliable transmission */
 xgl_tx_data_t tx_data = {
@@ -107,8 +107,8 @@ xgl_tx_data_t tx_data = {
     .data_type = 0x01,
     .data = chunk_data,
     .data_len = chunk_size,
-    .reliable = true,    // Request ACK
-    .priority = 5        // High priority
+    .reliable = true,    /* Request ACK/retry semantics */
+    .priority = 5        /* High priority */
 };
 xgl_send(handle, &tx_data);
 
@@ -223,13 +223,13 @@ xgl_config_t config;
 xgl_config_get_default(&config);
 
 /* Customize for file transfer */
-config.max_retry_count = 5;           // Retry failed chunks
-config.ack_timeout_ms = 1000;         // ACK timeout
-config.window_size = 8;               // Sliding window size
-config.max_frame_size = 256;          // Maximum frame size
-config.enable_fragmentation = true;   // Enable fragmentation
-config.tx_pool_size = 8192;           // Larger TX pool for file data
-config.rx_buffer_size = 1024;         // Larger RX buffer
+config.protocol.max_retry_count = 5;        /* Retry failed chunks */
+config.protocol.ack_timeout_ms = 1000;      /* ACK timeout */
+config.protocol.window_size = 8;            /* Sliding window size */
+config.protocol.max_frame_size = 256;       /* Maximum frame size */
+config.features.enable_fragmentation = true;/* Enable fragmentation */
+config.memory.tx_pool_size = 8192;          /* Larger TX pool for file data */
+config.memory.rx_buffer_size = 1024;        /* Larger RX buffer */
 ```
 
 ## Adapting for Real Hardware
@@ -458,7 +458,7 @@ int main(void)
 ### Adjust Window Size
 
 ```c
-config.window_size = 16;  /* More in-flight packets */
+config.protocol.window_size = 16;  /* More in-flight packets */
 ```
 
 ### Use Zero-Copy API
@@ -530,8 +530,10 @@ After understanding this example, explore:
 
 1. **Multi-Node Example** - Transfer files through intermediate nodes
 2. **Zero-Copy API** - Optimize for high-throughput transfers
-3. **Compression** - Enable compression for text files
-4. **Encryption** - Enable encryption for secure transfers
+3. **Resource Model** - Tune pools, route MTU, and fragment budgets
+4. **Security Model** - Add an authentication provider when using production profiles
+
+Compression and encryption feature flags are reserved in the current production path and are rejected by configuration validation until the codec/security paths are fully wired.
 
 ## References
 

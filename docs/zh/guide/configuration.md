@@ -26,7 +26,12 @@
 
 - `auth_key_id`
 - `auth_provider`
+- `memory.allocator`，并且同时提供 `malloc` 和 `free`
 - `auth_provider->tag_len`，必须满足 `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`
+
+当 provider 不完整或 allocator 缺失时，`xgl_config_validate()` 会拒绝
+authenticated 配置。当前实现会在准备认证运行时状态时使用 allocator，因此
+production auth 不走 fallback malloc 路径。
 
 ## Memory
 
@@ -45,6 +50,10 @@
 ## 校验建议
 
 - `source_id` 不得为 0 或保留地址。
+- `source_id` 不得为 `XGL_BROADCAST_ID`。
+- `memory.rx_buffer_size` 必须至少等于 `protocol.max_frame_size`。
 - `window_size` 不应超过可靠队列和 MCU RAM 预算。
 - `max_retry_count` 与低功耗 sleep 周期一起评估。
 - production preset 必须提供 auth provider 后再 create/init。
+- `features.enable_compression` 和 `features.enable_encryption` 必须保持
+  false，直到 reserved codec/encryption 路径实现完成。

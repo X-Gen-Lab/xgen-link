@@ -5,8 +5,12 @@ Reliability is managed by connection-scoped peer state, not by 8-bit seq/ack fie
 ## Peer Key
 
 ```text
-target_id + connection_id + session_epoch
+remote_peer_id + connection_id + session_epoch
 ```
+
+`remote_peer_id` is direction-dependent: the TX path uses `target_id`, while
+the RX/ACK paths use the incoming packet's `source_id`. This matches
+`transport_get_or_create_peer_scope()` and `transport_find_peer_scope()`.
 
 This key isolates:
 
@@ -24,6 +28,44 @@ This key isolates:
 - ACK_RANGE_EXT and SACK_EXT live in the header TLV area and do not consume payload.
 - ACK-only packets do not rely on a single-byte ACK field in the base header.
 - ACK and SACK replies preserve `connection_id`, `session_epoch`, and transport `session_id` from the received reliable packet so lost-ACK recovery targets the same peer scope.
+
+### ACK_RANGE_EXT Fields
+
+| Field | Type | Meaning | Source/tests |
+| --- | --- | --- | --- |
+| `largest_ack` | u32 | Highest packet number described by this ACK frame | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `ack_delay_us` | u32 | Encoded ACK delay metadata; current tests validate round-trip encoding | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `range_count` | u8 | Number of repeated ranges | `src/wire/xgl_wire_ack_ext.c`, `test/test_reliable.cpp` |
+| `gap` | u16 | Distance from the previous acknowledged range when walking backward | `src/transport/xgl_reliable_ack.c`, `test/test_reliable.cpp` |
+| `length` | u16 | Number of packets covered by the range | `src/transport/xgl_reliable_ack.c`, `test/test_reliable.cpp` |
+
+### SACK_EXT Fields
+
+| Field | Type | Meaning | Source/tests |
+| --- | --- | --- | --- |
+| `base_packet` | u32 | First packet number represented by the bitmap | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `bitmap_len` | u8 | Number of bitmap bytes | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `bitmap` | bytes | Bit `n` describes receive state for `base_packet + n` | `src/transport/xgl_transport_sack.c`, `test/test_transport.cpp` |
+
+An all-zero SACK bitmap is valid. It preserves `base_packet` as a known hole
+and allows the sender to fast-retransmit the missing packet while removing
+packets that are explicitly marked received.
+
+### Reliable Data Flow
+
+```mermaid
+flowchart LR
+  App[xgl_send reliable] --> Peer[Resolve remote peer scope]
+  Peer --> Queue[Admit payload into reliable queue]
+  Queue --> Network[Network/frame TX]
+  Network --> Await[Wait for ACK_RANGE/SACK]
+  Await --> Acked[ACK range removes covered packets]
+  Await --> Sack[SACK keeps holes and fast-retransmits missing packets]
+  Await --> Timeout[Timeout uses exponential backoff]
+  Timeout --> Retry{retry_count <= max?}
+  Retry -- yes --> Network
+  Retry -- no --> Failed[Remove and report ACK timeout]
+```
 
 ## Sender State
 

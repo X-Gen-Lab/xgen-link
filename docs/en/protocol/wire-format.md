@@ -18,6 +18,24 @@ XGL v2 uses a fixed 24-byte base header. The wire path does not depend on packed
 | 20 | 2 | `payload_len` | LE u16 | Payload length |
 | 22 | 2 | `header_crc16` | LE u16 | Header CRC |
 
+## Field Lifecycle
+
+| Field | TX source | Forwarding rule | RX validation | Evidence |
+| --- | --- | --- | --- | --- |
+| `magic` | `xgl_wire_encode_header()` writes `A5 5A` | Immutable | Parser resynchronizes on this byte pair | `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c`, `test/test_parser.cpp` |
+| `version` | Fixed protocol version `2` | Immutable | Header decode rejects unsupported versions | `include/xgl/internal/xgl_network.h`, `src/wire/xgl_wire.c`, `test/test_wire.cpp` |
+| `header_len` | Base header plus serialized TLVs | Immutable after TX | Must be at least 24 and fit parser cache | `src/wire/xgl_wire.c`, `src/wire/xgl_parser_extensions.c`, `test/test_parser.cpp` |
+| `packet_type` | Transport/network packet semantic | Immutable | Values outside DATA..CLOSE fail closed | `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c`, `test/test_wire.cpp` |
+| `flags` | Derived from reliability, extensions, fragmentation, auth, control | Immutable except future hop-local designs | SECURITY_EXT must exist when AUTHENTICATED is set | `src/wire/xgl_frame.c`, `src/wire/xgl_parser_extensions.c`, `test/test_parser.cpp` |
+| `ttl` | `XGL_DEFAULT_TTL` on network TX | Decremented exactly once per forward | Remote frames with `ttl <= 1` are dropped | `src/network/xgl_network_send.c`, `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| `traffic_class` | Reliability class, fragment bit, priority | Immutable | Transport interprets ACK-eliciting/ACK-only classes | `include/xgl/xgl_types.h`, `src/transport`, `test/test_transport.cpp` |
+| `source_id` | Local `config.source_id` unless packet overrides zero on internal send | Immutable | Cannot be 0 or `XGL_BROADCAST_ID` | `src/network/xgl_network.c`, `src/network/xgl_network_send.c`, `test/test_network.cpp` |
+| `target_id` | `xgl_tx_data_t.target_id` or control target | Immutable | Local delivery when local or broadcast; otherwise route lookup | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| `connection_id` | TX connection scope, default 0 | Immutable | Scopes peer, replay, ACK, and fragment state | `src/transport/xgl_transport_peer.c`, `test/test_transport.cpp` |
+| `packet_number` | Monotonic transport packet number | Immutable | Drives ACK/SACK, replay, ordering | `src/transport/xgl_transport_packet_number.c`, `test/test_reliable.cpp` |
+| `payload_len` | Application payload or fragment payload length | Immutable | Parser uses it to derive body length | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+| `header_crc16` | Computed over base header with this field zeroed | Recomputed after TTL rewrite | Header decode recomputes and compares | `src/wire/xgl_wire.c`, `test/test_wire.cpp`, `test/test_crc.cpp` |
+
 ## CRC Coverage
 
 `header_crc16` covers only the 24-byte base header with the CRC field treated as zero. TLV extensions, payload, and the authentication trailer are covered by the frame CRC; authenticated frames are also covered by the auth tag. End-to-end authentication uses a canonical AAD where hop-mutable TTL and header CRC are treated as zero before signing or verification.

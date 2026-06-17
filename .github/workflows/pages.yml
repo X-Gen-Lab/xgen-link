@@ -46,6 +46,10 @@ jobs:
       - name: Install documentation dependencies
         run: python -m pip install -r docs/requirements.txt
 
+      - name: Run documentation QA
+        shell: pwsh
+        run: ./tools/docs_qa.ps1
+
       - name: Configure
         run: cmake --preset ci
 

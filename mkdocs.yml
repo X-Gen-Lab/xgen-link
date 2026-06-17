@@ -92,6 +92,7 @@ nav:
           - GitHub CI/CD: zh/reference/github-ci.md
           - 验证矩阵: zh/reference/validation-matrix.md
           - 静态分析: zh/reference/static-analysis.md
+          - 术语表: zh/reference/glossary.md
       - 贡献:
           - 文档规范: zh/contributing/documentation.md
   - English:
@@ -127,5 +128,6 @@ nav:
           - GitHub CI/CD: en/reference/github-ci.md
           - Validation Matrix: en/reference/validation-matrix.md
           - Static Analysis: en/reference/static-analysis.md
+          - Glossary: en/reference/glossary.md
       - Contributing:
           - Documentation: en/contributing/documentation.md

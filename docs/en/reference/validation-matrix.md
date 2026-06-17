@@ -18,6 +18,11 @@ The validation matrix links protocol capability, risk, and required tests. Befor
 | Fragmentation | Memory exhaustion, cross-session mixing | `FRAGMENT_EXT` reassembly, budget, timeout, reset scope | `test/test_fragment.cpp` |
 | Low-power deadline | Sleep misses retransmit/reassembly deadline | nearest route/reliable/reassembly deadline | `test/test_instance.cpp` |
 | No-heap profile | Hidden malloc and fragmentation | no-heap smoke and allocator failure paths | `tools/noheap_smoke.c`, memory tests |
+| Examples build | README drift from compilable examples | echo server, file transfer, and multi-node targets build | `examples/CMakeLists.txt`, `xgl_release_validation` |
+| Low-power runtime guide | Documentation diverges from runtime deadline API | `xgl_next_deadline_ms()` and route polling deadline behavior | `test/test_instance.cpp`, `test/test_time_provider.cpp` |
+| Porting guide | Platform assumptions break new board ports | PHY callbacks, time provider, mutex/noop mutex behavior | `test/test_platform.cpp`, `test/test_time.cpp`, `test/test_mutex.cpp` |
+| Resource model | Preset budgets drift from config macros | preset tx/rx/window/frame values and no-heap behavior | `test/test_config.cpp`, `test/test_types.cpp`, `test/test_footprint.cpp` |
+| Documentation build | Broken links or stale Doxygen public API | strict MkDocs plus Doxygen API generation | `docs/CMakeLists.txt`, `.github/workflows/pages.yml` |
 
 ## Fuzz / Stress Recommendations
 

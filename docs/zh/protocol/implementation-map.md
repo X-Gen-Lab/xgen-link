@@ -49,6 +49,7 @@
 | `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | payload 内不再放分片头 |
 | `SECURITY_EXT` | `xgl_wire_encode/decode_security_ext_value` | frame、datalink、network | 标记 key、nonce/material、tag 长度；tag 是端到端认证材料，转发不重签 |
 | `ROUTE_EXT` | `xgl_wire_encode/decode_route_ext_value` | network/routing | route epoch、上一跳、下一跳、metric |
+| `TIMESTAMP_EXT` | 仅 enum | TODO | TODO(xgen-link): confirm TIMESTAMP_EXT value format and whether it is reserved or intentionally unimplemented. |
 | `DATA_TYPE_EXT` | `xgl_wire_encode_ext` | network、transport | DATA 包携带应用 data_type，CONTROL 包携带控制子类型，避免污染 packet_type |
 
 ## 公共 API 与内部 API
@@ -73,6 +74,21 @@
 | reliable/ACK/SACK/window | `test/test_transport.cpp`, `test/test_reliable.cpp`, `test/test_window.cpp`, `test/property/test_transport_properties.cpp` |
 | fragmentation/budget | `test/test_fragment.cpp`, `test/property/test_fragment_properties.cpp` |
 | memory/noheap/footprint | `test/test_allocator.cpp`, `test/test_mempool.cpp`, `test/test_packet_pool.cpp`, `test/test_footprint.cpp`, `tools/noheap_smoke.c` |
+
+## 协议规则追溯
+
+| 协议规则 | 主要源码 | 主要测试 | 设计文档 |
+| --- | --- | --- | --- |
+| Header offset 与 little-endian 编码 | `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c` | `test/test_wire.cpp`, `test/test_crc.cpp` | `wire-format.md` |
+| Parser resync、body 长度、auth trailer 长度 | `src/wire/xgl_parser.c`, `src/wire/xgl_parser_extensions.c` | `test/test_parser.cpp` | `state-machines.md`, `wire-format.md` |
+| 端到端 auth canonicalize TTL/header CRC | `src/wire/xgl_wire.c`, `src/wire/xgl_frame_auth.c` | `test/test_datalink.cpp`, `test/test_network.cpp` | `security.md` |
+| Replay key 使用 source、connection、session、packet | `src/security/xgl_security.c`, `src/datalink/xgl_datalink_receive.c` | `test/test_security.cpp`, `test/test_datalink.cpp` | `security.md` |
+| 地址校验与 broadcast 本地交付 | `src/network/xgl_network.c`, `include/xgl/internal/xgl_network.h` | `test/test_network.cpp` | `routing.md` |
+| 转发递减 TTL 并重算 CRC | `src/network/xgl_network_receive.c` | `test/test_network.cpp` | `routing.md`, `security.md` |
+| ACK range/SACK 释放 reliable queue entry | `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_sack.c`, `src/transport/xgl_reliable_ack.c` | `test/test_reliable.cpp`, `test/test_transport.cpp` | `reliability.md`, `extensions.md` |
+| Peer scope 使用 remote peer id 加 connection/session | `src/transport/xgl_transport_peer.c`, `src/transport/xgl_transport_receive_peer.c` | `test/test_transport.cpp` | `reliability.md` |
+| Fragment budget 计入 TLV、auth 和 CRC | `src/transport/xgl_transport_send_plan.c` | `test/test_transport.cpp` | `fragmentation.md` |
+| Reassembly key 与 cleanup scope | `src/transport/xgl_fragment_reassembly.c`, `src/transport/xgl_fragment_maintenance.c` | `test/test_fragment.cpp`, `test/test_transport.cpp` | `fragmentation.md`, `state-machines.md` |
 
 ## 维护规则
 

@@ -1,6 +1,12 @@
 # 路由
 
-XGL 使用 16-bit 节点地址。`0` 和保留地址不能作为普通本地节点 ID。
+XGL 使用 16-bit 节点地址。本地 `source_id` 不得为 `0` 或
+`XGL_BROADCAST_ID` (`0xFFFF`)。收到的 frame 在 source 为 0、source 为
+broadcast，或 source 等于 target 且 target 不是 broadcast 时会被拒绝。
+`target_id` 可以是本地节点、远端节点或 `XGL_BROADCAST_ID`。
+
+TODO(xgen-link): confirm broadcast/multicast address policy beyond
+`XGL_BROADCAST_ID`.
 
 ## Route Table
 
@@ -23,6 +29,20 @@ XGL 使用 16-bit 节点地址。`0` 和保留地址不能作为普通本地节�
 5. 检查完整 frame 长度不超过 route MTU。
 6. 更新 TTL，并重算 header/frame CRC。
 7. 调用 egress PHY。
+
+## 决策表
+
+| 输入条件 | 决策 | 错误/计数行为 | 证据 |
+| --- | --- | --- | --- |
+| `source_id == 0` | 丢弃 | `XGL_ERR_INVALID_PARAM`，RX drop count | `src/network/xgl_network.c`, `src/network/xgl_network_receive.c` |
+| `source_id == XGL_BROADCAST_ID` | 丢弃 | `XGL_ERR_INVALID_PARAM`，RX drop count | `src/network/xgl_network.c` |
+| `source_id == target_id` 且 target 不是 broadcast | 丢弃 | `XGL_ERR_INVALID_PARAM`，RX drop count | `src/network/xgl_network.c` |
+| `target_id == local_id` | 本地交付给 transport | 增加 network RX stats | `src/network/xgl_network_receive.c` |
+| `target_id == XGL_BROADCAST_ID` | 本地交付给 transport | `xgl_network_is_local()` 视为本地 | `include/xgl/internal/xgl_network.h` |
+| 远端 target 且 route 缺失 | 丢弃 | `XGL_ERR_ROUTE_NOT_FOUND`，RX drop count，error callback | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| 远端 target 且 `ttl <= 1` | 丢弃 | `XGL_ERR_TTL_EXPIRED`，RX drop count，error callback | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| 远端 target 且 frame 超过 route MTU | 丢弃 | `XGL_ERR_BUFFER_TOO_SMALL`，RX drop count | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| 远端 target、route 存在、TTL 合法、MTU 适配 | 转发 | 递减 TTL，重算 header CRC 和 frame CRC，调用 route PHY TX | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
 
 ## TTL
 

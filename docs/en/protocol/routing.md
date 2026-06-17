@@ -1,6 +1,12 @@
 # Routing
 
-XGL uses 16-bit node IDs. `0` and reserved addresses are not valid normal local node IDs.
+XGL uses 16-bit node IDs. Local `source_id` must not be `0` or
+`XGL_BROADCAST_ID` (`0xFFFF`). Received frames are rejected when the source is
+zero, the source is broadcast, or source equals target except for broadcast.
+`target_id` may be the local node, a remote node, or `XGL_BROADCAST_ID`.
+
+TODO(xgen-link): confirm broadcast/multicast address policy beyond
+`XGL_BROADCAST_ID`.
 
 ## Route Table
 
@@ -23,6 +29,20 @@ Forwarding must check route MTU. Frames larger than `max_frame_size` return `XGL
 5. Check complete frame length against route MTU.
 6. Update TTL and recompute header/frame CRC.
 7. Call egress PHY.
+
+## Decision Table
+
+| Input condition | Decision | Error/counter behavior | Evidence |
+| --- | --- | --- | --- |
+| `source_id == 0` | Drop | `XGL_ERR_INVALID_PARAM`, RX drop count | `src/network/xgl_network.c`, `src/network/xgl_network_receive.c` |
+| `source_id == XGL_BROADCAST_ID` | Drop | `XGL_ERR_INVALID_PARAM`, RX drop count | `src/network/xgl_network.c` |
+| `source_id == target_id` and target is not broadcast | Drop | `XGL_ERR_INVALID_PARAM`, RX drop count | `src/network/xgl_network.c` |
+| `target_id == local_id` | Local delivery to transport | Increment network RX stats | `src/network/xgl_network_receive.c` |
+| `target_id == XGL_BROADCAST_ID` | Local delivery to transport | Treated as local by `xgl_network_is_local()` | `include/xgl/internal/xgl_network.h` |
+| Remote target and route missing | Drop | `XGL_ERR_ROUTE_NOT_FOUND`, RX drop count, error callback | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| Remote target and `ttl <= 1` | Drop | `XGL_ERR_TTL_EXPIRED`, RX drop count, error callback | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| Remote target and frame exceeds route MTU | Drop | `XGL_ERR_BUFFER_TOO_SMALL`, RX drop count | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| Remote target, route found, TTL valid, MTU fits | Forward | Decrement TTL, recompute header CRC and frame CRC, call route PHY TX | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
 
 ## TTL
 

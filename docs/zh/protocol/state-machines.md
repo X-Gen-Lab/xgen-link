@@ -26,6 +26,18 @@ stateDiagram-v2
 - `Extensions` 按 TLV cursor 遍历，任何越界都 reset。
 - `Body` 的长度必须由 `payload_len + auth_tag_len + frame_crc16` 推导。
 
+### Parser 状态表
+
+| 状态 | 进入条件 | 完成条件 | 错误/超时行为 | 证据 |
+| --- | --- | --- | --- | --- |
+| `XGL_PARSE_MAGIC` | parser reset 或坏帧被丢弃 | 找到 `A5 5A` | 忽略噪声；保留重叠 magic | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+| `XGL_PARSE_HEADER` | 第一个 magic byte 已缓存 | 24-byte 基础头 decode 成功 | magic/version/header CRC 错误时 reset 到 MAGIC | `src/wire/xgl_parser.c`, `src/wire/xgl_wire.c`, `test/test_parser.cpp` |
+| `XGL_PARSE_PAYLOAD` | header/TLV 合法且 body 长度非零 | 缓存 `payload_len + auth_tag_len` 字节 | cache overflow reset 到 MAGIC | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+| `XGL_PARSE_CRC` | header-only frame 或 body 字节已完整 | frame CRC 校验通过 | CRC 失败 reset 到 MAGIC | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+
+`xgl_parser_check_timeout()` 只会让非 MAGIC 状态过期。超时会把 parser reset 到
+MAGIC，并清空 cached length、expected payload length 和 expected authentication tag length。
+
 ## Datalink 验证状态机
 
 ```mermaid

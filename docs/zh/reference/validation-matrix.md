@@ -18,6 +18,11 @@
 | fragmentation | 内存耗尽、跨 session 混包 | FRAGMENT_EXT 重组、预算、timeout、reset scope | `test/test_fragment.cpp` |
 | low-power deadline | 睡眠过久导致超时 | route/reliable/reassembly 最近 deadline | `test/test_instance.cpp` |
 | noheap profile | 隐式 malloc、碎片化 | noheap smoke、allocator 失败路径 | `tools/noheap_smoke.c`, memory tests |
+| examples build | README 与可编译示例漂移 | echo server、file transfer、multi-node target 能构建 | `examples/CMakeLists.txt`, `xgl_release_validation` |
+| low-power runtime guide | 文档与 runtime deadline API 漂移 | `xgl_next_deadline_ms()` 与 route polling deadline 行为 | `test/test_instance.cpp`, `test/test_time_provider.cpp` |
+| porting guide | 平台假设破坏新板级移植 | PHY callbacks、time provider、mutex/noop mutex 行为 | `test/test_platform.cpp`, `test/test_time.cpp`, `test/test_mutex.cpp` |
+| resource model | preset 预算与 config macro 漂移 | preset tx/rx/window/frame 值和 no-heap 行为 | `test/test_config.cpp`, `test/test_types.cpp`, `test/test_footprint.cpp` |
+| documentation build | 断链或 Doxygen public API 过期 | strict MkDocs 加 Doxygen API 生成 | `docs/CMakeLists.txt`, `.github/workflows/pages.yml` |
 
 ## Fuzz / Stress 建议
 

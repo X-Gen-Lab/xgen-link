@@ -26,7 +26,13 @@ The production preset enables `auth_required`. Configure:
 
 - `auth_key_id`
 - `auth_provider`
+- `memory.allocator`, including both `malloc` and `free`
 - `auth_provider->tag_len`, with `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`
+
+`xgl_config_validate()` rejects authenticated configurations when the provider
+is incomplete or when the allocator is missing. The current implementation uses
+the allocator while preparing authenticated runtime state, so production auth
+does not use the fallback-malloc path.
 
 ## Memory
 
@@ -45,6 +51,10 @@ Compression and encryption are reserved. Production builds should not enable cod
 ## Validation Guidance
 
 - `source_id` must not be 0 or reserved.
+- `source_id` must not be `XGL_BROADCAST_ID`.
+- `memory.rx_buffer_size` must be at least `protocol.max_frame_size`.
 - `window_size` must fit reliable queue and MCU RAM budgets.
 - Evaluate `max_retry_count` with low-power sleep intervals.
 - Production preset must provide an auth provider before create/init.
+- `features.enable_compression` and `features.enable_encryption` must remain
+  false until the reserved codec/encryption paths are implemented.

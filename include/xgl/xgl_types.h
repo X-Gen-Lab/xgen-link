@@ -44,9 +44,27 @@ typedef struct {
 
 /**
  * \brief           Physical layer operations
+ * \details         Both callbacks are invoked from xgl_run() context. They
+ *                  must be non-blocking or bounded, must not call back into the
+ *                  same xgl_handle_t, and must return an xgl_error_t status.
  */
 typedef struct {
+    /**
+     * \brief       Transmit one complete serialized frame.
+     * \param[in]   data: Frame bytes to transmit
+     * \param[in]   len: Number of bytes in data
+     * \param[in]   user_data: PHY user data pointer
+     * \return      XGL_OK when the frame was accepted for transmission
+     */
     xgl_error_t (*tx)(const uint8_t* data, size_t len, void* user_data);
+
+    /**
+     * \brief       Receive available serialized frame bytes.
+     * \param[out]  buffer: Destination buffer owned by xgen-link
+     * \param[in,out] len: On entry, buffer capacity; on return, bytes written
+     * \param[in]   user_data: PHY user data pointer
+     * \return      XGL_OK when the read completed; zero bytes is allowed
+     */
     xgl_error_t (*rx)(uint8_t* buffer, size_t* len, void* user_data);
     void* user_data;                /**< User data for PHY operations */
 } xgl_phy_ops_t;
@@ -79,22 +97,35 @@ typedef struct {
  */
 #define XGL_RELIABILITY_CLASS_SHIFT     6
 #define XGL_RELIABILITY_CLASS_MASK      0xC0
+/** No transport acknowledgement is requested. */
 #define XGL_RELIABILITY_NONE            0x00
+/** Packet elicits ACK range/SACK feedback and may be retransmitted. */
 #define XGL_RELIABILITY_ACK_ELICITING   0x40
+/** Packet carries acknowledgement information and no application payload. */
 #define XGL_RELIABILITY_ACK_ONLY        0x80
 
+/** Traffic-class bit position used to mark fragmented packets. */
 #define XGL_TRAFFIC_FRAGMENTED_SHIFT    5
+/** Traffic-class mask used to mark fragmented packets. */
 #define XGL_TRAFFIC_FRAGMENTED_MASK     0x20
 
+/** Reserved encryption-class bit position. */
 #define XGL_TRAFFIC_ENCRYPTION_SHIFT    3
+/** Reserved encryption-class mask. */
 #define XGL_TRAFFIC_ENCRYPTION_MASK     0x18
+/** No encryption. This is the only accepted production value today. */
 #define XGL_TRAFFIC_ENCRYPTION_NONE     0x00
+/** Reserved; rejected until the encryption path is wired. */
 #define XGL_TRAFFIC_ENCRYPTION_AES128   0x08
+/** Reserved; rejected until the encryption path is wired. */
 #define XGL_TRAFFIC_ENCRYPTION_CHACHA20 0x10
 
+/** Traffic-class bit position used for priority. */
 #define XGL_TRAFFIC_PRIORITY_SHIFT      0
+/** Traffic-class mask used for priority values 0..7. */
 #define XGL_TRAFFIC_PRIORITY_MASK       0x07
 
+/** Maximum authentication tag length accepted by public configuration. */
 #define XGL_AUTH_TAG_MAX_LEN            32U
 
 /**
@@ -102,11 +133,16 @@ typedef struct {
  */
 #define XGL_COMPRESSION_SHIFT           6
 #define XGL_COMPRESSION_MASK            0xC0
+/** No compression. This is the only accepted production value today. */
 #define XGL_COMPRESSION_NONE            0x00
+/** Reserved; rejected until the codec path is wired. */
 #define XGL_COMPRESSION_RLE             0x40
+/** Reserved; rejected until the codec path is wired. */
 #define XGL_COMPRESSION_LZ77            0x80
+/** Reserved; rejected until the codec path is wired. */
 #define XGL_COMPRESSION_ZLIB            0xC0
 
+/** Short transport session-id mask stored in traffic/session metadata. */
 #define XGL_SESSION_ID_MASK             0x3F
 
 /*---------------------------------------------------------------------------*/
@@ -193,6 +229,19 @@ typedef struct {
     uint16_t max_frame_size;        /**< Maximum frame size in bytes */
 } xgl_protocol_config_t;
 
+/**
+ * \brief           Authentication signing callback
+ * \param[in]       key_id: Application key identifier from configuration
+ * \param[in]       aad: Canonical authenticated header/TLV bytes
+ * \param[in]       aad_len: AAD length in bytes
+ * \param[in]       payload: Payload bytes to authenticate
+ * \param[in]       payload_len: Payload length in bytes
+ * \param[out]      tag: Destination authentication tag buffer
+ * \param[in]       tag_capacity: Capacity of tag in bytes
+ * \param[out]      tag_len: Number of tag bytes written
+ * \param[in]       user_data: Provider user data
+ * \return          XGL_OK on success, error code otherwise
+ */
 typedef xgl_error_t (*xgl_auth_sign_fn)(uint32_t key_id,
                                         const uint8_t* aad,
                                         size_t aad_len,
@@ -203,6 +252,19 @@ typedef xgl_error_t (*xgl_auth_sign_fn)(uint32_t key_id,
                                         size_t* tag_len,
                                         void* user_data);
 
+/**
+ * \brief           Authentication verification callback
+ * \param[in]       key_id: Application key identifier from frame metadata
+ * \param[in]       aad: Canonical authenticated header/TLV bytes
+ * \param[in]       aad_len: AAD length in bytes
+ * \param[in]       payload: Payload bytes to authenticate
+ * \param[in]       payload_len: Payload length in bytes
+ * \param[in]       tag: Authentication tag from the received frame
+ * \param[in]       tag_len: Tag length in bytes
+ * \param[out]      valid: Set to true only when verification succeeds
+ * \param[in]       user_data: Provider user data
+ * \return          XGL_OK when verification was performed, error code otherwise
+ */
 typedef xgl_error_t (*xgl_auth_verify_fn)(uint32_t key_id,
                                           const uint8_t* aad,
                                           size_t aad_len,
@@ -344,9 +406,9 @@ typedef struct {
     size_t data_len;                /**< Data length */
     bool reliable;                  /**< Enable reliable transmission */
     uint8_t priority;               /**< Priority level (0-7) */
-    uint32_t timeout_ms;            /**< Timeout in ms (0 = use default) */
-    uint32_t connection_id;         /**< Production connection scope (0 = default) */
-    uint32_t session_epoch;         /**< Production session epoch scope (0 = default) */
+    uint32_t timeout_ms;            /**< ACK timeout in ms (0 = default/RTT-derived) */
+    uint32_t connection_id;         /**< Connection scope for peer state (0 = default) */
+    uint32_t session_epoch;         /**< Session epoch for replay/peer/fragment isolation (0 = default) */
 } xgl_tx_data_t;
 
 /**

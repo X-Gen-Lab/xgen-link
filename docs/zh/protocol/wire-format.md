@@ -18,6 +18,24 @@ XGL v2 的基础头固定 24 bytes。wire path 不依赖 packed struct 或 `memc
 | 20 | 2 | `payload_len` | LE u16 | payload 长度 |
 | 22 | 2 | `header_crc16` | LE u16 | 头 CRC |
 
+## 字段生命周期
+
+| 字段 | TX 来源 | 转发规则 | RX 校验 | 证据 |
+| --- | --- | --- | --- | --- |
+| `magic` | `xgl_wire_encode_header()` 写入 `A5 5A` | 不变 | parser 通过该字节对重同步 | `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c`, `test/test_parser.cpp` |
+| `version` | 固定协议版本 `2` | 不变 | header decode 拒绝不支持的版本 | `include/xgl/internal/xgl_network.h`, `src/wire/xgl_wire.c`, `test/test_wire.cpp` |
+| `header_len` | 基础头加已序列化 TLV | TX 后不变 | 必须至少为 24 且适配 parser cache | `src/wire/xgl_wire.c`, `src/wire/xgl_parser_extensions.c`, `test/test_parser.cpp` |
+| `packet_type` | transport/network 包语义 | 不变 | DATA..CLOSE 之外的值 fail closed | `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c`, `test/test_wire.cpp` |
+| `flags` | 由可靠性、扩展、分片、认证、控制语义派生 | 除未来 hop-local 设计外不变 | 设置 AUTHENTICATED 时必须存在 SECURITY_EXT | `src/wire/xgl_frame.c`, `src/wire/xgl_parser_extensions.c`, `test/test_parser.cpp` |
+| `ttl` | network TX 使用 `XGL_DEFAULT_TTL` | 每次转发只递减一次 | 远端帧 `ttl <= 1` 时丢弃 | `src/network/xgl_network_send.c`, `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| `traffic_class` | 可靠性类别、fragment bit、priority | 不变 | transport 解释 ACK-eliciting/ACK-only 类别 | `include/xgl/xgl_types.h`, `src/transport`, `test/test_transport.cpp` |
+| `source_id` | 本地 `config.source_id`，内部发送为 0 时由 network 填充 | 不变 | 不能为 0 或 `XGL_BROADCAST_ID` | `src/network/xgl_network.c`, `src/network/xgl_network_send.c`, `test/test_network.cpp` |
+| `target_id` | `xgl_tx_data_t.target_id` 或控制目标 | 不变 | 本地或 broadcast 交付，否则查 route | `src/network/xgl_network_receive.c`, `test/test_network.cpp` |
+| `connection_id` | TX connection scope，默认 0 | 不变 | 隔离 peer、replay、ACK 和 fragment 状态 | `src/transport/xgl_transport_peer.c`, `test/test_transport.cpp` |
+| `packet_number` | transport 单调包号 | 不变 | 驱动 ACK/SACK、replay、ordering | `src/transport/xgl_transport_packet_number.c`, `test/test_reliable.cpp` |
+| `payload_len` | 应用 payload 或 fragment payload 长度 | 不变 | parser 用它推导 body 长度 | `src/wire/xgl_parser.c`, `test/test_parser.cpp` |
+| `header_crc16` | 按该字段置 0 的基础头计算 | TTL rewrite 后重算 | header decode 重算并比较 | `src/wire/xgl_wire.c`, `test/test_wire.cpp`, `test/test_crc.cpp` |
+
 ## CRC 范围
 
 `header_crc16` 只覆盖 24-byte 基础头，CRC 字段本身按零值参与计算。TLV 扩展、payload 和认证 trailer 的完整性由 frame CRC 覆盖；认证开启时还由 auth tag 覆盖。端到端认证使用 canonical AAD：签名或验签前，逐跳可变的 TTL 和 header CRC 按零值处理。

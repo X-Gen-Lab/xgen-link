@@ -5,8 +5,12 @@
 ## Peer Key
 
 ```text
-target_id + connection_id + session_epoch
+remote_peer_id + connection_id + session_epoch
 ```
+
+`remote_peer_id` 与方向有关：TX 路径使用 `target_id`，RX/ACK 路径使用收到包的
+`source_id`。这与 `transport_get_or_create_peer_scope()` 和
+`transport_find_peer_scope()` 的查找逻辑一致。
 
 该 key 隔离：
 
@@ -24,6 +28,42 @@ target_id + connection_id + session_epoch
 - ACK_RANGE_EXT 和 SACK_EXT 放在 header TLV 区，不占用 payload。
 - ACK-only 包不再依赖基础头中的单字节 ack 字段。
 - ACK/SACK 回复会保留收到的可靠包中的 `connection_id`、`session_epoch` 和 transport `session_id`，确保 ACK 丢失恢复仍命中同一个 peer scope。
+
+### ACK_RANGE_EXT 字段
+
+| 字段 | 类型 | 含义 | 源码/测试 |
+| --- | --- | --- | --- |
+| `largest_ack` | u32 | 该 ACK frame 描述的最高 packet number | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `ack_delay_us` | u32 | 编码后的 ACK delay 元数据；当前测试验证 encode/decode 往返 | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `range_count` | u8 | 后续 range 数量 | `src/wire/xgl_wire_ack_ext.c`, `test/test_reliable.cpp` |
+| `gap` | u16 | 从前一个确认 range 向后回退的距离 | `src/transport/xgl_reliable_ack.c`, `test/test_reliable.cpp` |
+| `length` | u16 | 该 range 覆盖的 packet 数量 | `src/transport/xgl_reliable_ack.c`, `test/test_reliable.cpp` |
+
+### SACK_EXT 字段
+
+| 字段 | 类型 | 含义 | 源码/测试 |
+| --- | --- | --- | --- |
+| `base_packet` | u32 | bitmap 描述的第一个 packet number | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `bitmap_len` | u8 | bitmap 字节数 | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
+| `bitmap` | bytes | bit `n` 描述 `base_packet + n` 的接收状态 | `src/transport/xgl_transport_sack.c`, `test/test_transport.cpp` |
+
+全零 SACK bitmap 是合法编码。它保留 `base_packet` 这个已知缺口，使发送端可以快速重传缺失包，同时移除被明确标记为已接收的包。
+
+### Reliable 数据流
+
+```mermaid
+flowchart LR
+  App[xgl_send reliable] --> Peer[Resolve remote peer scope]
+  Peer --> Queue[Admit payload into reliable queue]
+  Queue --> Network[Network/frame TX]
+  Network --> Await[Wait for ACK_RANGE/SACK]
+  Await --> Acked[ACK range removes covered packets]
+  Await --> Sack[SACK keeps holes and fast-retransmits missing packets]
+  Await --> Timeout[Timeout uses exponential backoff]
+  Timeout --> Retry{retry_count <= max?}
+  Retry -- yes --> Network
+  Retry -- no --> Failed[Remove and report ACK timeout]
+```
 
 ## 发送端状态
 

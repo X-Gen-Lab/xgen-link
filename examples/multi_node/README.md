@@ -324,22 +324,19 @@ Each node needs:
 - Route table with multiple paths
 - Optional: Dynamic routing to select best path
 
-### 3. Implement Dynamic Routing
+### 3. Plan Dynamic Routing
 
-```c
-/* Add route at runtime */
-xgl_route_add(handle, target_id, &phy, max_frame_size, metric);
+The public API configures routes through `xgl_route_item_t` entries supplied in
+`xgl_config_t` before `xgl_create()`. Runtime route mutation helpers exist only
+in the internal route table layer and are not exposed as public SDK calls.
 
-/* Remove route */
-xgl_route_remove(handle, target_id);
-
-/* Update route metric (link quality) */
-xgl_route_update_metric(handle, target_id, new_metric);
-```
+TODO(xgen-link): confirm whether a future public route-management API should be
+added for runtime route add/remove/metric updates.
 
 ### 4. Add Route Discovery
 
-Implement a simple route discovery protocol:
+Route discovery is a protocol extension idea, not part of the current public
+API. A future design could:
 - Broadcast route request packets
 - Intermediate nodes forward requests
 - Destination sends route reply
