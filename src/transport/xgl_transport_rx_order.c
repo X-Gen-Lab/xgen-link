@@ -58,6 +58,59 @@ void transport_clear_rx_buffered(xgl_transport_ctx_t *ctx,
     peer->rx_buffered_count = 0U;
 }
 
+static xgl_error_t transport_copy_rx_buffered_packet(
+    xgl_transport_ctx_t *ctx, xgl_transport_rx_buffered_packet_t *buffered,
+    const xgl_packet_t *packet, uint32_t packet_number)
+{
+    buffered->data =
+        (uint8_t *) transport_malloc(ctx->allocator, packet->data->data_len);
+    if (buffered->data == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+    memcpy(buffered->data, packet->data->data, packet->data->data_len);
+    buffered->data_len = packet->data->data_len;
+
+    if (packet->extensions != NULL && packet->extensions_len > 0U) {
+        buffered->extensions = (uint8_t *) transport_malloc(
+            ctx->allocator, packet->extensions_len);
+        if (buffered->extensions == NULL) {
+            return XGL_ERR_NO_MEMORY;
+        }
+        memcpy(buffered->extensions, packet->extensions,
+               packet->extensions_len);
+        buffered->extensions_len = packet->extensions_len;
+    }
+
+    buffered->packet = *packet;
+    buffered->packet.packet_number = packet_number;
+    buffered->packet_data.ref_count = 1;
+    buffered->packet_data.data_len = buffered->data_len;
+    buffered->packet_data.data = buffered->data;
+    buffered->packet_data.owned_data = buffered->data;
+    buffered->packet.data = &buffered->packet_data;
+    buffered->packet.extensions = buffered->extensions;
+    buffered->packet.extensions_len = buffered->extensions_len;
+
+    return XGL_OK;
+}
+
+static void
+transport_insert_rx_buffered(xgl_transport_peer_state_t *peer,
+                             xgl_transport_rx_buffered_packet_t *buffered,
+                             uint32_t packet_number)
+{
+    xgl_transport_rx_buffered_packet_t *prev = NULL;
+    (void) transport_find_rx_buffered(peer, packet_number, &prev);
+    if (prev == NULL) {
+        buffered->next = peer->rx_buffered;
+        peer->rx_buffered = buffered;
+    } else {
+        buffered->next = prev->next;
+        prev->next = buffered;
+    }
+    peer->rx_buffered_count++;
+}
+
 xgl_error_t transport_cache_out_of_order_packet(
     xgl_transport_ctx_t *ctx, xgl_transport_peer_state_t *peer,
     const xgl_packet_t *packet, uint32_t packet_number)
@@ -89,47 +142,14 @@ xgl_error_t transport_cache_out_of_order_packet(
     }
     memset(buffered, 0, sizeof(*buffered));
 
-    buffered->data =
-        (uint8_t *) transport_malloc(ctx->allocator, packet->data->data_len);
-    if (buffered->data == NULL) {
+    xgl_error_t err =
+        transport_copy_rx_buffered_packet(ctx, buffered, packet, packet_number);
+    if (err != XGL_OK) {
         transport_free_rx_buffered_packet(ctx, buffered);
-        return XGL_ERR_NO_MEMORY;
-    }
-    memcpy(buffered->data, packet->data->data, packet->data->data_len);
-    buffered->data_len = packet->data->data_len;
-
-    if (packet->extensions != NULL && packet->extensions_len > 0U) {
-        buffered->extensions = (uint8_t *) transport_malloc(
-            ctx->allocator, packet->extensions_len);
-        if (buffered->extensions == NULL) {
-            transport_free_rx_buffered_packet(ctx, buffered);
-            return XGL_ERR_NO_MEMORY;
-        }
-        memcpy(buffered->extensions, packet->extensions,
-               packet->extensions_len);
-        buffered->extensions_len = packet->extensions_len;
+        return err;
     }
 
-    buffered->packet = *packet;
-    buffered->packet.packet_number = packet_number;
-    buffered->packet_data.ref_count = 1;
-    buffered->packet_data.data_len = buffered->data_len;
-    buffered->packet_data.data = buffered->data;
-    buffered->packet_data.owned_data = buffered->data;
-    buffered->packet.data = &buffered->packet_data;
-    buffered->packet.extensions = buffered->extensions;
-    buffered->packet.extensions_len = buffered->extensions_len;
-
-    xgl_transport_rx_buffered_packet_t *prev = NULL;
-    (void) transport_find_rx_buffered(peer, packet_number, &prev);
-    if (prev == NULL) {
-        buffered->next = peer->rx_buffered;
-        peer->rx_buffered = buffered;
-    } else {
-        buffered->next = prev->next;
-        prev->next = buffered;
-    }
-    peer->rx_buffered_count++;
+    transport_insert_rx_buffered(peer, buffered, packet_number);
 
     return XGL_OK;
 }
