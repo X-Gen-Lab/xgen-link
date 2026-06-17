@@ -4,10 +4,11 @@
  * \author          X-Gen Lab
  */
 
-#include "xgl_transport_internal.h"
-#include "xgl/xgl_config.h"
-#include "xgl/internal/xgl_allocator.h"
 #include <string.h>
+
+#include "xgl/internal/xgl_allocator.h"
+#include "xgl/xgl_config.h"
+#include "xgl_transport_internal.h"
 
 /*---------------------------------------------------------------------------*/
 /* Transport Layer Initialization                                            */
@@ -16,8 +17,9 @@
 /**
  * \brief           Initialize transport layer context
  */
-xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
-                               const xgl_transport_config_t* config) {
+xgl_error_t xgl_transport_init(xgl_transport_ctx_t *ctx,
+                               const xgl_transport_config_t *config)
+{
     xgl_error_t err;
 
     if (!ctx || !config) {
@@ -37,7 +39,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->max_frame_size = config->max_frame_size;
     ctx->auth_tag_len = config->auth_tag_len;
     ctx->route_table = config->route_table;
-    ctx->next_session_id = (uint16_t)(config->local_id & XGL_SESSION_ID_MASK);
+    ctx->next_session_id = (uint16_t) (config->local_id & XGL_SESSION_ID_MASK);
     if (ctx->next_session_id == 0U) {
         ctx->next_session_id = 1U;
     }
@@ -53,15 +55,15 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     xgl_rtt_init(&ctx->rtt_est);
 
     /* Initialize sliding window */
-    err = xgl_window_init_with_allocator(&ctx->window,
-                                         config->window_size,
+    err = xgl_window_init_with_allocator(&ctx->window, config->window_size,
                                          config->allocator);
     if (err != XGL_OK) {
         return err;
     }
 
     /* Initialize reliable transmission queue */
-    err = xgl_reliable_init(&ctx->reliable_queue, config->max_retry_count, config->allocator);
+    err = xgl_reliable_init(&ctx->reliable_queue, config->max_retry_count,
+                            config->allocator);
     if (err != XGL_OK) {
         xgl_window_destroy(&ctx->window);
         return err;
@@ -69,15 +71,16 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 
     /* Initialize fragmentation manager if enabled */
     if (config->enable_fragmentation) {
-        ctx->fragment_mgr = (xgl_fragment_manager_t*)transport_malloc(config->allocator,
-                                                                       sizeof(xgl_fragment_manager_t));
+        ctx->fragment_mgr = (xgl_fragment_manager_t *) transport_malloc(
+            config->allocator, sizeof(xgl_fragment_manager_t));
         if (!ctx->fragment_mgr) {
             xgl_reliable_destroy(&ctx->reliable_queue);
             xgl_window_destroy(&ctx->window);
             return XGL_ERR_NO_MEMORY;
         }
 
-        err = xgl_fragment_init(ctx->fragment_mgr, 8, XGL_FRAGMENT_TIMEOUT_MS, config->allocator);
+        err = xgl_fragment_init(ctx->fragment_mgr, 8, XGL_FRAGMENT_TIMEOUT_MS,
+                                config->allocator);
         if (err != XGL_OK) {
             transport_free(config->allocator, ctx->fragment_mgr);
             ctx->fragment_mgr = NULL;
@@ -93,7 +96,8 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 /**
  * \brief           Destroy transport layer context
  */
-void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
+void xgl_transport_destroy(xgl_transport_ctx_t *ctx)
+{
     if (!ctx) {
         return;
     }
@@ -124,14 +128,15 @@ void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
 /**
  * \brief           Periodic transport layer processing
  */
-xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
-                              xgl_handle_t handle,
-                              uint32_t current_time_ms) {
+xgl_error_t xgl_transport_run(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
+                              uint32_t current_time_ms)
+{
     if (!ctx) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    uint32_t retransmit_count = transport_process_retransmissions(ctx, handle, current_time_ms);
+    uint32_t retransmit_count =
+        transport_process_retransmissions(ctx, handle, current_time_ms);
 
     /* Update retransmission statistics */
     if (retransmit_count > 0 && ctx->tx_retries != NULL) {
@@ -140,14 +145,14 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
 
     /* Process fragment reassembly timeouts */
     if (ctx->fragment_mgr) {
-        uint32_t timeout_count = xgl_fragment_process_timeouts(ctx->fragment_mgr,
-                                                                current_time_ms);
+        uint32_t timeout_count =
+            xgl_fragment_process_timeouts(ctx->fragment_mgr, current_time_ms);
         if (timeout_count > 0) {
             /* Report error */
             if (ctx->error_callback) {
                 ctx->error_callback(handle, XGL_ERR_TIMEOUT,
-                                  "Fragment reassembly timeout",
-                                  ctx->callback_user_data);
+                                    "Fragment reassembly timeout",
+                                    ctx->callback_user_data);
             }
 
             /* Update statistics */
@@ -165,7 +170,8 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx,
 /**
  * \brief           Get next packet number for target
  */
-uint32_t xgl_transport_get_next_packet_number(xgl_transport_ctx_t* ctx) {
+uint32_t xgl_transport_get_next_packet_number(xgl_transport_ctx_t *ctx)
+{
     if (!ctx) {
         return 0;
     }
@@ -175,7 +181,8 @@ uint32_t xgl_transport_get_next_packet_number(xgl_transport_ctx_t* ctx) {
 /**
  * \brief           Check if transport layer can send
  */
-bool xgl_transport_can_send(const xgl_transport_ctx_t* ctx) {
+bool xgl_transport_can_send(const xgl_transport_ctx_t *ctx)
+{
     if (!ctx) {
         return false;
     }
@@ -185,10 +192,9 @@ bool xgl_transport_can_send(const xgl_transport_ctx_t* ctx) {
 /**
  * \brief           Report error through error callback
  */
-void xgl_transport_report_error(xgl_transport_ctx_t* ctx,
-                                xgl_handle_t handle,
-                                xgl_error_t error,
-                                const char* message) {
+void xgl_transport_report_error(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
+                                xgl_error_t error, const char *message)
+{
     if (!ctx) {
         return;
     }
@@ -196,87 +202,4 @@ void xgl_transport_report_error(xgl_transport_ctx_t* ctx,
     if (ctx->error_callback) {
         ctx->error_callback(handle, error, message, ctx->callback_user_data);
     }
-}
-
-
-/*---------------------------------------------------------------------------*/
-/* Layer Interface Implementation                                            */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Reject send calls through the lower-layer interface
- * \details         Applications enter transport TX through xgl_transport_send().
- */
-static xgl_error_t transport_send_impl(void* ctx,
-                                      xgl_handle_t handle,
-                                      void* data) {
-    (void)ctx;
-    (void)handle;
-    (void)data;
-    return XGL_ERR_INVALID_PARAM;
-}
-
-/**
- * \brief           Transport layer receive implementation (called by lower layers)
- * \details         This function is called by network layer to deliver packets
- */
-static xgl_error_t transport_receive_impl(void* ctx,
-                                         xgl_handle_t handle,
-                                         // cppcheck-suppress constParameterCallback
-                                         void* data) {
-    xgl_transport_ctx_t* trans_ctx = (xgl_transport_ctx_t*)ctx;
-    const xgl_packet_t* packet = (const xgl_packet_t*)data;
-
-    if (trans_ctx == NULL || packet == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    /* Forward to transport receive function */
-    return xgl_transport_receive(trans_ctx, handle, packet);
-}
-
-/**
- * \brief           Transport layer error reporting implementation
- * \details         This function is called to report errors to application
- */
-static xgl_error_t transport_report_error_impl(void* ctx,
-                                              xgl_handle_t handle,
-                                              void* data) {
-    xgl_transport_ctx_t* trans_ctx = (xgl_transport_ctx_t*)ctx;
-    xgl_layer_error_info_t* error_info = (xgl_layer_error_info_t*)data;
-
-    if (trans_ctx == NULL || error_info == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    /* Forward error to callback if available */
-    if (trans_ctx->error_callback != NULL) {
-        trans_ctx->error_callback(handle, error_info->error,
-                                 error_info->message,
-                                 trans_ctx->callback_user_data);
-    }
-
-    return XGL_OK;
-}
-
-/**
- * \brief           Get transport layer interface
- * \details         Returns the layer interface for this transport instance
- * \param[in]       ctx: Transport layer context
- * \param[out]      iface: Layer interface structure to initialize
- * \return          XGL_OK on success, error code otherwise
- */
-xgl_error_t xgl_transport_get_interface(xgl_transport_ctx_t* ctx,
-                                       xgl_layer_interface_t* iface) {
-    if (ctx == NULL || iface == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    xgl_layer_interface_init(iface,
-                            ctx,
-                            transport_send_impl,
-                            transport_receive_impl,
-                            transport_report_error_impl);
-
-    return XGL_OK;
 }
