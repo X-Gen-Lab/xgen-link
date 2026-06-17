@@ -37,6 +37,9 @@ transport_get_or_create_rx_peer(xgl_transport_ctx_t *ctx,
 xgl_error_t transport_prepare_rx_peer(xgl_transport_ctx_t *ctx,
                                       const xgl_packet_t *packet,
                                       xgl_transport_peer_state_t **peer);
+xgl_error_t transport_process_reliable_rx_order(
+    xgl_transport_ctx_t *ctx, xgl_handle_t handle, const xgl_packet_t *packet,
+    xgl_transport_peer_state_t **peer);
 void transport_destroy_peers(xgl_transport_ctx_t *ctx);
 void transport_commit_packet_number(xgl_transport_ctx_t *ctx,
                                     xgl_transport_peer_state_t *peer);
