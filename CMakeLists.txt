@@ -149,6 +149,7 @@ set(XGL_SOURCES
     src/transport/xgl_window.c
     src/transport/xgl_reliable_packet.c
     src/transport/xgl_reliable.c
+    src/transport/xgl_reliable_timeout.c
     src/transport/xgl_reliable_ack.c
     src/transport/xgl_fragment_range.c
     src/transport/xgl_fragment_reassembly.c
