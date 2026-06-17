@@ -5,93 +5,8 @@
  */
 
 #include <xgl/internal/xgl_reliable.h>
-#include <xgl/internal/xgl_allocator.h>
+#include "xgl_reliable_internal.h"
 #include <string.h>
-
-/*---------------------------------------------------------------------------*/
-/* Helper Functions                                                          */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Allocate memory using the configured allocator policy
- */
-static void* reliable_malloc(xgl_allocator_t* allocator, size_t size) {
-    return xgl_alloc(allocator, size);
-}
-
-/**
- * \brief           Free memory using the configured allocator policy
- */
-static void reliable_free(xgl_allocator_t* allocator, void* ptr) {
-    xgl_free(allocator, ptr);
-}
-
-static size_t reliable_index_bucket(uint16_t target_id,
-                                    uint32_t packet_number) {
-    uint32_t mixed = packet_number ^ ((uint32_t)target_id * 2654435761UL);
-    return (size_t)(mixed % XGL_RELIABLE_INDEX_BUCKETS);
-}
-
-static void reliable_index_packet(xgl_reliable_queue_t* queue,
-                                  xgl_reliable_packet_t* packet) {
-    if (queue == NULL || packet == NULL) {
-        return;
-    }
-
-    size_t bucket = reliable_index_bucket(packet->target_id,
-                                          packet->packet_number);
-    packet->index_next = queue->index_buckets[bucket];
-    queue->index_buckets[bucket] = packet;
-}
-
-static void reliable_unindex_packet(xgl_reliable_queue_t* queue,
-                                    xgl_reliable_packet_t* packet) {
-    if (queue == NULL || packet == NULL) {
-        return;
-    }
-
-    size_t bucket = reliable_index_bucket(packet->target_id,
-                                          packet->packet_number);
-    xgl_reliable_packet_t* previous = NULL;
-    xgl_reliable_packet_t* current = queue->index_buckets[bucket];
-    while (current != NULL) {
-        if (current == packet) {
-            if (previous == NULL) {
-                queue->index_buckets[bucket] = current->index_next;
-            } else {
-                previous->index_next = current->index_next;
-            }
-            current->index_next = NULL;
-            return;
-        }
-        previous = current;
-        current = current->index_next;
-    }
-}
-
-/**
- * \brief           Free reliable packet and its data
- */
-static void free_reliable_packet(xgl_reliable_queue_t* queue,
-                                xgl_reliable_packet_t* packet) {
-    if (packet == NULL) {
-        return;
-    }
-
-    /* Free packet data buffer */
-    if (packet->data != NULL) {
-        reliable_free(queue->allocator, packet->data);
-        packet->data = NULL;
-    }
-
-    if (packet->extensions != NULL) {
-        reliable_free(queue->allocator, packet->extensions);
-        packet->extensions = NULL;
-    }
-
-    /* Free packet structure */
-    reliable_free(queue->allocator, packet);
-}
 
 /*---------------------------------------------------------------------------*/
 /* Reliable Queue Functions                                                  */
@@ -240,7 +155,7 @@ xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
     if (packet != NULL) {
         reliable_unindex_packet(queue, packet);
         xgl_list_remove(&queue->wait_ack_list, &packet->node);
-        free_reliable_packet(queue, packet);
+        reliable_free_packet(queue, packet);
         return XGL_OK;
     }
 
@@ -291,7 +206,7 @@ uint32_t xgl_reliable_process_timeouts(xgl_reliable_queue_t* queue,
                     *retry_exhausted = packet;
                 } else {
                     /* Free packet if caller doesn't want it */
-                    free_reliable_packet(queue, packet);
+                    reliable_free_packet(queue, packet);
                 }
 
                 continue;
@@ -355,29 +270,10 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
     while ((node = xgl_list_remove_head(&queue->wait_ack_list)) != NULL) {
         xgl_reliable_packet_t* packet = XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         reliable_unindex_packet(queue, packet);
-        free_reliable_packet(queue, packet);
+        reliable_free_packet(queue, packet);
     }
 
     memset(queue->index_buckets, 0, sizeof(queue->index_buckets));
-}
-
-xgl_reliable_packet_t* xgl_reliable_find_packet_number(const xgl_reliable_queue_t* queue,
-                                                       uint32_t packet_number,
-                                                       uint16_t target_id) {
-    if (queue == NULL) {
-        return NULL;
-    }
-
-    size_t bucket = reliable_index_bucket(target_id, packet_number);
-    xgl_reliable_packet_t* packet = queue->index_buckets[bucket];
-    while (packet != NULL) {
-        if (packet->packet_number == packet_number && packet->target_id == target_id) {
-            return packet;
-        }
-        packet = packet->index_next;
-    }
-
-    return NULL;
 }
 
 /**
