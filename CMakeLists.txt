@@ -172,6 +172,7 @@ set(XGL_SOURCES
     src/transport/xgl_transport_sack.c
     src/transport/xgl_transport_sack_send.c
     src/transport/xgl_transport_interface.c
+    src/transport/xgl_transport_runtime.c
     src/transport/xgl_transport.c
 
     # Platform Abstraction
