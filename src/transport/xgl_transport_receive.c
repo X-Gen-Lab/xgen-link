@@ -4,14 +4,13 @@
  */
 
 #include "xgl_transport_internal.h"
-#include "xgl/internal/xgl_wire.h"
 
-static xgl_transport_peer_state_t* transport_find_rx_peer(xgl_transport_ctx_t* ctx,
-                                                          const xgl_packet_t* packet) {
+static xgl_transport_peer_state_t *
+transport_find_rx_peer(xgl_transport_ctx_t *ctx, const xgl_packet_t *packet)
+{
     bool scoped = (packet->connection_id != 0U || packet->session_epoch != 0U);
     if (scoped) {
-        return transport_find_peer_scope(ctx,
-                                         packet->source_id,
+        return transport_find_peer_scope(ctx, packet->source_id,
                                          packet->connection_id,
                                          packet->session_epoch);
     }
@@ -19,81 +18,24 @@ static xgl_transport_peer_state_t* transport_find_rx_peer(xgl_transport_ctx_t* c
     return transport_find_peer(ctx, packet->source_id);
 }
 
-static xgl_transport_peer_state_t* transport_get_or_create_rx_peer(xgl_transport_ctx_t* ctx,
-                                                                   const xgl_packet_t* packet) {
+static xgl_transport_peer_state_t *
+transport_get_or_create_rx_peer(xgl_transport_ctx_t *ctx,
+                                const xgl_packet_t *packet)
+{
     bool scoped = (packet->connection_id != 0U || packet->session_epoch != 0U);
     if (scoped) {
-        return transport_get_or_create_peer_scope(ctx,
-                                                 packet->source_id,
-                                                 packet->connection_id,
-                                                 packet->session_epoch);
+        return transport_get_or_create_peer_scope(ctx, packet->source_id,
+                                                  packet->connection_id,
+                                                  packet->session_epoch);
     }
 
     return transport_get_or_create_peer(ctx, packet->source_id);
 }
 
-static xgl_transport_peer_state_t* transport_find_ack_peer(xgl_transport_ctx_t* ctx,
-                                                           const xgl_packet_t* packet) {
-    bool scoped = (packet->connection_id != 0U || packet->session_epoch != 0U);
-    xgl_transport_peer_state_t* peer = transport_find_rx_peer(ctx, packet);
-    if (peer == NULL && scoped) {
-        peer = transport_find_peer(ctx, packet->source_id);
-    }
-
-    return peer;
-}
-
-static xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
-                                                xgl_handle_t handle,
-                                                const xgl_packet_t* packet) {
-    if (packet->packet_type != XGL_PACKET_TYPE_ACK) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    xgl_transport_peer_state_t* peer = transport_find_ack_peer(ctx, packet);
-    if (peer == NULL) {
-        return XGL_ERR_SEQUENCE_ERROR;
-    }
-
-    if (packet->session_id != 0U && packet->session_id != peer->session_id) {
-        return XGL_ERR_SEQUENCE_ERROR;
-    }
-
-    if ((packet->flags & XGL_WIRE_FLAG_HAS_EXTENSIONS) == 0U ||
-        packet->extensions == NULL ||
-        packet->extensions_len == 0U) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    bool handled_ack_range = false;
-    xgl_error_t err = transport_try_process_ack_range_ext(ctx,
-                                                          peer,
-                                                          packet->source_id,
-                                                          packet->extensions,
-                                                          packet->extensions_len,
-                                                          &handled_ack_range);
-    if (err != XGL_OK || handled_ack_range) {
-        return err;
-    }
-
-    bool handled_sack = false;
-    err = transport_try_process_sack_ext(ctx,
-                                         handle,
-                                         peer,
-                                         packet->source_id,
-                                         packet->extensions,
-                                         packet->extensions_len,
-                                         &handled_sack);
-    if (err != XGL_OK || handled_sack) {
-        return err;
-    }
-
-    return XGL_ERR_INVALID_FRAME;
-}
-
-static xgl_error_t transport_prepare_rx_peer(xgl_transport_ctx_t* ctx,
-                                             const xgl_packet_t* packet,
-                                             xgl_transport_peer_state_t** peer) {
+static xgl_error_t transport_prepare_rx_peer(xgl_transport_ctx_t *ctx,
+                                             const xgl_packet_t *packet,
+                                             xgl_transport_peer_state_t **peer)
+{
     *peer = NULL;
 
     if (packet->session_id == 0U) {
@@ -106,9 +48,7 @@ static xgl_error_t transport_prepare_rx_peer(xgl_transport_ctx_t* ctx,
         if (*peer == NULL) {
             return XGL_ERR_NO_MEMORY;
         }
-        transport_reset_peer_state(ctx,
-                                   *peer,
-                                   packet->session_id,
+        transport_reset_peer_state(ctx, *peer, packet->session_id,
                                    packet->connection_id,
                                    packet->session_epoch);
         return XGL_OK;
@@ -121,10 +61,10 @@ static xgl_error_t transport_prepare_rx_peer(xgl_transport_ctx_t* ctx,
     return XGL_OK;
 }
 
-static xgl_error_t transport_process_reliable_rx_order(xgl_transport_ctx_t* ctx,
-                                                       xgl_handle_t handle,
-                                                       const xgl_packet_t* packet,
-                                                       xgl_transport_peer_state_t** peer) {
+static xgl_error_t transport_process_reliable_rx_order(
+    xgl_transport_ctx_t *ctx, xgl_handle_t handle, const xgl_packet_t *packet,
+    xgl_transport_peer_state_t **peer)
+{
     if (*peer == NULL) {
         *peer = transport_get_or_create_rx_peer(ctx, packet);
         if (*peer == NULL) {
@@ -139,49 +79,34 @@ static xgl_error_t transport_process_reliable_rx_order(xgl_transport_ctx_t* ctx,
     }
 
     if (packet_number < (*peer)->rx_next_packet_number) {
-        (void)transport_send_ack(ctx,
-                                 handle,
-                                 packet_number,
-                                 packet->source_id,
-                                 packet->session_id,
-                                 packet->connection_id,
-                                 packet->session_epoch);
+        (void) transport_send_ack(ctx, handle, packet_number, packet->source_id,
+                                  packet->session_id, packet->connection_id,
+                                  packet->session_epoch);
         return XGL_OK;
     }
 
     if (packet_number > (*peer)->rx_next_packet_number) {
         uint32_t expected_packet_number = (*peer)->rx_next_packet_number;
-        xgl_error_t err = transport_cache_out_of_order_packet(ctx,
-                                                              *peer,
-                                                              packet,
-                                                              packet_number);
-        (void)transport_send_sack(ctx,
-                                  handle,
-                                  *peer,
-                                  packet->source_id,
-                                  expected_packet_number,
-                                  packet->session_id,
-                                  packet->connection_id,
-                                  packet->session_epoch);
+        xgl_error_t err = transport_cache_out_of_order_packet(
+            ctx, *peer, packet, packet_number);
+        (void) transport_send_sack(
+            ctx, handle, *peer, packet->source_id, expected_packet_number,
+            packet->session_id, packet->connection_id, packet->session_epoch);
         if (err != XGL_OK && ctx->stats != NULL) {
             ctx->stats->rx_dropped++;
         }
         return err;
     }
 
-    (void)transport_send_ack(ctx,
-                             handle,
-                             packet_number,
-                             packet->source_id,
-                             packet->session_id,
-                             packet->connection_id,
-                             packet->session_epoch);
+    (void) transport_send_ack(ctx, handle, packet_number, packet->source_id,
+                              packet->session_id, packet->connection_id,
+                              packet->session_epoch);
     return XGL_OK;
 }
 
-xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
-                                  xgl_handle_t handle,
-                                  const xgl_packet_t* packet) {
+xgl_error_t xgl_transport_receive(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
+                                  const xgl_packet_t *packet)
+{
     if (ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -195,7 +120,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         return transport_process_ack_packet(ctx, handle, packet);
     }
 
-    const uint8_t* data = NULL;
+    const uint8_t *data = NULL;
     size_t data_len = 0U;
     if (packet->data != NULL) {
         data = packet->data->data;
@@ -205,14 +130,15 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    xgl_transport_peer_state_t* rx_peer = NULL;
+    xgl_transport_peer_state_t *rx_peer = NULL;
     xgl_error_t err = transport_prepare_rx_peer(ctx, packet, &rx_peer);
     if (err != XGL_OK) {
         return err;
     }
 
     if (packet->reliable == XGL_RELIABILITY_ACK_ELICITING) {
-        err = transport_process_reliable_rx_order(ctx, handle, packet, &rx_peer);
+        err =
+            transport_process_reliable_rx_order(ctx, handle, packet, &rx_peer);
         if (err != XGL_OK) {
             return err;
         }
