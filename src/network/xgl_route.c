@@ -271,36 +271,3 @@ void xgl_route_table_clear(xgl_route_table_t* table) {
     /* Reset route count */
     table->route_count = 0;
 }
-
-/**
- * \brief           Load routes from configuration
- */
-xgl_error_t xgl_route_table_load(xgl_route_table_t* table,
-                                 const xgl_route_item_t* routes,
-                                 size_t count) {
-    if (table == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (routes == NULL && count > 0) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    /* Clear existing routes */
-    xgl_route_table_clear(table);
-
-    /* Add each route */
-    for (size_t i = 0; i < count; i++) {
-        xgl_error_t err = xgl_route_table_add(table,
-                                             routes[i].target_id,
-                                             routes[i].phy,
-                                             routes[i].max_frame_size,
-                                             routes[i].read_freq_hz,
-                                             routes[i].metric);
-        if (err != XGL_OK) {
-            return err;
-        }
-    }
-
-    return XGL_OK;
-}
