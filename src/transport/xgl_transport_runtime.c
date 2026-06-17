@@ -5,6 +5,13 @@
 
 #include "xgl_transport_internal.h"
 
+void transport_count_send_error(xgl_transport_ctx_t *ctx)
+{
+    if (ctx != NULL && ctx->stats != NULL) {
+        ctx->stats->tx_errors++;
+    }
+}
+
 /**
  * \brief           Periodic transport layer processing
  */

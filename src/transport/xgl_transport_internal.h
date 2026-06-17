@@ -44,6 +44,7 @@ void transport_destroy_peers(xgl_transport_ctx_t *ctx);
 void transport_commit_packet_number(xgl_transport_ctx_t *ctx,
                                     xgl_transport_peer_state_t *peer);
 uint32_t transport_receive_packet_number(const xgl_packet_t *packet);
+void transport_count_send_error(xgl_transport_ctx_t *ctx);
 void transport_reset_peer_state(xgl_transport_ctx_t *ctx,
                                 xgl_transport_peer_state_t *peer,
                                 uint16_t session_id, uint32_t connection_id,
