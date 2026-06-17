@@ -84,6 +84,9 @@ xgl_error_t transport_cache_out_of_order_packet(
     const xgl_packet_t *packet, uint32_t packet_number);
 void transport_clear_rx_buffered(xgl_transport_ctx_t *ctx,
                                  xgl_transport_peer_state_t *peer);
+xgl_transport_rx_buffered_packet_t *
+transport_take_rx_buffered(xgl_transport_peer_state_t *peer,
+                           uint32_t packet_number);
 xgl_error_t transport_deliver_packet(xgl_transport_ctx_t *ctx,
                                      xgl_handle_t handle,
                                      const xgl_packet_t *packet,

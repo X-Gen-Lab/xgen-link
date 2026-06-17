@@ -168,6 +168,7 @@ set(XGL_SOURCES
     src/transport/xgl_transport_receive_ack.c
     src/transport/xgl_transport_receive_peer.c
     src/transport/xgl_transport_receive_order.c
+    src/transport/xgl_transport_rx_buffer.c
     src/transport/xgl_transport_delivery.c
     src/transport/xgl_transport_control.c
     src/transport/xgl_transport_retransmit.c
