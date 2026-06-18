@@ -76,18 +76,30 @@ nav:
           - 安全模型: zh/protocol/security.md
           - 路由: zh/protocol/routing.md
           - 分片重组: zh/protocol/fragmentation.md
+          - Datalink 层: zh/protocol/datalink.md
+          - Transport 内部: zh/protocol/transport-internals.md
+          - Memory 子系统: zh/protocol/memory.md
+          - Platform 抽象层: zh/protocol/platform.md
+          - Codec 层: zh/protocol/codec.md
       - 使用指南:
           - 配置: zh/guide/configuration.md
+          - Kconfig 配置: zh/guide/kconfig.md
           - Send API: zh/guide/send-api.md
           - Zero-Copy: zh/guide/zero-copy.md
           - 低功耗运行时: zh/guide/low-power-runtime.md
           - 移植: zh/guide/porting.md
+          - 线程安全: zh/guide/thread-safety.md
+          - 诊断与调试: zh/guide/troubleshooting.md
+          - 性能调优: zh/guide/performance-tuning.md
           - 资源模型: zh/guide/resource-model.md
           - 生产检查表: zh/guide/production-checklist.md
       - 参考:
           - 公共 API: zh/reference/public-api.md
           - 错误码: zh/reference/errors.md
+          - 统计系统: zh/reference/statistics.md
+          - 性能分析: zh/reference/performance.md
           - 配置预设: zh/reference/config-presets.md
+          - 互操作性: zh/reference/interoperability.md
           - 发布验证: zh/reference/release-validation.md
           - GitHub CI/CD: zh/reference/github-ci.md
           - 验证矩阵: zh/reference/validation-matrix.md
@@ -95,6 +107,7 @@ nav:
           - 术语表: zh/reference/glossary.md
       - 贡献:
           - 文档规范: zh/contributing/documentation.md
+          - 测试策略: zh/contributing/testing.md
   - English:
       - Home: en/index.md
       - Getting Started:
@@ -112,18 +125,30 @@ nav:
           - Security: en/protocol/security.md
           - Routing: en/protocol/routing.md
           - Fragmentation: en/protocol/fragmentation.md
+          - Datalink Layer: en/protocol/datalink.md
+          - Transport Internals: en/protocol/transport-internals.md
+          - Memory Subsystem: en/protocol/memory.md
+          - Platform Abstraction: en/protocol/platform.md
+          - Codec Layer: en/protocol/codec.md
       - Guides:
           - Configuration: en/guide/configuration.md
+          - Kconfig Configuration: en/guide/kconfig.md
           - Send API: en/guide/send-api.md
           - Zero-Copy: en/guide/zero-copy.md
           - Low-Power Runtime: en/guide/low-power-runtime.md
           - Porting: en/guide/porting.md
+          - Thread Safety: en/guide/thread-safety.md
+          - Troubleshooting: en/guide/troubleshooting.md
+          - Performance Tuning: en/guide/performance-tuning.md
           - Resource Model: en/guide/resource-model.md
           - Production Checklist: en/guide/production-checklist.md
       - Reference:
           - Public API: en/reference/public-api.md
           - Errors: en/reference/errors.md
+          - Statistics: en/reference/statistics.md
+          - Performance: en/reference/performance.md
           - Config Presets: en/reference/config-presets.md
+          - Interoperability: en/reference/interoperability.md
           - Release Validation: en/reference/release-validation.md
           - GitHub CI/CD: en/reference/github-ci.md
           - Validation Matrix: en/reference/validation-matrix.md
@@ -131,3 +156,4 @@ nav:
           - Glossary: en/reference/glossary.md
       - Contributing:
           - Documentation: en/contributing/documentation.md
+          - Testing: en/contributing/testing.md
