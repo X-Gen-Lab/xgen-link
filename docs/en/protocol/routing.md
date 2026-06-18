@@ -58,4 +58,38 @@ Authenticated frames keep their original end-to-end tag while TTL changes. The f
 
 ## Multi-PHY Notes
 
-Each PHY can use a different `read_freq_hz`. `xgl_run()` polls routes and combines transport/reassembly deadlines into the next wakeup time. Low-power systems should not wake the full protocol stack at a fixed high frequency just because one PHY is slow.
+## Routing Table Internals
+
+Route table uses a hash table for O(1) lookup.
+
+### Hash Table Structure
+
+| Component | Description |
+| --- | --- |
+| `xgl_hashtable_t` | Generic hash table (`src/core/`) |
+| Key | `target_id` (16-bit node address) |
+| Value | route entry (containing PHY, metric, MTU) |
+
+Average lookup time complexity: O(1) (hash + chaining collision resolution).
+
+### Runtime Route Mutation
+
+`xgl_route_mutation.c` supports runtime dynamic route table modification:
+
+| Operation | Description |
+| --- | --- |
+| `add` | Add a new route entry |
+| `remove` | Remove a route entry |
+| `update_metric` | Update route metric (affects routing selection) |
+
+### Metric Strategy
+
+| Metric type | Description |
+| --- | --- |
+| Direct | metric = 0, highest priority |
+| Relay | metric = hop count, lower is better |
+| Link quality | TODO: confirm whether supported |
+
+### Evidence
+
+`src/network/xgl_route.c`, `src/network/xgl_route_lookup.c`, `src/network/xgl_route_mutation.c`, `include/xgl/internal/xgl_route.h`

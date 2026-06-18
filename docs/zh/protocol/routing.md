@@ -59,3 +59,39 @@ TTL 每转发一跳递减。非本地包在 `ttl <= 1` 时返回 `XGL_ERR_TTL_EX
 ## 多 PHY 注意事项
 
 每个 PHY 的 `read_freq_hz` 可以不同。`xgl_run()` 会轮询 route，并结合 transport/reassembly deadline 给出下一次唤醒时间。低功耗系统不应为了一个慢速 PHY 固定高频唤醒整个协议栈。
+
+## 路由表内部实现
+
+Route table 使用 hash table 实现 O(1) 查找。
+
+### Hash Table 结构
+
+| 组件 | 说明 |
+| --- | --- |
+| `xgl_hashtable_t` | 通用 hash table（`src/core/`） |
+| 键 | `target_id`（16-bit 节点地址） |
+| 值 | route entry（包含 PHY、metric、MTU） |
+
+查找时间复杂度：O(1)（hash + 链式冲突解决）。
+
+### 运行时路由变更
+
+`xgl_route_mutation.c` 支持运行时动态修改路由表：
+
+| 操作 | 说明 |
+| --- | --- |
+| `add` | 添加新路由条目 |
+| `remove` | 移除路由条目 |
+| `update_metric` | 更新路由度量值（影响路由选择） |
+
+### Metric 策略
+
+| Metric 类型 | 说明 |
+| --- | --- |
+| 直连 | metric = 0，最高优先级 |
+| 中继 | metric = 跳数，越小越优 |
+| 链路质量 | TODO: 确认是否支持 |
+
+### 证据
+
+`src/network/xgl_route.c`, `src/network/xgl_route_lookup.c`, `src/network/xgl_route_mutation.c`, `include/xgl/internal/xgl_route.h`
