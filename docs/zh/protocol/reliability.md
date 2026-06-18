@@ -104,3 +104,64 @@ RESET 和 CLOSE 只清理对应 peer、connection 和 session，不全局清 ACK
 ## 可观测性
 
 可靠路径应通过统计暴露重传、ACK timeout、窗口满和丢弃情况。生产调试时优先看 route MTU、auth/replay 拒绝和 reliable queue 使用峰值。
+
+## RTT 估算算法
+
+Transport 层的 RTT 估算基于 RFC 6298，通过 `xgl_rtt_estimator_t` 实现。
+
+### 算法参数
+
+| 参数 | 说明 |
+| --- | --- |
+| SRTT | 平滑往返时间，指数移动平均 |
+| RTTVAR | RTT 变化量估计 |
+| RTO | 重传超时 = SRTT + 4 × RTTVAR |
+
+### 更新规则
+
+1. 首次采样：`SRTT = RTT_sample`, `RTTVAR = RTT_sample / 2`
+2. 后续采样：`RTTVAR = (1 - β) × RTTVAR + β × |SRTT - RTT_sample|`, `SRTT = (1 - α) × SRTT + α × RTT_sample`（α = 1/8, β = 1/4）
+3. RTO 取值范围有最小/最大边界钳制
+4. 超时重传时不更新 SRTT/RTTVAR（仅在收到新 ACK 时更新）
+
+### 证据
+
+`src/transport/xgl_rtt.c`, `include/xgl/internal/xgl_rtt.h`
+
+## 滑动窗口机制
+
+`xgl_sliding_window_t` 控制未确认 packet 的在途数量。
+
+### 结构
+
+| 字段 | 说明 |
+| --- | --- |
+| `window_size` | 窗口大小（可配置） |
+| `base` | 窗口基序号（已确认的最小序号） |
+| `is_used[window_size]` | bitmap 标记哪些槽位被占用 |
+
+### 工作流程
+
+**发送端：**
+
+1. 发送新 packet 时，检查窗口是否有空闲槽位
+2. 有空闲：分配槽位，标记 `is_used[序号 % window_size] = true`
+3. 无空闲：等待 ACK 释放槽位
+4. 收到 ACK range：释放范围内所有槽位，推进 base
+
+**接收端：**
+
+1. 收到 packet：检查 `packet_number` 相对于 `rx_next_packet_number` 的位置
+2. 等于期望值：交付并推进窗口
+3. 大于期望值：缓存乱序包
+4. 小于期望值：视为重复，丢弃
+
+### 与 Reliable Queue 的关系
+
+- Reliable Queue 管理待 ACK 的 packet（32-bucket hash index 加速查找）
+- Sliding Window 管理在途数量上限
+- 两者协同实现流量控制和可靠交付
+
+### 证据
+
+`src/transport/xgl_window.c`, `include/xgl/internal/xgl_window.h`, `include/xgl/internal/xgl_transport.h`
