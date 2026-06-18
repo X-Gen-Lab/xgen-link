@@ -18,7 +18,7 @@ Extensions immediately follow the 24-byte base header.
 | FRAGMENT_EXT | `message_id`, `fragment_offset`, `message_len` | Fragment reassembly |
 | SECURITY_EXT | `key_id`, nonce/material metadata | Authentication trailer metadata |
 | ROUTE_EXT | previous hop, next hop, route epoch, metric | Routing metadata |
-| TIMESTAMP_EXT | TODO | Reserved/unclear timestamp metadata |
+| TIMESTAMP_EXT | Reserved — not present on production wire | Reserved timestamp metadata |
 | DATA_TYPE_EXT | `data_type` | Application payload class on DATA packets; transport control subtype on CONTROL packets |
 
 ## Value Format
@@ -31,7 +31,7 @@ Extensions immediately follow the 24-byte base header.
 | FRAGMENT_EXT | 12 | `message_id u32`, `fragment_offset u32`, `message_len u32` |
 | SECURITY_EXT | 13 | `key_id u32`, `nonce_id u64`, `tag_len u8` |
 | ROUTE_EXT | 10 | `previous_hop u16`, `next_hop u16`, `route_epoch u32`, `metric u16` |
-| TIMESTAMP_EXT | TODO | TODO(xgen-link): confirm TIMESTAMP_EXT value format and whether it is reserved or intentionally unimplemented. |
+| TIMESTAMP_EXT | Reserved | Reserved; not present on production wire, value format TBD |
 | DATA_TYPE_EXT | 1 | `data_type u8` |
 
 ACK ranges use `gap` and `length` to describe acknowledged ranges backwards from `largest_ack`. SACK bitmap bits describe receive state for `base_packet + bit_index`.
@@ -49,7 +49,7 @@ Application `data_type` values are not reserved by transport control values. Rec
 | FRAGMENT_EXT | 4 | Fragment send path | Fragment manager and delivery path | Missing/invalid value prevents reassembly | `src/transport/xgl_transport_send_fragment.c`, `src/transport/xgl_transport_delivery.c`, `test/test_fragment.cpp` |
 | SECURITY_EXT | 5 | Authenticated frame build | Parser auth length, datalink verification | AUTHENTICATED without valid SECURITY_EXT fails closed | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_parser_extensions.c`, `test/test_datalink.cpp` |
 | ROUTE_EXT | 6 | Route-aware internals/future route controls | Network metadata/routing | Invalid length fails decode | `src/wire/xgl_wire_ext.c`, `test/test_wire.cpp`, `test/test_network.cpp` |
-| TIMESTAMP_EXT | 7 | TODO | TODO | TODO(xgen-link): confirm TIMESTAMP_EXT value format and whether it is reserved or intentionally unimplemented. | `include/xgl/internal/xgl_wire.h` |
+| TIMESTAMP_EXT | 7 | Reserved | Not present on production wire | Value format undefined; production path does not encode this extension | `include/xgl/internal/xgl_wire.h` |
 | DATA_TYPE_EXT | 8 | Send, zero-copy, control packets | Network metadata and transport control | Value is one byte; control interpretation requires `packet_type=CONTROL` | `src/network/xgl_network_send.c`, `src/network/xgl_network_metadata.c`, `src/transport/xgl_transport_control.c` |
 
 ## Failure Rules
