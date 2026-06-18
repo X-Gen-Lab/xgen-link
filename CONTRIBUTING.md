@@ -249,7 +249,14 @@ TEST_F(TransportTest, BasicInitialization) {
 
 TEST_F(TransportTest, SendPacket) {
     uint8_t data[] = {0x01, 0x02, 0x03};
-    ASSERT_EQ(XGL_OK, xgl_send(handle, data, sizeof(data)));
+    xgl_tx_data_t tx_data = {
+        .target_id = 2,
+        .data_type = 0x01,
+        .data = data,
+        .data_len = sizeof(data),
+        .reliable = true
+    };
+    ASSERT_EQ(XGL_OK, xgl_send(handle, &tx_data));
 }
 ```
 
