@@ -111,6 +111,87 @@ Encryption is reserved. Do not treat `enable_encryption` as an available product
 
 XGL does not persist keys or define key derivation. Production applications implement key storage, rotation, key id mapping, and hardware security module integration inside the auth provider.
 
+## Replay Window Algorithm
+
+### Data Structure
+
+```text
+xgl_replay_window_t
+├── received_bitmap (uint64_t — 64-bit bitmap)
+└── window_size     (uint8_t — window size, default 64)
+```
+
+### Slot Allocation
+
+Datalink layer maintains 16 replay window slots (`XGL_DATALINK_REPLAY_WINDOW_COUNT = 16`), each 64 bits (`XGL_DATALINK_REPLAY_WINDOW_SIZE = 64`). Slots are indexed by `(connection_id, session_epoch)`.
+
+### Tri-State Verdict
+
+| State | Condition | Behavior |
+| --- | --- | --- |
+| NEW | First seen for this peer/session; allocate idle slot | Accept frame, set corresponding bitmap bit |
+| VALID | `packet_number` within window range and bitmap bit is 0 | Accept frame, set corresponding bitmap bit |
+| DUPLICATE | `packet_number` within window range and bitmap bit is 1 | Drop, count |
+| OUT_OF_WINDOW | `packet_number` outside window range | Drop |
+
+### Sliding Update
+
+When `packet_number > base + window_size`, bitmap is right-shifted by `packet_number - base` bits and base is updated.
+
+### Capacity Decision
+
+16 slots × 64 bits = supports up to 16 concurrent authenticated connections with 64 in-flight packets each. This is sufficient for MCU scenarios.
+
+### Evidence
+
+`src/security/xgl_security.c`, `include/xgl/internal/xgl_security.h`, `include/xgl/internal/xgl_datalink.h`
+
+## Security Threat Model
+
+### Threat Classification (STRIDE)
+
+| Threat | Specific scenario | XGL defense |
+| --- | --- | --- |
+| **Spoofing** | Attacker forges source node to send malicious frames | Authentication: AUTHENTICATED flag + auth provider verification |
+| **Tampering** | Man-in-the-middle modifies frame contents | CRC16 check + authentication trailer (tampering causes CRC or auth tag failure) |
+| **Repudiation** | Sender denies sending a frame | No persistent signatures currently; relies on runtime auth provider |
+| **Information Disclosure** | Frame contents are eavesdropped | ENCRYPTED flag reserved; current production path rejects encrypted frames |
+| **Denial of Service (DoS)** | Flood of invalid frames consumes resources | Parser timeout + CRC check + replay window filtering |
+| **Elevation of Privilege** | Unauthorized node injects control frames | Authentication requirement + connection_id isolation |
+
+### Replay Attack Defense
+
+1. Each authenticated connection maintains an independent replay window (64-bit bitmap)
+2. Received packet_numbers are marked in the bitmap
+3. Duplicate packet_numbers are immediately dropped
+4. 16 slots support up to 16 concurrent authenticated connections
+
+### DoS Defense
+
+| Attack | Defense |
+| --- | --- |
+| Invalid frame flood | Parser CRC check drops quickly, no upper-layer processing |
+| Authenticated spoofed frame flood | Replay window rejects duplicate packet_numbers |
+| Oversized frames | Parser cache size limit |
+| Slow connections | Parser timeout (1000 ms) resets state |
+
+### Known Limitations
+
+| Limitation | Description |
+| --- | --- |
+| No encryption | ENCRYPTED flag reserved but not implemented; frame contents are plaintext |
+| No perfect forward secrecy | Key compromise exposes all frames using that key (if encryption were enabled) |
+| Limited replay window capacity | 16 slots × 64 bits; high-concurrency scenarios may overflow |
+| No rate limiting | High-speed flooding may exhaust CPU time before CRC check |
+
+### Security Recommendations
+
+1. **Enable authentication in production** (`auth_required = true`)
+2. Auth provider implementations should use secure key storage (HSM/TEE)
+3. Rotate authentication keys periodically
+4. Monitor `rx_auth_failures` and `rx_replay_duplicates` counters
+5. In security-sensitive scenarios, consider implementing end-to-end encryption at the application layer
+
 ## Traceability
 
 | Rule | Source | Tests |

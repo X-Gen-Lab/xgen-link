@@ -118,3 +118,96 @@ XGL 不持久化密钥，也不规定密钥派生方案。生产应用应在 aut
 | SECURITY_EXT 编码和 auth trailer 位置 | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_wire_ext.c` | `test/test_wire.cpp`, `test/test_frame.cpp` |
 | TTL/header CRC 置零的 canonical AAD | `src/wire/xgl_wire.c` | `test/test_datalink.cpp`, `test/test_network.cpp` |
 | Datalink auth verification 和 replay classification | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | `test/test_datalink.cpp`, `test/test_security.cpp` |
+
+## Replay Window 算法
+
+### 数据结构
+
+```text
+xgl_replay_window_t
+├── received_bitmap (uint64_t — 64 位 bitmap)
+└── window_size     (uint8_t — 窗口大小，默认 64)
+```
+
+### Slot 分配
+
+Datalink 层维护 16 个 replay window 槽位（`XGL_DATALINK_REPLAY_WINDOW_COUNT = 16`），每个槽位 64 位（`XGL_DATALINK_REPLAY_WINDOW_SIZE = 64`）。槽位按 `(connection_id, session_epoch)` 定位。
+
+### 三态判定
+
+| 状态 | 条件 | 行为 |
+| --- | --- | --- |
+| NEW | 首次看到该 peer/session，分配空闲槽位 | 接受帧，设置 bitmap 对应位 |
+| VALID | `packet_number` 在窗口范围内且 bitmap 对应位为 0 | 接受帧，设置 bitmap 对应位 |
+| DUPLICATE | `packet_number` 在窗口范围内且 bitmap 对应位为 1 | 丢弃，计数 |
+| OUT_OF_WINDOW | `packet_number` 在窗口范围外 | 丢弃 |
+
+### 滑动更新
+
+当收到的 `packet_number > base + window_size` 时，bitmap 右移 `packet_number - base` 位，更新 base。
+
+### 时钟回退处理
+
+TODO: 确认 replay window 是否处理时钟回退（当前未发现相关代码）
+
+### 容量决策
+
+16 槽位 × 64 位 = 支持最多 16 个并发认证连接，每个连接支持 64 个在途 packet。这对 MCU 场景足够。
+
+### 证据
+
+`src/security/xgl_security.c`, `include/xgl/internal/xgl_security.h`, `include/xgl/internal/xgl_datalink.h`
+
+## 安全威胁模型
+
+### 威胁分类 (STRIDE)
+
+| 威胁类型 | 具体场景 | XGL 防御措施 |
+| --- | --- | --- |
+| **仿冒 (Spoofing)** | 攻击者伪造源节点发送恶意帧 | 认证机制：AUTHENTICATED flag + auth provider 验证 |
+| **篡改 (Tampering)** | 中间人修改帧内容 | CRC16 校验 + 认证 trailer（篡改导致 CRC 或 auth tag 失败） |
+| **抵赖 (Repudiation)** | 发送方否认发送过某帧 | 当前无持久化签名，依赖运行时 auth provider |
+| **信息泄露 (Information Disclosure)** | 帧内容被窃听 | ENCRYPTED flag 预留，当前生产路径拒绝加密帧 |
+| **拒绝服务 (DoS)** | 大量无效帧消耗资源 | Parser 超时 + CRC 校验 + replay window 过滤 |
+| **权限提升 (Elevation of Privilege)** | 非授权节点注入控制帧 | 认证要求 + connection_id 隔离 |
+
+### 重放攻击防御
+
+1. 每个认证连接维护独立的 replay window（64 位 bitmap）
+2. 已接收的 packet_number 被标记在 bitmap 中
+3. 重复的 packet_number 被立即丢弃
+4. 16 个槽位支持最多 16 个并发认证连接
+
+### DoS 防御
+
+| 攻击方式 | 防御 |
+| --- | --- |
+| 洪泛无效帧 | Parser CRC 校验快速丢弃，不进入上层处理 |
+| 洪泛已认证伪造帧 | Replay window 拒绝重复 packet_number |
+| 超大帧 | Parser cache 大小限制 |
+| 慢速连接 | Parser timeout (1000ms) 重置状态 |
+
+### 密钥边界
+
+- XGL 不持久化密钥
+- 密钥由 auth provider 在应用层管理
+- auth_key_id 随帧传输，用于定位验证密钥
+- 密钥轮换由应用层实现
+
+### 已知限制
+
+| 限制 | 说明 |
+| --- | --- |
+| 无加密保护 | ENCRYPTED flag 预留但未实现，帧内容明文传输 |
+| 无完美前向保密 | 密钥泄露导致所有使用该密钥的帧可解密（如启用加密） |
+| Replay window 容量有限 | 16 槽 × 64 位，高并发场景可能溢出 |
+| 时钟回退风险 | TODO: 确认 replay window 是否处理时钟回退 |
+| 无速率限制 | 高速洪泛可能在 CRC 校验前耗尽 CPU 时间 |
+
+### 安全建议
+
+1. **生产环境必须启用认证**（`auth_required = true`）
+2. auth provider 实现应使用安全密钥存储（HSM/TEE）
+3. 定期轮换认证密钥
+4. 监控 `rx_auth_failures` 和 `rx_replay_duplicates` 计数
+5. 在安全敏感场景中，考虑在应用层实现端到端加密
