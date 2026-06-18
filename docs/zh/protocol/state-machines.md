@@ -156,3 +156,33 @@ target/source node + connection_id + session_epoch
 ```
 
 不得全局清空 route table、其他 peer 的 reliable queue、其他 session 的 replay window 或 fragment reassembly。
+
+## Parser 超时行为
+
+Parser 状态机在帧接收过程中设有超时保护。
+
+### 超时参数
+
+| 常量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `XGL_PARSER_TIMEOUT_MS` | 1000 | parser 单帧接收超时 (ms) |
+
+### 超时触发条件
+
+- parser 已找到 magic 并开始解析，但在 `XGL_PARSER_TIMEOUT_MS` 内未完成完整帧接收
+- 连续字节流中长时间未出现下一个 magic
+
+### 超时行为
+
+1. 丢弃已接收的不完整帧数据
+2. 重置 parser 状态机到 `SearchMagic` 状态
+3. 计数器递增
+4. 继续从下一字节开始搜索 magic
+
+### 认证 tag 长度
+
+Parser 维护 `expected_auth_tag_len` 字段，用于在 `AUTHENTICATED` flag 设置时正确定位 auth trailer 和 frame CRC 的边界。
+
+### 证据
+
+`include/xgl/internal/xgl_parser.h`, `src/wire/xgl_parser.c`

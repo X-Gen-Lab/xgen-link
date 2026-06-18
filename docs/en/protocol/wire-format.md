@@ -90,6 +90,35 @@ frame crc16
 - When authentication is required, unauthenticated frames are not delivered upward.
 - When a frame declares authentication with AUTHENTICATED/SECURITY_EXT, the tag is verified even if authentication is optional for the instance.
 
+## CRC16 Algorithm Parameters
+
+XGL uses CRC-16/MODBUS for frame integrity checking.
+
+| Parameter | Value | Description |
+| --- | --- | --- |
+| Polynomial | `0x8005` | x^16 + x^15 + x^2 + 1 (CRC-16/MODBUS) |
+| Initial value | `0xFFFF` | All ones |
+| Final XOR | `0x0000` | No final XOR |
+| Reflect in/out | Yes | Both input and output are reflected |
+| Implementation | Table-driven (256-entry) | Byte-at-a-time lookup |
+
+Source: `src/wire/xgl_crc.c`, `include/xgl/internal/xgl_crc.h`.
+
+### CRC Coverage
+
+- `header_crc16`: Covers only the 24-byte base header; the CRC field itself is treated as zero.
+- `frame_crc16`: Covers the complete frame (header + extensions + payload + auth trailer); the CRC field itself is treated as zero.
+
+### Usage
+
+| Scenario | CRC type | Evidence |
+| --- | --- | --- |
+| TX header encoding | header_crc16 | `src/wire/xgl_wire.c` |
+| RX header verification | header_crc16 recomputed and compared | `src/wire/xgl_wire.c`, `test/test_wire.cpp` |
+| TX frame building | frame_crc16 | `src/wire/xgl_frame.c` |
+| RX frame verification | frame_crc16 recomputed and compared | `src/wire/xgl_parser.c`, `test/test_crc.cpp` |
+| TTL forwarding rewrite | header_crc16 recomputed | `src/network/xgl_network_receive.c` |
+
 ## Design Constraints
 
 - Public structs are not wire layout.

@@ -157,3 +157,33 @@ target/source node + connection_id + session_epoch
 ```
 
 They must not globally clear the route table, other peers' reliable queues, other sessions' replay windows, or unrelated fragment reassembly state.
+
+## Parser Timeout Behavior
+
+The parser state machine includes a timeout guard during frame reception.
+
+### Timeout Parameter
+
+| Constant | Default | Description |
+| --- | --- | --- |
+| `XGL_PARSER_TIMEOUT_MS` | 1000 | Parser per-frame reception timeout (ms) |
+
+### Timeout Trigger Conditions
+
+- Parser has found magic and started parsing, but the complete frame is not received within `XGL_PARSER_TIMEOUT_MS`.
+- No new magic appears for an extended period in a continuous byte stream.
+
+### Timeout Behavior
+
+1. Discard incomplete frame data already received.
+2. Reset the parser state machine to `SearchMagic`.
+3. Increment the counter.
+4. Continue searching for magic from the next byte.
+
+### Authentication Tag Length
+
+Parser maintains `expected_auth_tag_len` to correctly locate the auth trailer and frame CRC boundary when the `AUTHENTICATED` flag is set.
+
+### Evidence
+
+`include/xgl/internal/xgl_parser.h`, `src/wire/xgl_parser.c`

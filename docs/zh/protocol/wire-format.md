@@ -96,3 +96,31 @@ frame crc16
 - 所有 multi-byte 字段都是 little-endian。
 - parser 必须能处理任意分片输入和连续多帧输入。
 - 错误帧丢弃后必须继续寻找下一组 magic，不阻塞后续数据。
+
+## CRC16 算法参数
+
+XGL 使用 CRC16 校验帧完整性。具体算法参数：
+
+| 参数 | 值 | 说明 |
+| --- | --- | --- |
+| 算法 | CRC-16/MODBUS | 工业标准 CRC16 变体 |
+| 多项式 | `0x8005` | x^16 + x^15 + x^2 + 1 |
+| 初始值 | `0xFFFF` | 全 1 起始 |
+| 输入反射 | 是 | 按字节查表,低位优先 |
+| 输出反射 | 是 | 计算完成后结果按位反射 |
+| 结果异或 | `0x0000` | 无最终异或 |
+
+### CRC 覆盖范围
+
+- `header_crc16`：仅覆盖 24-byte 基础头，CRC 字段本身按零值参与计算
+- `frame_crc16`：覆盖完整帧（header + extensions + payload + auth trailer），CRC 字段本身按零值参与计算
+
+### 使用场景
+
+| 场景 | CRC 类型 | 证据 |
+| --- | --- | --- |
+| TX header 编码 | header_crc16 | `src/wire/xgl_wire.c` |
+| RX header 验证 | header_crc16 重算比较 | `src/wire/xgl_wire.c`, `test/test_wire.cpp` |
+| TX frame 构建 | frame_crc16 | `src/wire/xgl_frame.c` |
+| RX frame 验证 | frame_crc16 重算比较 | `src/wire/xgl_parser.c`, `test/test_crc.cpp` |
+| TTL 转发重写 | header_crc16 重算 | `src/network/xgl_network_receive.c` |
