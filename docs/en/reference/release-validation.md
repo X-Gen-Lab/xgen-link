@@ -35,3 +35,30 @@ cmake --build build/ci --target xgl_docs
 4. Build `xgl_release_validation`.
 5. Build `xgl_docs`.
 6. Check `git status --short`.
+
+## Wire Format Compatibility Commitments
+
+| Commitment | Description |
+| --- | --- |
+| Base header layout | 24-byte fixed layout unchanged, compatible across all versions |
+| Byte order | Always little-endian, never changes |
+| Magic value | `A5 5A` unchanged |
+| Version field | Currently fixed `2`, incremented on major version upgrades |
+| TLV extensions | Backward compatible: new extensions do not affect old receivers (unknown TLVs are ignored) |
+| Flags reserved bits | Unused bits (`0xC0`) reserved, not used for new features |
+| Packet Type reserved values | 4–7 reserved; old versions should ignore them if used in the future |
+
+## API Stability Commitments
+
+| Layer | Stability | Description |
+| --- | --- | --- |
+| `xgl.h` public API | Stable | Semantically compatible; no removal or renaming of existing functions |
+| `xgl_types.h` types | Stable | No removal of existing fields; new fields may be appended |
+| `xgl_config.h` configuration | Stable | No removal of existing config items; new items may be appended |
+| `xgl_error.h` error codes | Stable | No renumbering of existing error codes |
+| `include/xgl/internal/` | Internal | Not a stable ABI; may be freely modified |
+
+## Version Upgrade Strategy
+
+- **Minor version**: New features, new extensions, new Kconfig options; no breaking changes to existing API or wire format.
+- **Major version**: May modify wire format base header, remove deprecated APIs; migration path must be documented.
