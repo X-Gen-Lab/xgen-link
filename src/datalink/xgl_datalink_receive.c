@@ -9,6 +9,7 @@
 #include <xgl/internal/xgl_wire.h>
 #include <xgl/xgl_config.h>
 #include <xgl/xgl_error.h>
+#include <xgl/internal/xgl_log.h>
 
 static xgl_replay_result_t datalink_check_replay(xgl_datalink_ctx_t* ctx,
                                                  uint16_t source_id,
@@ -157,6 +158,9 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
             (*ctx->rx_header_crc_errors)++;
         }
         if (metadata.frame_crc_failed) {
+            XGL_LOG_ERROR("datalink",
+                          "Frame CRC16 validation failed (len=%u)",
+                          (unsigned)frame_len);
             if (ctx->rx_crc16_errors != NULL) {
                 (*ctx->rx_crc16_errors)++;
             }
