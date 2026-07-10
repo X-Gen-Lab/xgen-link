@@ -99,6 +99,7 @@ xgl_error_t transport_try_process_ack_range_ext(
 
         transport_mark_ack_range_windows(ctx, peer, largest_ack, ranges,
                                          range_count);
+        transport_update_peer_deadline(peer);
         *handled = true;
         return XGL_OK;
     }

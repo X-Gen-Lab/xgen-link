@@ -12,6 +12,7 @@
 #include <xgl/internal/xgl_window.h>
 #include <xgl/internal/xgl_rtt.h>
 #include <xgl/internal/xgl_parser.h>
+#include <xgl/internal/xgl_codec.h>
 #include "xgl_instance_internal.h"
 #include <string.h>
 
@@ -161,7 +162,7 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     };
     err = xgl_network_init(&handle->layers.network_ctx, &network_config);
     if (err != XGL_OK) {
-        goto cleanup_rx_buffer;
+        goto cleanup_datalink;
     }
 
     /* Initialize transport layer */
@@ -182,27 +183,30 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .callback_user_data = handle->config.callback_user_data,
         .stats = &handle->stats.transport,
         .tx_retries = &handle->stats.tx_retries,
-        .allocator = handle->allocator
+        .allocator = handle->allocator,
+        .peer_idle_timeout_ms = handle->config.features.peer_idle_timeout_ms,
+        .max_reassembly_slots = handle->config.features.max_reassembly_slots,
+        .codec_registry = &handle->codec_registry
     };
     err = xgl_transport_init(&handle->layers.transport_ctx, &transport_config);
     if (err != XGL_OK) {
-        goto cleanup_rx_buffer;
+        goto cleanup_network;
     }
 
     /* Create layer interfaces */
     err = xgl_datalink_get_interface(&handle->layers.datalink_ctx, &handle->layers.datalink_iface);
     if (err != XGL_OK) {
-        goto cleanup_rx_buffer;
+        goto cleanup_transport;
     }
 
     err = xgl_network_get_interface(&handle->layers.network_ctx, &handle->layers.network_iface);
     if (err != XGL_OK) {
-        goto cleanup_rx_buffer;
+        goto cleanup_transport;
     }
 
     err = xgl_transport_get_interface(&handle->layers.transport_ctx, &handle->layers.transport_iface);
     if (err != XGL_OK) {
-        goto cleanup_rx_buffer;
+        goto cleanup_transport;
     }
 
     /* Wire up layer interfaces */
@@ -215,9 +219,42 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     /* Mark as initialized */
     handle->initialized = true;
 
+    /* Initialize codec registry and register user-provided codecs */
+    (void) xgl_codec_registry_init(&handle->codec_registry,
+                                    handle->codec_storage, 4U);
+    for (size_t i = 0; i < handle->config.codecs_len; i++) {
+        err = xgl_codec_register(&handle->codec_registry,
+                                 &handle->config.codecs[i]);
+        if (err != XGL_OK) {
+            /* Codec registration failure is not fatal; log via error callback */
+            if (handle->config.error_callback != NULL) {
+                handle->config.error_callback(
+                    handle, err,
+                    "Codec registration failed",
+                    handle->config.callback_user_data);
+            }
+        }
+    }
+
     return XGL_OK;
 
-    /* Cleanup on error */
+    /* Cleanup on error -- each label destroys the layer that was successfully
+     * initialized *before* the failure point.                            */
+
+cleanup_transport:
+    xgl_transport_destroy(&handle->layers.transport_ctx);
+
+cleanup_network:
+    /* Network context is embedded; no heap resources to release */
+    memset(&handle->layers.network_ctx, 0, sizeof(handle->layers.network_ctx));
+
+cleanup_datalink:
+    /* Datalink context stores rx_cache pointer after successful init */
+    if (handle->layers.datalink_ctx.rx_cache != NULL) {
+        handle->layers.datalink_ctx.rx_cache = NULL;
+    }
+    memset(&handle->layers.datalink_ctx, 0, sizeof(handle->layers.datalink_ctx));
+
 cleanup_rx_buffer:
     xgl_free(handle->allocator, rx_buffer);
 

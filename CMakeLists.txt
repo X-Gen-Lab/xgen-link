@@ -93,6 +93,7 @@ set(XGL_SOURCES
     src/api/xgl_send.c
     src/api/xgl_send_zerocopy.c
     src/api/xgl_stats.c
+    src/api/xgl_log.c
     src/api/xgl_version.c
 
     # Wire format and serialization

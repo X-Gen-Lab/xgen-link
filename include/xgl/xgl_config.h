@@ -41,6 +41,16 @@ extern "C" {
 #endif
 
 /**
+ * \brief           Maximum bytes to read per datalink receive call
+ * \details         Used in xgl_run() to bound the amount of data read from
+ *                  the PHY in a single cycle. The previous hardcoded value
+ *                  was 1000.
+ */
+#ifndef XGL_DATALINK_RX_MAX_BYTES_PER_CALL
+#define XGL_DATALINK_RX_MAX_BYTES_PER_CALL  1000
+#endif
+
+/**
  * \brief           Maximum allowed frame size for security validation
  * \details         Absolute maximum frame size to prevent buffer overflow attacks.
  *                  Should be larger than any configured max_frame_size in routes.

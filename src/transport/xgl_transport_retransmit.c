@@ -4,6 +4,7 @@
  */
 
 #include "xgl_transport_internal.h"
+#include "xgl/internal/xgl_log.h"
 xgl_error_t transport_retransmit_reliable_packet(
     xgl_transport_ctx_t *ctx, xgl_handle_t handle,
     xgl_reliable_packet_t *rel_packet, uint32_t current_time_ms)
@@ -76,6 +77,11 @@ static uint32_t transport_process_retransmission_queue(
         if (rel_packet->retry_count >= queue->max_retry_count) {
             uint16_t target_id = rel_packet->target_id;
 
+            XGL_LOG_ERROR("transport",
+                          "Packet %u to peer %u exhausted retries",
+                          (unsigned)rel_packet->packet_number,
+                          (unsigned)target_id);
+
             (void) xgl_reliable_remove_packet_number(
                 queue, rel_packet->packet_number, target_id);
             if (ctx->error_callback != NULL) {
@@ -106,6 +112,8 @@ uint32_t transport_process_retransmissions(xgl_transport_ctx_t *ctx,
          peer = peer->next) {
         retransmit_count += transport_process_retransmission_queue(
             ctx, &peer->reliable_queue, handle, current_time_ms);
+        /* Queue may have changed (retransmits or timeout removals); refresh cache */
+        transport_update_peer_deadline(peer);
     }
 
     return retransmit_count;

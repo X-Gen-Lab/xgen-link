@@ -22,6 +22,7 @@ extern "C" {
 #include "xgl/internal/xgl_layer_interface.h"
 #include "xgl/internal/xgl_packet_pool.h"
 #include "xgl/internal/xgl_route.h"
+#include "xgl/internal/xgl_codec.h"
 
 /**
  * \brief           Reserved transport control data types
@@ -61,6 +62,7 @@ typedef struct xgl_transport_peer_state_s {
     bool rx_has_packet_number_state;         /**< Receive packet-number state initialized */
     xgl_transport_rx_buffered_packet_t* rx_buffered; /**< Out-of-order RX packets */
     uint8_t rx_buffered_count;               /**< Number of buffered RX packets */
+    uint32_t earliest_deadline_ms;           /**< Cached earliest reliable TX deadline (0 = none) */
 } xgl_transport_peer_state_t;
 
 /**
@@ -77,6 +79,8 @@ typedef struct xgl_transport_ctx_s {
     uint8_t auth_tag_len;           /**< Authentication tag length reserved per frame */
     xgl_route_table_t* route_table; /**< Optional route table for route MTU lookup */
     uint16_t next_session_id;       /**< Next local session/epoch ID */
+    uint32_t peer_idle_timeout_ms;  /**< Idle peer reclaim timeout; 0 = disabled */
+    uint8_t max_reassembly_slots;   /**< Max concurrent fragment reassembly slots */
 
     /* Transport components */
     xgl_rtt_estimator_t rtt_est;    /**< RTT estimator */
@@ -100,6 +104,9 @@ typedef struct xgl_transport_ctx_s {
     /* Memory management */
     xgl_allocator_t* allocator;     /**< Memory allocator */
 
+    /* Codec registry (optional; owned by instance) */
+    xgl_codec_registry_t* codec_registry; /**< Codec registry for compression; NULL if no codecs */
+
 } xgl_transport_ctx_t;
 
 /**
@@ -121,6 +128,9 @@ typedef struct {
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* tx_retries;           /**< Retransmission counter pointer (can be NULL) */
     xgl_allocator_t* allocator;     /**< Memory allocator; NULL fallback is build-policy controlled */
+    uint32_t peer_idle_timeout_ms;  /**< Idle peer reclaim timeout; 0 = disabled */
+    uint8_t max_reassembly_slots;   /**< Max concurrent fragment reassembly slots (0 = default 8) */
+    xgl_codec_registry_t* codec_registry; /**< Codec registry for compression; may be NULL */
 } xgl_transport_config_t;
 
 /*---------------------------------------------------------------------------*/

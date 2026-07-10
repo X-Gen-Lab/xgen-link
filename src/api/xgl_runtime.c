@@ -5,6 +5,7 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_config.h>
 #include <xgl/internal/xgl_datalink.h>
 #include <xgl/internal/xgl_time.h>
 #include "xgl_instance_internal.h"
@@ -72,18 +73,16 @@ static void collect_reliable_deadlines(const xgl_transport_ctx_t* transport,
     for (const xgl_transport_peer_state_t* peer = transport->peers;
          peer != NULL;
          peer = peer->next) {
-        xgl_list_node_t* node;
-        XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
-            const xgl_reliable_packet_t* packet =
-                XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-            if (packet->send_timestamp == 0U || packet->timeout_ms <= 0) {
-                continue;
-            }
+        if (peer->earliest_deadline_ms == 0U) {
+            continue;
+        }
 
-            deadline_take_min(deadline_ms,
-                              deadline_delta_ms(now_ms,
-                                                packet->send_timestamp,
-                                                (uint32_t)packet->timeout_ms));
+        /* earliest_deadline_ms is an absolute deadline; compute remaining time */
+        int32_t remaining = (int32_t)(peer->earliest_deadline_ms - now_ms);
+        if (remaining <= 0) {
+            deadline_take_min(deadline_ms, 0U);
+        } else {
+            deadline_take_min(deadline_ms, (uint32_t)remaining);
         }
     }
 }
@@ -184,7 +183,7 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
             xgl_datalink_receive(&handle->layers.datalink_ctx,
                                  route->phy,
                                  current_time_ms,
-                                 1000);
+                                 XGL_DATALINK_RX_MAX_BYTES_PER_CALL);
         }
     }
 

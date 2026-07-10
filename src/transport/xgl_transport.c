@@ -50,6 +50,11 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t *ctx,
     ctx->stats = config->stats;
     ctx->tx_retries = config->tx_retries;
     ctx->allocator = config->allocator;
+    ctx->peer_idle_timeout_ms = config->peer_idle_timeout_ms;
+    ctx->max_reassembly_slots = (config->max_reassembly_slots > 0U)
+                                    ? config->max_reassembly_slots
+                                    : 8U;
+    ctx->codec_registry = config->codec_registry;
 
     /* Initialize RTT estimator */
     xgl_rtt_init(&ctx->rtt_est);
@@ -79,8 +84,8 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t *ctx,
             return XGL_ERR_NO_MEMORY;
         }
 
-        err = xgl_fragment_init(ctx->fragment_mgr, 8, XGL_FRAGMENT_TIMEOUT_MS,
-                                config->allocator);
+        err = xgl_fragment_init(ctx->fragment_mgr, ctx->max_reassembly_slots,
+                                XGL_FRAGMENT_TIMEOUT_MS, config->allocator);
         if (err != XGL_OK) {
             transport_free(config->allocator, ctx->fragment_mgr);
             ctx->fragment_mgr = NULL;

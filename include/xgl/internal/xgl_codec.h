@@ -31,7 +31,7 @@ typedef xgl_error_t (*xgl_codec_process_fn)(const uint8_t* input,
                                             size_t* output_len,
                                             void* user_data);
 
-typedef struct {
+typedef struct xgl_codec_s {
     uint8_t id;
     xgl_codec_kind_t kind;
     xgl_codec_process_fn encode;

@@ -41,6 +41,9 @@ xgl_error_t transport_process_reliable_rx_order(
     xgl_transport_ctx_t *ctx, xgl_handle_t handle, const xgl_packet_t *packet,
     xgl_transport_peer_state_t **peer);
 void transport_destroy_peers(xgl_transport_ctx_t *ctx);
+uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t *ctx,
+                                      uint32_t current_time_ms);
+void transport_update_peer_deadline(xgl_transport_peer_state_t *peer);
 void transport_commit_packet_number(xgl_transport_ctx_t *ctx,
                                     xgl_transport_peer_state_t *peer);
 uint32_t transport_receive_packet_number(const xgl_packet_t *packet);

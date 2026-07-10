@@ -47,6 +47,9 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
         }
     }
 
+    /* Reclaim idle peer states */
+    (void) transport_reclaim_idle_peers(ctx, current_time_ms);
+
     return XGL_OK;
 }
 

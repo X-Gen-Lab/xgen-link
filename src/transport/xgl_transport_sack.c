@@ -94,6 +94,7 @@ transport_process_sack_value(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
 
     (void) xgl_window_advance_base_packet_number(&peer->tx_window);
     (void) xgl_window_advance_base_packet_number(&ctx->window);
+    transport_update_peer_deadline(peer);
 
     return XGL_OK;
 }

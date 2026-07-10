@@ -4,6 +4,9 @@
  */
 
 #include "xgl_transport_send_internal.h"
+#include "xgl/internal/xgl_time.h"
+#include "xgl/internal/xgl_codec.h"
+#include "xgl/xgl_config.h"
 
 static xgl_transport_peer_state_t *
 transport_select_tx_peer(xgl_transport_ctx_t *ctx, const xgl_tx_data_t *tx_data)
@@ -54,29 +57,6 @@ transport_prepare_reliable_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
     return err;
 }
 
-static xgl_error_t transport_send_single_frame(xgl_transport_ctx_t *ctx,
-                                               xgl_handle_t handle,
-                                               xgl_transport_peer_state_t *peer,
-                                               const xgl_tx_data_t *tx_data)
-{
-    uint32_t packet_number = 0U;
-    if (tx_data->reliable && peer != NULL) {
-        packet_number = xgl_window_get_next_packet_number(&peer->tx_window);
-    }
-
-    xgl_reliable_packet_t *rel_packet = NULL;
-    xgl_error_t err = transport_queue_reliable_tx(
-        ctx, peer, tx_data, tx_data->data, tx_data->data_len, packet_number,
-        false, NULL, 0U, &rel_packet);
-    if (err != XGL_OK) {
-        return err;
-    }
-
-    return transport_send_packet_view(ctx, handle, peer, tx_data, tx_data->data,
-                                      tx_data->data_len, packet_number, false,
-                                      NULL, 0U, &rel_packet);
-}
-
 xgl_error_t xgl_transport_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
                                const xgl_tx_data_t *tx_data)
 {
@@ -117,10 +97,46 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
         return err;
     }
 
+    /* Apply codec compression if requested and codec is registered */
+    const uint8_t *send_data = tx_data->data;
+    size_t send_data_len = tx_data->data_len;
+    uint8_t codec_buffer[XGL_DATALINK_STACK_BUFFER_SIZE];
+
+    if (tx_data->compression_id != 0U && ctx->codec_registry != NULL) {
+        const xgl_codec_t *codec = xgl_codec_find(
+            ctx->codec_registry, XGL_CODEC_KIND_COMPRESSION,
+            tx_data->compression_id);
+        if (codec != NULL) {
+            size_t encoded_len = sizeof(codec_buffer);
+            err = codec->encode(tx_data->data, tx_data->data_len,
+                                codec_buffer, &encoded_len, codec->user_data);
+            if (err == XGL_OK && encoded_len < tx_data->data_len) {
+                send_data = codec_buffer;
+                send_data_len = encoded_len;
+            }
+            /* If encode fails or doesn't compress, fall through with original data */
+        }
+    }
+
     if (send_plan.needs_fragmentation) {
         err = transport_send_fragmented(ctx, handle, peer, tx_data, &send_plan);
     } else {
-        err = transport_send_single_frame(ctx, handle, peer, tx_data);
+        /* Use encoded data if available */
+        uint32_t packet_number = 0U;
+        if (tx_data->reliable && peer != NULL) {
+            packet_number = xgl_window_get_next_packet_number(&peer->tx_window);
+        }
+
+        xgl_reliable_packet_t *rel_packet = NULL;
+        err = transport_queue_reliable_tx(
+            ctx, peer, tx_data, send_data, send_data_len, packet_number,
+            false, NULL, 0U, &rel_packet);
+        if (err == XGL_OK) {
+            err = transport_send_packet_view(ctx, handle, peer, tx_data,
+                                             send_data, send_data_len,
+                                             packet_number, false,
+                                             NULL, 0U, &rel_packet);
+        }
     }
 
     if (err != XGL_OK) {
@@ -129,5 +145,10 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
 
     ctx->stats->tx_packets++;
     ctx->stats->tx_bytes += tx_data->data_len;
+
+    if (peer != NULL) {
+        peer->last_active_ms = xgl_time_ms();
+    }
+
     return XGL_OK;
 }

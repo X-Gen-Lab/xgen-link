@@ -116,6 +116,7 @@ xgl_error_t transport_send_packet_view(
             if (!fragment) {
                 (*rel_packet)->phy = packet.phy;
             }
+            transport_update_peer_deadline(peer);
         }
     }
 

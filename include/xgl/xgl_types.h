@@ -21,6 +21,11 @@ extern "C" {
 /*---------------------------------------------------------------------------*/
 
 /**
+ * \brief           Codec structure (opaque; defined in xgl/internal/xgl_codec.h)
+ */
+struct xgl_codec_s;
+
+/**
  * \brief           Protocol instance handle (opaque pointer)
  */
 typedef struct xgl_instance* xgl_handle_t;
@@ -290,6 +295,8 @@ typedef struct {
     bool enable_compression;        /**< Reserved; rejected until codec path is wired */
     bool enable_encryption;         /**< Reserved; rejected until codec path is wired */
     bool thread_safe;               /**< Enable thread safety when built with XGL_THREAD_SAFE */
+    uint32_t peer_idle_timeout_ms;  /**< Idle peer reclaim timeout; 0 = disabled (default 60000) */
+    uint8_t max_reassembly_slots;   /**< Max concurrent fragment reassembly slots (0 = use default) */
 } xgl_feature_config_t;
 
 /**
@@ -329,6 +336,19 @@ typedef struct {
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;       /**< User data for callbacks */
 
+    /*-----------------------------------------------------------------------*/
+    /* Codec Configuration                                                   */
+    /*-----------------------------------------------------------------------*/
+    const struct xgl_codec_s* codecs; /**< Array of codecs to register; may be NULL */
+    size_t codecs_len;              /**< Number of codecs in the array */
+
+    /*-----------------------------------------------------------------------*/
+    /* Logging Configuration                                                 */
+    /*-----------------------------------------------------------------------*/
+    /** Log callback; invoked when XGL_ENABLE_LOGGING is defined and logs are emitted */
+    void (*log_callback)(int level, const char* tag, const char* message,
+                         void* user_data);
+
 } xgl_config_t;
 
 /*---------------------------------------------------------------------------*/
@@ -360,7 +380,20 @@ typedef struct {
 /**
  * \brief           Protocol statistics structure
  * \details         Aggregated statistics across all protocol layers with
- *                  layer-specific counters to prevent double-counting
+ *                  layer-specific counters to prevent double-counting.
+ *
+ * \note            **Atomicity contract:**
+ *                  - When built with \c XGL_THREAD_SAFE and
+ *                    \c config.features.thread_safe enabled, \c xgl_stats_get()
+ *                    copies the entire structure under the instance mutex,
+ *                    providing a consistent point-in-time snapshot.
+ *                  - In non-thread-safe builds (the default for bare-metal and
+ *                    RTOS single-threaded deployments), counters are plain
+ *                    \c uint64_t and are **best-effort**: a concurrent ISR and
+ *                    main-loop increment may produce a torn read on 32-bit
+ *                    targets. Applications that require exact counts in ISR
+ *                    contexts should periodically snapshot via
+ *                    \c xgl_stats_get() from the main loop only.
  */
 typedef struct {
     /*-----------------------------------------------------------------------*/
@@ -409,6 +442,7 @@ typedef struct {
     uint32_t timeout_ms;            /**< ACK timeout in ms (0 = default/RTT-derived) */
     uint32_t connection_id;         /**< Connection scope for peer state (0 = default) */
     uint32_t session_epoch;         /**< Session epoch for replay/peer/fragment isolation (0 = default) */
+    uint8_t compression_id;         /**< Compression codec id (0 = none); maps to codec registry */
 } xgl_tx_data_t;
 
 /**
@@ -454,6 +488,8 @@ typedef struct {
         .enable_compression = false, \
         .enable_encryption = false, \
         .thread_safe = false, \
+        .peer_idle_timeout_ms = 60000, \
+        .max_reassembly_slots = 2, \
     }, \
     .auth_required = false, \
     .auth_key_id = 0, \
@@ -487,6 +523,8 @@ typedef struct {
         .enable_compression = false, \
         .enable_encryption = false, \
         .thread_safe = false, \
+        .peer_idle_timeout_ms = 60000, \
+        .max_reassembly_slots = 4, \
     }, \
     .auth_required = false, \
     .auth_key_id = 0, \
@@ -520,6 +558,8 @@ typedef struct {
         .enable_compression = false, \
         .enable_encryption = false, \
         .thread_safe = false, \
+        .peer_idle_timeout_ms = 60000, \
+        .max_reassembly_slots = 8, \
     }, \
     .auth_required = false, \
     .auth_key_id = 0, \
@@ -553,6 +593,8 @@ typedef struct {
         .enable_compression = false, \
         .enable_encryption = false, \
         .thread_safe = false, \
+        .peer_idle_timeout_ms = 60000, \
+        .max_reassembly_slots = 16, \
     }, \
     .auth_required = false, \
     .auth_key_id = 0, \
@@ -588,6 +630,8 @@ typedef struct {
         .enable_compression = false, \
         .enable_encryption = false, \
         .thread_safe = false, \
+        .peer_idle_timeout_ms = 60000, \
+        .max_reassembly_slots = 16, \
     }, \
     .auth_required = true, \
     .auth_key_id = 1, \

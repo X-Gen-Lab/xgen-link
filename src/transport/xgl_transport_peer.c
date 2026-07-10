@@ -134,6 +134,47 @@ void transport_destroy_peers(xgl_transport_ctx_t *ctx)
     ctx->peers = NULL;
 }
 
+/**
+ * \brief           Reclaim peer states that have been idle beyond the configured
+ *                  timeout and have no pending reliable or buffered RX state.
+ * \return          Number of peers reclaimed.
+ */
+uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t *ctx,
+                                      uint32_t current_time_ms)
+{
+    if (ctx == NULL || ctx->peer_idle_timeout_ms == 0U) {
+        return 0U;
+    }
+
+    uint32_t reclaimed = 0U;
+    xgl_transport_peer_state_t **prev = &ctx->peers;
+    xgl_transport_peer_state_t *peer = ctx->peers;
+
+    while (peer != NULL) {
+        xgl_transport_peer_state_t *next = peer->next;
+
+        /* Skip peers that still hold pending reliable packets or buffered
+         * out-of-order RX data -- those must not be reclaimed.           */
+        bool has_pending = !xgl_reliable_is_empty(&peer->reliable_queue) ||
+                           peer->rx_buffered != NULL;
+
+        uint32_t idle_ms = current_time_ms - peer->last_active_ms;
+        if (!has_pending && idle_ms >= ctx->peer_idle_timeout_ms) {
+            *prev = next;
+            xgl_reliable_destroy(&peer->reliable_queue);
+            xgl_window_destroy(&peer->tx_window);
+            transport_free(ctx->allocator, peer);
+            reclaimed++;
+        } else {
+            prev = &peer->next;
+        }
+
+        peer = next;
+    }
+
+    return reclaimed;
+}
+
 void transport_reset_peer_state(xgl_transport_ctx_t *ctx,
                                 xgl_transport_peer_state_t *peer,
                                 uint16_t session_id, uint32_t connection_id,
@@ -158,4 +199,26 @@ void transport_reset_peer_state(xgl_transport_ctx_t *ctx,
     peer->rx_has_packet_number_state = false;
     transport_clear_rx_buffered(ctx, peer);
     peer->last_active_ms = xgl_time_ms();
+}
+
+void transport_update_peer_deadline(xgl_transport_peer_state_t *peer)
+{
+    if (peer == NULL) {
+        return;
+    }
+
+    peer->earliest_deadline_ms = 0U;
+
+    xgl_list_node_t *node;
+    XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+        const xgl_reliable_packet_t *pkt =
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+        if (pkt->send_timestamp != 0U && pkt->timeout_ms > 0) {
+            uint32_t abs_deadline = pkt->send_timestamp + (uint32_t)pkt->timeout_ms;
+            if (peer->earliest_deadline_ms == 0U ||
+                (int32_t)(abs_deadline - peer->earliest_deadline_ms) < 0) {
+                peer->earliest_deadline_ms = abs_deadline;
+            }
+        }
+    }
 }
