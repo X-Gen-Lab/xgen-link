@@ -12,6 +12,7 @@
 #include <xgl/internal/xgl_route.h>
 #include <xgl/internal/xgl_wire.h>
 #include <xgl/internal/xgl_window.h>
+#include "../src/transport/xgl_transport_internal.h"
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -2198,6 +2199,81 @@ TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
 
     EXPECT_EQ(rx_tracker.receive_count, 2);
     EXPECT_EQ(spy.send_count, 3);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, PeerIdleTimeoutReclaimsInactivePeer) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.peer_idle_timeout_ms = 1000;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    /* Create a peer by receiving an ACK-eliciting packet with session_id */
+    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    xgl_packet_data_t packet_data = {
+        .ref_count = 1, .data_len = sizeof(payload),
+        .data = payload, .owned_data = nullptr
+    };
+    xgl_packet_t packet = {};
+    packet.source_id = 2;
+    packet.target_id = 1;
+    packet.session_id = 1;
+    packet.data_type = 1;
+    packet.reliable = XGL_RELIABILITY_ACK_ELICITING;
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
+    packet.data = &packet_data;
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+    ASSERT_NE(find_peer(&ctx, 2), nullptr);
+
+    /* Set last_active_ms to a past time and run transport beyond timeout */
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    peer->last_active_ms = 100U;
+    EXPECT_EQ(xgl_transport_run(&ctx, nullptr, 5000U), XGL_OK);
+
+    /* Peer should be reclaimed (no pending reliable queue or rx buffered) */
+    EXPECT_EQ(find_peer(&ctx, 2), nullptr);
+
+    xgl_transport_destroy(&ctx);
+}
+
+TEST(XglTransportTest, PeerWithPendingReliableNotReclaimed) {
+    LowerLayerSpy spy;
+    xgl_layer_interface_t lower_layer = {};
+    xgl_layer_interface_init(&lower_layer, &spy, spy_send, nullptr, nullptr);
+
+    xgl_layer_stats_t stats = {};
+    uint64_t tx_retries = 0;
+    xgl_transport_ctx_t ctx;
+    xgl_transport_config_t config = make_transport_config(&lower_layer, &stats, &tx_retries);
+    config.peer_idle_timeout_ms = 1000;
+
+    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
+
+    /* Send a reliable packet to create a peer with pending reliable queue */
+    const uint8_t payload[] = {'h', 'i'};
+    xgl_tx_data_t tx_data = {
+        .target_id = 2, .data_type = 1,
+        .data = payload, .data_len = sizeof(payload),
+        .reliable = true, .priority = 0, .timeout_ms = 100
+    };
+    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    ASSERT_NE(find_peer(&ctx, 2), nullptr);
+
+    /* Set last_active_ms to past and run beyond timeout */
+    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
+    peer->last_active_ms = 100U;
+    EXPECT_EQ(xgl_transport_run(&ctx, nullptr, 5000U), XGL_OK);
+
+    /* Peer should NOT be reclaimed because reliable queue has pending packets */
+    EXPECT_NE(find_peer(&ctx, 2), nullptr);
 
     xgl_transport_destroy(&ctx);
 }

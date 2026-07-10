@@ -180,3 +180,53 @@ add_custom_target(test_report
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating test report..."
 )
+
+#-----------------------------------------------------------------------------
+# Benchmark Targets (optional, OFF by default)
+#-----------------------------------------------------------------------------
+
+option(XGL_BUILD_BENCHMARKS "Build performance benchmarks" OFF)
+
+if(XGL_BUILD_BENCHMARKS)
+    # Throughput benchmark
+    add_executable(bench_throughput
+        benchmark/bench_throughput.cpp
+        mocks/mock_phy.cpp
+    )
+    target_link_libraries(bench_throughput PRIVATE xgl GTest::gmock)
+    target_include_directories(bench_throughput
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+    )
+
+    # Latency benchmark
+    add_executable(bench_latency
+        benchmark/bench_latency.cpp
+        mocks/mock_phy.cpp
+    )
+    target_link_libraries(bench_latency PRIVATE xgl GTest::gmock)
+    target_include_directories(bench_latency
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+    )
+
+    # Memory usage benchmark
+    add_executable(bench_memory
+        benchmark/bench_memory.cpp
+        mocks/mock_phy.cpp
+    )
+    target_link_libraries(bench_memory PRIVATE xgl GTest::gmock)
+    target_include_directories(bench_memory
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+    )
+
+    # Convenience target to build all benchmarks
+    add_custom_target(xgl_benchmarks
+        DEPENDS bench_throughput bench_latency bench_memory
+        COMMENT "Building all benchmarks..."
+    )
+endif()
