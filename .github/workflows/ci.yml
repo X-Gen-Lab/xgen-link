@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - develop
   pull_request:
     branches:
       - main
+      - develop
   workflow_dispatch:
 
 concurrency:
@@ -66,8 +68,42 @@ jobs:
           path: build/ci/footprint/xgl-footprint.txt
           if-no-files-found: ignore
 
+  # ---- GCC smoke test (multi-platform) ----
   gcc-smoke:
-    name: GCC smoke
+    name: GCC Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            g++ \
+            gcc \
+            ninja-build
+
+      - name: Configure
+        run: cmake --preset gcc-test
+
+      - name: Build tests and examples
+        run: cmake --build build/gcc-test --parallel
+
+      - name: Run CTest
+        run: ctest --preset gcc-test --output-on-failure
+
+  # ---- AddressSanitizer smoke test ----
+  asan-smoke:
+    name: ASan Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -85,10 +121,38 @@ jobs:
             ninja-build
 
       - name: Configure
-        run: cmake --preset gcc-test
+        run: cmake --preset asan
 
-      - name: Build tests and examples
-        run: cmake --build build/gcc-test --parallel
+      - name: Build
+        run: cmake --build build/asan --target xgl_tests
 
-      - name: Run CTest
-        run: ctest --preset gcc-test --output-on-failure
+      - name: Test
+        run: ctest --preset asan
+
+  # ---- Thread-safe smoke test ----
+  threadsafe-smoke:
+    name: Thread-Safe Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            g++ \
+            gcc \
+            ninja-build
+
+      - name: Configure
+        run: cmake --preset gcc-test-threadsafe
+
+      - name: Build
+        run: cmake --build build/gcc-test-threadsafe --target xgl_tests
+
+      - name: Test
+        run: ctest --preset gcc-test-threadsafe
