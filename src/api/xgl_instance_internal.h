@@ -22,6 +22,7 @@ extern "C" {
 #include <xgl/internal/xgl_network.h>
 #include <xgl/internal/xgl_transport.h>
 #include <xgl/internal/xgl_layer_interface.h>
+#include <xgl/internal/xgl_codec.h>
 
 /*---------------------------------------------------------------------------*/
 /* Internal Instance Structure                                               */
@@ -82,12 +83,50 @@ struct xgl_instance {
     xgl_statistics_t stats;         /**< Protocol statistics */
 
     /*-----------------------------------------------------------------------*/
+    /* Codec Registry                                                        */
+    /*-----------------------------------------------------------------------*/
+    xgl_codec_registry_t codec_registry; /**< Instance-scoped codec registry */
+    xgl_codec_t codec_storage[4];   /**< Storage for up to 4 registered codecs */
+
+    /*-----------------------------------------------------------------------*/
     /* Thread Safety                                                         */
     /*-----------------------------------------------------------------------*/
 #ifdef XGL_THREAD_SAFE
     xgl_mutex_t mutex;              /**< Instance mutex */
 #endif
 };
+
+/*---------------------------------------------------------------------------*/
+/* Thread-Safety Guard Macros (internal only)                                */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * \brief           Lock instance mutex if thread-safe mode is active
+ * \return          XGL_OK on success, error code on lock failure
+ */
+static inline xgl_error_t xgl_instance_lock(xgl_handle_t h) {
+#ifdef XGL_THREAD_SAFE
+    if (h->config.features.thread_safe) {
+        return xgl_mutex_lock(&h->mutex);
+    }
+#else
+    (void)h;
+#endif
+    return XGL_OK;
+}
+
+/**
+ * \brief           Unlock instance mutex if thread-safe mode is active
+ */
+static inline void xgl_instance_unlock(xgl_handle_t h) {
+#ifdef XGL_THREAD_SAFE
+    if (h->config.features.thread_safe) {
+        xgl_mutex_unlock(&h->mutex);
+    }
+#else
+    (void)h;
+#endif
+}
 
 #ifdef __cplusplus
 }

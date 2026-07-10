@@ -67,7 +67,7 @@ xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
 
 #ifdef XGL_THREAD_SAFE
     if (handle->config.features.thread_safe) {
-        err = xgl_mutex_lock(&handle->mutex);
+        err = xgl_instance_lock(handle);
         if (err != XGL_OK) {
             return err;
         }
@@ -186,9 +186,7 @@ zerocopy_done:
     }
 
 #ifdef XGL_THREAD_SAFE
-    if (handle->config.features.thread_safe) {
-        xgl_mutex_unlock(&handle->mutex);
-    }
+    xgl_instance_unlock(handle);
 #endif
 
     return err;

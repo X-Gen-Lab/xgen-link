@@ -68,11 +68,9 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data) {
 
 #ifdef XGL_THREAD_SAFE
     /* Lock mutex if thread safety is enabled */
-    if (handle->config.features.thread_safe) {
-        err = xgl_mutex_lock(&handle->mutex);
-        if (err != XGL_OK) {
-            return err;
-        }
+    err = xgl_instance_lock(handle);
+    if (err != XGL_OK) {
+        return err;
     }
 #endif
 
@@ -81,9 +79,7 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data) {
 
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex if thread safety is enabled */
-    if (handle->config.features.thread_safe) {
-        xgl_mutex_unlock(&handle->mutex);
-    }
+    xgl_instance_unlock(handle);
 #endif
 
     return err;

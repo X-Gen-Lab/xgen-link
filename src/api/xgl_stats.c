@@ -17,8 +17,10 @@
 /**
  * \brief           Get protocol statistics
  * \details         Retrieves current statistics from the protocol instance.
- *                  Uses atomic operations to ensure thread-safe reads.
- * \note            Statistics are copied atomically to prevent inconsistencies
+ *                  When built with \c XGL_THREAD_SAFE and thread_safe enabled,
+ *                  the copy is taken under the instance mutex, providing a
+ *                  consistent point-in-time snapshot. In non-thread-safe
+ *                  builds, counters are best-effort (see xgl_statistics_t).
  */
 xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
     /* Validate parameters */
@@ -41,7 +43,7 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
 #ifdef XGL_THREAD_SAFE
     /* Lock mutex for thread-safe access */
     if (inst->config.features.thread_safe) {
-        xgl_error_t err = xgl_mutex_lock(&inst->mutex);
+        xgl_error_t err = xgl_instance_lock(inst);
         if (err != XGL_OK) {
             return err;
         }
@@ -53,9 +55,7 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
 
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex */
-    if (inst->config.features.thread_safe) {
-        xgl_mutex_unlock(&inst->mutex);
-    }
+    xgl_instance_unlock(inst);
 #endif
 
     return XGL_OK;
@@ -83,7 +83,7 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
 #ifdef XGL_THREAD_SAFE
     /* Lock mutex for thread-safe access */
     if (inst->config.features.thread_safe) {
-        xgl_error_t err = xgl_mutex_lock(&inst->mutex);
+        xgl_error_t err = xgl_instance_lock(inst);
         if (err != XGL_OK) {
             return err;
         }
@@ -95,9 +95,7 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
 
 #ifdef XGL_THREAD_SAFE
     /* Unlock mutex */
-    if (inst->config.features.thread_safe) {
-        xgl_mutex_unlock(&inst->mutex);
-    }
+    xgl_instance_unlock(inst);
 #endif
 
     return XGL_OK;

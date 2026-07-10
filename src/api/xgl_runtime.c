@@ -120,7 +120,7 @@ uint32_t xgl_next_deadline_ms(xgl_handle_t handle) {
 
 #ifdef XGL_THREAD_SAFE
     if (handle->config.features.thread_safe) {
-        xgl_mutex_lock(&handle->mutex);
+        xgl_instance_lock(handle);
     }
 #endif
 
@@ -133,9 +133,7 @@ uint32_t xgl_next_deadline_ms(xgl_handle_t handle) {
                                  &deadline_ms);
 
 #ifdef XGL_THREAD_SAFE
-    if (handle->config.features.thread_safe) {
-        xgl_mutex_unlock(&handle->mutex);
-    }
+    xgl_instance_unlock(handle);
 #endif
 
     return deadline_ms;
@@ -153,7 +151,7 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
 
 #ifdef XGL_THREAD_SAFE
     if (handle->config.features.thread_safe) {
-        xgl_mutex_lock(&handle->mutex);
+        xgl_instance_lock(handle);
     }
 #endif
 
@@ -193,8 +191,6 @@ void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
     xgl_transport_run(&handle->layers.transport_ctx, handle, current_time_ms);
 
 #ifdef XGL_THREAD_SAFE
-    if (handle->config.features.thread_safe) {
-        xgl_mutex_unlock(&handle->mutex);
-    }
+    xgl_instance_unlock(handle);
 #endif
 }
