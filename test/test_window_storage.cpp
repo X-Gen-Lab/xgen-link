@@ -9,7 +9,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
-#include <xgc/allocator.h>
+#include <xgen/memory/allocator.h>
 
 #include "xgl/internal/xgl_window.h"
 
@@ -39,7 +39,7 @@ TEST(CompactWindowTest, AllocatesOnlyRequiredBitmapBytes) {
     for (const auto& item : cases) {
         SCOPED_TRACE(static_cast<unsigned>(item[0]));
         AllocationProbe probe;
-        const xgc_allocator_t allocator = {&probe, allocate, release};
+        const xgm_allocator_t allocator = {&probe, allocate, release};
         xgl_sliding_window_t window = {};
         ASSERT_EQ(xgl_window_init_with_allocator(&window, item[0], &allocator),
                   XGL_OK);
@@ -53,7 +53,7 @@ TEST(CompactWindowTest, AllocatesOnlyRequiredBitmapBytes) {
 TEST(CompactWindowTest, FailedInitializationPreservesCallerState) {
     AllocationProbe probe;
     probe.fail = true;
-    const xgc_allocator_t allocator = {&probe, allocate, release};
+    const xgm_allocator_t allocator = {&probe, allocate, release};
     xgl_sliding_window_t window = {};
     window.window_size = 9U;
     window.send_base_packet_number = 123U;
@@ -71,7 +71,7 @@ TEST(CompactWindowTest, FailedInitializationPreservesCallerState) {
 
 TEST(CompactWindowTest, ReusesNonByteAlignedWindowWithoutStaleAcknowledgments) {
     AllocationProbe probe;
-    const xgc_allocator_t allocator = {&probe, allocate, release};
+    const xgm_allocator_t allocator = {&probe, allocate, release};
     xgl_sliding_window_t window = {};
     ASSERT_EQ(xgl_window_init_with_allocator(&window, 9U, &allocator), XGL_OK);
     for (uint32_t cycle = 0U; cycle < 40U; ++cycle) {
@@ -100,7 +100,7 @@ TEST(CompactWindowTest, ReusesNonByteAlignedWindowWithoutStaleAcknowledgments) {
 
 TEST(CompactWindowTest, ResetClearsRotatedAcknowledgments) {
     AllocationProbe probe;
-    const xgc_allocator_t allocator = {&probe, allocate, release};
+    const xgm_allocator_t allocator = {&probe, allocate, release};
     xgl_sliding_window_t window = {};
     ASSERT_EQ(xgl_window_init_with_allocator(&window, 9U, &allocator), XGL_OK);
     ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 0U), XGL_OK);
