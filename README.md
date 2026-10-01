@@ -37,11 +37,24 @@ Application → API → Transport → Network → Datalink → synchronous PHY�
 
 ## Validation / 验证
 
+先显式安装 [tools/quality.json](tools/quality.json) 固定提交的 xgen-quality 包、其要求的原生分析器，以及 `docs/requirements.txt` 中的文档依赖。下面使用原生 GNU 和已安装的基础包；源码开发从 [dev 入口](dev/README.md) 配置，并使用对应的 `build/dev-ci` 目录。
+
 ```sh
+python tools/quality.py text
+python tools/quality.py format
 cmake --preset ci \
   -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
   -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
-cmake --build build/ci --target xgl_release_validation --parallel
+cmake --build --preset ci --parallel 2
+python tools/quality.py test --build-dir build/ci
+python tools/quality.py tidy --build-dir build/ci
+python tools/quality.py docs
+python tools/quality.py coverage --build-dir build/ci --gcov-executable gcov
+cmake --build build/ci --target xgl_release_validation --parallel 2
 ```
+
+GoogleTest 使用严格 C++17，CTest 逐用例发现、标记并保留全部历史测试。性质测试支持显式种子和失败回放。行、函数、分支覆盖率分别要求 80%；资源报告、共享 Cppcheck、SDK 消费和文档站点由发布辅助目标组织。命令、限制和产物见[测试策略](docs/zh/contributing/testing.md)、[发布验证](docs/zh/reference/release-validation.md)及[工程规范采用声明](docs/standards.md)。
+
+CI 覆盖 Linux、Windows/MSVC、macOS，以及独立的 sanitizer、受限配置和依赖契约任务。功能分支可通过 `feat/**` push 触发；Pages 的自动部署仍仅由 `main` push 触发。本地和远端结论分别记录在[实施状态](REFACTORING_STATUS.md)。
 
 参见[验证矩阵](docs/zh/reference/validation-matrix.md)、[迁移指南](docs/zh/guide/modular-migration.md)、[Boot 升级示例](examples/boot_update/README.md)及 [Cortex-M0 占用探针](tools/boot_footprint/README.md)。主机测试及 ELF 链接不替代板级 Flash、断电、栈和密码 provider 验收。
