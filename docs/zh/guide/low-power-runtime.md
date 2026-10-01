@@ -10,6 +10,8 @@ Parser 截止时间独立于 PHY 轮询间隔参与 `xgl_next_timeout()`。即�
 
 Step 返回最先出现的 parser 超时、PHY、交付或 transport 错误，同时继续消费已读出的整个字节批次并维护 transport。流中的格式错误帧被丢弃并通过诊断报告，不阻断后续帧的解析。PHY 成功读出字节不等于应用成功接纳。
 
+ACK/SACK 接收负责校验反馈并记录可执行工作。DATA 重传和后续分片在 RX 处理后的 transport 维护阶段执行，可能仍在同一次 step 内完成。就绪的重传和消息推进可以给出零超时；临时 PHY 或资源背压安排正的重试延迟。维护返回首个硬错误并继续其他 scope；重试已保留工作时的 BUSY 或 NO_MEMORY 属于正常背压，不会单独使 step 失败。即时 RX 接纳和 ACK 提交错误仍向上传递，ACK 失败不撤销已接纳字节或接收历史。
+
 每条到期链路在一次 step 中只读取 PHY 一次，读取量还受构建时 `XGL_DATALINK_RX_CHUNK_SIZE` 限制。`AUTO` 在 Boot 为 32 字节，其余 profile 为 128 字节；运行期预算不是要求把该预算全部读满。选择较小 chunk 时，应重新核对整帧所需的轮询次数、驱动缓冲容量及 parser 超时，详见 [Datalink](../protocol/datalink.md)。
 
 `xgl_next_timeout(handle, now_ms, &delay_ms)` 在存在截止事件时返回 true。延迟为零表示立即有工作；false 不修改输出，必须单独处理，不能按未初始化的值睡眠。
@@ -45,3 +47,5 @@ for (;;) {
 统一使用单调的 32 位毫秒时钟，经过时间小于 `2^31` 毫秒。支持时钟回绕，不支持在实例仍运行时重置时钟作为恢复手段。
 
 存在在途包、待推进消息或应用 BUSY 待交付数据时，继续调度。正确处理背压和 scope 最终失败；发送失败后无限睡眠不会释放保留资源。
+
+应用 BUSY 的接收数据不会创建持续就绪的定时事件。应用恢复接纳能力后，应通知 owner task 并驱动一次 step。`xgl_next_timeout()` 描述协议截止时间，不代表应用容量恢复事件。

@@ -217,6 +217,7 @@ jobs:
           python -m unittest discover -s dev/tests -v
           python test/cmake/test_discovery_policy.py
           python test/cmake/test_footprint_budget.py
+          python test/cmake/test_footprint_storage.py
       - name: Validate real source and package consumers
         run: |
           python test/cmake/dependency_contracts.py \

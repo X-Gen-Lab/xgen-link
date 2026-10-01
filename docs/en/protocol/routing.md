@@ -30,7 +30,7 @@ Relays do not refragment or negotiate path MTU. Senders must respect the path bo
 
 ## Broadcast and Reliability
 
-Broadcast uses node `0xFFFF`. Plain broadcast is available when the authentication policy allows it. The authentication implementation supports unicast associations only. Broadcast must not be treated as a group reliable-delivery or group-authentication protocol. Capacity and feature compatibility between peers are configured by the application; route discovery does not negotiate transport windows or trusted epochs.
+Broadcast uses node `0xFFFF`. Plain unreliable broadcast is available when the authentication policy allows it. Reliable broadcast submission returns `XGL_ERR_INVALID_PARAM` before creating transport ownership; a received broadcast that requests acknowledgement returns `XGL_ERR_INVALID_FRAME` before changing peer history or sending feedback. It cannot consume the same source's unicast DATA number. The authentication implementation supports unicast associations only; no group reliable-delivery or group-authentication protocol is provided. Capacity and feature compatibility between peers are configured by the application; route discovery does not negotiate transport windows or trusted epochs.
 
 Received broadcast is delivered locally without flooding other PHYs; transmission requires an explicit broadcast egress. TTL limits continued forwarding: 0/1 cannot be forwarded, while locally addressed frames may still be delivered. Egress lookup precedes TTL checking, so a frame with both no route and expired TTL returns `XGL_ERR_ROUTE_NOT_FOUND`.
 

@@ -1,8 +1,20 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。当前阶段为 network 契约与资源优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0010](design/adr/0010-network-contracts.md)。
+更新日期：2026-10-02。当前阶段为 transport 准入、恢复与存储优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0011](design/adr/0011-transport-admission-recovery.md)。
 
-## 当前：Network 契约与资源优化
+## 当前：Transport 准入、恢复与存储优化
+
+完整 RX 语义检查在 peer/缓存准入前完成，拒绝保留类型、可靠广播、重复 FRAGMENT 和耗尽包号。初次 TX 失败只回收本次新建且未使用的 scope。接受后的 ACK 发送错误原样返回，保留已经接受的历史，避免重复交付。
+
+ACK/SACK 接收仅处理确认与标记，快速重传及窗口释放后的分片发送交给维护阶段。就绪工作发布零延迟，重复反馈保留 PHY 背压重试期限。维护返回第一个终止性错误并继续其他 peer；临时背压仍持有数据。窗口位内嵌，乱序载荷/TLV 共用存储块，重组仅保留一个消息长度，删除多余分配服务和池描述；wire v3、公开函数及配置布局不变。
+
+Windows GNU Full/Embedded 各 746 项、Boot 155 项、Lite 222 项通过。多配置安装/能力契约首轮 4 项通过，完整配置 runner 保留 510 个历史测试名。生产和测试最终冻结点为 `45aa76a`；交叉审查新增四项回归，修复维护误把 ACK 失败当成保留数据的背压，硬错误不再被此前临时反馈失败掩盖。详细 TDD、MSVC/Linux/静态质量结果与最终资源证据汇总见[传输优化验证](design/validation/transport-optimization.md)。
+
+最终 MSVC Full/Boot 为 746/158 项，Linux Full/ASan+UBSan 为 746/745 项；生产行/函数/分支覆盖率为 93.6%/100%/83.7%。Cppcheck、Clang-Tidy 各 43 个生产文件及格式、pre-commit、严格 API/站点文档通过。Windows/Linux 八组 ARM ELF 通过原预算，各组 Flash 镜像逐字节一致；远端 CI 和真实板级验收另行记录。
+
+Boot MTU128/64 工作区为 1,064/872 B，各减 48 B。非 LTO Flash 为 16,116 B，LTO 为 12,792 B，后者比前轮增加 88 B 且仅余 8 B 回归预算。同步 SACK 重传链已断开；普通接收后 ACK 的已知栈链仍为非 LTO 988 B/LTO 844 B，不含调用者、驱动回调和 ISR，1 KiB 预留不等于产品栈验收。未放宽预算；8 KiB Flash 的小 Boot 目标仍未达到。
+
+## 历史：Network 契约与资源优化
 
 静态配置提前拒绝目标零、本机目标和重复目标；整表加载先检查再替换。工作区规划与链路初始化共用 PHY 去重规则，并按唯一 PHY 合并轮询周期。保留兼容配置布局，metric 不参与择优，私有路由更新不改变链路生命周期。
 

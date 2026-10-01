@@ -24,7 +24,7 @@ LTO 应使用独立构建目录。`footprint-optimization.json` 和最终报告�
 
 配置固定为一个 peer、一个路由、一个 link、window 1、一个可靠 TX 记录，默认 MTU 128、RX 128，关闭 AUTH、转发、分片、乱序和 libc allocator。可通过 `XGL_FOOTPRINT_FRAME_SIZE`、`XGL_FOOTPRINT_RX_SIZE` 显式选择较小帧和 RX 空间；MTU 范围为 64–2048，RX 必须不小于 MTU 且不大于 4096。布局对象、消费者和报告使用相同参数。全部容量显式给出；不可变配置为 `static const`，在消费者整个生命周期有效并可放入 Flash。
 
-`layout_probe.c` 包含私有 workspace 类型头，不再包含生产 `.c` 文件；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 4 布局常量，分别计算初始化区域以及 peer、window、TX record、TX payload、scratch 五个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。消费者入口仍调用真实 `xgl_memory_requirements` 核对该大小。交叉构建未执行目标代码，因此这项运行时比较只有在将消费者适配至目标或模拟器后才算 ARM 执行验证。
+`layout_probe.c` 包含私有 workspace 类型头，不包含生产 `.c` 文件；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 5 布局常量，分别计算初始化区域以及 peer、TX record、TX payload、scratch 四个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。窗口位图已内嵌于 peer：`ack_bytes` 保留逻辑位图需求，`window_pool_blocks=0` 表示无独立窗口池，报告的 window 分区为零；公共 `xgl_memory_report` 的 `window_bytes` 同样为零，实际位图成本已计入 `peer_bytes`。旧版本布局和非零窗口池声明会被拒绝。消费者入口仍调用真实 `xgl_memory_requirements` 核对大小；交叉构建不执行目标代码，只有将消费者适配至目标或模拟器并执行后，这项比较才算 ARM 运行验证。
 
 2026-09-30 旧 core 组合的 GCC 15.2.1 Cortex-M0 `-Os`、无 LTO 历史测量如下；2026-10-01 迁移前重跑确认同一基线。它不表示新五包组合的最终资源。
 
@@ -90,7 +90,7 @@ python tools/boot_footprint/check_budget.py \
 
 测量 64 时使用独立构建目录，并同时设置 `-DXGL_FOOTPRINT_FRAME_SIZE=64 -DXGL_FOOTPRINT_RX_SIZE=64`，选择对应 policy。任一限额超出、工具链/profile/容量不匹配、缺少测量、堆或未解析符号都会失败。CI 分别保存 ELF、map、`.su`、布局和预算差异 JSON；新增任务的远端结果必须按本次提交验证。
 
-LTO 测量分别使用 `budget-mtu128-lto.json`、`budget-mtu64-lto.json`。这些独立预算的 Flash 上限为 12,800 B、最大单函数静态栈上限为 320 B，RAM 限额与对应普通配置相同；普通预算限额保持不变。预算要求报告的 `lto` 模式与自身一致，不能用 LTO 报告替代普通基线。首次正式选项测量为 Flash 12,600 B、最大单函数栈 312 B，来源与实际脏状态保存在各 policy 的 `baseline_source`，不表示远端 CI 或板级验收通过。
+LTO 测量分别使用 `budget-mtu128-lto.json`、`budget-mtu64-lto.json`。这些独立预算的 Flash 上限为 12,800 B，当前最大单函数静态栈上限为 224 B，RAM 限额与对应普通配置相同；普通预算限额保持不变。预算要求报告的 `lto` 模式与自身一致，不能用 LTO 报告替代普通基线。首次正式选项测量为 Flash 12,600 B、最大单函数栈 312 B（当时上限为 320 B，历史基线不代表当前限额），来源与实际脏状态保存在各 policy 的 `baseline_source`，不表示远端 CI 或板级验收通过。
 
 新增选项的真实配置、编译和报告契约可在准备好 ARM 工具链后运行：
 
@@ -103,9 +103,9 @@ python test/cmake/test_footprint_lto.py --link-source . --work-dir out/lto-contr
 
 测试分别构建默认配置和 LTO 配置，核查真实编译/链接命令、布局与消费者隔离、完整报告、禁堆约束及预算模式拒绝。命令日志保存在显式工作目录中。
 
-## Datalink 接收优化后的当前配置
+## Datalink 接收优化阶段的配置
 
-Boot 的 `XGL_DATALINK_RX_CHUNK_SIZE=AUTO` 解析为 32 字节；可显式选择 16/32/64/128。版本 4 布局从目标编译导出实际 `rx_chunk_bytes`，报告与预算据此拒绝缺失或冲突配置。该参数独立于 MTU/RX cache，消费方不能用冲突的预处理宏覆盖已编译值。
+Boot 的 `XGL_DATALINK_RX_CHUNK_SIZE=AUTO` 解析为 32 字节；可显式选择 16/32/64/128。版本 5 布局从目标编译导出实际 `rx_chunk_bytes`，报告与预算据此拒绝缺失或冲突配置。该参数独立于 MTU/RX cache，消费方不能用冲突的预处理宏覆盖已编译值。
 
 `fb53b99` 阶段 Cortex-M0 非 LTO/LTO Flash 为 15,988/12,600 B；MTU128/64 workspace 为 1,112/920 B，静态 RAM 为 1,176/984 B，含 1,024 B 预留栈的总 RAM 为 2,200/2,008 B。最大单函数栈为 192/224 B。四份 policy 已收紧 RAM 与单函数栈限额，Flash 上限仍为 16,384/12,800 B。历史基线保留 chunk128，不把读取工作量变化写成相同配置。
 
@@ -116,3 +116,7 @@ Windows 与固定官方 Linux 工具链的四组合及收紧预算均通过，�
 后续恢复实现复用同一 cache，并在交付后继续排空完整帧。更新后的非 LTO/LTO Flash 为 16,172/12,796 B，常驻 RAM 不变，最大单函数栈为 192/216 B。原预算保持，LTO 距 12,800 B 上限仅余 4 B；这些数字只适用于固定编译器与探针组合，不代表其他工具链具有同样余量。
 
 首版 LTO 12,912 B 的超额报告与结构精简后的验证分别保留，见[缓存重新同步验证](../../design/validation/parser-resynchronization.md)。错误恢复的 CRC 工作可能随候选数增长；资源预算通过不代替产品实时性或板级栈验收。
+
+资源布局契约可独立运行 `python test/cmake/test_footprint_storage.py`，核对内嵌窗口不会产生额外池块、旧格式拒绝，以及预算对缺失或冲突 `window_pool_blocks` 的拒绝。该契约不替代最终 ELF 测量与完整调用链栈检查。
+
+Transport 优化后的布局格式为 5。MTU128/64 工作区为 1,064/872 B，静态 RAM 为 1,128/936 B，另加 1,024 B 栈预留后为 2,152/1,960 B。普通/LTO Flash 为 16,116/12,792 B，既有 16,384/12,800 B 回归限额保持；LTO 仅余 8 B。普通 ACK 的已知调用链从 `xgl_step()` 起为 988/844 B，尚不含调用者、实际驱动和 ISR，预留栈不能当作板级峰值证明。具体冻结版本、Windows/Linux 对照和路径证据见[传输优化验证](../../design/validation/transport-optimization.md)。

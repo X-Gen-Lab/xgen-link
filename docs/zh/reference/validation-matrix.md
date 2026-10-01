@@ -8,6 +8,7 @@
 | 长度回绕、借用 SACK、失败视图清零及 raw/stream 一致 | `test/unit/wire/test_frame.cpp`、`test_wire_sack_view.cpp`、`test_wire_rx_contracts.cpp`、`test/unit/transport/test_transport_sack_view.cpp` |
 | 固定路由及认证帧转发 | `test/unit/network/test_route.cpp`、`test/unit/network/test_network.cpp` |
 | 精确 scope、原子 ACK、RX 保留、重传、RESET 与关闭 | `test/unit/transport/test_transport.cpp`、transport 性质测试 |
+| RX/TX 无副作用拒绝、延迟快重传、终止错误与唯一存储归属 | `test_transport_rx_contracts.cpp`、`test_transport_tx_contracts.cpp`、`test_transport_runtime_contracts.cpp`、`test_transport_storage.cpp`（均位于 `test/unit/transport/`） |
 | 分片预算、重叠、超时、消息大于窗口 | `test/unit/transport/test_fragment.cpp`、memory 性质测试 |
 | 显式可信会话、nonce/AAD、防重放、关闭槽 | `test/unit/security/test_security.cpp` |
 | 静态认证丢 ACK 恢复、应用只交付一次 | `test/unit/api/test_send.cpp` |
@@ -43,5 +44,7 @@ Cortex-M0 探针记录真实链接的 ELF、map、目标 ABI 工作区公式及�
 wire 优化后的固定 GCC 15.2.1、MTU/RX 128 和 64 完整 ELF 均为 Flash 15,932 B，较上一轮 16,060 B 减少 128 B；启用显式 LTO 为 12,600 B。workspace 分别为 1,136/944 B，含预留 1,024 B 栈的 RAM 分别为 2,224/2,032 B，均未增加。最大单函数栈为普通模式 272 B、LTO 312 B。四组合无堆或未解析符号，通过各自独立 policy。普通 16 KiB 门槛和 LTO 12,800 B 门槛均为回归限额，8 KiB Flash 设计目标尚未达到。对照、取舍与复现见 [Wire 优化](wire-optimization.md)。
 
 CI 矩阵包含 Boot/Lite 能力测试、Embedded 完整回归、多配置安装消费及 MTU128/64 × LTO OFF/ON 四个 ARM 资源门槛；本地脚本通过不等于该新矩阵已在远端执行，须以当前提交的实际结果为准。
+
+上述 wire 数字是历史基线。transport 优化后的本地最终 ELF 为非 LTO/LTO Flash 16,116/12,792 B，MTU128/64 工作区 1,064/872 B，含 1 KiB 预留栈 RAM 2,152/1,960 B。普通 ACK 已知调用链从 step 起为 988/844 B，尚不含调用者、真实驱动或 ISR；预留栈不是产品峰值证明。TDD、构建矩阵、覆盖率、资源取舍及未执行项以仓库根 `design/validation/transport-optimization.md` 为准。
 
 未验收真实板卡、Flash 断电、ISR 嵌套、完整调用链栈上界、DMA lease、生产密码 provider 或跨重启新鲜性。Boot 升级使用主机 Flash 模型，CRC16 只用于意外损坏校验。Linux sanitizer 的实际运行单独归档，不能从 Windows 结果推断。

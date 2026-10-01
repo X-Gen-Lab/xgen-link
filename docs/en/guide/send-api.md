@@ -53,11 +53,13 @@ Boot's private logical network TX workspace is 32 extension bytes, enough for on
 
 Reliable sends are constrained by the peer window and global TX capacity. Continue calling `xgl_step()` to receive ACKs, advance retransmissions, and report terminal failures.
 
+`reliable=true` requires a unicast target. A broadcast target (`0xFFFF`) is rejected with `XGL_ERR_INVALID_PARAM` before allocating peer or retransmission state. Plain unreliable broadcast remains available through an explicit route when authentication policy permits it.
+
 Unreliable sends do not create an ACK/retry guarantee. A PHY success confirms local frame acceptance only. The SDK has no public per-message delivery-completion callback; use an application response if that distinction matters.
 
 ## Fragmentation
 
-Fragmentation requires a supporting profile and explicit message/reassembly budgets. A reliable message can span more fragments than the window: one retained message per peer feeds the window as ACKs free packet slots. Temporary PHY/resource backpressure pauses the pump. Do not resubmit a message merely because not all fragments were emitted synchronously.
+Fragmentation requires a supporting profile and explicit message/reassembly budgets. A reliable message can span more fragments than the window: one retained message per peer feeds the window as ACKs free packet slots. ACK reception releases those slots; the transport maintenance phase performs further DATA transmission. Temporary PHY/resource backpressure pauses the pump. Admission checks that every fragment fits the remaining usable DATA numbers. Do not resubmit a message merely because not all fragments were emitted synchronously.
 
 For reliable fragmented sends, `XGL_OK` means message admission. A later hard failure can be reported through the error callback, including during the initial call. Terminal failure releases retained work and fails that scope.
 
@@ -69,11 +71,15 @@ Prefer `rx_accept_callback`: return `XGL_OK` after consuming or copying the payl
 
 A reliable packet is ACKed only after application acceptance or admission into owned bounded receive storage. A completed fragmented message may therefore already be ACKed while waiting for the application; its bytes remain retained and charged to the RX budget. Keep stepping to retry delivery.
 
+An ACK/SACK submission error is returned without undoing accepted bytes or receive numbering. Retrying the same incoming DATA never repeats successful application delivery. During later maintenance, BUSY or NO_MEMORY retains owned data as normal backpressure; a hard application error fails the owning scope, releases its bytes and is reported once. Notify the protocol owner when application capacity returns, since pending application delivery alone does not create a ready timeout.
+
 All callback buffers are borrowed only for that call. Callbacks must not reenter, close, or destroy the instance; queue recovery work for after return.
 
 ## Failure and Scope Recovery
 
 Treat `XGL_ERR_WINDOW_FULL`, `XGL_ERR_BUSY`, and `XGL_ERR_NO_MEMORY` as capacity/backpressure conditions where appropriate; process incoming work before retrying a rejected submission. Check other errors for invalid input, route failure, PHY failure, or unsupported capability.
+
+`xgl_step()` reports the first receive or hard maintenance error while continuing independent work. A maintenance retry that retains data after temporary backpressure does not require the application to submit that data again. Error callbacks describe scope failures and selected diagnostics; they are not a replacement for checking operation return values.
 
 A reliable scope is identified by remote ID, connection ID, and epoch. A scope that has used reliable packet numbers is not silently reclaimed by an idle timeout. Hard failure or RESET must not cause sequence-number reuse. Close an unauthenticated scope with `xgl_close_peer()`, drain stale link traffic, and reconnect with a new epoch. Pending TX reports `XGL_ERR_CANCELLED` on explicit close. Authenticated peers must instead close the security session and install fresh trusted parameters.
 

@@ -8,6 +8,7 @@
 | Length overflow, borrowed SACK, failure-view clearing, and raw/stream agreement | `test/unit/wire/test_frame.cpp`, `test_wire_sack_view.cpp`, `test_wire_rx_contracts.cpp`, `test/unit/transport/test_transport_sack_view.cpp` |
 | Fixed routes and authenticated forwarding | `test/unit/network/test_route.cpp`, `test/unit/network/test_network.cpp` |
 | Exact scope, atomic ACK, RX retention, retry, RESET and close | `test/unit/transport/test_transport.cpp`, transport properties |
+| Side-effect-free RX/TX rejection, deferred fast retry, terminal errors and unique storage ownership | `test_transport_rx_contracts.cpp`, `test_transport_tx_contracts.cpp`, `test_transport_runtime_contracts.cpp`, `test_transport_storage.cpp` (all under `test/unit/transport/`) |
 | Fragment budgets, overlaps, timeout, messages larger than a window | `test/unit/transport/test_fragment.cpp`, memory properties |
 | Explicit trusted sessions, nonce/AAD, replay, closed slots | `test/unit/security/test_security.cpp` |
 | Static authenticated lost-ACK recovery and exactly-once delivery | `test/unit/api/test_send.cpp` |
@@ -43,5 +44,7 @@ The Cortex-M0 probe records a real linked ELF, map, target-ABI workspace formula
 After the wire optimization, the fixed GCC 15.2.1 MTU/RX 128 and 64 final ELFs both use 15,932 B Flash, 128 B below the preceding 16,060 B baseline. Explicit LTO produces 12,600 B. Workspaces remain 1,136/944 B; RAM including the reserved 1,024 B stack remains 2,224/2,032 B. The largest single-function stack is 272 B without LTO and 312 B with LTO. All four combinations have no heap or unresolved symbols and pass separate budget policies. The normal 16 KiB and LTO 12,800 B ceilings are regression limits; the 8 KiB Flash design goal remains unmet. See [Wire optimization](wire-optimization.md) for comparisons, tradeoffs, and reproduction.
 
 The CI matrix includes Boot/Lite capability tests, complete Embedded regression, multi-configuration installed consumers, and four ARM budget gates for MTU128/64 × LTO OFF/ON. Local script passes do not mean this new matrix has executed remotely; use actual results for the current commit.
+
+The wire figures above are historical. After transport optimization, local final ELFs use 16,116/12,792 B Flash without/with LTO, workspaces of 1,064/872 B for MTU128/64, and RAM of 2,152/1,960 B including a 1 KiB stack reservation. The known ordinary-ACK call chain from step uses 988/844 B, excluding callers, real drivers and ISRs; reserved stack is not proof of product peak usage. See repository-root `design/validation/transport-optimization.md` for TDD, build matrices, coverage, resource tradeoffs and unexecuted qualification.
 
 No real board, Flash power interruption, ISR nesting, full call-chain stack bound, DMA lease, production cipher provider or cross-restart freshness has been qualified. Boot update uses a host Flash model and CRC16 for accidental corruption only. Actual Linux sanitizer executions are recorded separately; do not infer them from Windows results.

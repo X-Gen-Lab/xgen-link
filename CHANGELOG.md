@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Defer SACK retries and ACK-triggered message pumping to transport maintenance, with immediate deadlines for ready work and preserved local backpressure delays.
+- Inline send-window bits, own out-of-order payload and TLVs in one block, and consolidate reassembly lengths; retain the public `window_bytes` report field as zero and count inline windows under `peer_bytes`.
+- Bound ACK/SACK scratch to encoded sizes and retain only final send-plan results; footprint format 5 explicitly reports the removed window pool.
 - Require validated views at internal frame RX endpoints; keep raw decoding separate with instance-size admission, and share PHY deduplication between workspace planning and link setup.
 - Preserve original forwarding submission errors and remove redundant TX extension clearing without reducing supported extension capacity.
 - Recover stream framing from retained bytes after malformed headers or CRC failures; consume one validated frame at a time and drain cached successors without new input. Private parser callers must advance after COMPLETE/ERROR; explicit reset still discards the cache.
@@ -49,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject reserved packet types, reliable broadcasts, duplicate fragment metadata and exhausted reliable DATA packet numbers before receive admission.
+- Reclaim only a newly admitted unused TX scope when its first send fails, preserving existing scope history and outstanding data.
+- Return terminal retry, delivery and reassembly errors from maintenance while continuing other peers; preserve owned data across temporary backpressure.
+- Report immediate ACK submission errors without rolling back accepted receive history or delivering accepted bytes twice.
+- Distinguish retained application backpressure from failed feedback after buffered delivery; preserve hard errors over earlier temporary ACK failures within and across peers.
 - Reject zero, local and duplicate static destinations before instance allocation; validate whole route sets before replacing existing entries.
 - Count failed zero-copy logical submissions consistently with ordinary transport sends while keeping basic request rejection and layout queries free of TX counter changes.
 - Correct the network property generator to exclude the local destination from valid random senders; add real reliable/authenticated multihop and reverse-ACK regressions.
