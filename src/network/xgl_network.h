@@ -68,7 +68,9 @@ typedef struct xgl_network_ctx_s {
 
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;            /**< User data for callbacks */
+#if XGL_FEATURE_STATISTICS
     xgl_layer_stats_t* stats;            /**< Layer statistics pointer */
+#endif
 #if XGL_FEATURE_AUTH
     xgl_security_ctx_t* security; /**< Borrowed instance security state */
 #endif

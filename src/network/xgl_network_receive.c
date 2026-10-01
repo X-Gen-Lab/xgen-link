@@ -57,8 +57,7 @@ network_deliver_local(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                            .traffic_class = metadata->header.traffic_class,
                            .data = &packet_data,
                            .extensions = metadata->extensions,
-                           .extensions_len = metadata->extensions_len,
-                           .phy = NULL};
+                           .extensions_len = metadata->extensions_len};
 
     return ctx->upper_layer->receive(ctx->upper_layer->ctx, handle, &packet);
 }

@@ -44,11 +44,6 @@ typedef struct xgl_packet {
     const uint8_t* extensions; /**< Production TLV extension bytes */
     size_t extensions_len;     /**< Length of production TLV extensions */
 
-    /*-----------------------------------------------------------------------*/
-    /* Routing                                                               */
-    /*-----------------------------------------------------------------------*/
-    xgl_phy_ops_t* phy; /**< Physical layer operations */
-
 } xgl_packet_t;
 
 #endif /* XGL_PACKET_H */

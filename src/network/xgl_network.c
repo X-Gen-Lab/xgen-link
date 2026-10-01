@@ -38,7 +38,9 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     ctx->lower_layer = config->lower_layer;
     ctx->error_callback = config->error_callback;
     ctx->callback_user_data = config->callback_user_data;
+#if XGL_FEATURE_STATISTICS
     ctx->stats = config->stats;
+#endif
 #if XGL_FEATURE_AUTH
     ctx->security = config->security;
 #endif

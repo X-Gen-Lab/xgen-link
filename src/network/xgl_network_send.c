@@ -12,6 +12,15 @@
 #include "xgl/xgl_config.h"
 #include "xgl_network_internal.h"
 
+/* Boot emits one ACK range, SESSION and optional DATA_TYPE. This logical TX
+ * workspace does not constrain the wire decoder or serialized frame ingress. */
+#if !XGL_FEATURE_AUTH && !XGL_FEATURE_FORWARDING &&                            \
+    !XGL_FEATURE_FRAGMENTATION && !XGL_FEATURE_OUT_OF_ORDER
+#define XGL_NETWORK_TX_EXT_CAPACITY 32U
+#else
+#define XGL_NETWORK_TX_EXT_CAPACITY (UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE)
+#endif
+
 static void network_count_tx_error(xgl_network_ctx_t* ctx) {
 #if XGL_FEATURE_STATISTICS
     if (ctx->stats != NULL) {
@@ -221,14 +230,14 @@ network_validate_auth_tx_budget(xgl_network_ctx_t* ctx,
 
 static xgl_error_t
 network_send_frame_to_lower(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                            const xgl_packet_t* packet, xgl_frame_t* frame,
+                            xgl_phy_ops_t* phy, xgl_frame_t* frame,
                             const xgl_tx_data_zerocopy_t* inplace) {
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         network_count_tx_error(ctx);
         return XGL_ERR_INVALID_PARAM;
     }
 
-    xgl_frame_tx_message_t send_data = {.frame = frame, .phy = packet->phy};
+    xgl_frame_tx_message_t send_data = {.frame = frame, .phy = phy};
     if (inplace != NULL) {
         send_data.buffer = inplace->buffer;
         send_data.buffer_size = inplace->buffer_size;
@@ -268,12 +277,11 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
         return XGL_ERR_ROUTE_NOT_FOUND;
     }
 
-    packet->phy = route->phy;
     if (packet->source_id == 0U) {
         packet->source_id = ctx->local_id;
     }
 
-    uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
+    uint8_t extensions[XGL_NETWORK_TX_EXT_CAPACITY] = {0};
     xgl_frame_t frame;
     xgl_error_t err = network_build_tx_frame(ctx, packet, extensions,
                                              sizeof(extensions), &frame);
@@ -286,7 +294,7 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
         return err;
     }
 
-    err = network_send_frame_to_lower(ctx, handle, packet, &frame, inplace);
+    err = network_send_frame_to_lower(ctx, handle, route->phy, &frame, inplace);
 #if XGL_FEATURE_STATISTICS
     if (err == XGL_OK && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
