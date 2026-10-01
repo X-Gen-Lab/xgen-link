@@ -99,11 +99,16 @@ list(APPEND TEST_SOURCES
     unit/datalink/test_parser_recovery.cpp
     unit/datalink/test_parser_resync.cpp
     unit/network/test_network_contracts.cpp
+    integration/test_network_routes_contracts.cpp
 )
 
 #-----------------------------------------------------------------------------
 # Mock Objects
 #-----------------------------------------------------------------------------
+
+if(XGL_FEATURE_STATISTICS)
+    list(APPEND TEST_SOURCES integration/test_network_tx_contracts.cpp)
+endif()
 
 set(MOCK_SOURCES
     mocks/mock_phy.cpp
