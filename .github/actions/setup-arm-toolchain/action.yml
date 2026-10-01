@@ -1,0 +1,35 @@
+name: Prepare fixed Arm GNU toolchain
+description: Explicitly install the pinned Linux compiler and verify its upstream checksum
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        python - <<'PY'
+        import hashlib
+        import json
+        import os
+        from pathlib import Path
+        import shutil
+        import tarfile
+        import urllib.request
+
+        lock = json.loads(Path('tools/boot_footprint/toolchain-lock.json').read_text())
+        destination = Path(os.environ['RUNNER_TEMP']) / 'xgen-arm-toolchain'
+        destination.mkdir(parents=True, exist_ok=True)
+        archive = destination / lock['archive']
+        with urllib.request.urlopen(lock['url'], timeout=120) as response, archive.open('wb') as output:
+            shutil.copyfileobj(response, output)
+        with archive.open('rb') as stream:
+            actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+        if actual != lock['sha256']:
+            raise SystemExit('Arm GNU toolchain checksum mismatch')
+        with tarfile.open(archive, 'r:xz') as bundle:
+            bundle.extractall(destination, filter='data')
+        compilers = list(destination.glob('*/bin/arm-none-eabi-gcc'))
+        if len(compilers) != 1:
+            raise SystemExit('Expected exactly one installed Arm compiler')
+        with Path(os.environ['GITHUB_PATH']).open('a', encoding='utf-8') as stream:
+            stream.write(str(compilers[0].parent) + '\n')
+        print(f"Installed Arm GNU {lock['release']}: {actual}")
+        PY

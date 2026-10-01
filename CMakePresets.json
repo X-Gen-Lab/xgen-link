@@ -127,6 +127,13 @@
       }
     },
     {
+      "name": "embedded-lite",
+      "inherits": "boot",
+      "cacheVariables": {
+        "XGL_PROFILE": "embedded-lite"
+      }
+    },
+    {
       "name": "embedded",
       "inherits": "base",
       "cacheVariables": {
@@ -187,6 +194,10 @@
       "configurePreset": "boot"
     },
     {
+      "name": "embedded-lite",
+      "configurePreset": "embedded-lite"
+    },
+    {
       "name": "embedded",
       "configurePreset": "embedded"
     }
@@ -225,6 +236,12 @@
       "output": {
         "outputOnFailure": true
       }
+    },
+    {
+      "name": "embedded-lite",
+      "configurePreset": "embedded-lite",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "error"}
     },
     {
       "name": "embedded",

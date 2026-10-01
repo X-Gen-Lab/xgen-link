@@ -53,6 +53,13 @@
       }
     },
     {
+      "name": "embedded-lite", "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel", "XGL_PROFILE": "embedded-lite",
+        "XGL_BUILD_TESTS": "OFF", "XGL_BUILD_EXAMPLES": "OFF", "XGL_ALLOW_FALLBACK_MALLOC": "OFF"
+      }
+    },
+    {
       "name": "embedded", "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "MinSizeRel", "XGL_PROFILE": "embedded",
@@ -76,6 +83,7 @@
     {"name": "ci", "configurePreset": "ci"},
     {"name": "asan", "configurePreset": "asan"},
     {"name": "boot", "configurePreset": "boot"},
+    {"name": "embedded-lite", "configurePreset": "embedded-lite"},
     {"name": "embedded", "configurePreset": "embedded"},
     {"name": "docs", "configurePreset": "docs", "targets": ["xgl_docs"]}
   ],
@@ -87,6 +95,7 @@
     {"name": "ci", "configurePreset": "ci", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
     {"name": "asan", "configurePreset": "asan", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
     {"name": "boot", "configurePreset": "boot", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "embedded-lite", "configurePreset": "embedded-lite", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
     {"name": "embedded", "configurePreset": "embedded", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}}
   ]
 }

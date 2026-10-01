@@ -18,7 +18,7 @@ cmake --build build/boot-footprint --parallel 6
 
 产物包括 `xgl_boot_probe.elf`、`xgl_boot_probe.map`、`boot-footprint.json`、`workspace-layout.json` 和各源文件的 `.su`。构建结束自动检查最终 ELF 中没有 malloc、free、calloc、realloc、sbrk 或相应 newlib 堆服务，也不允许未解析符号。
 
-配置固定为一个 peer、一个路由、一个 link、window 1、一个可靠 TX 记录、MTU 128、RX 128，关闭 AUTH、转发、分片、乱序和 libc allocator。全部容量显式给出；不可变配置为 `static const`，在消费者整个生命周期有效并可放入 Flash。
+配置固定为一个 peer、一个路由、一个 link、window 1、一个可靠 TX 记录，默认 MTU 128、RX 128，关闭 AUTH、转发、分片、乱序和 libc allocator。可通过 `XGL_FOOTPRINT_FRAME_SIZE`、`XGL_FOOTPRINT_RX_SIZE` 显式选择较小帧和 RX 空间；MTU 范围为 64–2048，RX 必须不小于 MTU 且不大于 4096。布局对象、消费者和报告使用相同参数。全部容量显式给出；不可变配置为 `static const`，在消费者整个生命周期有效并可放入 Flash。
 
 `layout_probe.c` 包含私有 workspace 类型头，不再包含生产 `.c` 文件；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 3 布局常量，分别计算初始化区域以及 peer、window、TX record、TX payload、scratch 五个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。消费者入口仍调用真实 `xgl_memory_requirements` 核对该大小。交叉构建未执行目标代码，因此这项运行时比较只有在将消费者适配至目标或模拟器后才算 ARM 执行验证。
 
@@ -55,3 +55,33 @@ cmake --build build/boot-footprint --parallel 6
 | 最大已链接单函数栈 | 392 B | 392 B | 0 B |
 
 证据分别位于 `out/refactor-arm-baseline` 与 `out/refactor-arm-final`，包含完整 ELF、map、布局、`.su` 和 JSON 报告；没有堆服务或未解析符号。满足本探针的 64 KiB Flash / 8 KiB RAM 限额，仍未达到 8 KiB Flash / 1 KiB workspace 目标。测量源码、工作区状态与验证边界见[协议结构验证记录](../../design/validation/protocol-structure.md)。
+
+## 本轮有界调度与容量优化
+
+本轮使用相同 GCC 15.2.1、Cortex-M0、`-Os`、无 LTO 配置。默认 MTU/RX 128 的真实对比保留新增边界检查和调度修复带来的代码量，而不将不同容量混作同配置优化：
+
+| 项目 | 前一轮 128 基线 | 本轮 128 | 同配置变化 | 本轮首次 64 |
+| --- | ---: | ---: | ---: | ---: |
+| Flash | 15,692 B | 16,060 B | +368 B | 16,060 B |
+| workspace | 1,168 B | 1,136 B | -32 B | 944 B |
+| 静态 RAM | 1,232 B | 1,200 B | -32 B | 1,008 B |
+| 额外预留栈 | 1,024 B | 1,024 B | 0 B | 1,024 B |
+| RAM 合计 | 2,256 B | 2,224 B | -32 B | 2,032 B |
+| 最大已链接单函数栈 | 392 B | 272 B | -120 B | 272 B |
+
+证据为 `out/opt-arm-128` 与 `out/opt-arm-64`。两份报告保留测量时的实际 revision、dirty 状态和源码内容哈希；64 为该配置首次测量，其回归基线从本轮开始，不宣称存在旧 64 测量。两者无堆或未解析符号；64 的 workspace 达到 1 KiB 目标，128 尚未达到。两者均未达到 8 KiB Flash 目标，也未完成板级验收。
+
+## 固定工具链与自动门槛
+
+`toolchain-lock.json` 固定 Arm GNU 15.2.rel1/GCC 15.2.1 的官方 Linux 归档与官方 SHA-256，并记录校验和来源 URL。CI 在独立准备步骤下载、验证校验和并加入 PATH；生产配置及本地探针不下载工具。Windows 本地验证必须自行准备同版本的 ARM 工具链。
+
+`budget-mtu128.json` 和 `budget-mtu64.json` 分别固定 profile、MTU/RX、编译器、基线来源及资源限额。Flash 的 16,384 B 是本轮回归上限，其他限额固定本轮实际 workspace、静态 RAM、预留栈、总 RAM 和最大单函数栈；它不是已达成的 8 KiB 设计目标。运行门槛：
+
+```sh
+python tools/boot_footprint/check_budget.py \
+  --report build/boot-footprint/boot-footprint.json \
+  --policy tools/boot_footprint/budget-mtu128.json \
+  --output build/boot-footprint/budget-result.json
+```
+
+测量 64 时使用独立构建目录，并同时设置 `-DXGL_FOOTPRINT_FRAME_SIZE=64 -DXGL_FOOTPRINT_RX_SIZE=64`，选择对应 policy。任一限额超出、工具链/profile/容量不匹配、缺少测量、堆或未解析符号都会失败。CI 分别保存 ELF、map、`.su`、布局和预算差异 JSON；新增任务的远端结果必须按本次提交验证。

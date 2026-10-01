@@ -10,6 +10,18 @@ if(NOT CMAKE_CROSSCOMPILING OR NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
 endif()
 get_filename_component(XGL_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
+set(XGL_FOOTPRINT_FRAME_SIZE 128 CACHE STRING "Probe frame MTU in bytes")
+set(XGL_FOOTPRINT_RX_SIZE 128 CACHE STRING "Probe per-link RX storage in bytes")
+foreach(capacity XGL_FOOTPRINT_FRAME_SIZE XGL_FOOTPRINT_RX_SIZE)
+    if(NOT "${${capacity}}" MATCHES "^[0-9]+$")
+        message(FATAL_ERROR "${capacity} must be a decimal byte count")
+    endif()
+endforeach()
+if(XGL_FOOTPRINT_FRAME_SIZE LESS 64 OR XGL_FOOTPRINT_FRAME_SIZE GREATER 2048 OR
+   XGL_FOOTPRINT_RX_SIZE LESS XGL_FOOTPRINT_FRAME_SIZE OR XGL_FOOTPRINT_RX_SIZE GREATER 4096)
+    message(FATAL_ERROR "Probe requires MTU 64..2048 and RX capacity MTU..4096")
+endif()
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 find_program(XGL_ARM_SIZE arm-none-eabi-size REQUIRED)
 find_program(XGL_ARM_NM arm-none-eabi-nm REQUIRED)
@@ -39,6 +51,9 @@ target_link_libraries(xgl_boot_layout PRIVATE xgl::xgl
     xgm::pool xgm::size_class xgct::list xgct::bitset
     xgb::bytes xgcrc::crc16)
 target_compile_options(xgl_boot_layout PRIVATE -Wall -Wextra -Werror -Wpedantic)
+target_compile_definitions(xgl_boot_layout PRIVATE
+    XGL_FOOTPRINT_FRAME_SIZE=${XGL_FOOTPRINT_FRAME_SIZE}U
+    XGL_FOOTPRINT_RX_SIZE=${XGL_FOOTPRINT_RX_SIZE}U)
 set(layout_binary "${CMAKE_CURRENT_BINARY_DIR}/workspace-layout.bin")
 set(layout_header "${CMAKE_CURRENT_BINARY_DIR}/workspace_layout.h")
 set(layout_json "${CMAKE_CURRENT_BINARY_DIR}/workspace-layout.json")
@@ -61,6 +76,9 @@ set_target_properties(xgl_boot_probe PROPERTIES SUFFIX .elf)
 target_include_directories(xgl_boot_probe PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(xgl_boot_probe PRIVATE xgl::xgl)
 target_compile_options(xgl_boot_probe PRIVATE -Wall -Wextra -Werror -Wpedantic)
+target_compile_definitions(xgl_boot_probe PRIVATE
+    XGL_FOOTPRINT_FRAME_SIZE=${XGL_FOOTPRINT_FRAME_SIZE}U
+    XGL_FOOTPRINT_RX_SIZE=${XGL_FOOTPRINT_RX_SIZE}U)
 target_link_options(xgl_boot_probe PRIVATE
     -nostartfiles --specs=nano.specs --specs=nosys.specs
     "-T${CMAKE_CURRENT_SOURCE_DIR}/memory.ld"

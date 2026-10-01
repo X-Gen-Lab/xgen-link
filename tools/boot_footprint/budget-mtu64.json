@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "compiler_version": "15.2.1",
+  "configuration": {
+    "profile": "boot",
+    "frame_bytes": 64,
+    "rx_bytes": 64
+  },
+  "qualification": "Fixed Cortex-M0 MinSizeRel no-heap probe, one peer and window one; 16 KiB is a regression ceiling, not the unmet 8 KiB Flash design goal.",
+  "baseline_kind": "first_measurement_of_this_configuration",
+  "baseline_source": {
+    "revision": "83f90a6fec77aa99a5690bac62f6c6561fba2948",
+    "dirty": true,
+    "source_sha256": "fbb165943a8535d4e5b44f8b2311bcbc619009fd2bf4a936d75ba5294537a104"
+  },
+  "baseline_report": "out/opt-arm-64/boot-footprint.json",
+  "baseline": {
+    "flash_bytes": 16060,
+    "workspace_bytes": 944,
+    "static_ram_bytes": 1008,
+    "reserved_stack_bytes": 1024,
+    "ram_with_reserved_stack_bytes": 2032,
+    "largest_linked_function_stack_bytes": 272
+  },
+  "limits": {
+    "flash_bytes": 16384,
+    "workspace_bytes": 944,
+    "static_ram_bytes": 1008,
+    "reserved_stack_bytes": 1024,
+    "ram_with_reserved_stack_bytes": 2032,
+    "largest_linked_function_stack_bytes": 272
+  }
+}

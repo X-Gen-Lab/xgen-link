@@ -46,7 +46,8 @@ def cache_values(build):
         key, value = line.split("=", 1)
         key = key.split(":", 1)[0]
         if key.startswith(("CMAKE_C_FLAGS", "CMAKE_EXE_LINKER_FLAGS")) or key in (
-            "CMAKE_BUILD_TYPE", "CMAKE_TOOLCHAIN_FILE",
+            "CMAKE_BUILD_TYPE", "CMAKE_TOOLCHAIN_FILE", "XGL_PROFILE",
+            "XGL_FOOTPRINT_FRAME_SIZE", "XGL_FOOTPRINT_RX_SIZE",
             "CMAKE_INTERPROCEDURAL_OPTIMIZATION") or (
                 key.startswith(("XGL_", "xgen_")) and key.endswith("_SOURCE_DIR")):
             result[key] = value
@@ -161,7 +162,10 @@ def report_elf(args):
     configuration = cache_values(args.build)
     result = {
         "elf": elf,
-        "configuration": f"Cortex-M0, GCC {args.configuration}, boot, no heap, one peer, window 1, MTU 128",
+        "configuration": (f"Cortex-M0, GCC {args.configuration}, boot, no heap, "
+                          f"one peer, window 1, MTU {layout['frame_bytes']}"),
+        "frame_bytes": layout["frame_bytes"],
+        "rx_bytes": layout["rx_bytes"],
         "compiler": run([args.compiler, "--version"]).splitlines()[0],
         "build_parameters": configuration,
         "link_source": source_identity(Path(__file__).resolve().parents[2]),
