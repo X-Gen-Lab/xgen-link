@@ -32,6 +32,27 @@ TEST(XglRttTest, InitializationNullPointer) {
     EXPECT_TRUE(true);
 }
 
+TEST(XglRttTest, LargeSamplesClampWithoutIntermediateOverflow) {
+    for (const int32_t sample :
+         {INT32_C(715827884), INT32_C(1000000000), INT32_MAX}) {
+        SCOPED_TRACE(sample);
+        xgl_rtt_estimator_t est;
+        xgl_rtt_init(&est);
+        xgl_rtt_update(&est, sample);
+        EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_MAX_RTO_MS);
+        xgl_rtt_update(&est, 1);
+        EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_MAX_RTO_MS);
+    }
+}
+
+TEST(XglRttTest, LargeSubsequentSampleKeepsRtoBounded) {
+    xgl_rtt_estimator_t est;
+    xgl_rtt_init(&est);
+    xgl_rtt_update(&est, 20);
+    xgl_rtt_update(&est, INT32_MAX);
+    EXPECT_EQ(xgl_rtt_get_rto(&est), XGL_MAX_RTO_MS);
+}
+
 /**
  * \brief           Test is_initialized with null pointer
  */
