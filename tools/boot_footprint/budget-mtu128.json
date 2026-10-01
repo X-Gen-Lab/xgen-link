@@ -7,7 +7,11 @@
     "rx_bytes": 128,
     "lto": false,
     "rx_chunk_bytes": 32,
-    "window_pool_blocks": 0
+    "window_pool_blocks": 0,
+    "resource_config_id": 1857,
+    "compiled_window_capacity": 128,
+    "reliable_bucket_count": 1,
+    "adaptive_rto": true
   },
   "qualification": "Fixed Cortex-M0 MinSizeRel no-heap probe, one peer and window one; 16 KiB is a regression ceiling, not the unmet 8 KiB Flash design goal.",
   "baseline_kind": "previous_refactor_measurement",

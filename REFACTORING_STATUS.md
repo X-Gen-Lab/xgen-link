@@ -1,8 +1,24 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-02。当前阶段为 transport 准入、恢复与存储优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0011](design/adr/0011-transport-admission-recovery.md)。
+更新日期：2026-10-02。当前阶段为 transport 事实归属、预准入与显式资源裁剪。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
 
-## 当前：Transport 准入、恢复与存储优化
+## 当前：Transport 事实归属、预准入与显式资源裁剪
+
+分片按消息保存已接纳可靠属性，混用在 ACK/SACK 之前拒绝；非可靠超时只释放该消息，不终止同 scope 的可靠历史。过期对象先从活动队列摘出再清理所属 scope，防止回调清理破坏遍历。
+
+可靠发送在 HELLO 前预留本地记录、载荷，分片另预留完整消息与首片资源。空 HELLO 预约使用独立 5 秒期限，重复 HELLO 和被拒绝 DATA 不续期，普通 idle 禁用时仍回收；有历史或拥有数据的 scope 保持。global 满时既有失败和 pending-message 错误优先级不变。
+
+支持显式桶数、编译窗口容量和关闭自适应 RTO，默认能力保持。生成头、target、安装包和运行时均核对解析后的资源身份；格式 6 与预算拒绝混用其他选择。RX 私有头、顺序分片元数据和 OOO 插入位置归属清晰；ACK/SACK 与 TX rollback 复用已拥有记录。
+
+最终逻辑冻结 `725a4fd`，诊断注释冻结 `ae59a0f`，构建/测试冻结 `4bdc046`。完整矩阵发现 Lite 错误注册无转发能力的多节点示例，保留真实 RED 并改为按编译能力装配；全部 5 项 profile/安装/例子契约 GREEN，历史协议测试不删除。
+
+最终 Windows GNU Full/Embedded 各 778 项、Boot 174 项、Lite 257 项；MSVC Full/Boot 为 778/174 项，Linux Full/ASan+UBSan 为 778/777 项。历史 510 名保留，29 头 C11/C++17 首包含通过；生产覆盖率为 93.7%/100%/83.7%。Cppcheck、Clang-Tidy 各 43 个生产文件、严格文档及格式通过。最后 Python 工具 fixture 迁移 `4af91d8` 后 RX chunk 7/7，不改变已验收编译输入。
+
+默认普通/LTO Flash 为 **16,336/12,964 B**，LTO 超出原门槛 **164 B**。small 的显式窗口 1、桶 1、固定 RTO 为 **16,100/12,788 B**，LTO 余量仅 **12 B**；MTU128/64 工作区为 **1,040/848 B**，加 1 KiB 预留栈的 RAM 为 **2,128/1,936 B**。默认配置和 small 分别验收，原预算不放宽；CI 仍严格保留默认超限任务。8 KiB Flash 目标、板级栈和远端 CI 全绿尚未达到。
+
+详细 TDD、最终矩阵、CPU/布局、全部成功与失败预算见[资源优化验证](design/validation/transport-resource-refinement.md)。主机通过、源码本地提交与硬件验收分别报告。
+
+## 历史：Transport 准入、恢复与存储优化
 
 完整 RX 语义检查在 peer/缓存准入前完成，拒绝保留类型、可靠广播、重复 FRAGMENT 和耗尽包号。初次 TX 失败只回收本次新建且未使用的 scope。接受后的 ACK 发送错误原样返回，保留已经接受的历史，避免重复交付。
 

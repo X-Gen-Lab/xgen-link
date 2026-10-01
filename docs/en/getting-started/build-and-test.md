@@ -60,13 +60,49 @@ All three disable protocol libc fallback and default to checking a static lifecy
 
 For source development use the corresponding dev preset, supplying all five source-path environment variables or explicit `-D` arguments, for example `cmake -S dev --preset boot -DXGL_BUILD_TESTS=ON`. Keep profiles in separate directories; do not reuse Full caches or generated headers. The development harness adds the libc allocator target needed by host tests, but the Boot protocol does not link it.
 
+## Compiled resource options
+
+The product selects the following resource combination when compiling the protocol library. The production root and `dev` harness accept the same options. They determine actual object layout and behavior; consumer macros cannot resize an installed library.
+
+| CMake option | Supported values and default | Effect |
+| --- | --- | --- |
+| `XGL_RELIABLE_INDEX_BUCKETS` | `AUTO`, `1`, `2`, `4`, `8`, `16`, `32`; default `AUTO` | Reliable queue index buckets per peer; fewer buckets reduce fixed storage, while longer bucket chains can increase lookup cost |
+| `XGL_TRANSPORT_WINDOW_CAPACITY` | `AUTO`, `1`, `8`, `16`, `32`, `64`, `128`; default `AUTO`, resolved to `128` | Compiled private window capacity and embedded acknowledgement bitmap |
+| `XGL_ENABLE_ADAPTIVE_RTO` | `ON`, `OFF`; default `ON` | Retain peer RTT estimators and ACK sampling; `OFF` uses the configured or request-specific ACK timeout |
+
+Index bucket `AUTO` defaults are `1` for Boot, `8` for Embedded Lite and `32` for Embedded/Full. Compiled window capacity and runtime `protocol.window_size` are separate selections: the public runtime window remains `1–32` and cannot exceed compiled capacity. Default private capacity `128` preserves the historical contract without enlarging the public API window limit. Disabling adaptive RTO retains per-request timeout overrides and exponential retry backoff; see [reliability](../protocol/reliability.md#transmit-lifecycle).
+
+For example, after installing the five dependency packages, build a Boot SDK with a one-packet window and fixed RTO:
+
+```sh
+cmake -S . -B build/boot-compact -G Ninja \
+  -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DXGL_PROFILE=boot \
+  -DXGL_RELIABLE_INDEX_BUCKETS=1 \
+  -DXGL_TRANSPORT_WINDOW_CAPACITY=1 \
+  -DXGL_ENABLE_ADAPTIVE_RTO=OFF \
+  -DXGL_BUILD_TESTS=OFF -DXGL_BUILD_EXAMPLES=OFF
+cmake --build build/boot-compact
+cmake --install build/boot-compact --prefix ./install-boot-compact
+```
+
+This selects a build combination; it does not prove compliance with a Flash, RAM or stack budget. The product must also configure runtime capacities and validate its complete target ELF and board peak usage. `test/cmake/test_transport_resource_config.py` verifies supported combinations, window boundaries, conflict rejection and installed consumption. `test/unit/transport/test_transport_fixed_rto.cpp` verifies fixed RTO behavior.
+
+## Build identities and SDK consistency
+
+When all resolved resources match profile defaults, `XGL_BUILD_CONFIG_ID` remains `301` for Boot, `302` for Embedded, `303` for Full and `304` for Embedded Lite. A nondefault combination receives a distinct identity incorporating index buckets, window capacity, adaptive RTO, resolved PHY read chunk size and libc fallback selection. `XGL_DATALINK_RX_CHUNK_SIZE` accepts `AUTO/16/32/64/128`; `AUTO` resolves to `32` for Boot and `128` for other profiles. Libc fallback defaults to enabled for Full and disabled for the other profiles; Boot requires it disabled.
+
+The generated header also provides the compiled resource identity. CMake `xgl::xgl` exports matching properties, and the installed package exposes `xgl_BUILD_CONFIG_ID`, `xgl_RESOURCE_CONFIG_ID` and resolved resource options. Package configuration rejects an identity mismatch with an existing target; target compatibility requirements reject conflicting consumer combinations; generated headers reject macro overrides that disagree with compiled resources; public checked entry points reject caller/runtime identity mismatches. Consumers must use the target and generated header from the same SDK and pass generated identities through public entry points instead of hardcoding `301–304` from the profile name.
+
+Use a separate build directory and SDK prefix when changing the resource combination, then rebuild consumers. Setting these CMake options while consuming an installed package does not resize the library: rebuild and select the matching SDK. See [memory and capacity](../protocol/memory.md#static-workspace-layout) for querying that build's actual workspace requirements.
+
 ## Install
 
 ```sh
 cmake --install build/gcc-test --prefix ./install
 ```
 
-Install the five dependencies separately into a common prefix or prefixes listed in `CMAKE_PREFIX_PATH`; installing link does not install its dependencies. Consumers use `find_package(xgl CONFIG REQUIRED)` and `xgl::xgl`. The package resolves required components and checks versions and ABI. Use the installed generated profile header; checked entry points reject ABI/profile mismatches.
+Install the five dependencies separately into a common prefix or prefixes listed in `CMAKE_PREFIX_PATH`; installing link does not install its dependencies. Consumers use `find_package(xgl CONFIG REQUIRED)` and `xgl::xgl`. The package resolves required components and checks versions and ABI. Use the installed generated profile and resource configuration header; checked entry points reject ABI/profile/compiled resource identity mismatches.
 
 Consumers may request `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)` to reject insufficient package capabilities during configuration. See [configuration](../guide/configuration.md) for capability names and profile identities.
 

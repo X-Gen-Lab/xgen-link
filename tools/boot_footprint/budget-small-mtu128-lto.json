@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "compiler_version": "15.2.1",
+  "configuration": {
+    "profile": "boot",
+    "frame_bytes": 128,
+    "rx_bytes": 128,
+    "lto": true,
+    "rx_chunk_bytes": 32,
+    "window_pool_blocks": 0,
+    "resource_config_id": 1025,
+    "compiled_window_capacity": 1,
+    "reliable_bucket_count": 1,
+    "adaptive_rto": false
+  },
+  "qualification": "Explicit one-slot, fixed-RTO Cortex-M0 MinSizeRel no-heap probe. Separate capability selection from the default 128-slot adaptive-RTO library. The 12800-byte LTO ceiling is not an 8 KiB Flash goal or a complete product/stack qualification.",
+  "baseline_kind": "first_measurement_of_explicit_small_transport_configuration",
+  "baseline_source": {
+    "revision": "725a4fd5e7fafcd1a6ceac0f0dd7c170360f8d77",
+    "dirty": true,
+    "source_sha256": "d7a8b52df094cd53d568763efcb4621307cf14d63cee4e9b536a8bbbbf6d8fab"
+  },
+  "baseline_report": "out/transport-next/arm/freeze-725a4fd/trimmed-mtu128-lto/boot-footprint.json",
+  "baseline": {
+    "flash_bytes": 12788,
+    "workspace_bytes": 1040,
+    "static_ram_bytes": 1104,
+    "reserved_stack_bytes": 1024,
+    "ram_with_reserved_stack_bytes": 2128,
+    "largest_linked_function_stack_bytes": 208
+  },
+  "limits": {
+    "flash_bytes": 12800,
+    "workspace_bytes": 1040,
+    "static_ram_bytes": 1104,
+    "reserved_stack_bytes": 1024,
+    "ram_with_reserved_stack_bytes": 2128,
+    "largest_linked_function_stack_bytes": 224
+  }
+}

@@ -29,7 +29,7 @@
 | 配置字段 | 上限 |
 | --- | --- |
 | `features.max_peers` | 同时存在的 connection/epoch scope 数 |
-| `protocol.window_size` | 每个 peer 的可靠在途包，1–32 |
+| `protocol.window_size` | 每个 peer 的可靠在途包，1–32，且不超过编译窗口容量 |
 | `features.max_tx_packets` | 整个实例的可靠在途包 |
 | `features.max_rx_buffered_packets` | 整个实例的乱序包 |
 | `features.max_message_size` | 单条分片收发消息的最大长度 |
@@ -51,15 +51,17 @@
 
 只支持以下明确的能力组合，不提供任意 feature flag 的排列。实际启用项及容量仍由运行时配置决定，运行时配置不能恢复编译时已裁剪的能力。
 
-| Profile | 配置 ID | 认证/转发 | 分片/乱序 | 统计/诊断文字 |
+| Profile | 默认配置 ID | 认证/转发 | 分片/乱序 | 统计/诊断文字 |
 | --- | ---: | --- | --- | --- |
 | `boot` | 301 | 无 | 无 | 无 |
 | `embedded-lite` | 304 | 无 | 有 | 有 |
 | `embedded` | 302 | 有 | 有 | 有 |
 | `full` | 303 | 有 | 有 | 有 |
 
-Boot 允许一个 peer、最多一条路由、窗口一。Embedded Lite 使用 8 个可靠索引桶，不保留安全会话存储；适用于需要有界分片和乱序但无需认证及路由转发的端点。其他容量上限由生成的 `xgl_build_config.h` 给出。
+Boot 允许一个 peer、最多一条路由、窗口一。Embedded Lite 默认使用 8 个可靠索引桶，不保留安全会话存储；适用于需要有界分片和乱序但无需认证及路由转发的端点。其他容量上限由生成的 `xgl_build_config.h` 给出。
 
-安装包导出 `xgl_PROFILE`、`xgl_BUILD_CONFIG_ID`、`xgl_CAPABILITIES`，目标 `xgl::xgl` 同时具有 `XGL_PROFILE`、`XGL_BUILD_CONFIG_ID`、`XGL_CAPABILITIES` 属性。消费者可用 `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)` 要求能力；不支持的必需能力在配置阶段拒绝。可请求名称为 `wire`、`reliable`、`authentication`、`forwarding`、`fragmentation`、`out_of_order`、`statistics` 和 `diagnostics`。
+可靠索引桶数、私有窗口容量和自适应 RTO 可以通过受控编译选项选择，默认私有窗口仍为 128 槽，自适应 RTO 默认开启。运行时配置不能扩大已编译容量。上表 ID 仅适用于全部实际资源与 profile 默认值一致的构建；改变资源组合、PHY 读取块或 libc fallback 会获得不同的构建身份。选项、安装消费和冲突拒绝见[构建与测试](../getting-started/build-and-test.md)。
 
-压缩和 payload 加密仍是保留项，启用会被拒绝；两个 feature flag 保持 false，`compression_id` 保持零。通过 `xgl_memory_requirements()` 检查 workspace 算术溢出并查询依赖 ABI 的真实大小。库与消费者必须使用匹配的生成 profile 头文件。
+安装包导出 `xgl_PROFILE`、`xgl_BUILD_CONFIG_ID`、`xgl_RESOURCE_CONFIG_ID`、`xgl_CAPABILITIES` 和实际资源选项，目标 `xgl::xgl` 同时具有对应的 profile、构建与资源身份、能力属性。消费者可用 `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)` 要求能力；不支持的必需能力在配置阶段拒绝。可请求名称为 `wire`、`reliable`、`authentication`、`forwarding`、`fragmentation`、`out_of_order`、`statistics` 和 `diagnostics`。
+
+压缩和 payload 加密仍是保留项，启用会被拒绝；两个 feature flag 保持 false，`compression_id` 保持零。通过 `xgl_memory_requirements()` 检查 workspace 算术溢出并查询依赖 ABI 的真实大小。库、CMake target 与消费者必须使用匹配的生成 profile 和资源头文件；公开 checked 入口使用生成的构建身份，不能硬编码默认 profile ID。

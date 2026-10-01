@@ -239,6 +239,14 @@ jobs:
             --bytes-source out/deps/xgen-bytes --crc-source out/deps/xgen-crc \
             --memory-source out/deps/xgen-memory --containers-source out/deps/xgen-containers \
             --work-dir out/reports/rx-chunk-contracts
+      - name: Validate transport capacities, identity and fixed RTO consumers
+        run: |
+          python test/cmake/test_transport_resource_config.py \
+            --link-source . --status-source out/deps/xgen-status \
+            --bytes-source out/deps/xgen-bytes --crc-source out/deps/xgen-crc \
+            --memory-source out/deps/xgen-memory --containers-source out/deps/xgen-containers \
+            --gtest-dir "$GTest_ROOT/lib/cmake/GTest" \
+            --work-dir out/reports/transport-resource-contracts
       - name: Preserve contract results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -248,10 +256,11 @@ jobs:
             out/reports/dependency-contracts
             out/reports/profile-contracts
             out/reports/rx-chunk-contracts
+            out/reports/transport-resource-contracts
           if-no-files-found: error
 
   arm-footprint:
-    name: Cortex-M0 ELF budget (MTU ${{ matrix.mtu }}, LTO ${{ matrix.lto }})
+    name: Cortex-M0 ELF budget (${{ matrix.resource }}, MTU ${{ matrix.mtu }}, LTO ${{ matrix.lto }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
@@ -259,6 +268,7 @@ jobs:
       matrix:
         mtu: [128, 64]
         lto: ['OFF', 'ON']
+        resource: ['default', 'small']
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
@@ -273,7 +283,7 @@ jobs:
           containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
       - uses: ./.github/actions/setup-arm-toolchain
       - name: Validate explicit LTO mode and budget contracts
-        if: matrix.mtu == 128 && matrix.lto == 'OFF'
+        if: matrix.resource == 'default' && matrix.mtu == 128 && matrix.lto == 'OFF'
         run: |
           python test/cmake/test_footprint_lto.py \
             --link-source . --status-source "$XGL_DEV_STATUS_SOURCE_DIR" \
@@ -282,33 +292,36 @@ jobs:
             --work-dir out/footprint-lto-contracts
       - name: Link the fixed no-heap Boot consumer
         run: |
-          cmake -S tools/boot_footprint -B out/arm-${{ matrix.mtu }}-${{ matrix.lto }} -G Ninja \
+          cmake -S tools/boot_footprint -B out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }} -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/tools/boot_footprint/toolchain-arm-cortex-m0.cmake" \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DXGL_FOOTPRINT_LTO=${{ matrix.lto }} \
             -DXGL_FOOTPRINT_FRAME_SIZE=${{ matrix.mtu }} -DXGL_FOOTPRINT_RX_SIZE=${{ matrix.mtu }} \
+            -DXGL_RELIABLE_INDEX_BUCKETS=1 \
+            -DXGL_TRANSPORT_WINDOW_CAPACITY=${{ matrix.resource == 'small' && '1' || '128' }} \
+            -DXGL_ENABLE_ADAPTIVE_RTO=${{ matrix.resource == 'small' && 'OFF' || 'ON' }} \
             -DXGL_DEV_STATUS_SOURCE_DIR="$XGL_DEV_STATUS_SOURCE_DIR" \
             -DXGL_DEV_BYTES_SOURCE_DIR="$XGL_DEV_BYTES_SOURCE_DIR" \
             -DXGL_DEV_CRC_SOURCE_DIR="$XGL_DEV_CRC_SOURCE_DIR" \
             -DXGL_DEV_MEMORY_SOURCE_DIR="$XGL_DEV_MEMORY_SOURCE_DIR" \
             -DXGL_DEV_CONTAINERS_SOURCE_DIR="$XGL_DEV_CONTAINERS_SOURCE_DIR"
-          cmake --build out/arm-${{ matrix.mtu }}-${{ matrix.lto }} --parallel 2
+          cmake --build out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }} --parallel 2
       - name: Enforce the probe budget and retain baseline deltas
         run: |
           python tools/boot_footprint/check_budget.py \
-            --report out/arm-${{ matrix.mtu }}-${{ matrix.lto }}/boot-footprint.json \
-            --policy tools/boot_footprint/budget-mtu${{ matrix.mtu }}${{ matrix.lto == 'ON' && '-lto' || '' }}.json \
-            --output out/arm-${{ matrix.mtu }}-${{ matrix.lto }}/budget-result.json
+            --report out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/boot-footprint.json \
+            --policy tools/boot_footprint/budget-${{ matrix.resource == 'small' && 'small-' || '' }}mtu${{ matrix.mtu }}${{ matrix.lto == 'ON' && '-lto' || '' }}.json \
+            --output out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/budget-result.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: arm-footprint-${{ matrix.mtu }}-${{ matrix.lto }}
+          name: arm-footprint-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}
           path: |
-            out/arm-${{ matrix.mtu }}-${{ matrix.lto }}/*.json
-            out/arm-${{ matrix.mtu }}-${{ matrix.lto }}/*.txt
-            out/arm-${{ matrix.mtu }}-${{ matrix.lto }}/*.elf
-            out/arm-${{ matrix.mtu }}-${{ matrix.lto }}/*.map
-            out/arm-${{ matrix.mtu }}-${{ matrix.lto }}/**/*.su
+            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.json
+            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.txt
+            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.elf
+            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.map
+            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/**/*.su
             out/footprint-lto-contracts/
           if-no-files-found: error
 

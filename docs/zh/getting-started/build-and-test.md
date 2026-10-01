@@ -60,13 +60,49 @@ ctest --preset embedded
 
 源码开发时使用对应 dev 预设，提供五个路径环境变量或显式 `-D` 参数，例如 `cmake -S dev --preset boot -DXGL_BUILD_TESTS=ON`。各 profile 使用独立目录；不复用 Full 的缓存或生成头。开发入口会为主机测试补齐测试使用的 libc allocator target，但 Boot 协议仍不链接它。
 
+## 编译资源选项
+
+产品在编译协议库时选择以下资源组合，正式根工程和 `dev` 装配接受相同选项。这些选项确定实际对象布局和行为，消费者不能通过自己的宏定义改变已安装库。
+
+| CMake 选项 | 支持值与默认值 | 作用 |
+| --- | --- | --- |
+| `XGL_RELIABLE_INDEX_BUCKETS` | `AUTO`、`1`、`2`、`4`、`8`、`16`、`32`；默认 `AUTO` | 每个 peer 的可靠队列索引桶数；少量桶减少固定存储，较长桶链可能增加查找成本 |
+| `XGL_TRANSPORT_WINDOW_CAPACITY` | `AUTO`、`1`、`8`、`16`、`32`、`64`、`128`；默认 `AUTO`，解析为 `128` | 私有窗口及其内嵌确认位图的编译容量 |
+| `XGL_ENABLE_ADAPTIVE_RTO` | `ON`、`OFF`；默认 `ON` | 是否保留 peer RTT 估计器与 ACK 采样；`OFF` 使用配置或请求指定的 ACK 超时 |
+
+索引桶的 `AUTO` 默认值为 Boot `1`、Embedded Lite `8`、Embedded/Full `32`。编译窗口容量与运行时 `protocol.window_size` 分别选择：公开运行时窗口仍为 `1–32`，且不能超过编译容量；默认私有 `128` 槽能力保持历史契约，不会扩大公开 API 的窗口上限。关闭自适应 RTO 不取消单次超时覆盖或重传指数退避，详见[可靠传输](../protocol/reliability.md)。
+
+例如，在五个依赖包已安装后构建一个单包窗口、固定 RTO 的 Boot SDK：
+
+```sh
+cmake -S . -B build/boot-compact -G Ninja \
+  -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DXGL_PROFILE=boot \
+  -DXGL_RELIABLE_INDEX_BUCKETS=1 \
+  -DXGL_TRANSPORT_WINDOW_CAPACITY=1 \
+  -DXGL_ENABLE_ADAPTIVE_RTO=OFF \
+  -DXGL_BUILD_TESTS=OFF -DXGL_BUILD_EXAMPLES=OFF
+cmake --build build/boot-compact
+cmake --install build/boot-compact --prefix ./install-boot-compact
+```
+
+该命令仅选择构建组合，不证明镜像满足某个 Flash、RAM 或栈预算。实际产品还须设置运行时容量，并验收完整目标 ELF 与板级峰值。支持的资源配置、窗口边界、冲突拒绝和安装消费由 `test/cmake/test_transport_resource_config.py` 验证；固定 RTO 行为由 `test/unit/transport/test_transport_fixed_rto.cpp` 验证。
+
+## 构建身份与 SDK 一致性
+
+全部资源保持 profile 默认值时，`XGL_BUILD_CONFIG_ID` 保持 Boot `301`、Embedded `302`、Full `303`、Embedded Lite `304`。实际组合偏离默认值时会生成不同身份，包含索引桶、窗口容量、自适应 RTO、已解析的 PHY 读取块大小及 libc fallback 选择。`XGL_DATALINK_RX_CHUNK_SIZE` 支持 `AUTO/16/32/64/128`，`AUTO` 在 Boot 解析为 `32`、其余 profile 为 `128`；libc fallback 默认为 Full 开启、其余关闭，Boot 要求关闭。
+
+生成头同时提供编译资源身份；CMake `xgl::xgl` 导出对应属性，安装包提供 `xgl_BUILD_CONFIG_ID`、`xgl_RESOURCE_CONFIG_ID` 和已解析的资源选项。安装配置拒绝 package 与既有 target 身份不符，目标的兼容接口拒绝同一消费者组合冲突，生成头拒绝与已编译资源冲突的宏覆盖，公开 checked 入口拒绝调用方与运行库身份不匹配。消费者应使用同一 SDK 的 target 和生成头，并通过生成身份调用公开入口，不能只按 profile 名称硬编码 `301–304`。
+
+重新选择资源组合时使用独立构建目录，安装到独立 SDK 前缀，随后重新编译消费者。对已安装包设置这些 CMake 选项不会重新裁剪库；必须重新构建并选择匹配的 SDK。[内存与容量](../protocol/memory.md)说明如何查询该构建的实际工作区需求。
+
 ## 安装
 
 ```sh
 cmake --install build/gcc-test --prefix ./install
 ```
 
-五个依赖包需分别安装到同一前缀或由 `CMAKE_PREFIX_PATH` 指定的多个前缀；安装 link 不代替安装依赖。消费者使用 `find_package(xgl CONFIG REQUIRED)` 和 `xgl::xgl`，安装配置解析实际所需组件并检查版本/ABI。使用安装包生成的 profile 头文件；checked 入口拒绝 ABI/profile 不匹配。
+五个依赖包需分别安装到同一前缀或由 `CMAKE_PREFIX_PATH` 指定的多个前缀；安装 link 不代替安装依赖。消费者使用 `find_package(xgl CONFIG REQUIRED)` 和 `xgl::xgl`，安装配置解析实际所需组件并检查版本/ABI。使用安装包生成的 profile 与资源配置头文件；checked 入口拒绝 ABI/profile/编译资源身份不匹配。
 
 消费者可要求 `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)`，在配置阶段拒绝能力不足的包；可用能力及 profile 身份见[配置](../guide/configuration.md)。
 

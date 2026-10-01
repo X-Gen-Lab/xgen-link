@@ -29,7 +29,7 @@ The effective frame must fit the configured protocol limit and route MTU, includ
 | Configuration field | Bound |
 | --- | --- |
 | `features.max_peers` | Simultaneous connection/epoch scopes |
-| `protocol.window_size` | Outstanding reliable packets per peer, 1–32 |
+| `protocol.window_size` | Outstanding reliable packets per peer, 1–32, within compiled window capacity |
 | `features.max_tx_packets` | Outstanding reliable packets across the instance |
 | `features.max_rx_buffered_packets` | Out-of-order packets across the instance |
 | `features.max_message_size` | Largest fragmented TX/RX message |
@@ -51,15 +51,17 @@ Authentication does not require a libc allocator: static workspaces support it. 
 
 Only these explicit capability combinations are supported, rather than arbitrary feature-flag permutations. Runtime configuration still selects enabled features and capacities, but cannot restore capabilities removed at build time.
 
-| Profile | Configuration ID | Authentication/forwarding | Fragmentation/out-of-order | Statistics/diagnostic text |
+| Profile | Default configuration ID | Authentication/forwarding | Fragmentation/out-of-order | Statistics/diagnostic text |
 | --- | ---: | --- | --- | --- |
 | `boot` | 301 | No | No | No |
 | `embedded-lite` | 304 | No | Yes | Yes |
 | `embedded` | 302 | Yes | Yes | Yes |
 | `full` | 303 | Yes | Yes | Yes |
 
-Boot permits one peer, at most one route, and window one. Embedded Lite uses eight reliable-index buckets and retains no security-session storage. It serves endpoints requiring bounded fragmentation and out-of-order buffering without authentication or forwarding. The generated `xgl_build_config.h` declares the other capacity limits.
+Boot permits one peer, at most one route, and window one. Embedded Lite defaults to eight reliable-index buckets and retains no security-session storage. It serves endpoints requiring bounded fragmentation and out-of-order buffering without authentication or forwarding. The generated `xgl_build_config.h` declares the other capacity limits.
 
-Installed packages export `xgl_PROFILE`, `xgl_BUILD_CONFIG_ID`, and `xgl_CAPABILITIES`; target `xgl::xgl` also carries `XGL_PROFILE`, `XGL_BUILD_CONFIG_ID`, and `XGL_CAPABILITIES` properties. Consumers can require capabilities with `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)`; unsupported required capabilities fail configuration. Requestable names are `wire`, `reliable`, `authentication`, `forwarding`, `fragmentation`, `out_of_order`, `statistics`, and `diagnostics`.
+Reliable index buckets, private window capacity and adaptive RTO can be selected through controlled compiled options. Default private capacity remains 128 slots, and adaptive RTO defaults to enabled. Runtime settings cannot enlarge compiled capacity. The table's IDs apply only when all resolved resources match profile defaults; changing the resource combination, PHY read chunk or libc fallback produces a different build identity. See [build and test](../getting-started/build-and-test.md#compiled-resource-options) for options, installed consumption and conflict rejection.
 
-Compression and payload encryption remain reserved and rejected; keep both feature flags false and `compression_id` zero. Use `xgl_memory_requirements()` to detect workspace arithmetic overflow and query the actual ABI-dependent size. Build and consume matching generated profile headers.
+Installed packages export `xgl_PROFILE`, `xgl_BUILD_CONFIG_ID`, `xgl_RESOURCE_CONFIG_ID`, `xgl_CAPABILITIES` and resolved resource options. Target `xgl::xgl` carries the corresponding profile, build identity, resource identity and capability properties. Consumers can require capabilities with `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)`; unsupported required capabilities fail configuration. Requestable names are `wire`, `reliable`, `authentication`, `forwarding`, `fragmentation`, `out_of_order`, `statistics`, and `diagnostics`.
+
+Compression and payload encryption remain reserved and rejected; keep both feature flags false and `compression_id` zero. Use `xgl_memory_requirements()` to detect workspace arithmetic overflow and query the actual ABI-dependent size. The library, CMake target and consumer must use matching generated profile and resource headers. Public checked entry points use the generated build identity rather than hardcoded default profile IDs.

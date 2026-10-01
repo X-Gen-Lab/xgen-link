@@ -120,3 +120,11 @@ Windows 与固定官方 Linux 工具链的四组合及收紧预算均通过，�
 资源布局契约可独立运行 `python test/cmake/test_footprint_storage.py`，核对内嵌窗口不会产生额外池块、旧格式拒绝，以及预算对缺失或冲突 `window_pool_blocks` 的拒绝。该契约不替代最终 ELF 测量与完整调用链栈检查。
 
 Transport 优化后的布局格式为 5。MTU128/64 工作区为 1,064/872 B，静态 RAM 为 1,128/936 B，另加 1,024 B 栈预留后为 2,152/1,960 B。普通/LTO Flash 为 16,116/12,792 B，既有 16,384/12,800 B 回归限额保持；LTO 仅余 8 B。普通 ACK 的已知调用链从 `xgl_step()` 起为 988/844 B，尚不含调用者、实际驱动和 ISR，预留栈不能当作板级峰值证明。具体冻结版本、Windows/Linux 对照和路径证据见[传输优化验证](../../design/validation/transport-optimization.md)。
+
+## 当前：显式 transport 资源组合
+
+格式 6 记录目标实编的 `resource_config_id`、`compiled_window_capacity`、`reliable_bucket_count` 和 `adaptive_rto`。默认 Boot 使用 128 槽、1 桶、自适应 RTO；实例的运行时窗口仍为 1，不能把它误当成编译容量。默认预算绑定资源身份 1857，原资源限额与历史基线不变。
+
+small 独立构建明确追加 `-DXGL_TRANSPORT_WINDOW_CAPACITY=1 -DXGL_RELIABLE_INDEX_BUCKETS=1 -DXGL_ENABLE_ADAPTIVE_RTO=OFF`，资源身份为 1025，使用 `budget-small-mtu128.json`、`budget-small-mtu64.json` 及各自 `-lto` 文件。不要在同一目录切换组合，也不能使用 small 报告满足默认预算。
+
+2026-10-02 默认非 LTO/LTO Flash 为 16,336/12,964 B，后者超原 12,800 B 门槛 164 B；small 为 16,100/12,788 B，LTO 仅余 12 B。默认 MTU128/64 workspace 为 1,072/880 B，small 为 1,040/848 B。完整报告与不含调用者的栈路径见[资源优化验证](../../design/validation/transport-resource-refinement.md)。不同能力组合的差值不能称为同功能优化；1 KiB 栈预留和主机通过仍不代替板级验收。

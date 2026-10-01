@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Explicit reliable-index bucket, compiled-window and adaptive-RTO selection, with exported target/header/runtime identity checks and fixed-RTO installed-consumer tests.
+- Separate small-transport Cortex-M0 budgets bound to their actual compiled capabilities; keep the original default budgets and report their failures independently.
 - Bounded RX chunk selection through CMake, with installed-header consistency and target-derived footprint budget identity.
 - Checked borrowed SACK views and opt-in Cortex-M0 footprint LTO with separate mode-specific budgets.
 - Scoped zero-copy sends and side-effect-free exact layout queries, while retaining the original zero-copy request ABI.
@@ -25,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Validate complete ACK ranges before merging them with ordered outstanding records; process SACK against owned records and reuse known records during ACK removal and TX rollback.
+- Keep RX declarations in a dedicated private header, reuse decoded fragment metadata and the out-of-order insertion position without adding permanent caches.
+- Footprint format 6 records resolved transport capacity, buckets, adaptive RTO and resource identity; budget policies reject another compiled combination.
 - Defer SACK retries and ACK-triggered message pumping to transport maintenance, with immediate deadlines for ready work and preserved local backpressure delays.
 - Inline send-window bits, own out-of-order payload and TLVs in one block, and consolidate reassembly lengths; retain the public `window_bytes` report field as zero and count inline windows under `peer_bytes`.
 - Bound ACK/SACK scratch to encoded sizes and retain only final send-plan results; footprint format 5 explicitly reports the removed window pool.
@@ -52,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve each reassembly's accepted reliability, reject mixed fragment attributes before feedback, and expire unreliable messages without terminating unrelated reliable history.
+- Reserve local reliable resources before HELLO and reclaim unused remote HELLO reservations after five seconds even when ordinary idle expiry is disabled; duplicates do not renew the lease.
+- Preserve failed-scope and owned-message error precedence under global capacity pressure, and retain accepted receive facts after ACK submission failure.
 - Reject reserved packet types, reliable broadcasts, duplicate fragment metadata and exhausted reliable DATA packet numbers before receive admission.
 - Reclaim only a newly admitted unused TX scope when its first send fails, preserving existing scope history and outstanding data.
 - Return terminal retry, delivery and reassembly errors from maintenance while continuing other peers; preserve owned data across temporary backpressure.

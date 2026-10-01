@@ -7,7 +7,11 @@
     "rx_bytes": 64,
     "lto": true,
     "rx_chunk_bytes": 32,
-    "window_pool_blocks": 0
+    "window_pool_blocks": 0,
+    "resource_config_id": 1857,
+    "compiled_window_capacity": 128,
+    "reliable_bucket_count": 1,
+    "adaptive_rto": true
   },
   "qualification": "Cortex-M0 MinSizeRel probe with library IPO and an opaque non-LTO consumer/layout; independent LTO regression ceiling, not an 8 KiB Flash or complete call-chain stack claim.",
   "baseline_kind": "first_explicit_lto_measurement",

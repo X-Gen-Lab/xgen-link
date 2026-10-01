@@ -28,7 +28,7 @@ CI 从 `dev/dependencies.json` 读取 status、bytes、CRC、memory、containers
 | `sanitizers` | Ubuntu 24.04；ASan/UBSan，先构建全部选中目标，再运行共享测试入口 |
 | `bounded-profiles` | Boot/Lite 能力 GoogleTest、Embedded 完整回归；各自 C11 无协议 libc fallback、静态生命周期及安装消费 |
 | `dependency-contracts` | dev 准备、真实 target 复用、安装消费与依赖拒绝；能力声明、Debug/Release 发布及预算检查器契约 |
-| `arm-footprint` | Cortex-M0 固定 GCC 15.2.1，MTU/RX 128 与 64 两组完整 ELF、资源门槛、堆/未解析符号拒绝及基线差值 |
+| `arm-footprint` | Cortex-M0 固定 GCC 15.2.1，默认/small、MTU/RX 128/64、LTO OFF/ON 八组合的完整 ELF、精确资源身份、堆/未解析符号拒绝及独立预算 |
 | `status` | 汇总全部必要任务，任何非成功结果都失败 |
 
 Host 使用 `cmake -S dev --preset debug`，输出到 `build/dev-debug`。分析、sanitizer、受限配置分别使用 `dev-ci`、`dev-asan`、`dev-boot`、`dev-embedded-lite` 和 `dev-embedded`。这些是不同构建目录，不共享 ABI、profile 或覆盖率计数。源码开发的 CTest 根目录是 `build/dev-<preset>`。
@@ -37,7 +37,9 @@ GoogleTest 逐用例登记并标记 `unit`、`integration`、`property`。Full/E
 
 ASan 预设关闭安装包 smoke，因为全局 sanitizer 参数不会自动成为外部消费者的链接要求；安装边界由 Full 和独立消费契约覆盖。受限配置 CI 显式设置 `XGL_BUILD_TESTS=ON`，这些主机测试不引入 MCU 生产依赖。
 
-ARM 任务的独立准备步骤读取 `tools/boot_footprint/toolchain-lock.json`，下载 Arm 官方 15.2.rel1 Linux 归档并验证已固定的官方 SHA-256。CMake 不下载编译器。资源检查读取对应 `budget-mtu128.json` 或 `budget-mtu64.json`；编译器、profile 和 MTU/RX 必须匹配，缺少必要测量或超出任一限额都失败。两组配置分别保留差值，设计目标和回归门槛分别报告。
+ARM 任务的独立准备步骤读取 `tools/boot_footprint/toolchain-lock.json`，下载 Arm 官方 15.2.rel1 Linux 归档并验证已固定的官方 SHA-256。CMake 不下载编译器。默认资源组合明确使用 128 槽、1 桶、自适应 RTO，small 使用 1 槽、1 桶、固定 RTO；各自读取 `budget-mtu*.json` 或 `budget-small-mtu*.json`，LTO 文件带 `-lto` 后缀。编译器、profile、MTU/RX、LTO 和解析后的资源身份必须匹配，缺少必要测量或超出任一限额都失败。
+
+2026-10-02 本地默认 LTO 为 12,964 B，超过原 12,800 B 门槛；small LTO 为 12,788 B。原默认任务和门槛继续保留，未通过排除矩阵或吞错获得绿色结果。该修改尚未声明远端 CI 通过；详细证据和未达目标记录在仓库根 `REFACTORING_STATUS.md`，验收方法见[发布验证](release-validation.md)。开发/安装消费契约还检查桶数、窗口、固定 RTO 行为、头/target/运行时身份冲突，报告单独归档。
 
 ## 产物与执行结论
 

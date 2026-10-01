@@ -28,7 +28,7 @@ Variables override `owner/repository`, not the pinned commit. Private forks addi
 | `sanitizers` | Ubuntu 24.04; ASan/UBSan, building every selected target before running the shared test entry |
 | `bounded-profiles` | Boot/Lite capability GoogleTest and complete Embedded regression; separate C11 builds without protocol libc fallback, static lifecycle and installation consumption |
 | `dependency-contracts` | dev preparation, real target reuse, installation and dependency rejection; capability declarations, Debug/Release publication and budget-checker contracts |
-| `arm-footprint` | Cortex-M0 with fixed GCC 15.2.1; MTU/RX 128 and 64 final ELFs, resource limits, heap/unresolved-symbol rejection, and baseline deltas |
+| `arm-footprint` | Fixed Cortex-M0 GCC 15.2.1; eight default/small, MTU/RX 128/64 and LTO OFF/ON combinations, exact resource identity, heap/unresolved-symbol rejection and independent budgets |
 | `status` | Require success from every mandatory job |
 
 Host uses `cmake -S dev --preset debug` and writes to `build/dev-debug`. Analysis, sanitizers, and bounded profiles use `dev-ci`, `dev-asan`, `dev-boot`, `dev-embedded-lite`, and `dev-embedded`. They do not share ABI/profile outputs or coverage counters. The source-development CTest root is `build/dev-<preset>`.
@@ -37,7 +37,9 @@ GoogleTest registers individual cases with `unit`, `integration`, and `property`
 
 The ASan preset disables installed-package smoke because global sanitizer flags are not automatically exported as external consumer link requirements. Full and independent consumer contracts validate installation. Bounded CI configurations explicitly set `XGL_BUILD_TESTS=ON`; these host tests do not become MCU production dependencies.
 
-The ARM preparation step reads `tools/boot_footprint/toolchain-lock.json`, downloads the official Arm 15.2.rel1 Linux archive, and verifies the pinned upstream SHA-256. CMake does not download a compiler. Resource checks use `budget-mtu128.json` or `budget-mtu64.json`; compiler, profile, and MTU/RX must match. Missing required measurements or any exceeded limit fail. Each configuration retains its own deltas, and design goals remain separate from regression limits.
+The ARM preparation step reads `tools/boot_footprint/toolchain-lock.json`, downloads the official Arm 15.2.rel1 Linux archive, and verifies the pinned upstream SHA-256. CMake does not download a compiler. Default resources explicitly select 128 slots, one bucket and adaptive RTO; small selects one slot, one bucket and fixed RTO. They use `budget-mtu*.json` and `budget-small-mtu*.json` respectively, with `-lto` suffixes for LTO. Compiler, profile, MTU/RX, LTO and resolved resource identity must match. Missing required measurements or any exceeded limit fail.
+
+The 2026-10-02 local default LTO measurement is 12,964 B, exceeding the original 12,800 B ceiling; small LTO is 12,788 B. The default jobs and original ceiling remain required, without matrix exclusions or ignored failures. This update does not claim remote CI success; evidence and unmet goals are recorded in the root `REFACTORING_STATUS.md`, with methods in [release validation](release-validation.md). Development/installed-consumer contracts also check buckets, windows, fixed-RTO behavior and header/target/runtime identity conflicts, with separate reports.
 
 ## Artifacts and conclusions
 
