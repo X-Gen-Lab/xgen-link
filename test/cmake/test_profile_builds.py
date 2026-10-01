@@ -41,13 +41,14 @@ class ProfileBuilds(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, f"Unexpected acceptance: {log}")
         return result
 
-    def configure(self, name, profile, *, tests=False, multi=False):
+    def configure(self, name, profile, *, tests=False, multi=False, examples=False):
         binary = self.root / name
         command = ["cmake", "-S", ARGS.link_source / "dev", "-B", binary,
                    "-G", "Ninja Multi-Config" if multi else "Ninja",
                    f"-DXGL_PROFILE={profile}", "-DCMAKE_BUILD_TYPE=Debug",
                    f"-DXGL_BUILD_TESTS={'ON' if tests else 'OFF'}",
-                   "-DXGL_BUILD_EXAMPLES=OFF", "-DXGL_BUILD_DOCS=OFF",
+                   f"-DXGL_BUILD_EXAMPLES={'ON' if examples else 'OFF'}",
+                   "-DXGL_BUILD_DOCS=OFF",
                    "-DXGL_BUILD_STATIC_ANALYSIS_TARGET=OFF",
                    "-DXGL_BUILD_FOOTPRINT_REPORT=OFF",
                    "-DXGL_BUILD_NOHEAP_SMOKE=ON",
@@ -65,6 +66,24 @@ class ProfileBuilds(unittest.TestCase):
             command.append(f"-DCMAKE_CXX_COMPILER={ARGS.cxx_compiler}")
         self.execute(*command)
         return binary
+
+    def test_examples_follow_compiled_forwarding_capability(self):
+        for profile, forwarding in (("boot", False), ("embedded-lite", False),
+                                    ("embedded", True), ("full", True)):
+            with self.subTest(profile=profile):
+                binary = self.configure("examples-" + profile, profile, examples=True)
+                self.execute("cmake", "--build", binary, "--parallel", "2")
+                listing = json.loads(self.execute("ctest", "--test-dir", binary,
+                                                 "--show-only=json-v1").stdout)
+                names = {test["name"] for test in listing["tests"]}
+                examples = {name for name in names if name.endswith("_example")}
+                expected = {"xgl_echo_example", "xgl_file_transfer_example",
+                            "xgl_boot_update_example"}
+                if forwarding:
+                    expected.add("xgl_multi_node_example")
+                self.assertEqual(examples, expected)
+                self.execute("ctest", "--test-dir", binary, "-R", "_example$",
+                             "--output-on-failure", "--no-tests=error")
 
     def test_multiconfig_release_and_installed_consumer(self):
         binary = self.configure("multi", "boot", multi=True)
