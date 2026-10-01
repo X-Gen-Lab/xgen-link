@@ -49,9 +49,7 @@ typedef struct xgl_layer_contexts_s {
 typedef struct {
     xgl_phy_ops_t* phy;
     xgl_parser_t parser;
-    uint8_t* rx_cache;
     uint32_t poll_interval_ms;
-    uint32_t read_freq_hz;
     uint32_t last_poll_ms;
     bool polled;
 } xgl_instance_link_t;
@@ -63,6 +61,7 @@ struct xgl_instance {
     const xgl_config_t* config; /**< Instance configuration */
     bool initialized;           /**< Initialization flag */
     bool caller_owned;          /**< Instance resides inside caller workspace */
+    uint32_t parser_timeout_ms; /**< Latest step policy; zero disables expiry */
 
     /*-----------------------------------------------------------------------*/
     /* Memory Management                                                     */
@@ -78,7 +77,6 @@ struct xgl_instance {
 
     xgl_instance_link_t* links; /**< One RX parser per unique PHY */
     size_t link_count;
-    uint32_t parser_timeout_ms; /**< Latest step policy; zero disables expiry */
 
     /*-----------------------------------------------------------------------*/
     /* Protocol Stack Layers (Unified Management)                            */

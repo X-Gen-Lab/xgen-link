@@ -28,8 +28,8 @@ class XglRuntimeContractTest : public ::testing::Test {
         config.route_table = &route;
         config.route_table_len = 1U;
         config.callback_user_data = this;
-        config.error_callback = [](xgl_handle_t, xgl_error_t error,
-                                   const char*, void* user) {
+        config.error_callback = [](xgl_handle_t, xgl_error_t error, const char*,
+                                   void* user) {
             auto* self = static_cast<XglRuntimeContractTest*>(user);
             if (error == XGL_ERR_TIMEOUT) {
                 ++self->timeouts;
@@ -47,8 +47,7 @@ class XglRuntimeContractTest : public ::testing::Test {
             ++static_cast<XglRuntimeContractTest*>(user)->writes;
             return XGL_OK;
         };
-        phy.rx = [](uint8_t* data, size_t* length,
-                    void* user) -> xgl_error_t {
+        phy.rx = [](uint8_t* data, size_t* length, void* user) -> xgl_error_t {
             auto* self = static_cast<XglRuntimeContractTest*>(user);
             ++self->reads;
             size_t copied = 0U;
@@ -124,7 +123,8 @@ TEST_F(XglRuntimeContractTest, ZeroRxBudgetStillExpiresPartialFrames) {
     EXPECT_EQ(reads, 1U);
 }
 
-TEST_F(XglRuntimeContractTest, LatestTimeoutAppliesWithoutRestartingPartialFrame) {
+TEST_F(XglRuntimeContractTest,
+       LatestTimeoutAppliesWithoutRestartingPartialFrame) {
     input = {XGL_WIRE_MAGIC_0};
     xgl_work_budget_t budget{128U, 100U};
     ASSERT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
@@ -160,7 +160,8 @@ TEST_F(XglRuntimeContractTest, PartialFrameDeadlineSurvivesClockWrap) {
     EXPECT_EQ(timeouts, 1U);
 }
 
-TEST_F(XglRuntimeContractTest, BatchReturnsFirstDeliveryErrorAndConsumesLaterFrames) {
+TEST_F(XglRuntimeContractTest,
+       BatchReturnsFirstDeliveryErrorAndConsumesLaterFrames) {
     AppendFrame();
     AppendFrame();
     AppendFrame();

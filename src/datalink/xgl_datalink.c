@@ -30,10 +30,11 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
 #endif
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_datalink_ctx_t));
+#if XGL_FEATURE_STATISTICS
     ctx->stats = config->stats;
     ctx->rx_header_crc_errors = config->rx_header_crc_errors;
     ctx->rx_crc16_errors = config->rx_crc16_errors;
-    ctx->source_id = config->source_id;
+#endif
     ctx->upper_layer = config->upper_layer;
     ctx->error_callback = config->error_callback;
     ctx->callback_user_data = config->callback_user_data;

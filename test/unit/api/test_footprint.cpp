@@ -166,11 +166,11 @@ TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
     config.route_table_len = 1U;
     xgl_memory_report_t report{};
     ASSERT_EQ(xgl_memory_report(&config, &report), XGL_OK);
-    const size_t explained =
-        report.management_bytes + report.initialization_bytes +
-        report.peer_bytes + report.window_bytes + report.tx_record_bytes +
-        report.tx_payload_bytes + report.scratch_bytes +
-        report.rx_buffered_bytes + report.fragment_bytes;
+    const size_t explained = report.management_bytes +
+                             report.initialization_bytes + report.peer_bytes +
+                             report.window_bytes + report.tx_record_bytes +
+                             report.tx_payload_bytes + report.scratch_bytes +
+                             report.rx_buffered_bytes + report.fragment_bytes;
     EXPECT_EQ(explained, report.requirements.size);
     EXPECT_GT(report.management_bytes, 0U);
     EXPECT_GT(report.initialization_bytes, 0U);
@@ -180,8 +180,9 @@ TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
     void* workspace = std::malloc(report.requirements.size);
     ASSERT_NE(workspace, nullptr);
     xgl_handle_t handle = nullptr;
-    EXPECT_EQ(xgl_init_static(&config, workspace, report.requirements.size,
-                              &handle), XGL_OK);
+    EXPECT_EQ(
+        xgl_init_static(&config, workspace, report.requirements.size, &handle),
+        XGL_OK);
     xgl_destroy(handle);
     std::free(workspace);
 }
@@ -212,9 +213,10 @@ TEST(XglFootprintTest, MemoryReportFailureDoesNotOverwriteOutput) {
     std::memcpy(&original, &report, sizeof(report));
     EXPECT_EQ(xgl_memory_report(nullptr, &report), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_memory_report(&config, nullptr), XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_memory_report_checked(
-                  &config, sizeof(config), XGL_CONFIG_ABI_VERSION,
-                  XGL_BUILD_CONFIG_ID + 1U, &report), XGL_ERR_INVALID_VERSION);
+    EXPECT_EQ(xgl_memory_report_checked(&config, sizeof(config),
+                                        XGL_CONFIG_ABI_VERSION,
+                                        XGL_BUILD_CONFIG_ID + 1U, &report),
+              XGL_ERR_INVALID_VERSION);
     config.features.max_peers = 0U;
     EXPECT_EQ(xgl_memory_report(&config, &report), XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(std::memcmp(&report, &original, sizeof(report)), 0);

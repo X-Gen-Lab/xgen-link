@@ -36,7 +36,7 @@ void xgl_instance_destroy_links(xgl_handle_t handle) {
         return;
     }
     for (size_t i = 0; i < handle->link_count; ++i) {
-        xgm_free(handle->allocator, handle->links[i].rx_cache);
+        xgm_free(handle->allocator, handle->links[i].parser.cache);
     }
     xgm_free(handle->allocator, handle->links);
     handle->links = NULL;
@@ -73,9 +73,6 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
             ++index;
         }
         if (index < handle->link_count) {
-            if (route->read_freq_hz > handle->links[index].read_freq_hz) {
-                handle->links[index].read_freq_hz = route->read_freq_hz;
-            }
             if (interval < handle->links[index].poll_interval_ms) {
                 handle->links[index].poll_interval_ms = interval;
             }
@@ -84,15 +81,14 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
         xgl_instance_link_t* link = &handle->links[handle->link_count++];
         link->phy = route->phy;
         link->poll_interval_ms = interval;
-        link->read_freq_hz = route->read_freq_hz;
-        link->rx_cache =
+        link->parser.cache =
             xgm_alloc(handle->allocator, handle->config->memory.rx_buffer_size);
-        if (link->rx_cache == NULL) {
+        if (link->parser.cache == NULL) {
             xgl_instance_destroy_links(handle);
             return XGL_ERR_NO_MEMORY;
         }
         xgl_error_t error =
-            xgl_parser_init(&link->parser, link->rx_cache,
+            xgl_parser_init(&link->parser, link->parser.cache,
                             handle->config->protocol.max_frame_size);
         if (error != XGL_OK) {
             xgl_instance_destroy_links(handle);

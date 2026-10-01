@@ -302,7 +302,6 @@ TEST(XglCoverageApi, RuntimeUsesFastestSharedPhyAndPreservesFirstReceiveError) {
     ASSERT_NE(handle, nullptr);
     ASSERT_EQ(xgl_init(handle), XGL_OK);
     ASSERT_EQ(handle->link_count, 2U);
-    EXPECT_EQ(handle->links[0].read_freq_hz, 2000U);
     EXPECT_EQ(handle->links[0].poll_interval_ms, 1U);
     uint32_t delay = 99;
     ASSERT_TRUE(xgl_next_timeout(handle, 0, &delay));
@@ -884,5 +883,101 @@ TEST_F(ScopedZeroCopyApiTest,
     EXPECT_EQ(first.session_epoch, 0U);
     ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U), XGL_OK);
     EXPECT_EQ(phy_state.writes, 2U);
+}
+
+TEST_F(ScopedZeroCopyApiTest, QueriesDoNotChangeStatisticsOrClosedScopeState) {
+    Install();
+    xgl_statistics_t before = {};
+    ASSERT_EQ(xgl_stats_get(handle, &before), XGL_OK);
+    xgl_tx_frame_layout_t layout = {};
+    request.data.target_id = 3U;
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_ROUTE_NOT_FOUND);
+    request.data.target_id = 0U;
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_INVALID_PARAM);
+    request.data.target_id = 2U;
+    request.data.data_len = 0U;
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_INVALID_PARAM);
+    request.data.data_len = 3U;
+    request.data.priority = 8U;
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_INVALID_PARAM);
+    request.data.priority = 0U;
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    ASSERT_EQ(xgl_close_security_session(handle, 2U, 11U, 9U), XGL_OK);
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_NOT_FOUND);
+    EXPECT_EQ(layout.frame_size, 0U);
+    xgl_statistics_t after = {};
+    ASSERT_EQ(xgl_stats_get(handle, &after), XGL_OK);
+    EXPECT_EQ(after.network.tx_packets, before.network.tx_packets);
+    EXPECT_EQ(after.network.tx_errors, before.network.tx_errors);
+    EXPECT_EQ(after.transport.tx_packets, before.transport.tx_packets);
+    EXPECT_EQ(after.memory_used, before.memory_used);
+    EXPECT_EQ(sign_calls, 0U);
+    EXPECT_EQ(phy_state.writes, 0U);
+}
+
+TEST_F(ScopedZeroCopyApiTest, FailedPhyConsumesSequenceAndQueryDetectsExhaustion) {
+    auto session = test_session_config(2U, 11U, 9U);
+    session.tx_initial_seq = UINT64_MAX;
+    ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
+    xgl_tx_frame_layout_t layout = {};
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    uint8_t buffer[128] = {};
+    request.data.buffer = buffer;
+    request.data.buffer_size = sizeof(buffer);
+    request.data.data_offset = layout.payload_offset;
+    phy_state.write_error = XGL_ERR_TX_FAILED;
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 1U),
+              XGL_ERR_TX_FAILED);
+    EXPECT_EQ(last_sequence, UINT64_MAX);
+    EXPECT_EQ(sign_calls, 1U);
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(layout.payload_offset, 0U);
+    EXPECT_EQ(layout.frame_size, 0U);
+    EXPECT_EQ(sign_calls, 1U);
+    EXPECT_EQ(phy_state.writes, 1U);
+    xgl_statistics_t stats = {};
+    ASSERT_EQ(xgl_stats_get(handle, &stats), XGL_OK);
+    EXPECT_EQ(stats.network.tx_packets, 0U);
+    EXPECT_EQ(stats.transport.tx_packets, 0U);
+}
+
+TEST_F(ScopedZeroCopyApiTest, PlainScopedFramesNeedNoSecurityAssociation) {
+    xgl_destroy(handle);
+    config.auth_required = false;
+    config.auth_provider = nullptr;
+    handle = xgl_create(&config);
+    ASSERT_NE(handle, nullptr);
+    xgl_tx_frame_layout_t layout = {};
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_NOT_INITIALIZED);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
+              XGL_ERR_NOT_INITIALIZED);
+    ASSERT_EQ(xgl_init(handle), XGL_OK);
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    EXPECT_EQ(layout.payload_offset, 41U);
+    EXPECT_EQ(layout.frame_size, 46U);
+    uint8_t buffer[128] = {};
+    request.data.buffer = buffer;
+    request.data.buffer_size = sizeof(buffer);
+    request.data.data_offset = layout.payload_offset;
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(nullptr, &request, 0U),
+              XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, nullptr, 0U),
+              XGL_ERR_NULL_POINTER);
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U), XGL_OK);
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, captured.data(), captured.size(),
+                                     nullptr),
+              XGL_OK);
+    EXPECT_FALSE(view.authenticated);
+    EXPECT_EQ(view.header.connection_id, 11U);
+    EXPECT_EQ(view.session_epoch, 9U);
+    EXPECT_EQ(sign_calls, 0U);
 }
 #endif

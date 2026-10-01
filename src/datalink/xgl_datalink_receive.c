@@ -80,8 +80,8 @@ static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
 
 /** \brief           Reset expired parser state once without reading the PHY. */
 xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
-                                      xgl_parser_t* parser, uint32_t now_ms,
-                                      uint32_t timeout_ms) {
+                                       xgl_parser_t* parser, uint32_t now_ms,
+                                       uint32_t timeout_ms) {
     if (!xgl_parser_check_timeout(parser, now_ms, timeout_ms)) {
         return XGL_OK;
     }
@@ -124,8 +124,8 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    xgl_error_t first_error = xgl_datalink_expire_parser(
-        ctx, parser, current_time_ms, timeout_ms);
+    xgl_error_t first_error =
+        xgl_datalink_expire_parser(ctx, parser, current_time_ms, timeout_ms);
 
     uint8_t rx_buffer[XGL_DATALINK_RX_CHUNK_SIZE];
     size_t rx_capacity =

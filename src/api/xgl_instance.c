@@ -95,7 +95,6 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
 
     /* Initialize data link layer */
     xgl_datalink_config_t datalink_config = {
-        .source_id = handle->config->source_id,
         .stats = XGL_INSTANCE_STAT(handle, datalink),
         .rx_header_crc_errors = XGL_INSTANCE_STAT(handle, rx_header_crc_errors),
         .rx_crc16_errors = XGL_INSTANCE_STAT(handle, rx_crc16_errors),

@@ -73,8 +73,8 @@ void xgl_config_get_preset_boot(xgl_config_t* config) {
 
 /**
  * \brief           Get tiny configuration preset
- * \details         Optimized for 32KB RAM, 50KB Flash
- *                  Minimal features, suitable for very constrained MCUs
+ * \details         Fixed small capacities without fragmentation. Query exact
+ *                  workspace bytes with xgl_memory_report() for the ABI.
  */
 void xgl_config_get_preset_tiny(xgl_config_t* config) {
     if (config == NULL) {
@@ -87,8 +87,8 @@ void xgl_config_get_preset_tiny(xgl_config_t* config) {
 
 /**
  * \brief           Get small configuration preset
- * \details         Optimized for 64KB RAM, 100KB Flash
- *                  Includes fragmentation support
+ * \details         Bounded capacities including fragmentation support. Query
+ *                  workspace bytes before selecting a device memory budget.
  */
 void xgl_config_get_preset_small(xgl_config_t* config) {
     if (config == NULL) {
@@ -101,7 +101,7 @@ void xgl_config_get_preset_small(xgl_config_t* config) {
 
 /**
  * \brief           Get medium configuration preset
- * \details         Optimized for 128KB RAM, 256KB Flash
+ * \details         Increased bounded message and peer capacities.
  *                  Includes fragmentation. Compression is reserved and not
  *                  implemented in the current release.
  */
@@ -116,8 +116,8 @@ void xgl_config_get_preset_medium(xgl_config_t* config) {
 
 /**
  * \brief           Get large configuration preset
- * \details         Optimized for 256KB+ RAM, 512KB+ Flash
- *                  Encryption is reserved and not implemented in the current
+ * \details         Largest predefined bounded capacities; not a device-size
+ *                  guarantee. Encryption is not implemented in the current
  * release.
  */
 void xgl_config_get_preset_large(xgl_config_t* config) {

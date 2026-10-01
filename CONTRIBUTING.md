@@ -106,20 +106,18 @@ Use **backslash style** for all Doxygen comments:
  * \file            xgl_transport.h
  * \brief           Transport layer interface
  * \author          X-Gen Lab
- * \version         2.0.0
- * \date            2026-01-XX
  *
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 /**
  * \brief           Initialize transport layer
- * \param[in]       handle: Protocol instance handle
+ * \param[out]      ctx: Transport state owned by the instance
  * \param[in]       config: Pointer to configuration structure
  * \return          XGL_OK on success, error code otherwise
  * \note            Must be called before using transport layer
  */
-xgl_status_t xgl_transport_init(xgl_handle_t handle,
+xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
                                 const xgl_transport_config_t* config);
 ```
 
@@ -131,7 +129,7 @@ xgl_status_t xgl_transport_init(xgl_handle_t handle,
 | Functions | snake_case with xgl_ prefix | `xgl_transport_init()` |
 | Types | snake_case_t | `xgl_config_t` |
 | Macros | UPPER_CASE with XGL_ prefix | `XGL_MAX_PACKET_SIZE` |
-| Enums | UPPER_CASE with XGL_ prefix | `XGL_STATUS_OK` |
+| Enums | UPPER_CASE with XGL_ prefix | `XGL_OK` |
 
 ### Commit Messages
 
@@ -147,7 +145,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
 
-Scopes: `core`, `datalink`, `network`, `transport`, `platform`, `test`, `build`, `docs`
+Scopes: `api`, `wire`, `datalink`, `network`, `transport`, `security`, `test`, `build`, `docs`
 
 Examples:
 ```
@@ -206,10 +204,10 @@ build cache for the dev harness or between toolchains.
 
 ```bash
 # Run specific test suite
-./build/debug/test/xgl_tests --gtest_filter="Transport*"
+./build/debug/test/xgl_tests --gtest_filter="TransportRegressionTest.*"
 
 # Run specific test case
-./build/debug/test/xgl_tests --gtest_filter="TransportTest.BasicSend"
+./build/debug/test/xgl_tests --gtest_filter="XglRuntimeContractTest.ParserDeadlinePrecedesSlowPhyPolling"
 
 # Run with verbose output
 ctest --test-dir build/debug --verbose
@@ -223,7 +221,7 @@ Tests use Google Test framework. Each module should have corresponding test file
 
 ```
 test/
-├── test_<module>.cpp       # Unit tests
+├── unit/<layer>/          # Unit tests by protocol owner
 ├── integration/            # Integration tests
 ├── property/              # Property-based tests
 └── mocks/                 # Mock implementations
@@ -290,7 +288,7 @@ doxygen Doxyfile
 - Update API documentation for public interfaces
 - Add examples for new features
 - Keep README up to date
-- Document configuration options in Kconfig
+- Document supported CMake profiles and their generated capability identities
 
 ## Performance Considerations
 
@@ -299,7 +297,7 @@ When contributing to xgen-link, keep in mind:
 1. **Memory Efficiency**: Minimize RAM and Flash usage
 2. **CPU Overhead**: Optimize critical paths
 3. **Zero-Copy**: Avoid unnecessary data copying
-4. **Compile-Time Configuration**: Use Kconfig to eliminate unused code
+4. **Compile-Time Configuration**: Use supported CMake profiles to exclude unused capabilities
 5. **Resource Constraints**: Test on target hardware when possible
 
 ## Platform Abstraction

@@ -40,14 +40,15 @@ struct xgl_network_ctx_s;
  * \brief           Data link layer context structure
  */
 typedef struct xgl_datalink_ctx_s {
+#if XGL_FEATURE_STATISTICS
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer */
     uint64_t* rx_crc16_errors;      /**< Frame CRC16 error counter pointer */
+#endif
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;            /**< User data for callbacks */
     xgl_handle_t owner_handle;           /**< Owning protocol instance handle */
     const xgm_allocator_t* allocator; /**< Allocator for temporary TX buffers */
-    uint16_t source_id;               /**< Local source ID */
 #if XGL_FEATURE_AUTH
     xgl_security_ctx_t* security; /**< Borrowed instance security state */
 #endif
@@ -60,7 +61,6 @@ typedef struct xgl_datalink_ctx_s {
  * \brief           Data link layer configuration structure
  */
 typedef struct {
-    uint16_t source_id;             /**< Local source ID */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer (can
                                        be NULL) */
@@ -141,8 +141,8 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
  * \return          XGL_ERR_TIMEOUT after resetting an expired frame, else OK
  */
 xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
-                                      xgl_parser_t* parser, uint32_t now_ms,
-                                      uint32_t timeout_ms);
+                                       xgl_parser_t* parser, uint32_t now_ms,
+                                       uint32_t timeout_ms);
 
 /**
  * \brief           Poll one PHY using its own parser and shared link policy

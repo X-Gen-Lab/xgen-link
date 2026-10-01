@@ -262,7 +262,6 @@ TEST_F(XglCoverageDelivery, InitRequiresStorageStatisticsAndUsableCapacity) {
     EXPECT_EQ(xgl_datalink_init(&context, nullptr), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_datalink_init(&context, &config), XGL_ERR_NULL_POINTER);
     config.stats = &statistics;
-    config.source_id = 1;
     EXPECT_EQ(xgl_datalink_init(&context, &config), XGL_OK);
     EXPECT_EQ(xgl_parser_init(&parser, cache, 0U), XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(xgl_parser_init(&parser, cache, sizeof(cache)), XGL_OK);

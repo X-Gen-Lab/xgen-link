@@ -252,7 +252,6 @@ class XglDatalinkTest : public ::testing::Test {
 
         /* Initialize datalink context */
         xgl_datalink_config_t config = {};
-        config.source_id = SOURCE_ID;
         config.stats = &stats;
         config.rx_header_crc_errors = &rx_header_crc_errors;
         config.rx_crc16_errors = &rx_crc16_errors;
@@ -288,7 +287,6 @@ TEST_F(XglDatalinkTest, InitSuccess) {
     uint64_t header_crc = 0, crc16 = 0;
 
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &test_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;
@@ -298,7 +296,6 @@ TEST_F(XglDatalinkTest, InitSuccess) {
     xgl_error_t err = xgl_datalink_init(&test_ctx, &config);
 
     EXPECT_EQ(err, XGL_OK);
-    EXPECT_EQ(test_ctx.source_id, SOURCE_ID);
 }
 
 TEST_F(XglDatalinkTest, InitNullPointer) {
@@ -306,7 +303,6 @@ TEST_F(XglDatalinkTest, InitNullPointer) {
     uint64_t header_crc = 0, crc16 = 0;
 
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &test_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;
@@ -465,7 +461,6 @@ TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &large_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;
@@ -540,7 +535,6 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;
@@ -599,7 +593,6 @@ TEST_F(XglDatalinkTest, ProcessFrameLeavesEndToEndAuthenticationToNetwork) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;
@@ -652,7 +645,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDoesNotCommitEndpointReplayState) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;
@@ -706,7 +698,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDeliversWireValidReliableCopiesUpstream) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;
@@ -755,7 +746,6 @@ TEST_F(XglDatalinkTest, ProcessFrameHasNoImplicitEndpointAuthenticationPolicy) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.source_id = SOURCE_ID;
     config.stats = &optional_stats;
     config.rx_header_crc_errors = &header_crc;
     config.rx_crc16_errors = &crc16;

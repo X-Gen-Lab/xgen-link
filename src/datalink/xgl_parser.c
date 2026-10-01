@@ -182,7 +182,8 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
 bool xgl_parser_check_timeout(const xgl_parser_t* parser,
                               uint32_t current_time_ms, uint32_t timeout_ms) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    if (parser == NULL || timeout_ms == 0U || parser->state == XGL_PARSE_MAGIC ||
+    if (parser == NULL || timeout_ms == 0U ||
+        parser->state == XGL_PARSE_MAGIC ||
         parser->state == XGL_PARSE_COMPLETE) {
         return false;
     }
