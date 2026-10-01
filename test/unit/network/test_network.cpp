@@ -165,9 +165,9 @@ class XglNetworkTest : public ::testing::Test {
         datalink_config.stats = &datalink_stats;
         datalink_config.allocator = xgm_allocator_libc();
         ASSERT_EQ(xgl_datalink_init(&datalink_ctx, &datalink_config), XGL_OK);
-        ASSERT_EQ(xgl_datalink_get_interface(&datalink_ctx, &datalink_iface),
+        ASSERT_EQ(xgl_datalink_get_tx_endpoint(&datalink_ctx, &datalink_tx),
                   XGL_OK);
-        network_ctx.lower_layer = &datalink_iface;
+        network_ctx.lower_layer = &datalink_tx;
     }
 
     void TearDown() override {
@@ -209,7 +209,7 @@ class XglNetworkTest : public ::testing::Test {
     xgl_layer_stats_t stats;
     xgl_layer_stats_t datalink_stats = {};
     xgl_datalink_ctx_t datalink_ctx = {};
-    xgl_frame_interface_t datalink_iface = {};
+    xgl_frame_tx_endpoint_t datalink_tx = {};
     xgl_phy_ops_t phy_ops;
     int phy_tx_count;
 };
@@ -219,7 +219,7 @@ TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
         xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1),
         XGL_OK);
     std::vector<uint8_t> captured(256);
-    xgl_frame_interface_t lower = {};
+    xgl_frame_tx_endpoint_t lower = {};
     lower.ctx = &captured;
     lower.send = [](void* ctx, xgl_handle_t,
                     const xgl_frame_tx_message_t* data) {
@@ -262,7 +262,7 @@ TEST_F(XglNetworkTest, DefaultConnectionDoesNotUseLocalShortSession) {
         xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1),
         XGL_OK);
     uint32_t connection_id = UINT32_MAX;
-    xgl_frame_interface_t lower = {};
+    xgl_frame_tx_endpoint_t lower = {};
     lower.ctx = &connection_id;
     lower.send = [](void* ctx, xgl_handle_t,
                     const xgl_frame_tx_message_t* data) {
@@ -358,7 +358,7 @@ TEST_F(XglNetworkTest, EpochExtensionCountsAgainstRouteMtu) {
         xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, mtu, 100, 1),
         XGL_OK);
     unsigned sends = 0;
-    xgl_frame_interface_t lower = {};
+    xgl_frame_tx_endpoint_t lower = {};
     lower.ctx = &sends;
     lower.send = [](void* ctx, xgl_handle_t, const xgl_frame_tx_message_t*) {
         ++*static_cast<unsigned*>(ctx);
@@ -576,7 +576,7 @@ TEST_F(XglNetworkTest, SendPacketWithRoute) {
     packet.data = &packet_data;
 
     /* Mock lower layer interface */
-    xgl_frame_interface_t lower_layer;
+    xgl_frame_tx_endpoint_t lower_layer;
     lower_layer.ctx = nullptr;
     lower_layer.send = [](void* ctx, xgl_handle_t handle,
                           const xgl_frame_tx_message_t* data) -> xgl_error_t {
@@ -585,7 +585,6 @@ TEST_F(XglNetworkTest, SendPacketWithRoute) {
         (void)data;
         return XGL_OK;
     };
-    lower_layer.receive = nullptr;
 
     network_ctx.lower_layer = &lower_layer;
 
@@ -608,7 +607,7 @@ TEST_F(XglNetworkTest, SendPacketEncodesApplicationTypeAsHeaderExtension) {
         std::vector<uint8_t> extensions;
     } capture;
 
-    xgl_frame_interface_t lower_layer = {};
+    xgl_frame_tx_endpoint_t lower_layer = {};
     lower_layer.ctx = &capture;
     lower_layer.send = [](void* ctx, xgl_handle_t handle,
                           const xgl_frame_tx_message_t* data) -> xgl_error_t {
@@ -706,7 +705,7 @@ TEST_F(XglNetworkTest, SendPacketRouteMtuIncludesAuthenticationOverhead) {
     packet.data = &packet_data;
 
     bool lower_called = false;
-    xgl_frame_interface_t lower_layer = {};
+    xgl_frame_tx_endpoint_t lower_layer = {};
     lower_layer.ctx = &lower_called;
     lower_layer.send = [](void* ctx, xgl_handle_t handle,
                           const xgl_frame_tx_message_t* data) -> xgl_error_t {
@@ -736,7 +735,7 @@ TEST_F(XglNetworkTest, ReceivePacketForLocalNode) {
 
     /* Mock upper layer interface */
     bool upper_called = false;
-    xgl_packet_interface_t upper_layer;
+    xgl_packet_rx_endpoint_t upper_layer;
     upper_layer.ctx = &upper_called;
     upper_layer.receive = [](void* ctx, xgl_handle_t handle,
                              const xgl_packet_t* data) -> xgl_error_t {
@@ -746,7 +745,6 @@ TEST_F(XglNetworkTest, ReceivePacketForLocalNode) {
         *called = true;
         return XGL_OK;
     };
-    upper_layer.send = nullptr;
 
     network_ctx.upper_layer = &upper_layer;
 
@@ -780,8 +778,8 @@ TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
     config.stats = &datalink_stats;
     xgl_datalink_ctx_t datalink = {};
     ASSERT_EQ(xgl_datalink_init(&datalink, &config), XGL_OK);
-    xgl_frame_interface_t lower = {};
-    ASSERT_EQ(xgl_datalink_get_interface(&datalink, &lower), XGL_OK);
+    xgl_frame_tx_endpoint_t lower = {};
+    ASSERT_EQ(xgl_datalink_get_tx_endpoint(&datalink, &lower), XGL_OK);
     network_ctx.lower_layer = &lower;
     const auto frame = make_frame(REMOTE_ID, FORWARD_ID);
 
@@ -893,7 +891,7 @@ TEST_F(XglNetworkTest, ForwardingAllocatesWholeFrameFromNetworkResource) {
     config.route_table = &route_table;
     config.stats = &local_stats;
     config.allocator = &allocator;
-    config.lower_layer = &datalink_iface;
+    config.lower_layer = &datalink_tx;
     ASSERT_EQ(xgl_network_init(&ctx, &config), XGL_OK);
 
     CaptureTx capture;
@@ -1162,7 +1160,7 @@ TEST_F(XglNetworkTest, ReceiveLocalPacketPropagatesSessionExtensionEpoch) {
         xgl_packet_t packet = {};
     } capture;
 
-    xgl_packet_interface_t upper_layer = {};
+    xgl_packet_rx_endpoint_t upper_layer = {};
     upper_layer.ctx = &capture;
     upper_layer.receive = [](void* ctx, xgl_handle_t handle,
                              const xgl_packet_t* data) -> xgl_error_t {
@@ -1211,7 +1209,7 @@ TEST_F(XglNetworkTest, ReceiveLocalDataPacketDoesNotTreatControlFlagAsAckOnly) {
         xgl_packet_t packet = {};
     } capture;
 
-    xgl_packet_interface_t upper_layer = {};
+    xgl_packet_rx_endpoint_t upper_layer = {};
     upper_layer.ctx = &capture;
     upper_layer.receive = [](void* ctx, xgl_handle_t handle,
                              const xgl_packet_t* data) -> xgl_error_t {
@@ -1391,19 +1389,17 @@ TEST_F(XglNetworkTest, ErrorCallbackInvoked) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglNetworkTest, GetTypedInterfaces) {
-    xgl_packet_interface_t packets = {};
-    xgl_frame_interface_t frames = {};
-    ASSERT_EQ(xgl_network_get_interfaces(&network_ctx, &packets, &frames),
+    xgl_packet_tx_endpoint_t packets = {};
+    xgl_frame_rx_endpoint_t frames = {};
+    ASSERT_EQ(xgl_network_get_endpoints(&network_ctx, &packets, &frames),
               XGL_OK);
     EXPECT_EQ(packets.ctx, &network_ctx);
     EXPECT_NE(packets.send, nullptr);
-    EXPECT_EQ(packets.receive, nullptr);
     EXPECT_EQ(frames.ctx, &network_ctx);
-    EXPECT_EQ(frames.send, nullptr);
     EXPECT_NE(frames.receive, nullptr);
 }
 
 TEST_F(XglNetworkTest, GetTypedInterfacesRejectsNullPointer) {
-    EXPECT_EQ(xgl_network_get_interfaces(nullptr, nullptr, nullptr),
+    EXPECT_EQ(xgl_network_get_endpoints(nullptr, nullptr, nullptr),
               XGL_ERR_NULL_POINTER);
 }

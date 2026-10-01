@@ -209,12 +209,12 @@ static xgl_error_t transport_receive_impl(void* ctx, xgl_handle_t handle,
  * \param[out]      iface: Packet interface initialized with receive only
  * \return          XGL_OK or invalid argument error
  */
-xgl_error_t xgl_transport_get_interface(xgl_transport_ctx_t* ctx,
-                                        xgl_packet_interface_t* iface) {
+xgl_error_t xgl_transport_get_rx_endpoint(xgl_transport_ctx_t* ctx,
+                                          xgl_packet_rx_endpoint_t* iface) {
     if (ctx == NULL || iface == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    xgl_packet_interface_init(iface, ctx, NULL, transport_receive_impl);
+    xgl_packet_rx_endpoint_init(iface, ctx, transport_receive_impl);
     return XGL_OK;
 }
 

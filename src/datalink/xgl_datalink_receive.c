@@ -5,7 +5,6 @@
  */
 
 #include <datalink/xgl_datalink.h>
-#include <datalink/xgl_datalink_metadata.h>
 #include <internal/xgl_diagnostics.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_config.h>
@@ -42,11 +41,10 @@ static void datalink_report_decode_error(xgl_datalink_ctx_t* ctx,
     }
 }
 
-/** \brief           Deliver one validated borrowed view without decoding again.
- */
-static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
-                                         const xgl_wire_frame_view_t* view) {
-    if (view->frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
+/** \brief           Apply the same frame-size policy before either delivery. */
+static xgl_error_t datalink_check_frame_size(xgl_datalink_ctx_t* ctx,
+                                             size_t frame_len) {
+    if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
 #if XGL_FEATURE_STATISTICS
         if (ctx->stats != NULL) {
             ctx->stats->rx_errors++;
@@ -60,6 +58,12 @@ static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
         }
         return XGL_ERR_INVALID_FRAME;
     }
+    return XGL_OK;
+}
+
+/** \brief           Deliver a validated view within the datalink size limit. */
+static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
+                                         const xgl_wire_frame_view_t* view) {
 #if XGL_FEATURE_STATISTICS
     if (ctx->stats != NULL) {
         ctx->stats->rx_packets++;
@@ -97,6 +101,40 @@ xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
                             ctx->callback_user_data);
     }
     return XGL_ERR_TIMEOUT;
+}
+
+/* Span length and explicit time retain their documented parameter order. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
+                                      xgl_parser_t* parser,
+                                      const uint8_t* bytes, size_t len,
+                                      uint32_t current_time_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    if (ctx == NULL || parser == NULL || (bytes == NULL && len != 0U)) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    xgl_error_t first_error = XGL_OK;
+    xgl_wire_frame_view_t view;
+    for (size_t i = 0U; i < len; ++i) {
+        xgl_wire_decode_status_t status;
+        xgl_parse_result_t result = xgl_parser_feed_byte_view(
+            parser, bytes[i], current_time_ms, &view, &status);
+
+        if (result == XGL_PARSE_RESULT_COMPLETE) {
+            xgl_error_t error = datalink_check_frame_size(ctx, view.frame_len);
+            if (error == XGL_OK) {
+                error = datalink_deliver_view(ctx, &view);
+            }
+            if (first_error == XGL_OK) {
+                first_error = error;
+            }
+            xgl_parser_reset(parser);
+        } else if (result == XGL_PARSE_RESULT_ERROR) {
+            datalink_report_decode_error(ctx, status);
+        }
+    }
+    return first_error;
 }
 
 /* Parameter order follows the documented protocol fields and units. */
@@ -143,29 +181,9 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
         return first_error == XGL_OK ? XGL_ERR_INVALID_PARAM : first_error;
     }
 
-    if (rx_len == 0) {
-        return first_error;
-    }
-
-    xgl_wire_frame_view_t view;
-    for (size_t i = 0; i < rx_len; i++) {
-        xgl_wire_decode_status_t status;
-        xgl_parse_result_t result = xgl_parser_feed_byte_view(
-            parser, rx_buffer[i], current_time_ms, &view, &status);
-
-        if (result == XGL_PARSE_RESULT_COMPLETE) {
-            err = datalink_deliver_view(ctx, &view);
-            if (first_error == XGL_OK) {
-                first_error = err;
-            }
-            xgl_parser_reset(parser);
-
-        } else if (result == XGL_PARSE_RESULT_ERROR) {
-            datalink_report_decode_error(ctx, status);
-        }
-    }
-
-    return first_error;
+    err = xgl_datalink_consume_span(ctx, parser, rx_buffer, rx_len,
+                                    current_time_ms);
+    return first_error == XGL_OK ? err : first_error;
 }
 
 /**
@@ -182,26 +200,17 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    xgl_datalink_rx_metadata_t metadata;
-    xgl_error_t err =
-        xgl_datalink_decode_rx_metadata(frame_buffer, frame_len, &metadata);
+    xgl_error_t err = datalink_check_frame_size(ctx, frame_len);
     if (err != XGL_OK) {
-        xgl_wire_decode_status_t status = XGL_WIRE_DECODE_INVALID;
-        if (metadata.header_crc_failed) {
-            status = XGL_WIRE_DECODE_HEADER_CRC;
-        } else if (metadata.frame_crc_failed) {
-            status = XGL_WIRE_DECODE_FRAME_CRC;
-        }
+        return err;
+    }
+    xgl_wire_frame_view_t view;
+    xgl_wire_decode_status_t status;
+    err = xgl_wire_decode_frame(&view, frame_buffer, frame_len, &status);
+    if (err != XGL_OK) {
         datalink_report_decode_error(ctx, status);
-        if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE &&
-            ctx->error_callback != NULL) {
-            ctx->error_callback(
-                ctx->owner_handle, XGL_ERR_INVALID_FRAME,
-                XGL_ERROR_MESSAGE("Frame size exceeds maximum allowed"),
-                ctx->callback_user_data);
-        }
         return err;
     }
 
-    return datalink_deliver_view(ctx, &metadata.frame);
+    return datalink_deliver_view(ctx, &view);
 }

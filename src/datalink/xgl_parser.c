@@ -31,7 +31,6 @@ void xgl_parser_reset(xgl_parser_t* parser) {
     }
     parser->state = XGL_PARSE_MAGIC;
     parser->cache_len = 0U;
-    parser->index = 0U;
     parser->timestamp = 0U;
     parser->expected_header_len = 0U;
     parser->expected_payload_len = 0U;
@@ -48,12 +47,13 @@ static xgl_parse_result_t parser_finish_header(xgl_parser_t* parser) {
     xgl_wire_ext_metadata_t metadata;
     xgl_error_t error = xgl_wire_decode_ext_metadata(
         parser->cache + XGL_WIRE_BASE_HEADER_SIZE,
-        parser->expected_header_len - XGL_WIRE_BASE_HEADER_SIZE, &metadata);
+        (size_t)parser->expected_header_len - XGL_WIRE_BASE_HEADER_SIZE,
+        &metadata);
     if (error != XGL_OK) {
         return parser_reject(parser);
     }
     parser->expected_auth_tag_len = metadata.auth_tag_len;
-    size_t body_overhead = parser->expected_header_len +
+    size_t body_overhead = (size_t)parser->expected_header_len +
                            parser->expected_auth_tag_len + XGL_CRC16_SIZE;
     if (body_overhead > parser->cache_size ||
         parser->expected_payload_len > parser->cache_size - body_overhead) {
@@ -63,7 +63,6 @@ static xgl_parse_result_t parser_finish_header(xgl_parser_t* parser) {
         parser->expected_payload_len > 0U || parser->expected_auth_tag_len > 0U
             ? XGL_PARSE_PAYLOAD
             : XGL_PARSE_CRC;
-    parser->index = 0U;
     return XGL_PARSE_RESULT_INCOMPLETE;
 }
 
@@ -143,13 +142,14 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
                 (size_t)parser->expected_payload_len +
                     parser->expected_auth_tag_len) {
                 parser->state = XGL_PARSE_CRC;
-                parser->index = 0U;
             }
             return XGL_PARSE_RESULT_INCOMPLETE;
 
         case XGL_PARSE_CRC:
             parser->cache[parser->cache_len++] = byte;
-            if (++parser->index == XGL_CRC16_SIZE) {
+            if (parser->cache_len - parser->expected_header_len ==
+                (size_t)parser->expected_payload_len +
+                    parser->expected_auth_tag_len + XGL_CRC16_SIZE) {
                 xgl_error_t error = xgl_wire_decode_frame(
                     view, parser->cache, parser->cache_len, status);
                 if (error != XGL_OK) {

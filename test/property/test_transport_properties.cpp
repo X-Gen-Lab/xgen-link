@@ -1063,7 +1063,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
  */
 struct ProductionRetryProbe {
     xgl_transport_ctx_t ctx = {};
-    xgl_packet_interface_t lower = {};
+    xgl_packet_tx_endpoint_t lower = {};
     xgl_layer_stats_t stats = {};
     uint64_t retries = 0;
     size_t sends = 0;
@@ -1085,7 +1085,7 @@ struct ProductionRetryProbe {
     }
 
     xgl_error_t Init(uint8_t max_retry, uint8_t window = 4) {
-        xgl_packet_interface_init(&lower, this, Send, nullptr);
+        xgl_packet_tx_endpoint_init(&lower, this, Send);
         xgl_transport_config_t config = {};
         config.local_id = 1;
         config.max_retry_count = max_retry;

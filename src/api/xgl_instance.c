@@ -169,33 +169,31 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     }
 
     /* Create layer interfaces */
-    err = xgl_datalink_get_interface(&handle->layers.datalink_ctx,
-                                     &handle->layers.datalink_iface);
+    err = xgl_datalink_get_tx_endpoint(&handle->layers.datalink_ctx,
+                                       &handle->layers.datalink_tx);
     if (err != XGL_OK) {
         goto cleanup;
     }
 
-    err = xgl_network_get_interfaces(&handle->layers.network_ctx,
-                                     &handle->layers.network_packet_iface,
-                                     &handle->layers.network_frame_iface);
+    err = xgl_network_get_endpoints(&handle->layers.network_ctx,
+                                    &handle->layers.network_tx,
+                                    &handle->layers.network_rx);
     if (err != XGL_OK) {
         goto cleanup;
     }
 
-    err = xgl_transport_get_interface(&handle->layers.transport_ctx,
-                                      &handle->layers.transport_iface);
+    err = xgl_transport_get_rx_endpoint(&handle->layers.transport_ctx,
+                                        &handle->layers.transport_rx);
     if (err != XGL_OK) {
         goto cleanup;
     }
 
     /* Wire up layer interfaces */
     /* Datalink -> Network -> Transport -> Application */
-    handle->layers.datalink_ctx.upper_layer =
-        &handle->layers.network_frame_iface;
-    handle->layers.network_ctx.lower_layer = &handle->layers.datalink_iface;
-    handle->layers.network_ctx.upper_layer = &handle->layers.transport_iface;
-    handle->layers.transport_ctx.lower_layer =
-        &handle->layers.network_packet_iface;
+    handle->layers.datalink_ctx.upper_layer = &handle->layers.network_rx;
+    handle->layers.network_ctx.lower_layer = &handle->layers.datalink_tx;
+    handle->layers.network_ctx.upper_layer = &handle->layers.transport_rx;
+    handle->layers.transport_ctx.lower_layer = &handle->layers.network_tx;
 
     /* Mark as initialized */
     handle->initialized = true;

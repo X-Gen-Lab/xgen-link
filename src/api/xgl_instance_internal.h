@@ -37,10 +37,10 @@ typedef struct xgl_layer_contexts_s {
     xgl_transport_ctx_t transport_ctx; /**< Transport layer context */
 
     /* Layer interfaces for decoupled communication */
-    xgl_frame_interface_t datalink_iface;
-    xgl_frame_interface_t network_frame_iface;
-    xgl_packet_interface_t network_packet_iface;
-    xgl_packet_interface_t transport_iface;
+    xgl_frame_tx_endpoint_t datalink_tx;
+    xgl_frame_rx_endpoint_t network_rx;
+    xgl_packet_tx_endpoint_t network_tx;
+    xgl_packet_rx_endpoint_t transport_rx;
 } xgl_layer_contexts_t;
 
 /**

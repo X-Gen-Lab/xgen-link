@@ -201,7 +201,7 @@ TEST_F(XglCoverageDelivery, ParserViewRetainsTheDatalinkFrameLimit) {
 
 TEST_F(XglCoverageDelivery,
        DeliveryPropagatesAdmissionAndAllowsAbsentReceiver) {
-    xgl_frame_interface_t upper = {};
+    xgl_frame_rx_endpoint_t upper = {};
     context.upper_layer = &upper;
     context.stats = nullptr;
     EXPECT_EQ(xgl_datalink_process_frame(&context, frame, frame_size), XGL_OK);
@@ -235,14 +235,14 @@ TEST_F(XglCoverageDelivery, ParserDropsCorruptInputAndAcceptsTheNextFrame) {
 }
 
 TEST_F(XglCoverageDelivery, LayerInterfaceRejectsMissingFrameAndPhy) {
-    xgl_frame_interface_t interface = {};
+    xgl_frame_tx_endpoint_t interface = {};
     xgl_frame_tx_message_t message = {};
     xgl_frame_t value = {};
-    EXPECT_EQ(xgl_datalink_get_interface(nullptr, &interface),
+    EXPECT_EQ(xgl_datalink_get_tx_endpoint(nullptr, &interface),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_datalink_get_interface(&context, nullptr),
+    EXPECT_EQ(xgl_datalink_get_tx_endpoint(&context, nullptr),
               XGL_ERR_NULL_POINTER);
-    ASSERT_EQ(xgl_datalink_get_interface(&context, &interface), XGL_OK);
+    ASSERT_EQ(xgl_datalink_get_tx_endpoint(&context, &interface), XGL_OK);
     EXPECT_EQ(interface.send(nullptr, nullptr, &message), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(interface.send(interface.ctx, nullptr, nullptr),
               XGL_ERR_NULL_POINTER);
@@ -282,16 +282,16 @@ TEST_F(XglCoverageDelivery, SendValidatesPointersBeforeAllocatingStorage) {
 TEST_F(XglCoverageDelivery, NetworkInterfaceValidatesBorrowedMessages) {
     xgl_network_ctx_t network = {};
     network.local_id = 1;
-    xgl_packet_interface_t packets = {};
-    xgl_frame_interface_t frames = {};
+    xgl_packet_tx_endpoint_t packets = {};
+    xgl_frame_rx_endpoint_t frames = {};
     xgl_frame_rx_message_t message = {};
-    EXPECT_EQ(xgl_network_get_interfaces(nullptr, &packets, &frames),
+    EXPECT_EQ(xgl_network_get_endpoints(nullptr, &packets, &frames),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_network_get_interfaces(&network, nullptr, &frames),
+    EXPECT_EQ(xgl_network_get_endpoints(&network, nullptr, &frames),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_network_get_interfaces(&network, &packets, nullptr),
+    EXPECT_EQ(xgl_network_get_endpoints(&network, &packets, nullptr),
               XGL_ERR_NULL_POINTER);
-    ASSERT_EQ(xgl_network_get_interfaces(&network, &packets, &frames), XGL_OK);
+    ASSERT_EQ(xgl_network_get_endpoints(&network, &packets, &frames), XGL_OK);
     EXPECT_EQ(frames.receive(nullptr, nullptr, &message), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(frames.receive(frames.ctx, nullptr, nullptr),
               XGL_ERR_NULL_POINTER);
@@ -300,7 +300,7 @@ TEST_F(XglCoverageDelivery, NetworkInterfaceValidatesBorrowedMessages) {
     message.frame_buf = frame;
     message.frame_len = frame_size;
     EXPECT_EQ(frames.receive(frames.ctx, nullptr, &message), XGL_OK);
-    xgl_packet_interface_t upper = {};
+    xgl_packet_rx_endpoint_t upper = {};
     network.upper_layer = &upper;
     EXPECT_EQ(frames.receive(frames.ctx, nullptr, &message), XGL_OK);
 }

@@ -142,7 +142,8 @@ typedef struct xgl_transport_ctx_s {
         peers; /**< Peer-specific reliable transport state */
 
     /* Layer interface for decoupled communication */
-    xgl_packet_interface_t* lower_layer; /**< Lower layer interface (network) */
+    xgl_packet_tx_endpoint_t*
+        lower_layer; /**< Lower layer interface (network) */
 
     /* Callbacks */
     xgl_rx_callback_t rx_callback; /**< Receive callback */
@@ -181,8 +182,9 @@ typedef struct {
     uint8_t auth_tag_len; /**< Authentication tag length reserved per frame */
     xgl_route_table_t*
         route_table; /**< Optional route table for route MTU lookup */
-    xgl_packet_interface_t* lower_layer; /**< Lower layer interface (network) */
-    xgl_rx_callback_t rx_callback;       /**< Receive callback (can be NULL) */
+    xgl_packet_tx_endpoint_t*
+        lower_layer;               /**< Lower layer interface (network) */
+    xgl_rx_callback_t rx_callback; /**< Receive callback (can be NULL) */
     xgl_transport_accept_fn
         rx_accept_callback; /**< Overrides rx_callback; borrowed input */
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
@@ -319,8 +321,8 @@ void xgl_transport_report_error(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
  * \param[out]      iface: Layer interface structure to initialize
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_transport_get_interface(xgl_transport_ctx_t* ctx,
-                                        xgl_packet_interface_t* iface);
+xgl_error_t xgl_transport_get_rx_endpoint(xgl_transport_ctx_t* ctx,
+                                          xgl_packet_rx_endpoint_t* iface);
 
 #ifdef __cplusplus
 }

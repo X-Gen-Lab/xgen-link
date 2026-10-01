@@ -20,7 +20,7 @@ class XglTransportSackViewTest : public ::testing::Test {
     uint64_t retries = 0U;
     unsigned sends = 0U;
     unsigned sends_before_ack = 0U;
-    xgl_packet_interface_t lower = {};
+    xgl_packet_tx_endpoint_t lower = {};
     bool initialized = false;
 
     static xgl_error_t SendPacket(void* context, xgl_handle_t, xgl_packet_t*) {

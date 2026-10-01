@@ -44,51 +44,85 @@ typedef struct {
 } xgl_frame_rx_message_t;
 
 /**
- * \brief           Transport/network packet operations with explicit types
+ * \brief           Synchronous packet sender borrowing mutable packet metadata
  */
 typedef struct {
     void* ctx;
     xgl_error_t (*send)(void* ctx, xgl_handle_t handle, xgl_packet_t* packet);
-    xgl_error_t (*receive)(void* ctx, xgl_handle_t handle,
-                           const xgl_packet_t* packet);
-} xgl_packet_interface_t;
+} xgl_packet_tx_endpoint_t;
 
 /**
- * \brief           Network/datalink frame operations with explicit types
+ * \brief           Synchronous packet receiver borrowing immutable metadata
+ */
+typedef struct {
+    void* ctx;
+    xgl_error_t (*receive)(void* ctx, xgl_handle_t handle,
+                           const xgl_packet_t* packet);
+} xgl_packet_rx_endpoint_t;
+
+/**
+ * \brief           Synchronous frame sender with explicit storage ownership
  */
 typedef struct {
     void* ctx;
     xgl_error_t (*send)(void* ctx, xgl_handle_t handle,
                         const xgl_frame_tx_message_t* message);
-    xgl_error_t (*receive)(void* ctx, xgl_handle_t handle,
-                           const xgl_frame_rx_message_t* message);
-} xgl_frame_interface_t;
+} xgl_frame_tx_endpoint_t;
 
 /**
- * \brief           Initialize a typed packet endpoint
+ * \brief           Synchronous frame receiver borrowing validated wire storage
  */
-static inline void xgl_packet_interface_init(
-    xgl_packet_interface_t* iface, void* ctx,
-    xgl_error_t (*send)(void*, xgl_handle_t, xgl_packet_t*),
-    xgl_error_t (*receive)(void*, xgl_handle_t, const xgl_packet_t*)) {
+typedef struct {
+    void* ctx;
+    xgl_error_t (*receive)(void* ctx, xgl_handle_t handle,
+                           const xgl_frame_rx_message_t* message);
+} xgl_frame_rx_endpoint_t;
+
+/**
+ * \brief           Initialize a packet sender without taking ownership
+ */
+static inline void xgl_packet_tx_endpoint_init(
+    xgl_packet_tx_endpoint_t* iface, void* ctx,
+    xgl_error_t (*send)(void*, xgl_handle_t, xgl_packet_t*)) {
     if (iface != NULL) {
         iface->ctx = ctx;
         iface->send = send;
+    }
+}
+
+/**
+ * \brief           Initialize a packet receiver without taking ownership
+ */
+static inline void xgl_packet_rx_endpoint_init(
+    xgl_packet_rx_endpoint_t* iface, void* ctx,
+    xgl_error_t (*receive)(void*, xgl_handle_t, const xgl_packet_t*)) {
+    if (iface != NULL) {
+        iface->ctx = ctx;
         iface->receive = receive;
     }
 }
 
 /**
- * \brief           Initialize a typed frame endpoint
+ * \brief           Initialize a frame sender without taking ownership
  */
-static inline void xgl_frame_interface_init(
-    xgl_frame_interface_t* iface, void* ctx,
-    xgl_error_t (*send)(void*, xgl_handle_t, const xgl_frame_tx_message_t*),
+static inline void xgl_frame_tx_endpoint_init(
+    xgl_frame_tx_endpoint_t* iface, void* ctx,
+    xgl_error_t (*send)(void*, xgl_handle_t, const xgl_frame_tx_message_t*)) {
+    if (iface != NULL) {
+        iface->ctx = ctx;
+        iface->send = send;
+    }
+}
+
+/**
+ * \brief           Initialize a frame receiver without taking ownership
+ */
+static inline void xgl_frame_rx_endpoint_init(
+    xgl_frame_rx_endpoint_t* iface, void* ctx,
     xgl_error_t (*receive)(void*, xgl_handle_t,
                            const xgl_frame_rx_message_t*)) {
     if (iface != NULL) {
         iface->ctx = ctx;
-        iface->send = send;
         iface->receive = receive;
     }
 }
@@ -96,7 +130,7 @@ static inline void xgl_frame_interface_init(
 /**
  * \brief           Submit a packet without extending its storage lifetime
  */
-static inline xgl_error_t xgl_packet_send(const xgl_packet_interface_t* iface,
+static inline xgl_error_t xgl_packet_send(const xgl_packet_tx_endpoint_t* iface,
                                           xgl_handle_t handle,
                                           xgl_packet_t* packet) {
     if (iface == NULL || iface->send == NULL) {
@@ -109,7 +143,7 @@ static inline xgl_error_t xgl_packet_send(const xgl_packet_interface_t* iface,
  * \brief           Deliver a borrowed packet and return receive acceptance
  */
 static inline xgl_error_t
-xgl_packet_receive(const xgl_packet_interface_t* iface, xgl_handle_t handle,
+xgl_packet_receive(const xgl_packet_rx_endpoint_t* iface, xgl_handle_t handle,
                    const xgl_packet_t* packet) {
     if (iface == NULL || iface->receive == NULL) {
         return XGL_ERR_NULL_POINTER;

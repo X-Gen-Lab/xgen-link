@@ -32,7 +32,7 @@ TEST(XglFragmentProperties, ManagerInitInvalidParameters) {
 
 TEST(XglFragmentProperties, MessageIdAssignmentIsMonotonic32Bit) {
     std::vector<uint32_t> message_ids;
-    xgl_packet_interface_t lower = {};
+    xgl_packet_tx_endpoint_t lower = {};
     lower.ctx = &message_ids;
     lower.send = [](void* user, xgl_handle_t, xgl_packet_t* packet) {
         xgl_wire_ext_cursor_t cursor = {};

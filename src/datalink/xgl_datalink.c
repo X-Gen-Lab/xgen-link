@@ -92,13 +92,13 @@ static xgl_error_t datalink_send_impl(void* ctx, xgl_handle_t handle,
  * \param[out]      iface: Layer interface structure to initialize
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_datalink_get_interface(xgl_datalink_ctx_t* ctx,
-                                       xgl_frame_interface_t* iface) {
+xgl_error_t xgl_datalink_get_tx_endpoint(xgl_datalink_ctx_t* ctx,
+                                         xgl_frame_tx_endpoint_t* iface) {
     if (ctx == NULL || iface == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    xgl_frame_interface_init(iface, ctx, datalink_send_impl, NULL);
+    xgl_frame_tx_endpoint_init(iface, ctx, datalink_send_impl);
 
     return XGL_OK;
 }

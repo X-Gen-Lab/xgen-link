@@ -47,16 +47,14 @@ typedef enum {
  * \brief           Frame parser structure
  */
 typedef struct {
-    xgl_parse_state_t state;    /**< Current parser state */
-    uint8_t* cache;             /**< Cache buffer for frame data */
-    size_t cache_size;          /**< Total cache buffer size */
-    size_t cache_len;           /**< Current data length in cache */
-    size_t index;               /**< Current parsing index */
-    uint32_t timestamp;         /**< Timestamp when parsing started (ms) */
-    size_t expected_header_len; /**< Expected fixed + extension header length */
+    xgl_parse_state_t state;       /**< Current parser state */
+    uint8_t* cache;                /**< Cache buffer for frame data */
+    size_t cache_size;             /**< Total cache buffer size */
+    size_t cache_len;              /**< Current data length in cache */
+    uint32_t timestamp;            /**< Timestamp when parsing started (ms) */
     uint16_t expected_payload_len; /**< Expected payload length from header */
-    uint8_t
-        expected_auth_tag_len; /**< Expected authentication trailer length */
+    uint8_t expected_header_len;   /**< Header length including extensions */
+    uint8_t expected_auth_tag_len; /**< Authentication trailer length */
 } xgl_parser_t;
 
 /*---------------------------------------------------------------------------*/

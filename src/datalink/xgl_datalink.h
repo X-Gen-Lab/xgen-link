@@ -54,7 +54,8 @@ typedef struct xgl_datalink_ctx_s {
 #endif
 
     /* Layer interface for decoupled communication */
-    xgl_frame_interface_t* upper_layer; /**< Upper layer interface (network) */
+    xgl_frame_rx_endpoint_t*
+        upper_layer; /**< Upper layer interface (network) */
 } xgl_datalink_ctx_t;
 
 /**
@@ -66,7 +67,7 @@ typedef struct {
                                        be NULL) */
     uint64_t*
         rx_crc16_errors; /**< Frame CRC16 error counter pointer (can be NULL) */
-    xgl_frame_interface_t*
+    xgl_frame_rx_endpoint_t*
         upper_layer; /**< Upper layer interface (can be NULL) */
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
     void* callback_user_data; /**< User data for callbacks (can be NULL) */
@@ -145,6 +146,27 @@ xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
                                        uint32_t timeout_ms);
 
 /**
+ * \brief           Consume borrowed bytes synchronously using one PHY parser
+ * \param[in,out]   ctx: Shared diagnostics and delivery context
+ * \param[in,out]   parser: Initialized parser with exclusive receive storage
+ * \param[in]       bytes: Input span; NULL is valid only when len is zero
+ * \param[in]       len: Number of bytes to consume completely
+ * \param[in]       current_time_ms: Explicit monotonic time in milliseconds
+ * \return          First delivery/policy error, or XGL_OK; malformed frames
+ *                  are discarded and counted through diagnostics
+ * \note            Input must not overlap parser storage and is borrowed only
+ *                  until return. No input or view pointer is retained. Partial
+ *                  frames are copied into parser-owned storage. Delivery is
+ *                  synchronous; callbacks must not reenter or mutate input.
+ *                  This private entry does not poll the PHY or expire a parser;
+ *                  its caller performs timeout maintenance before consumption.
+ */
+xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
+                                      xgl_parser_t* parser,
+                                      const uint8_t* bytes, size_t len,
+                                      uint32_t current_time_ms);
+
+/**
  * \brief           Poll one PHY using its own parser and shared link policy
  * \param[in,out]   ctx: Shared security, statistics and delivery context
  * \param[in,out]   parser: Parser owned by the selected PHY
@@ -181,8 +203,8 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
  * \param[out]      iface: Layer interface structure to initialize
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_datalink_get_interface(xgl_datalink_ctx_t* ctx,
-                                       xgl_frame_interface_t* iface);
+xgl_error_t xgl_datalink_get_tx_endpoint(xgl_datalink_ctx_t* ctx,
+                                         xgl_frame_tx_endpoint_t* iface);
 
 #ifdef __cplusplus
 }

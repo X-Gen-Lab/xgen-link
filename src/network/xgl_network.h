@@ -62,9 +62,10 @@ typedef struct xgl_network_ctx_s {
     xgl_route_table_t* route_table; /**< Route table */
 
     /* Layer interfaces for decoupled communication */
-    xgl_packet_interface_t*
+    xgl_packet_rx_endpoint_t*
         upper_layer; /**< Upper layer interface (transport) */
-    xgl_frame_interface_t* lower_layer; /**< Lower layer interface (datalink) */
+    xgl_frame_tx_endpoint_t*
+        lower_layer; /**< Lower layer interface (datalink) */
 
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;            /**< User data for callbacks */
@@ -87,9 +88,9 @@ typedef struct {
     uint16_t local_id;     /**< Local node ID */
     size_t max_frame_size; /**< Instance frame limit; zero uses the route MTU */
     xgl_route_table_t* route_table; /**< Route table */
-    xgl_packet_interface_t*
+    xgl_packet_rx_endpoint_t*
         upper_layer; /**< Upper layer interface (can be NULL) */
-    xgl_frame_interface_t*
+    xgl_frame_tx_endpoint_t*
         lower_layer; /**< Lower layer interface (can be NULL) */
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
     void* callback_user_data; /**< User data for callbacks (can be NULL) */
@@ -215,9 +216,9 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
  * \param[out]      iface: Layer interface structure to initialize
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_network_get_interfaces(xgl_network_ctx_t* ctx,
-                                       xgl_packet_interface_t* packets,
-                                       xgl_frame_interface_t* frames);
+xgl_error_t xgl_network_get_endpoints(xgl_network_ctx_t* ctx,
+                                      xgl_packet_tx_endpoint_t* packets,
+                                      xgl_frame_rx_endpoint_t* frames);
 
 #ifdef __cplusplus
 }

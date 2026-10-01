@@ -178,8 +178,10 @@ TEST_F(XglParserTest, ResetParser) {
     /* Feed some data */
     parser.state = XGL_PARSE_HEADER;
     parser.cache_len = 5;
-    parser.index = 3;
     parser.timestamp = 1000;
+    parser.expected_header_len = 27;
+    parser.expected_payload_len = 12;
+    parser.expected_auth_tag_len = 8;
 
     /* Reset */
     xgl_parser_reset(&parser);
@@ -187,8 +189,10 @@ TEST_F(XglParserTest, ResetParser) {
     /* Verify reset state */
     EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     EXPECT_EQ(parser.cache_len, 0);
-    EXPECT_EQ(parser.index, 0);
     EXPECT_EQ(parser.timestamp, 0);
+    EXPECT_EQ(parser.expected_header_len, 0);
+    EXPECT_EQ(parser.expected_payload_len, 0);
+    EXPECT_EQ(parser.expected_auth_tag_len, 0);
 }
 
 TEST_F(XglParserTest, ResetNullPointer) {

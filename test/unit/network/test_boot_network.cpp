@@ -47,7 +47,7 @@ class XglBootNetworkTest : public ::testing::Test {
         xgl_datalink_config_t datalink_config = {};
         datalink_config.allocator = &allocator;
         ASSERT_EQ(xgl_datalink_init(&datalink, &datalink_config), XGL_OK);
-        ASSERT_EQ(xgl_datalink_get_interface(&datalink, &lower), XGL_OK);
+        ASSERT_EQ(xgl_datalink_get_tx_endpoint(&datalink, &lower), XGL_OK);
         xgl_network_config_t network_config = {};
         network_config.local_id = 1U;
         network_config.route_table = &routes;
@@ -66,7 +66,7 @@ class XglBootNetworkTest : public ::testing::Test {
     xgl_route_item_t route = {};
     xgl_route_table_t routes = {};
     xgl_datalink_ctx_t datalink = {};
-    xgl_frame_interface_t lower = {};
+    xgl_frame_tx_endpoint_t lower = {};
     xgl_network_ctx_t network = {};
     xgl_packet_data_t payload = {};
     xgl_packet_t packet = {};

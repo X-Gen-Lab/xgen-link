@@ -5,7 +5,6 @@
  */
 
 #include <datalink/xgl_datalink.h>
-#include <datalink/xgl_datalink_metadata.h>
 #include <network/xgl_route.h>
 #include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
@@ -63,10 +62,14 @@ TEST(XglDatalinkMetadataTest, RejectsDuplicateSessionExtensions) {
     header.target_id = 2;
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
     xgb_serialize_u16_le(bytes + offset, xgcrc_crc16_modbus(bytes, offset));
-    xgl_datalink_rx_metadata_t metadata = {};
-    EXPECT_EQ(xgl_datalink_decode_rx_metadata(bytes, offset + XGL_CRC16_SIZE,
-                                              &metadata),
-              XGL_ERR_INVALID_FRAME);
+    xgl_layer_stats_t statistics = {};
+    xgl_datalink_ctx_t context = {};
+    xgl_datalink_config_t config = {};
+    config.stats = &statistics;
+    ASSERT_EQ(xgl_datalink_init(&context, &config), XGL_OK);
+    EXPECT_EQ(
+        xgl_datalink_process_frame(&context, bytes, offset + XGL_CRC16_SIZE),
+        XGL_ERR_INVALID_FRAME);
 }
 
 static xgl_error_t mock_phy_tx(const uint8_t* data, size_t len,
@@ -194,7 +197,7 @@ TEST(XglDatalinkMetadataTest, SeparateParsersPreserveInterleavedPhyFrames) {
     uint8_t caches[2][64] = {};
     xgl_parser_t parsers[2] = {};
     std::vector<uint8_t> received;
-    xgl_frame_interface_t upper = {};
+    xgl_frame_rx_endpoint_t upper = {};
     upper.ctx = &received;
     upper.receive = [](void* ctx, xgl_handle_t,
                        const xgl_frame_rx_message_t* data) {
@@ -683,9 +686,9 @@ TEST_F(XglDatalinkTest, ProcessFrameDeliversWireValidReliableCopiesUpstream) {
     provider.tag_len = 4;
     provider.user_data = nullptr;
     DatalinkUpperSpy upper_spy;
-    xgl_frame_interface_t upper_layer = {};
-    xgl_frame_interface_init(&upper_layer, &upper_spy, nullptr,
-                             datalink_upper_receive_spy);
+    xgl_frame_rx_endpoint_t upper_layer = {};
+    xgl_frame_rx_endpoint_init(&upper_layer, &upper_spy,
+                               datalink_upper_receive_spy);
 
     xgl_datalink_ctx_t auth_ctx;
     xgl_layer_stats_t auth_stats = {};
@@ -823,21 +826,27 @@ TEST_F(XglDatalinkTest, RxMetadataDecodesAuthenticatedSessionFrame) {
                                            &provider, &encoded_len),
               XGL_OK);
 
-    xgl_datalink_rx_metadata_t metadata = {};
-    ASSERT_EQ(xgl_datalink_decode_rx_metadata(encoded, encoded_len, &metadata),
-              XGL_OK);
+    xgl_wire_frame_view_t metadata = {};
+    xgl_frame_rx_endpoint_t receiver = {};
+    receiver.ctx = &metadata;
+    receiver.receive = [](void* output, xgl_handle_t,
+                          const xgl_frame_rx_message_t* message) {
+        *static_cast<xgl_wire_frame_view_t*>(output) = *message->view;
+        return XGL_OK;
+    };
+    ctx.upper_layer = &receiver;
+    ASSERT_EQ(xgl_datalink_process_frame(&ctx, encoded, encoded_len), XGL_OK);
 
-    EXPECT_EQ(metadata.frame.header.source_id, SOURCE_ID);
-    EXPECT_EQ(metadata.frame.header.target_id, TARGET_ID);
-    EXPECT_EQ(metadata.frame.header.connection_id, 0x10203040U);
-    EXPECT_EQ(metadata.frame.header.packet_number, 77U);
-    EXPECT_EQ(metadata.frame.auth_tag_len, 4U);
-    EXPECT_TRUE(metadata.frame.has_security_ext);
-    EXPECT_TRUE(metadata.frame.authenticated);
-    EXPECT_TRUE(metadata.frame.authenticated);
-    EXPECT_EQ(metadata.frame.auth_key_id, 7U);
-    EXPECT_EQ(metadata.frame.session_epoch, 0x01020304U);
-    EXPECT_EQ(metadata.frame.payload_len, sizeof(payload));
+    EXPECT_EQ(metadata.header.source_id, SOURCE_ID);
+    EXPECT_EQ(metadata.header.target_id, TARGET_ID);
+    EXPECT_EQ(metadata.header.connection_id, 0x10203040U);
+    EXPECT_EQ(metadata.header.packet_number, 77U);
+    EXPECT_EQ(metadata.auth_tag_len, 4U);
+    EXPECT_TRUE(metadata.has_security_ext);
+    EXPECT_TRUE(metadata.authenticated);
+    EXPECT_EQ(metadata.auth_key_id, 7U);
+    EXPECT_EQ(metadata.session_epoch, 0x01020304U);
+    EXPECT_EQ(metadata.payload_len, sizeof(payload));
 }
 
 TEST_F(XglDatalinkTest,
@@ -863,10 +872,17 @@ TEST_F(XglDatalinkTest,
                                            &provider, &encoded_len),
               XGL_OK);
 
-    xgl_datalink_rx_metadata_t metadata = {};
-    EXPECT_EQ(xgl_datalink_decode_rx_metadata(encoded, encoded_len, &metadata),
-              XGL_OK);
-    EXPECT_EQ(metadata.frame.auth_key_id, 7U);
+    uint32_t received_key_id = 0U;
+    xgl_frame_rx_endpoint_t receiver = {};
+    receiver.ctx = &received_key_id;
+    receiver.receive = [](void* output, xgl_handle_t,
+                          const xgl_frame_rx_message_t* message) {
+        *static_cast<uint32_t*>(output) = message->view->auth_key_id;
+        return XGL_OK;
+    };
+    ctx.upper_layer = &receiver;
+    EXPECT_EQ(xgl_datalink_process_frame(&ctx, encoded, encoded_len), XGL_OK);
+    EXPECT_EQ(received_key_id, 7U);
 }
 
 /*---------------------------------------------------------------------------*/

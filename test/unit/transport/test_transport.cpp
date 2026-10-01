@@ -123,7 +123,7 @@ static void spy_receive(xgl_handle_t handle, uint16_t source_id,
 }
 
 static xgl_transport_config_t
-make_transport_config(xgl_packet_interface_t* lower_layer,
+make_transport_config(xgl_packet_tx_endpoint_t* lower_layer,
                       xgl_layer_stats_t* stats, uint64_t* tx_retries) {
     xgl_transport_config_t config = {};
     config.allocator = xgm_allocator_libc();
@@ -204,7 +204,7 @@ static uint32_t regression_time_ms;
 class TransportRegressionTest : public ::testing::Test {
   protected:
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower = {};
+    xgl_packet_tx_endpoint_t lower = {};
     xgl_layer_stats_t stats = {};
     uint64_t retries = 0;
     xgl_transport_ctx_t ctx = {};
@@ -265,7 +265,7 @@ class TransportRegressionTest : public ::testing::Test {
 
     void SetUp() override {
         regression_time_ms = 100;
-        xgl_packet_interface_init(&lower, &spy, spy_send, nullptr);
+        xgl_packet_tx_endpoint_init(&lower, &spy, spy_send);
     }
 
     void TearDown() override {
@@ -596,8 +596,8 @@ TEST_F(TransportRegressionTest,
     std::fill(input.begin(), input.end(), 0xFF);
 
     LowerLayerSpy remote_spy;
-    xgl_packet_interface_t remote_lower = {};
-    xgl_packet_interface_init(&remote_lower, &remote_spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t remote_lower = {};
+    xgl_packet_tx_endpoint_init(&remote_lower, &remote_spy, spy_send);
     xgl_layer_stats_t remote_stats = {};
     xgl_transport_config_t config =
         make_transport_config(&remote_lower, &remote_stats, nullptr);
@@ -898,8 +898,8 @@ TEST_F(TransportRegressionTest,
 
 TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -967,8 +967,8 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
 
 TEST(XglTransportTest, ReliableSendDoesNotTransmitWhenQueueAdmissionFails) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1014,8 +1014,8 @@ TEST(XglTransportTest, ReliableSendDoesNotTransmitWhenQueueAdmissionFails) {
 
 TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1081,8 +1081,8 @@ TEST(XglTransportTest, AckRangeExtensionReleasesMultipleReliablePackets) {
 
 TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1161,8 +1161,8 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
 
 TEST(XglTransportTest, EmptySackBitmapRetransmitsBasePacket) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1229,8 +1229,8 @@ TEST(XglTransportTest, EmptySackBitmapRetransmitsBasePacket) {
 TEST(XglTransportTest,
      ProductionAckWithUnknownExtensionDoesNotUseLegacyAckNumber) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1286,8 +1286,8 @@ TEST(XglTransportTest,
 
 TEST(XglTransportTest, ReliableSendUsesMonotonicPacketNumbersPastEightBitWrap) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1342,8 +1342,8 @@ TEST(XglTransportTest, ReliableSendUsesMonotonicPacketNumbersPastEightBitWrap) {
 
 TEST(XglTransportTest, AckFromUnexpectedSourceIsRejected) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1389,8 +1389,8 @@ TEST(XglTransportTest, AckFromUnexpectedSourceIsRejected) {
 
 TEST(XglTransportTest, PeerWindowFullDoesNotBlockDifferentTarget) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1423,8 +1423,8 @@ TEST(XglTransportTest, PeerWindowFullDoesNotBlockDifferentTarget) {
 
 TEST(XglTransportTest, ReliableQueuesArePeerScoped) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1465,8 +1465,8 @@ TEST(XglTransportTest, ReliableQueuesArePeerScoped) {
 
 TEST(XglTransportTest, HelloCreatesExactPeerWithoutDeliveringToApplication) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1505,8 +1505,8 @@ TEST(XglTransportTest, HelloCreatesExactPeerWithoutDeliveringToApplication) {
 TEST(XglTransportTest,
      ApplicationDataTypeCollidingWithControlValueIsDelivered) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1543,8 +1543,8 @@ TEST(XglTransportTest,
 
 TEST(XglTransportTest, FirstReliableDataCreatesExactPeerState) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1581,8 +1581,8 @@ TEST(XglTransportTest, FirstReliableDataCreatesExactPeerState) {
 
 TEST(XglTransportTest, OutOfOrderReliablePacketSendsSackForExpectedSequence) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1619,8 +1619,8 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsSackForExpectedSequence) {
 
 TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1682,8 +1682,8 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
 
 TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1745,7 +1745,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
 
 TEST(XglTransportTest, AckRangeUsesHeaderExtensionNotPayload) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
+    xgl_packet_tx_endpoint_t lower_layer = {};
     lower_layer.ctx = &spy;
     lower_layer.send = spy_send;
     xgl_layer_stats_t stats = {};
@@ -1792,8 +1792,8 @@ TEST(XglTransportTest, AckRangeUsesHeaderExtensionNotPayload) {
 
 TEST(XglTransportTest, ReliableReceiveAckPreservesConnectionScope) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1833,8 +1833,8 @@ TEST(XglTransportTest, ReliableReceiveAckPreservesConnectionScope) {
 
 TEST(XglTransportTest, ReliableReceiveIsolatesPacketNumbersByConnectionScope) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -1886,8 +1886,8 @@ TEST(XglTransportTest, ReliableReceiveIsolatesPacketNumbersByConnectionScope) {
 
 TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2006,8 +2006,8 @@ TEST(XglTransportTest, SendPlanAccountsForFragmentExtensionBudget) {
 
 TEST(XglTransportTest, FragmentedSendUsesFragmentExtensionNotPayloadPrefix) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2147,8 +2147,8 @@ TEST(XglTransportTest, FragmentReceiveUsesFragmentExtensionMetadata) {
 
 TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2195,8 +2195,8 @@ TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
 
 TEST(XglTransportTest, ReliableSendUsesIndependentWindowsPerConnectionScope) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2240,8 +2240,8 @@ TEST(XglTransportTest, ReliableSendUsesIndependentWindowsPerConnectionScope) {
 TEST(XglTransportTest,
      ReliableFragmentTimeoutRetransmitsWithFragmentExtension) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2312,8 +2312,8 @@ TEST(XglTransportTest,
 
 TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2437,8 +2437,8 @@ TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
 
 TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2472,8 +2472,8 @@ TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
 
 TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2512,8 +2512,8 @@ TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
 
 TEST(XglTransportTest, PeerIdleTimeoutRetainsReceiveDuplicateHistory) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2556,8 +2556,8 @@ TEST(XglTransportTest, PeerIdleTimeoutRetainsReceiveDuplicateHistory) {
 
 TEST(XglTransportTest, PeerWithPendingReliableNotReclaimed) {
     LowerLayerSpy spy;
-    xgl_packet_interface_t lower_layer = {};
-    xgl_packet_interface_init(&lower_layer, &spy, spy_send, nullptr);
+    xgl_packet_tx_endpoint_t lower_layer = {};
+    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
@@ -2734,9 +2734,8 @@ TEST_F(TransportRegressionTest, CompletedMessageRetainsReassemblyByteBudget) {
 
 TEST_F(TransportRegressionTest, TypedBoundaryOnlyExposesReceive) {
     Init();
-    xgl_packet_interface_t iface = {};
-    ASSERT_EQ(xgl_transport_get_interface(&ctx, &iface), XGL_OK);
-    EXPECT_EQ(iface.send, nullptr);
+    xgl_packet_rx_endpoint_t iface = {};
+    ASSERT_EQ(xgl_transport_get_rx_endpoint(&ctx, &iface), XGL_OK);
     EXPECT_NE(iface.receive, nullptr);
     EXPECT_EQ(iface.ctx, &ctx);
 }

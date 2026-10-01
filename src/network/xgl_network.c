@@ -135,13 +135,13 @@ static xgl_error_t network_receive_impl(void* ctx, xgl_handle_t handle,
 /**
  * \brief           Bind the packet and frame boundaries of a network context
  */
-xgl_error_t xgl_network_get_interfaces(xgl_network_ctx_t* ctx,
-                                       xgl_packet_interface_t* packets,
-                                       xgl_frame_interface_t* frames) {
+xgl_error_t xgl_network_get_endpoints(xgl_network_ctx_t* ctx,
+                                      xgl_packet_tx_endpoint_t* packets,
+                                      xgl_frame_rx_endpoint_t* frames) {
     if (ctx == NULL || packets == NULL || frames == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    xgl_packet_interface_init(packets, ctx, network_send_impl, NULL);
-    xgl_frame_interface_init(frames, ctx, NULL, network_receive_impl);
+    xgl_packet_tx_endpoint_init(packets, ctx, network_send_impl);
+    xgl_frame_rx_endpoint_init(frames, ctx, network_receive_impl);
     return XGL_OK;
 }
