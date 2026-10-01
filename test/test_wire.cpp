@@ -6,6 +6,29 @@
 #include <xgen/bytes/bytes.h>
 #include <xgen/crc/crc.h>
 
+TEST(XglWireViewTest, AckRangesBorrowWireBytesWithoutAnOutputArray) {
+    const uint8_t bytes[] = {42, 0, 0, 0, 250, 0, 0, 0, 2,
+                             0, 0, 3, 0, 2, 0, 1, 0};
+    xgl_wire_ack_range_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_ack_range_view(bytes, sizeof(bytes), &view),
+              XGL_OK);
+    EXPECT_EQ(view.largest_ack, 42U);
+    EXPECT_EQ(view.ack_delay_us, 250U);
+    EXPECT_EQ(view.range_count, 2U);
+    EXPECT_EQ(view.ranges, bytes + 9U);
+    xgl_wire_ack_range_t range = {};
+    ASSERT_EQ(xgl_wire_ack_range_at(&view, 0U, &range), XGL_OK);
+    EXPECT_EQ(range.gap, 0U);
+    EXPECT_EQ(range.length, 3U);
+    ASSERT_EQ(xgl_wire_ack_range_at(&view, 1U, &range), XGL_OK);
+    EXPECT_EQ(range.gap, 2U);
+    EXPECT_EQ(range.length, 1U);
+    EXPECT_EQ(xgl_wire_ack_range_at(&view, 2U, &range), XGL_ERR_NOT_FOUND);
+    EXPECT_EQ(xgl_wire_decode_ack_range_view(bytes, sizeof(bytes) - 1U, &view),
+              XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(view.ranges, nullptr);
+}
+
 TEST(XglWireViewTest, BorrowsValidatedBytesAndRejectsEveryTruncation) {
     uint8_t bytes[XGL_WIRE_BASE_HEADER_SIZE + 6] = {};
     xgl_wire_header_t header = {};

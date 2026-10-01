@@ -610,6 +610,42 @@ TEST_F(XglParserTest, RejectsFrameUntilBothCrcBytesArrive) {
     }
 }
 
+TEST_F(XglParserTest, CompleteViewBorrowsOnlyTheValidatedFrame) {
+    const auto frame = create_valid_frame({0xA1, 0xB2});
+    xgl_wire_frame_view_t view = {};
+    for (size_t i = 0U; i < frame.size(); ++i) {
+        const auto result =
+            xgl_parser_feed_byte_view(&parser, frame[i], 0U, &view);
+        if (i + 1U < frame.size()) {
+            EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
+        } else {
+            EXPECT_EQ(result, XGL_PARSE_RESULT_COMPLETE);
+        }
+    }
+    EXPECT_EQ(view.frame_buf, cache_buffer.data());
+    EXPECT_EQ(view.frame_len, frame.size());
+    ASSERT_EQ(view.payload_len, 2U);
+    EXPECT_EQ(view.payload[0], 0xA1U);
+    EXPECT_EQ(view.payload[1], 0xB2U);
+}
+
+TEST_F(XglParserTest, LongUnknownExtensionRemainsCompatible) {
+    std::vector<uint8_t> extension(231U, 0x33U);
+    extension[0] = 250U;
+    extension[1] = 229U;
+    const auto frame = create_wire_frame_with_ext(extension, {0x77});
+    xgl_wire_frame_view_t view = {};
+    for (size_t i = 0U; i < frame.size(); ++i) {
+        const auto result =
+            xgl_parser_feed_byte_view(&parser, frame[i], 0U, &view);
+        EXPECT_EQ(result, i + 1U == frame.size() ? XGL_PARSE_RESULT_COMPLETE
+                                               : XGL_PARSE_RESULT_INCOMPLETE);
+    }
+    EXPECT_EQ(view.extensions_len, 231U);
+    ASSERT_EQ(view.payload_len, 1U);
+    EXPECT_EQ(view.payload[0], 0x77U);
+}
+
 TEST_F(XglParserTest, GetFrameNullPointers) {
     xgl_error_t err = xgl_parser_get_frame(nullptr, nullptr, nullptr);
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);

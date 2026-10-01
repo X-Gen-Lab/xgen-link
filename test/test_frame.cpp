@@ -510,6 +510,61 @@ TEST(XglFrameTest, SerializeRejectsUnrepresentablePayloadLength) {
               XGL_ERR_BUFFER_TOO_SMALL);
 }
 
+TEST(XglFrameTest, PureEncodingPlansAuthenticatedLayoutWithoutAProvider) {
+    const uint8_t payload[] = {0x11, 0x22, 0x33};
+    xgl_frame_params_t params = {};
+    params.source_id = 1U;
+    params.target_id = 2U;
+    params.payload = payload;
+    params.payload_len = sizeof(payload);
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    xgl_frame_layout_t layout = {};
+    ASSERT_EQ(xgl_frame_measure(&frame, 4U, &layout), XGL_OK);
+    EXPECT_EQ(layout.header_len, 39U);
+    EXPECT_EQ(layout.payload_len, 3U);
+    EXPECT_EQ(layout.tag_len, 4U);
+    EXPECT_EQ(layout.frame_len, 48U);
+    uint8_t buffer[48] = {};
+    ASSERT_EQ(xgl_frame_encode_into(buffer, sizeof(buffer), &frame, 4U,
+                                   &layout),
+              XGL_OK);
+    EXPECT_EQ(std::memcmp(buffer + 39U, payload, sizeof(payload)), 0);
+    size_t written = 0U;
+    ASSERT_EQ(xgl_frame_finalize_crc(buffer, sizeof(buffer), &layout, &written),
+              XGL_OK);
+    EXPECT_EQ(written, 48U);
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, buffer, written, nullptr), XGL_OK);
+    EXPECT_TRUE(view.authenticated);
+    EXPECT_EQ(view.auth_tag_len, 4U);
+}
+
+TEST(XglFrameTest, ZeroCopyAndCopiedFramesUseIdenticalWireRules) {
+    const uint8_t payload[] = {0x41, 0x42};
+    xgl_frame_params_t params = {};
+    params.source_id = 1U;
+    params.target_id = 2U;
+    params.payload = payload;
+    params.payload_len = sizeof(payload);
+    params.packet_number = 99U;
+    params.ttl = 8U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    uint8_t copied[28] = {}, inplace[28] = {};
+    size_t copied_length = 0U, inplace_length = 0U;
+    ASSERT_EQ(xgl_frame_serialize(copied, sizeof(copied), &frame,
+                                  &copied_length),
+              XGL_OK);
+    std::memcpy(inplace + 24U, payload, sizeof(payload));
+    ASSERT_EQ(xgl_frame_build_zerocopy(inplace, sizeof(inplace), 24U,
+                                       sizeof(payload), 1U, 2U, 0U, 99U,
+                                       false, 0U, &inplace_length),
+              XGL_OK);
+    EXPECT_EQ(copied_length, inplace_length);
+    EXPECT_EQ(std::memcmp(copied, inplace, sizeof(copied)), 0);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Zero-Copy Tests                                                           */
 /*---------------------------------------------------------------------------*/
