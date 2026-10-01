@@ -5,6 +5,7 @@
 
 #include "wire/xgl_wire.h"
 #include "xgl_transport_internal.h"
+#include "xgl_transport_rx_internal.h"
 
 /**
  * \brief           Offer borrowed payload bytes to the application
@@ -91,6 +92,48 @@ xgl_error_t transport_decode_rx_fragment(const xgl_transport_ctx_t* ctx,
 }
 
 /**
+ * \brief           Match immutable attributes of all owned message fragments
+ */
+xgl_error_t transport_validate_rx_fragment_scope(
+    const xgl_transport_ctx_t* ctx, const xgl_transport_peer_state_t* peer,
+    const xgl_packet_t* packet, const transport_rx_fragment_t* fragment) {
+    const bool reliable = packet->reliable == XGL_RELIABILITY_ACK_ELICITING;
+    xgl_error_t error = xgl_fragment_validate_ext_scope(
+        ctx->fragment_mgr, packet->source_id, packet->connection_id,
+        packet->session_epoch, packet->data_type, fragment->message_id,
+        fragment->message_len, reliable);
+    if (error != XGL_OK) {
+        return error;
+    }
+#if XGL_FEATURE_OUT_OF_ORDER
+    if (peer != NULL) {
+        for (const xgl_transport_rx_buffered_packet_t* buffered =
+                 peer->rx_buffered;
+             buffered != NULL; buffered = buffered->next) {
+            if (!buffered->packet.fragment) {
+                continue;
+            }
+            transport_rx_fragment_t owned_fragment;
+            error = transport_decode_rx_fragment(ctx, &buffered->packet,
+                                                 &owned_fragment);
+            if (error != XGL_OK) {
+                return error;
+            }
+            if (owned_fragment.message_id == fragment->message_id &&
+                (buffered->packet.reliable != packet->reliable ||
+                 buffered->packet.data_type != packet->data_type ||
+                 owned_fragment.message_len != fragment->message_len)) {
+                return XGL_ERR_INVALID_FRAME;
+            }
+        }
+    }
+#else
+    (void)peer;
+#endif
+    return XGL_OK;
+}
+
+/**
  * \brief           Release a peer-owned completed message and its memory budget
  * \param[in,out]   ctx: Transport layer context
  * \param[in,out]   peer: Owning peer
@@ -168,10 +211,11 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
             return err;
         }
         xgl_fragment_message_t complete = {0};
-        err = xgl_fragment_process_ext(
+        err = xgl_fragment_process_ext_scoped(
             ctx->fragment_mgr, source_id, packet->connection_id,
             packet->session_epoch, data_type, fragment.message_id,
-            fragment.offset, fragment.message_len, data, data_len, &complete,
+            fragment.offset, fragment.message_len, data, data_len,
+            packet->reliable == XGL_RELIABILITY_ACK_ELICITING, &complete,
             transport_now(ctx));
 
         if (err == XGL_OK) {

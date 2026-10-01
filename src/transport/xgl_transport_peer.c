@@ -55,6 +55,34 @@ bool transport_peer_can_reclaim(const xgl_transport_ctx_t* ctx,
            !transport_peer_has_pending_data(ctx, peer);
 }
 
+bool transport_peer_reclaim_timeout(const xgl_transport_ctx_t* ctx,
+                                    const xgl_transport_peer_state_t* peer,
+                                    uint32_t now_ms, uint32_t* timeout_ms) {
+    if (!transport_peer_can_reclaim(ctx, peer)) {
+        return false;
+    }
+
+    bool active = false;
+    if (peer->hello_reserved) {
+        uint32_t elapsed = now_ms - peer->hello_reserved_ms;
+        *timeout_ms = elapsed >= XGL_TRANSPORT_HELLO_LEASE_MS
+                          ? 0U
+                          : XGL_TRANSPORT_HELLO_LEASE_MS - elapsed;
+        active = true;
+    }
+    if (ctx->peer_idle_timeout_ms != 0U) {
+        uint32_t elapsed = now_ms - peer->last_active_ms;
+        uint32_t remaining = elapsed >= ctx->peer_idle_timeout_ms
+                                 ? 0U
+                                 : ctx->peer_idle_timeout_ms - elapsed;
+        if (!active || remaining < *timeout_ms) {
+            *timeout_ms = remaining;
+        }
+        active = true;
+    }
+    return active;
+}
+
 static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
                                       xgl_transport_peer_state_t* peer);
 
@@ -123,7 +151,9 @@ transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
     peer->connection_id = connection_id;
     peer->session_epoch = session_epoch;
     peer->last_active_ms = transport_now(ctx);
+#if XGL_FEATURE_ADAPTIVE_RTO
     xgl_rtt_init(&peer->rtt_est);
+#endif
 
     xgl_error_t err = xgl_window_init(&peer->tx_window, ctx->window_size);
     if (err != XGL_OK) {
@@ -165,14 +195,14 @@ void transport_destroy_peers(xgl_transport_ctx_t* ctx) {
 
 /**
  * \brief           Reclaim peer states that have been idle beyond the
- *                  configured timeout without ever using reliable DATA numbers.
+ *                  configured timeout, or whose unused HELLO lease expired
  * \param[in,out]   ctx: Transport context
  * \param[in]       current_time_ms: Explicit current time
  * \return          Number of peers reclaimed.
  */
 uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
                                       uint32_t current_time_ms) {
-    if (ctx == NULL || ctx->peer_idle_timeout_ms == 0U) {
+    if (ctx == NULL) {
         return 0U;
     }
 
@@ -186,9 +216,10 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
         /* Accepted DATA history survives idle time so the same scope cannot
          * restart its packet numbers or lose duplicate suppression. */
 
-        uint32_t idle_ms = current_time_ms - peer->last_active_ms;
-        if (transport_peer_can_reclaim(ctx, peer) &&
-            idle_ms >= ctx->peer_idle_timeout_ms) {
+        uint32_t remaining = 0U;
+        if (transport_peer_reclaim_timeout(ctx, peer, current_time_ms,
+                                           &remaining) &&
+            remaining == 0U) {
             *prev = next;
             xgl_reliable_destroy(&peer->reliable_queue);
             xgl_window_destroy(&peer->tx_window);

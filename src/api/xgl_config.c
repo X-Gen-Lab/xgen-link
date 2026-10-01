@@ -47,6 +47,9 @@ void xgl_config_get_default(xgl_config_t* config) {
     return;
 #else
     xgl_config_t default_config = XGL_CONFIG_PRESET_MEDIUM;
+    if (default_config.protocol.window_size > XGL_BUILD_WINDOW_CAPACITY) {
+        default_config.protocol.window_size = XGL_BUILD_WINDOW_CAPACITY;
+    }
 
     /* Copy to output */
     memcpy(config, &default_config, sizeof(xgl_config_t));
@@ -201,7 +204,8 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
 
     if (config->protocol.window_size < XGL_MIN_WINDOW_SIZE ||
-        config->protocol.window_size > XGL_MAX_WINDOW_SIZE) {
+        config->protocol.window_size > XGL_MAX_WINDOW_SIZE ||
+        config->protocol.window_size > XGL_BUILD_WINDOW_CAPACITY) {
         return XGL_ERR_INVALID_PARAM;
     }
 

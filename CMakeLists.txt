@@ -57,6 +57,7 @@ option(XGL_ALLOW_FALLBACK_MALLOC "Allow instance creation to select the explicit
 if(XGL_PROFILE STREQUAL "boot" AND XGL_ALLOW_FALLBACK_MALLOC)
     message(FATAL_ERROR "The boot profile requires XGL_ALLOW_FALLBACK_MALLOC=OFF")
 endif()
+xgl_finalize_build_config()
 option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" ${PROJECT_IS_TOP_LEVEL})
 
 include(cmake/XglDependencies.cmake)
@@ -105,6 +106,7 @@ set_target_properties(xgl PROPERTIES
     XGL_BUILD_CONFIG_ID "${XGL_BUILD_CONFIG_ID}"
     XGL_CAPABILITIES "${XGL_CAPABILITIES}"
     EXPORT_PROPERTIES "XGL_PROFILE;XGL_BUILD_CONFIG_ID;XGL_CAPABILITIES")
+xgl_apply_build_contract(xgl)
 target_compile_features(xgl PUBLIC c_std_11)
 target_link_libraries(xgl PUBLIC xgm::allocator
     PRIVATE ${XGL_PRIVATE_DEPENDENCIES})

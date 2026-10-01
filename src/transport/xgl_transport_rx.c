@@ -5,6 +5,7 @@
 
 #include "xgl/xgl_config.h"
 #include "xgl_transport_internal.h"
+#include "xgl_transport_rx_internal.h"
 
 #if XGL_FEATURE_OUT_OF_ORDER
 /**
@@ -207,12 +208,14 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #endif
 
     xgl_error_t err;
+#if XGL_FEATURE_FRAGMENTATION
+    transport_rx_fragment_t fragment;
+#endif
     if (packet->fragment) {
 #if XGL_FEATURE_FRAGMENTATION
         if (ctx->fragment_mgr == NULL) {
             return XGL_ERR_INVALID_FRAME;
         }
-        transport_rx_fragment_t fragment;
         err = transport_decode_rx_fragment(ctx, packet, &fragment);
         if (err != XGL_OK) {
             return err;
@@ -227,6 +230,15 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     if (rx_peer != NULL && rx_peer->failed) {
         return XGL_ERR_ACK_TIMEOUT;
     }
+#if XGL_FEATURE_FRAGMENTATION
+    if (packet->fragment) {
+        err = transport_validate_rx_fragment_scope(ctx, rx_peer, packet,
+                                                   &fragment);
+        if (err != XGL_OK) {
+            return err;
+        }
+    }
+#endif
     if (rx_peer != NULL) {
         rx_peer->last_active_ms = transport_now(ctx);
     }

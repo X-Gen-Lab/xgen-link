@@ -76,22 +76,21 @@ static xgl_error_t ack_ranges_next(ack_ranges_t* cursor, uint32_t* low,
  * \brief           Complete one actually transmitted packet in its owning peer
  * \param[in,out]   ctx: Transport layer context
  * \param[in,out]   peer: Owning peer
- * \param[in]       packet_number: Acknowledged packet number
+ * \param[in]       packet: Live record already found in the owning queue
  * \param[in]       now_ms: Current transport clock
  */
 static void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
                                          xgl_transport_peer_state_t* peer,
-                                         uint32_t packet_number,
+                                         xgl_reliable_packet_t* packet,
                                          uint32_t now_ms) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
 #if !XGL_FEATURE_STATISTICS
     (void)ctx;
 #endif
-    const xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(
-        &peer->reliable_queue, packet_number, peer->peer_id);
-    if (packet == NULL || !packet->sent) {
+    if (packet == NULL || !packet->sent || packet->target_id != peer->peer_id) {
         return;
     }
+#if XGL_FEATURE_ADAPTIVE_RTO
     uint32_t elapsed = now_ms - packet->send_timestamp;
     if (packet->retry_count == 0U && elapsed > 0U && elapsed <= INT32_MAX) {
         xgl_rtt_update(&peer->rtt_est, (int32_t)elapsed);
@@ -108,9 +107,12 @@ static void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
         }
 #endif
     }
-    (void)xgl_window_mark_ack_packet_number(&peer->tx_window, packet_number);
-    (void)xgl_reliable_remove_packet_number(&peer->reliable_queue,
-                                            packet_number, peer->peer_id);
+#else
+    (void)now_ms;
+#endif
+    (void)xgl_window_mark_ack_packet_number(&peer->tx_window,
+                                            packet->packet_number);
+    (void)xgl_reliable_remove_owned(&peer->reliable_queue, packet);
 }
 
 /**
@@ -138,23 +140,27 @@ static xgl_error_t transport_process_ack_range(xgl_transport_ctx_t* ctx,
         return err;
     }
 
-    /* Visit actual outstanding records, never every number in an ACK span. */
+    /* Peer admission appends strictly increasing packet numbers. Walk that
+     * queue backwards with the descending ranges, without rescanning either.
+     * Complete validation above remains separate from all mutations. */
     uint32_t now = transport_now(ctx);
-    xgct_list_node_t *node, *next;
-    XGCT_LIST_FOR_EACH_SAFE(&peer->reliable_queue.wait_ack_list, node, next) {
-        const xgl_reliable_packet_t* packet =
+    ranges.index = 0U;
+    ranges.next_high = ranges.view.largest_ack;
+    bool has_range = ack_ranges_next(&ranges, &low, &high) == XGL_OK;
+    xgct_list_node_t* node = peer->reliable_queue.wait_ack_list.tail;
+    while (node != NULL && has_range) {
+        xgct_list_node_t* previous = node->prev;
+        xgl_reliable_packet_t* packet =
             /* The queue owns this intrusive record. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        ranges.index = 0U;
-        ranges.next_high = ranges.view.largest_ack;
-        while (ack_ranges_next(&ranges, &low, &high) == XGL_OK) {
-            if (packet->packet_number >= low && packet->packet_number <= high) {
-                transport_acknowledge_packet(ctx, peer, packet->packet_number,
-                                             now);
-                break;
-            }
+        while (has_range && packet->packet_number < low) {
+            has_range = ack_ranges_next(&ranges, &low, &high) == XGL_OK;
         }
+        if (has_range && packet->packet_number <= high) {
+            transport_acknowledge_packet(ctx, peer, packet, now);
+        }
+        node = previous;
     }
     (void)xgl_window_advance_base_packet_number(&peer->tx_window);
     peer->last_active_ms = now;
@@ -219,24 +225,34 @@ static xgl_error_t transport_process_sack_value(
     }
 
     uint32_t now = transport_now(ctx);
-    /* Commit the complete acknowledgement before retrying any missing packet.
-     * Local send backpressure cannot invalidate already received peer data. */
-    for (size_t i = 0; i <= highest_set; ++i) {
-        if (transport_sack_bit_is_set(view.bitmap, i)) {
-            transport_acknowledge_packet(ctx, peer,
-                                         view.base_packet + (uint32_t)i, now);
+    /* Visit actual records rather than every bitmap position. Commit all
+     * acknowledgements before marking any missing record for later retry. */
+    xgct_list_node_t *node, *next;
+    XGCT_LIST_FOR_EACH_SAFE(&peer->reliable_queue.wait_ack_list, node, next) {
+        /* The queue owns this intrusive record. */
+        /* NOLINTNEXTLINE(bugprone-casting-through-void) */
+        xgl_reliable_packet_t* packet =
+            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+        if (packet->packet_number >= view.base_packet) {
+            size_t bit = packet->packet_number - view.base_packet;
+            if (bit <= highest_set &&
+                transport_sack_bit_is_set(view.bitmap, bit)) {
+                transport_acknowledge_packet(ctx, peer, packet, now);
+            }
         }
     }
     (void)xgl_window_advance_base_packet_number(&peer->tx_window);
 
-    for (size_t i = 0; i <= highest_set; ++i) {
-        if (transport_sack_bit_is_set(view.bitmap, i)) {
-            continue;
+    XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+        /* The queue owns this intrusive record. */
+        /* NOLINTNEXTLINE(bugprone-casting-through-void) */
+        xgl_reliable_packet_t* packet =
+            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+        if (packet->target_id == source_id &&
+            packet->packet_number >= view.base_packet &&
+            packet->packet_number - view.base_packet <= highest_set) {
+            transport_schedule_fast_retry(packet);
         }
-        uint32_t packet_number = view.base_packet + (uint32_t)i;
-        xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
-            &peer->reliable_queue, packet_number, source_id);
-        transport_schedule_fast_retry(missing);
     }
 
     return XGL_OK;

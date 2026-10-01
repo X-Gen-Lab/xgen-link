@@ -38,15 +38,40 @@ static xgl_error_t transport_encode_fragment_ext(uint32_t message_id,
 }
 
 /**
- * \brief           Queue and synchronously transmit one message fragment
- * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle
+ * \brief           Reserve one fragment record and its encoded extensions
+ * \param[in]       ctx: Transport context
  * \param[in,out]   peer: Reliable owner, or NULL for unreliable transmission
  * \param[in]       tx_data: Message metadata and bytes
  * \param[in]       message_id: Fragment message identity
  * \param[in]       offset: Next message byte to transmit
  * \param[in]       length: Fragment payload size
- * \return          XGL_OK only after the lower layer has accepted the bytes
+ * \param[out]      extension: Encoded fragment metadata
+ * \param[out]      extension_len: Encoded metadata length
+ * \param[out]      packet: Owned reliable record, or NULL for unreliable data
+ * \return          XGL_OK or a local reservation error
+ */
+static xgl_error_t transport_reserve_message_fragment(
+    const xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
+    const xgl_tx_data_t* tx_data, uint32_t message_id, size_t offset,
+    size_t length, uint8_t* extension, size_t* extension_len,
+    xgl_reliable_packet_t** packet) {
+    xgl_error_t err = transport_encode_fragment_ext(
+        message_id, (uint32_t)offset, (uint32_t)tx_data->data_len, extension,
+        XGL_FRAGMENT_EXT_SIZE, extension_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    uint32_t packet_number =
+        peer != NULL ? xgl_window_get_next_packet_number(&peer->tx_window) : 0U;
+    return transport_queue_reliable_tx(
+        ctx, peer, tx_data, tx_data->data + offset, length, packet_number, true,
+        extension, *extension_len, packet);
+}
+
+/**
+ * \brief           Reserve and submit one fragment of an owned message
+ * \note            Local reservations are released on lower-layer rejection.
  */
 static xgl_error_t transport_send_message_fragment(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle,
@@ -54,22 +79,15 @@ static xgl_error_t transport_send_message_fragment(
     uint32_t message_id, size_t offset, size_t length) {
     uint8_t extension[XGL_FRAGMENT_EXT_SIZE] = {0};
     size_t extension_len = 0U;
-    xgl_error_t err = transport_encode_fragment_ext(
-        message_id, (uint32_t)offset, (uint32_t)tx_data->data_len, extension,
-        sizeof(extension), &extension_len);
+    xgl_reliable_packet_t* packet = NULL;
+    xgl_error_t err = transport_reserve_message_fragment(
+        ctx, peer, tx_data, message_id, offset, length, extension,
+        &extension_len, &packet);
     if (err != XGL_OK) {
         return err;
     }
-
     uint32_t packet_number =
         peer != NULL ? xgl_window_get_next_packet_number(&peer->tx_window) : 0U;
-    xgl_reliable_packet_t* packet = NULL;
-    err = transport_queue_reliable_tx(
-        ctx, peer, tx_data, tx_data->data + offset, length, packet_number, true,
-        extension, extension_len, &packet);
-    if (err != XGL_OK) {
-        return err;
-    }
     return transport_send_packet_view(
         ctx, handle, peer, tx_data, tx_data->data + offset, length,
         packet_number, true, extension, extension_len, &packet);
@@ -198,7 +216,8 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
         UINT32_MAX - peer->tx_window.next_packet_number) {
         return XGL_ERR_SEQUENCE_ERROR;
     }
-    if (tx_data->data_len > ctx->max_tx_message_bytes - ctx->tx_message_bytes) {
+    if (ctx->tx_message_bytes > ctx->max_tx_message_bytes ||
+        tx_data->data_len > ctx->max_tx_message_bytes - ctx->tx_message_bytes) {
         return XGL_ERR_NO_MEMORY;
     }
     uint8_t* owned_data = xgm_alloc(ctx->memory.tx_message, tx_data->data_len);
@@ -212,9 +231,49 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
     peer->tx_message.data = owned_data;
     peer->tx_message_offset = 0U;
     peer->tx_fragment_payload_size = plan->fragment_payload_budget;
-    peer->tx_message_id = ctx->next_message_id++;
+    peer->tx_message_id = ctx->next_message_id;
 
-    /* Admission has completed. Later failures use the peer error callback. */
+    uint8_t extension[XGL_FRAGMENT_EXT_SIZE] = {0};
+    size_t extension_len = 0U;
+    xgl_reliable_packet_t* packet = NULL;
+    size_t length = tx_data->data_len < plan->fragment_payload_budget
+                        ? tx_data->data_len
+                        : plan->fragment_payload_budget;
+    xgl_error_t err = transport_reserve_message_fragment(
+        ctx, peer, &peer->tx_message, peer->tx_message_id, 0U, length,
+        extension, &extension_len, &packet);
+    if (err == XGL_OK) {
+        err = transport_announce_peer(ctx, handle, peer);
+    }
+    if (err != XGL_OK) {
+        if (packet != NULL) {
+            (void)xgl_reliable_remove_packet_number(
+                &peer->reliable_queue, packet->packet_number, peer->peer_id);
+        }
+        transport_clear_tx_message(ctx, peer);
+        return err;
+    }
+
+    /* Both the complete message and its first frame now have local owners.
+     * Failures after announcing this admission retain or fail owned work. */
+    ctx->next_message_id++;
+    err = transport_send_packet_view(ctx, handle, peer, &peer->tx_message,
+                                     owned_data, length, packet->packet_number,
+                                     true, extension, extension_len, &packet);
+    if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY ||
+        err == XGL_ERR_WINDOW_FULL) {
+        peer->tx_message_retry_pending = true;
+        peer->tx_message_retry_started_ms = transport_now(ctx);
+        return XGL_OK;
+    }
+    if (err != XGL_OK) {
+        transport_fail_peer(ctx, handle, peer, err);
+        return XGL_OK;
+    }
+    peer->tx_message_offset = length;
+    if (length == peer->tx_message.data_len) {
+        transport_clear_tx_message(ctx, peer);
+    }
     (void)transport_pump_tx_message(ctx, handle, peer);
     return XGL_OK;
 }

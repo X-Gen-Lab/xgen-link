@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "xgl/xgl_build_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 
@@ -32,7 +33,8 @@ typedef struct {
     uint32_t
         send_base_packet_number; /**< Base packet number of sending window */
     uint32_t next_packet_number; /**< Next packet number to send */
-    uint8_t ack_received[16];    /**< Inline bitmap for at most 128 packets */
+    uint8_t ack_received[(XGL_BUILD_WINDOW_CAPACITY + 7U) / 8U];
+    /**< Inline bitmap bounded by the compiled private window capacity */
 } xgl_sliding_window_t;
 
 /*---------------------------------------------------------------------------*/
@@ -42,7 +44,7 @@ typedef struct {
 /**
  * \brief           Initialize a sliding window using its inline ACK bitmap
  * \param[in,out]   window: Uninitialized or previously destroyed window
- * \param[in]       window_size: Maximum window size, from 1 to 128
+ * \param[in]       window_size: Size from 1 to XGL_BUILD_WINDOW_CAPACITY
  * \return          XGL_OK on success, error code otherwise
  * \note            Destroy a live window before initializing it again.
  *                  Failure leaves the supplied window unchanged. No allocation

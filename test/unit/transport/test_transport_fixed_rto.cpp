@@ -104,7 +104,8 @@ TEST_F(XglTransportFixedRtoTest, ZeroRequestTimeoutUsesConfiguredDefault) {
     EXPECT_EQ(data_sends, 2U);
 }
 
-TEST_F(XglTransportFixedRtoTest, AcknowledgmentDoesNotReplaceConfiguredDefault) {
+TEST_F(XglTransportFixedRtoTest,
+       AcknowledgmentDoesNotReplaceConfiguredDefault) {
     ASSERT_EQ(Send(250U, 100U), XGL_OK);
     ASSERT_EQ(Acknowledge(150U), XGL_OK);
     ASSERT_EQ(Send(0U, 200U), XGL_OK);
@@ -130,5 +131,5 @@ TEST_F(XglTransportFixedRtoTest, SuccessfulRetryRetainsExponentialBackoff) {
     ExpectDeadline(2200U, 2800U);
 }
 
-} // namespace
+}  // namespace
 #endif

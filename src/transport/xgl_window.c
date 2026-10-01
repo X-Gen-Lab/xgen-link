@@ -21,7 +21,7 @@ xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (window_size == 0 || window_size > 128) {
+    if (window_size == 0 || window_size > XGL_BUILD_WINDOW_CAPACITY) {
         return XGL_ERR_INVALID_PARAM;
     }
 

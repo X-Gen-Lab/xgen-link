@@ -22,7 +22,7 @@ _Static_assert(XGL_ALLOW_FALLBACK_MALLOC == 0,
 
 __attribute__((used, section(".xgl_footprint_layout")))
 const uint32_t xgl_boot_target_layout[] = {UINT32_C(0x58474c42),
-                                           5U,
+                                           6U,
                                            sizeof(void*),
                                            _Alignof(xgm_max_align_t),
                                            sizeof(xgl_workspace_t),
@@ -45,4 +45,8 @@ const uint32_t xgl_boot_target_layout[] = {UINT32_C(0x58474c42),
                                            XGL_WIRE_BASE_HEADER_SIZE,
                                            XGL_CRC16_SIZE,
                                            XGL_DATALINK_RX_CHUNK_SIZE,
-                                           0U}; /* No external window pool. */
+                                           0U, /* No external window pool. */
+                                           XGL_RESOURCE_CONFIG_ID,
+                                           XGL_BUILD_WINDOW_CAPACITY,
+                                           XGL_RELIABLE_BUCKET_COUNT,
+                                           XGL_FEATURE_ADAPTIVE_RTO};

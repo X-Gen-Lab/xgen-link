@@ -65,10 +65,15 @@ typedef struct xgl_transport_peer_state_s {
     uint32_t session_epoch; /**< Production session epoch for scoped state */
     bool hello_sent;        /**< HELLO has been sent for this session */
     bool failed; /**< Scope is terminal after failure; use a new epoch */
+    bool hello_reserved; /**< Received HELLO holds an unused scope lease */
     xgl_sliding_window_t tx_window;      /**< Peer-specific TX window */
     xgl_reliable_queue_t reliable_queue; /**< Peer-specific wait-ACK queue */
-    xgl_rtt_estimator_t rtt_est;         /**< Peer-specific RTT estimator */
-    uint32_t last_active_ms;             /**< Last activity timestamp */
+#if XGL_FEATURE_ADAPTIVE_RTO
+    xgl_rtt_estimator_t rtt_est; /**< Peer-specific RTT estimator */
+#endif
+    uint32_t last_active_ms; /**< Last activity timestamp */
+    uint32_t
+        hello_reserved_ms; /**< First HELLO time; duplicates do not renew */
     uint32_t rx_next_packet_number;  /**< Next in-order packet number expected
                                         from peer */
     bool rx_has_packet_number_state; /**< Receive packet-number state

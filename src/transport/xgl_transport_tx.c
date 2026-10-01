@@ -90,9 +90,13 @@ static int32_t transport_send_timeout_ms(const xgl_transport_ctx_t* ctx,
         return (int32_t)tx_data->timeout_ms;
     }
 
+#if XGL_FEATURE_ADAPTIVE_RTO
     if (peer != NULL && xgl_rtt_is_initialized(&peer->rtt_est)) {
         return xgl_rtt_get_rto(&peer->rtt_est);
     }
+#else
+    (void)peer;
+#endif
     return ctx->default_timeout_ms != 0U ? (int32_t)ctx->default_timeout_ms
                                          : XGL_DEFAULT_RTO_MS;
 }
@@ -192,16 +196,15 @@ xgl_error_t transport_send_packet_view(
 }
 
 /**
- * \brief           Validate peer capacity and announce a reliable scope
+ * \brief           Validate a reliable owner before any external submission
  * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle
  * \param[in]       tx_data: Borrowed application request
  * \param[out]      peer: Exact reliable owner, or NULL for unreliable traffic
  * \param[out]      created: Whether this request reserved the peer
  * \return          XGL_OK or admission error
  */
 static xgl_error_t transport_prepare_reliable_send(
-    xgl_transport_ctx_t* ctx, xgl_handle_t handle, const xgl_tx_data_t* tx_data,
+    xgl_transport_ctx_t* ctx, const xgl_tx_data_t* tx_data,
     xgl_transport_peer_state_t** peer, bool* created) {
     *peer = NULL;
     *created = false;
@@ -210,10 +213,15 @@ static xgl_error_t transport_prepare_reliable_send(
         return XGL_OK;
     }
 
+    const bool has_capacity =
+        transport_tx_packet_count(ctx) < ctx->max_tx_packets;
     *peer = transport_find_peer_scope(ctx, tx_data->target_id,
                                       tx_data->connection_id,
                                       tx_data->session_epoch);
     if (*peer == NULL) {
+        if (!has_capacity) {
+            return XGL_ERR_WINDOW_FULL;
+        }
         *peer = transport_get_or_create_peer_scope(ctx, tx_data->target_id,
                                                    tx_data->connection_id,
                                                    tx_data->session_epoch);
@@ -239,15 +247,21 @@ static xgl_error_t transport_prepare_reliable_send(
         return XGL_ERR_WINDOW_FULL;
     }
 
-    if ((*peer)->hello_sent) {
+    return has_capacity ? XGL_OK : XGL_ERR_WINDOW_FULL;
+}
+
+xgl_error_t transport_announce_peer(const xgl_transport_ctx_t* ctx,
+                                    xgl_handle_t handle,
+                                    xgl_transport_peer_state_t* peer) {
+    if (peer == NULL || peer->hello_sent) {
         return XGL_OK;
     }
 
     xgl_error_t err = transport_send_control(
-        ctx, handle, tx_data->target_id, XGL_TRANSPORT_CONTROL_HELLO,
-        (*peer)->connection_id, (*peer)->session_epoch);
+        ctx, handle, peer->peer_id, XGL_TRANSPORT_CONTROL_HELLO,
+        peer->connection_id, peer->session_epoch);
     if (err == XGL_OK) {
-        (*peer)->hello_sent = true;
+        peer->hello_sent = true;
     }
 
     return err;
@@ -320,8 +334,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     /* Validate the complete frame budget before reserving a scope or HELLO. */
     xgl_transport_peer_state_t* peer = NULL;
     bool created = false;
-    err =
-        transport_prepare_reliable_send(ctx, handle, tx_data, &peer, &created);
+    err = transport_prepare_reliable_send(ctx, tx_data, &peer, &created);
     if (err != XGL_OK) {
         transport_rollback_new_peer(ctx, handle, peer, created);
         return err;
@@ -346,6 +359,14 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         err = transport_queue_reliable_tx(ctx, peer, tx_data, send_data,
                                           send_data_len, packet_number, false,
                                           NULL, 0U, &rel_packet);
+        if (err == XGL_OK) {
+            err = transport_announce_peer(ctx, handle, peer);
+            if (err != XGL_OK && rel_packet != NULL) {
+                (void)xgl_reliable_remove_packet_number(
+                    &peer->reliable_queue, packet_number, tx_data->target_id);
+                rel_packet = NULL;
+            }
+        }
         if (err == XGL_OK) {
             err = transport_send_packet_view(
                 ctx, handle, peer, tx_data, send_data, send_data_len,

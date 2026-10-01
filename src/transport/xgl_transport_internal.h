@@ -16,6 +16,10 @@
 extern "C" {
 #endif
 
+/** \brief           Maximum lifetime of an unused received HELLO reservation.
+ */
+#define XGL_TRANSPORT_HELLO_LEASE_MS 5000U
+
 /**
  * \brief           Read the selected transport clock; explicit zero is valid
  * \param[in]       ctx: Transport layer context
@@ -91,6 +95,17 @@ transport_get_or_create_rx_peer(xgl_transport_ctx_t* ctx,
                                 const xgl_packet_t* packet);
 bool transport_peer_can_reclaim(const xgl_transport_ctx_t* ctx,
                                 const xgl_transport_peer_state_t* peer);
+/**
+ * \brief           Query the earliest unused-scope reclaim deadline
+ * \param[in]       ctx: Transport configuration
+ * \param[in]       peer: Scope with no reliable history or owned bytes
+ * \param[in]       now_ms: Caller-provided current time
+ * \param[out]      timeout_ms: Remaining delay; zero means due
+ * \return          true when a HELLO lease or configured idle limit applies
+ */
+bool transport_peer_reclaim_timeout(const xgl_transport_ctx_t* ctx,
+                                    const xgl_transport_peer_state_t* peer,
+                                    uint32_t now_ms, uint32_t* timeout_ms);
 void transport_destroy_peers(xgl_transport_ctx_t* ctx);
 uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
                                       uint32_t current_time_ms);

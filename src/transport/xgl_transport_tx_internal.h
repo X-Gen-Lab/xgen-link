@@ -33,6 +33,19 @@ xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
                                       xgl_transport_send_plan_t* plan);
 
 /**
+ * \brief           Announce a peer after local record and payload reservation
+ * \param[in]       ctx: Transport context and lower endpoint
+ * \param[in]       handle: Protocol instance handle
+ * \param[in,out]   peer: Reliable owner, or NULL for unreliable traffic
+ * \return          XGL_OK or the HELLO submission error
+ * \note            Repeated calls never reset existing state. Callers release
+ *                  their unpublished reservations when HELLO fails.
+ */
+xgl_error_t transport_announce_peer(const xgl_transport_ctx_t* ctx,
+                                    xgl_handle_t handle,
+                                    xgl_transport_peer_state_t* peer);
+
+/**
  * \brief           Copy reliable payload and extensions into an owned record
  * \note            Unreliable traffic returns no record. Failed reservations
  *                  are released without consuming a DATA number.

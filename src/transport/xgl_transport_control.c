@@ -93,6 +93,12 @@ xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
     if (peer == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
-    peer->last_active_ms = transport_now(ctx);
+    /* A duplicate HELLO cannot keep an unused reservation alive forever.
+     * Accepted DATA, owned work and failed identities retain their normal
+     * explicit lifecycle instead of becoming lease-reclaimable. */
+    if (!peer->hello_reserved && transport_peer_can_reclaim(ctx, peer)) {
+        peer->hello_reserved = true;
+        peer->hello_reserved_ms = transport_now(ctx);
+    }
     return XGL_OK;
 }

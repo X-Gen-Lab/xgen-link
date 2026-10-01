@@ -278,7 +278,9 @@ class DependencyContracts(unittest.TestCase):
 
     def test_full_and_boot_have_independent_configuration_and_builds(self):
         ids = {}
-        for profile, expected in (("full", 303), ("boot", 301)):
+        # Full explicitly disables its default heap compatibility backend.
+        # Its resource identity is 3 + 8*(5 + 8*(5 + 8*(1 + 2*3))) = 3947.
+        for profile, expected in (("full", 65536 + 3947), ("boot", 301)):
             with self.subTest(profile=profile):
                 body = (parent_sources() + disable_helpers() + load_link(profile=profile) +
                         'get_target_property(libraries xgl LINK_LIBRARIES)\n'

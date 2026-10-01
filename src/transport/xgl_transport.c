@@ -34,8 +34,8 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     }
 #endif
     if (config->default_timeout_ms > INT32_MAX || config->window_size == 0U ||
-        config->window_size > 128U || config->max_tx_packets == 0U ||
-        config->max_peers == 0U) {
+        config->window_size > XGL_BUILD_WINDOW_CAPACITY ||
+        config->max_tx_packets == 0U || config->max_peers == 0U) {
         return XGL_ERR_INVALID_PARAM;
     }
 

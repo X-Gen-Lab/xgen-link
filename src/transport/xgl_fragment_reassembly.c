@@ -58,7 +58,7 @@ fragment_find_reassembly_buffer(const xgl_fragment_manager_t* manager,
 static xgl_error_t fragment_create_reassembly_buffer(
     xgl_fragment_manager_t* manager, uint16_t source_id, uint32_t connection_id,
     uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
-    uint32_t message_len, xgl_reassembly_buffer_t** buffer_out) {
+    uint32_t message_len, bool reliable, xgl_reassembly_buffer_t** buffer_out) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (manager == NULL || buffer_out == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -95,6 +95,7 @@ static xgl_error_t fragment_create_reassembly_buffer(
     buffer->session_epoch = session_epoch;
     buffer->message_id = message_id;
     buffer->data_type = data_type;
+    buffer->reliable = reliable;
     buffer->timeout_ms = manager->reassembly_timeout_ms;
     buffer->message_len = message_len;
 
@@ -137,11 +138,11 @@ static xgl_error_t fragment_validate_ext_input(uint32_t fragment_offset,
 
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-xgl_error_t xgl_fragment_process_ext(
+xgl_error_t xgl_fragment_process_ext_scoped(
     xgl_fragment_manager_t* manager, uint16_t source_id, uint32_t connection_id,
     uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
     uint32_t fragment_offset, uint32_t message_len,
-    const uint8_t* fragment_payload, size_t fragment_payload_len,
+    const uint8_t* fragment_payload, size_t fragment_payload_len, bool reliable,
     xgl_fragment_message_t* complete, uint32_t current_time_ms) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (manager == NULL || fragment_payload == NULL ||
@@ -167,14 +168,15 @@ xgl_error_t xgl_fragment_process_ext(
     if (buffer == NULL) {
         err = fragment_create_reassembly_buffer(
             manager, source_id, connection_id, session_epoch, data_type,
-            message_id, message_len, &buffer);
+            message_id, message_len, reliable, &buffer);
         if (err != XGL_OK) {
             return err;
         }
     }
 
     if (buffer->data_type != data_type ||
-        buffer->message_len != (size_t)message_len) {
+        buffer->message_len != (size_t)message_len ||
+        buffer->reliable != reliable) {
         return XGL_ERR_INVALID_FRAME;
     }
 
@@ -207,4 +209,39 @@ xgl_error_t xgl_fragment_process_ext(
     }
 
     return XGL_ERR_BUSY;
+}
+
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t xgl_fragment_process_ext(
+    xgl_fragment_manager_t* manager, uint16_t source_id, uint32_t connection_id,
+    uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
+    uint32_t fragment_offset, uint32_t message_len,
+    const uint8_t* fragment_payload, size_t fragment_payload_len,
+    xgl_fragment_message_t* complete, uint32_t current_time_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    return xgl_fragment_process_ext_scoped(
+        manager, source_id, connection_id, session_epoch, data_type, message_id,
+        fragment_offset, message_len, fragment_payload, fragment_payload_len,
+        false, complete, current_time_ms);
+}
+
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t xgl_fragment_validate_ext_scope(
+    const xgl_fragment_manager_t* manager, uint16_t source_id,
+    uint32_t connection_id, uint32_t session_epoch, uint8_t data_type,
+    uint32_t message_id, uint32_t message_len, bool reliable) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    if (manager == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    const xgl_reassembly_buffer_t* buffer = fragment_find_reassembly_buffer(
+        manager, source_id, connection_id, session_epoch, message_id);
+    if (buffer != NULL && (buffer->data_type != data_type ||
+                           buffer->message_len != (size_t)message_len ||
+                           buffer->reliable != reliable)) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    return XGL_OK;
 }

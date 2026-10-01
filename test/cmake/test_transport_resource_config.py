@@ -83,7 +83,7 @@ class TransportResourceConfig(unittest.TestCase):
             ''.join(f'    "{path.as_posix()}"\n' for path in (
                 ARGS.link_source / "src", ARGS.link_source / "include",
                 binary / "link/generated", ARGS.status_source / "include",
-                ARGS.containers_source / "include")) + ')\n' +
+                ARGS.memory_source / "include", ARGS.containers_source / "include")) + ')\n' +
             (f'target_compile_definitions(probe PRIVATE {definitions})\n' if definitions else "") +
             (f'target_sources(probe PRIVATE "{(ARGS.containers_source / "src/bitset.c").as_posix()}")\n'
              if window else ""), encoding="utf-8")
@@ -159,8 +159,14 @@ class TransportResourceConfig(unittest.TestCase):
 
     def test_generated_header_rejects_conflicting_resource_override(self):
         binary = self.configure("override", buckets="2", capacity="8", adaptive="OFF")
+        self.probe("override-matching", binary,
+                   '#include <xgl/xgl_build_config.h>\n'
+                   '_Static_assert(XGL_BUILD_WINDOW_CAPACITY == 8U, "compiled window");\n'
+                   'int main(void) { return 0; }\n',
+                   definitions="XGL_RELIABLE_BUCKET_COUNT=2 XGL_BUILD_WINDOW_CAPACITY=8 XGL_FEATURE_ADAPTIVE_RTO=0")
         for definition in ("XGL_RELIABLE_BUCKET_COUNT=32", "XGL_BUILD_WINDOW_CAPACITY=128",
-                           "XGL_FEATURE_ADAPTIVE_RTO=1", "XGL_EXPECTED_RESOURCE_CONFIG_ID=0"):
+                           "XGL_FEATURE_ADAPTIVE_RTO=1", "XGL_EXPECTED_RESOURCE_CONFIG_ID=0",
+                           "XGL_RESOURCE_CONFIG_ID=0", "XGL_BUILD_CONFIG_ID=303"):
             with self.subTest(definition=definition):
                 self.probe("override-" + definition.split("=")[0], binary,
                            '#include <xgl/xgl_build_config.h>\nint main(void) { return 0; }\n',
@@ -182,12 +188,16 @@ class TransportResourceConfig(unittest.TestCase):
             'int main(void) {\n'
             '    xgl_config_t config;\n    xgl_memory_requirements_t requirements;\n'
             '    xgl_config_get_preset_boot(&config);\n'
+            '    if (xgl_memory_requirements_checked(&config, sizeof(config),\n'
+            '        XGL_CONFIG_ABI_VERSION, 301U, &requirements) != XGL_ERR_INVALID_VERSION) return 3;\n'
             '    if (xgl_memory_requirements(&config, &requirements) != XGL_OK) return 1;\n'
             '    config.protocol.window_size = 2U;\n'
             '    if (xgl_config_validate(&config) != XGL_ERR_INVALID_PARAM) return 2;\n'
             '    return 0;\n}\n', encoding="utf-8")
         (source / "CMakeLists.txt").write_text(
-            'cmake_minimum_required(VERSION 3.24)\nproject(resource_sdk_consumer C)\n'
+            'cmake_minimum_required(VERSION 3.24)\nproject(resource_sdk_consumer C CXX)\n'
+            'set(CMAKE_CXX_STANDARD 17)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n'
+            'set(CMAKE_CXX_EXTENSIONS OFF)\n'
             'find_package(xgl CONFIG REQUIRED COMPONENTS reliable)\n'
             'get_target_property(identity xgl::xgl XGL_RESOURCE_CONFIG_ID)\n'
             'if(NOT identity STREQUAL xgl_RESOURCE_CONFIG_ID)\n'
@@ -196,16 +206,40 @@ class TransportResourceConfig(unittest.TestCase):
             'if(CONFLICT_IDENTITY)\n'
             '  add_library(conflict INTERFACE)\n'
             '  set_property(TARGET conflict PROPERTY INTERFACE_XGL_RESOURCE_CONFIG_ID conflict)\n'
-            '  target_link_libraries(probe PRIVATE conflict)\nendif()\n', encoding="utf-8")
+            '  target_link_libraries(probe PRIVATE conflict)\nendif()\n'
+            'find_package(GTest 1.16.0 EXACT CONFIG REQUIRED)\n'
+            f'add_executable(fixed_rto "{(ARGS.link_source / "test/unit/transport/test_transport_fixed_rto.cpp").as_posix()}"\n'
+            f'    "{(ARGS.memory_source / "src/libc_allocator.c").as_posix()}")\n'
+            f'target_include_directories(fixed_rto PRIVATE "{(ARGS.link_source / "src").as_posix()}"\n'
+            f'    "{(ARGS.memory_source / "include").as_posix()}")\n'
+            'target_link_libraries(fixed_rto PRIVATE xgl::xgl GTest::gtest_main)\n'
+            'if(MSVC)\n  target_compile_options(fixed_rto PRIVATE /permissive-)\n'
+            'else()\n  target_compile_options(fixed_rto PRIVATE -pedantic-errors)\nendif()\n'
+            'enable_testing()\ninclude(GoogleTest)\n'
+            'gtest_discover_tests(fixed_rto TEST_LIST fixed_rto_cases PROPERTIES LABELS "xgl;unit;transport;fixed-rto")\n',
+            encoding="utf-8")
         command = ["cmake", "-S", source, "-G", "Ninja",
-                   f"-DCMAKE_PREFIX_PATH={prefix.as_posix()}"]
+                   f"-DCMAKE_PREFIX_PATH={prefix.as_posix()}",
+                   f"-DGTest_DIR={ARGS.gtest_dir.as_posix()}"]
         if ARGS.c_compiler:
             command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")
+        if ARGS.cxx_compiler:
+            command.append(f"-DCMAKE_CXX_COMPILER={ARGS.cxx_compiler}")
         build = self.root / "sdk-build"
         self.execute(*command, "-B", build)
         self.execute("cmake", "--build", build)
         executable = build / ("probe.exe" if (build / "probe.exe").is_file() else "probe")
         self.execute(executable)
+        listing = json.loads(self.execute("ctest", "--test-dir", build,
+                                          "--show-only=json-v1").stdout)
+        names = {case["name"] for case in listing["tests"]}
+        self.assertEqual(names, {
+            "XglTransportFixedRtoTest.ZeroRequestTimeoutUsesConfiguredDefault",
+            "XglTransportFixedRtoTest.AcknowledgmentDoesNotReplaceConfiguredDefault",
+            "XglTransportFixedRtoTest.RequestOverrideRemainsEffectiveAfterFeedback",
+            "XglTransportFixedRtoTest.SuccessfulRetryRetainsExponentialBackoff"})
+        self.execute("ctest", "--test-dir", build, "--no-tests=error", "--output-on-failure",
+                     "--output-junit", self.root / "fixed-rto-green.xml")
         rejected = self.execute(*command, "-B", self.root / "sdk-conflict",
                                 "-DCONFLICT_IDENTITY=ON", succeeds=False)
         self.assertIn("XGL_RESOURCE_CONFIG_ID", rejected.stdout + rejected.stderr)
@@ -216,6 +250,8 @@ if __name__ == "__main__":
     parser.add_argument("--link-source", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--c-compiler")
+    parser.add_argument("--cxx-compiler")
+    parser.add_argument("--gtest-dir", type=Path, required=True)
     for package in PACKAGES:
         parser.add_argument(f"--{package}-source", type=Path, required=True)
     ARGS, remaining = parser.parse_known_args()

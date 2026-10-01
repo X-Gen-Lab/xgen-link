@@ -75,11 +75,20 @@ void xgl_fragment_destroy(xgl_fragment_manager_t* manager) {
  */
 uint32_t xgl_fragment_process_timeouts(xgl_fragment_manager_t* manager,
                                        uint32_t current_time_ms) {
+    return xgl_fragment_process_timeouts_scoped(manager, current_time_ms, NULL,
+                                                NULL);
+}
+
+uint32_t xgl_fragment_process_timeouts_scoped(
+    xgl_fragment_manager_t* manager, uint32_t current_time_ms,
+    xgl_fragment_timeout_callback_t callback, void* user_data) {
     if (manager == NULL) {
         return 0;
     }
 
-    uint32_t timeout_count = 0;
+    uint32_t timeout_count = 0U;
+    xgct_list_t expired;
+    xgct_list_init(&expired);
 
     /* Iterate through reassembly buffers */
     xgct_list_node_t* node;
@@ -100,14 +109,23 @@ uint32_t xgl_fragment_process_timeouts(xgl_fragment_manager_t* manager,
 
         /* Check if timeout occurred */
         if (elapsed_ms >= buffer->timeout_ms) {
-            /* Remove from list */
             xgct_list_remove(&manager->reassembly_list, node);
-
-            /* Free buffer */
-            fragment_free_reassembly_buffer(manager, buffer);
-
-            timeout_count++;
+            xgct_list_insert_tail(&expired, node);
         }
+    }
+
+    /* A callback can clear its entire active scope. Keep all expired records
+     * in a separate owner queue until that callback has returned. */
+    while ((node = xgct_list_remove_head(&expired)) != NULL) {
+        xgl_reassembly_buffer_t* buffer =
+            /* Intrusive node membership is established by the owning list. */
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
+            XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+        if (callback != NULL) {
+            callback(buffer, user_data);
+        }
+        fragment_free_reassembly_buffer(manager, buffer);
+        timeout_count++;
     }
 
     return timeout_count;

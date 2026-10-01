@@ -51,6 +51,39 @@ elseif(XGL_DATALINK_RX_CHUNK_SIZE MATCHES "^(16|32|64|128)$")
 else()
     message(FATAL_ERROR "XGL_DATALINK_RX_CHUNK_SIZE must be AUTO, 16, 32, 64 or 128")
 endif()
+set(XGL_RELIABLE_INDEX_BUCKETS "AUTO" CACHE STRING
+    "Reliable index buckets per peer: AUTO, 1, 2, 4, 8, 16, 32")
+set_property(CACHE XGL_RELIABLE_INDEX_BUCKETS PROPERTY STRINGS AUTO 1 2 4 8 16 32)
+if(NOT XGL_RELIABLE_INDEX_BUCKETS STREQUAL "AUTO")
+    if(NOT XGL_RELIABLE_INDEX_BUCKETS MATCHES "^(1|2|4|8|16|32)$")
+        message(FATAL_ERROR "XGL_RELIABLE_INDEX_BUCKETS must be AUTO, 1, 2, 4, 8, 16 or 32")
+    endif()
+    set(XGL_RELIABLE_BUCKET_COUNT "${XGL_RELIABLE_INDEX_BUCKETS}")
+endif()
+
+set(XGL_TRANSPORT_WINDOW_CAPACITY "AUTO" CACHE STRING
+    "Compiled private window capacity: AUTO (128), 1, 8, 16, 32, 64, 128")
+set_property(CACHE XGL_TRANSPORT_WINDOW_CAPACITY PROPERTY STRINGS AUTO 1 8 16 32 64 128)
+if(XGL_TRANSPORT_WINDOW_CAPACITY STREQUAL "AUTO")
+    # Preserve the historical private window contract in every profile.
+    set(XGL_BUILD_WINDOW_CAPACITY 128)
+elseif(XGL_TRANSPORT_WINDOW_CAPACITY MATCHES "^(1|8|16|32|64|128)$")
+    set(XGL_BUILD_WINDOW_CAPACITY "${XGL_TRANSPORT_WINDOW_CAPACITY}")
+else()
+    message(FATAL_ERROR "XGL_TRANSPORT_WINDOW_CAPACITY must be AUTO, 1, 8, 16, 32, 64 or 128")
+endif()
+
+option(XGL_ENABLE_ADAPTIVE_RTO "Include per-peer RTT estimator state and sampling" ON)
+string(TOUPPER "${XGL_ENABLE_ADAPTIVE_RTO}" adaptive_rto_option)
+if(adaptive_rto_option MATCHES "^(1|ON|YES|TRUE|Y)$")
+    set(XGL_FEATURE_ADAPTIVE_RTO 1)
+elseif(adaptive_rto_option MATCHES "^(0|OFF|NO|FALSE|N)$")
+    set(XGL_FEATURE_ADAPTIVE_RTO 0)
+else()
+    message(FATAL_ERROR "XGL_ENABLE_ADAPTIVE_RTO must be ON or OFF")
+endif()
+unset(adaptive_rto_option)
+
 set(XGL_CAPABILITIES wire reliable)
 foreach(capability AUTH FORWARDING FRAGMENTATION OUT_OF_ORDER STATISTICS DIAGNOSTICS)
     if(XGL_FEATURE_${capability})
@@ -62,4 +95,62 @@ foreach(capability AUTH FORWARDING FRAGMENTATION OUT_OF_ORDER STATISTICS DIAGNOS
         endif()
     endif()
 endforeach()
-configure_file(cmake/xgl_build_config.h.in generated/xgl/xgl_build_config.h @ONLY)
+
+# Finalize after the root has resolved fallback malloc. The identity is a
+# collision-free mixed-radix encoding of all compiled capacity selections.
+function(xgl_finalize_build_config)
+    set(bucket_values 1 2 4 8 16 32)
+    set(window_values 1 8 16 32 64 128)
+    set(chunk_values 16 32 64 128)
+    list(FIND bucket_values "${XGL_RELIABLE_BUCKET_COUNT}" bucket_code)
+    list(FIND window_values "${XGL_BUILD_WINDOW_CAPACITY}" window_code)
+    list(FIND chunk_values "${XGL_BUILD_RX_CHUNK_SIZE}" chunk_code)
+    if(XGL_ALLOW_FALLBACK_MALLOC)
+        set(heap_code 1)
+    else()
+        set(heap_code 0)
+    endif()
+    math(EXPR profile_code "${XGL_BUILD_CONFIG_ID} - 300")
+    math(EXPR resource_id
+        "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * ${heap_code}))))")
+
+    set(default_buckets 32)
+    set(default_chunk 128)
+    set(default_heap 0)
+    if(XGL_PROFILE STREQUAL "boot")
+        set(default_buckets 1)
+        set(default_chunk 32)
+    elseif(XGL_PROFILE STREQUAL "embedded-lite")
+        set(default_buckets 8)
+    elseif(XGL_PROFILE STREQUAL "full")
+        set(default_heap 1)
+    endif()
+    if(NOT (XGL_RELIABLE_BUCKET_COUNT EQUAL default_buckets AND
+            XGL_BUILD_WINDOW_CAPACITY EQUAL 128 AND
+            XGL_FEATURE_ADAPTIVE_RTO EQUAL 1 AND
+            XGL_BUILD_RX_CHUNK_SIZE EQUAL default_chunk AND
+            heap_code EQUAL default_heap))
+        math(EXPR XGL_BUILD_CONFIG_ID "65536 + ${resource_id}")
+    endif()
+    set(XGL_RESOURCE_CONFIG_ID "${resource_id}" PARENT_SCOPE)
+    set(XGL_BUILD_CONFIG_ID "${XGL_BUILD_CONFIG_ID}" PARENT_SCOPE)
+    set(XGL_RESOURCE_CONFIG_ID "${resource_id}")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/xgl_build_config.h.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/xgl/xgl_build_config.h" @ONLY)
+endfunction()
+
+function(xgl_apply_build_contract target)
+    set_target_properties(${target} PROPERTIES
+        XGL_RESOURCE_CONFIG_ID "${XGL_RESOURCE_CONFIG_ID}"
+        XGL_RELIABLE_INDEX_BUCKETS "${XGL_RELIABLE_BUCKET_COUNT}"
+        XGL_TRANSPORT_WINDOW_CAPACITY "${XGL_BUILD_WINDOW_CAPACITY}"
+        XGL_ENABLE_ADAPTIVE_RTO "${XGL_FEATURE_ADAPTIVE_RTO}"
+        INTERFACE_XGL_RESOURCE_CONFIG_ID "${XGL_RESOURCE_CONFIG_ID}")
+    set_property(TARGET ${target} APPEND PROPERTY EXPORT_PROPERTIES
+        XGL_RESOURCE_CONFIG_ID XGL_RELIABLE_INDEX_BUCKETS
+        XGL_TRANSPORT_WINDOW_CAPACITY XGL_ENABLE_ADAPTIVE_RTO)
+    set_property(TARGET ${target} APPEND PROPERTY COMPATIBLE_INTERFACE_STRING
+        XGL_RESOURCE_CONFIG_ID)
+    target_compile_definitions(${target} PUBLIC
+        "XGL_EXPECTED_RESOURCE_CONFIG_ID=${XGL_RESOURCE_CONFIG_ID}U")
+endfunction()

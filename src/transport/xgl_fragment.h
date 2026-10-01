@@ -55,8 +55,9 @@ typedef struct {
     xgct_list_node_t node; /**< List node for reassembly queue */
 
     /* Fragment identification */
-    uint16_t source_id;     /**< Source node ID */
-    uint8_t data_type;      /**< Data type */
+    uint16_t source_id; /**< Source node ID */
+    uint8_t data_type;  /**< Data type */
+    bool reliable;      /**< Admitted bytes require reliable scope recovery */
     uint32_t connection_id; /**< Production connection ID */
     uint32_t session_epoch; /**< Production session epoch */
     uint32_t message_id;    /**< Production message ID */
@@ -76,6 +77,17 @@ typedef struct {
     uint32_t timeout_ms;          /**< Reassembly timeout */
 
 } xgl_reassembly_buffer_t;
+
+/**
+ * \brief           Observe an expired message before its storage is released
+ * \param[in]       buffer: Borrowed expired record, detached from active
+ * storage
+ * \param[in]       user_data: Borrowed callback context
+ * \note            The callback may clear other active records in the manager.
+ *                  It must not release buffer or destroy the manager.
+ */
+typedef void (*xgl_fragment_timeout_callback_t)(
+    const xgl_reassembly_buffer_t* buffer, void* user_data);
 
 /*---------------------------------------------------------------------------*/
 /* Fragmentation Manager Structure                                           */
@@ -167,6 +179,49 @@ xgl_error_t xgl_fragment_process_ext(
     xgl_fragment_message_t* complete, uint32_t current_time_ms);
 
 /**
+ * \brief           Admit a fragment with immutable message reliability
+ * \param[in,out]   manager: Fragmentation manager structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       connection_id: Production connection ID
+ * \param[in]       session_epoch: Production session epoch
+ * \param[in]       data_type: Application data type
+ * \param[in]       message_id: Fragmented message ID
+ * \param[in]       fragment_offset: Payload offset in original message
+ * \param[in]       message_len: Complete message length
+ * \param[in]       fragment_payload: Fragment payload bytes
+ * \param[in]       fragment_payload_len: Fragment payload length
+ * \param[in]       reliable: Whether admitted bytes require reliable recovery
+ * \param[out]      complete: Owned completed message, empty while incomplete
+ * \param[in]       current_time_ms: Current explicit time in milliseconds
+ * \return          XGL_OK if complete, XGL_ERR_BUSY if waiting, error otherwise
+ * \note            Mixing reliable and unreliable fragments for one active
+ *                  message is rejected before modifying its owned bytes.
+ */
+xgl_error_t xgl_fragment_process_ext_scoped(
+    xgl_fragment_manager_t* manager, uint16_t source_id, uint32_t connection_id,
+    uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
+    uint32_t fragment_offset, uint32_t message_len,
+    const uint8_t* fragment_payload, size_t fragment_payload_len, bool reliable,
+    xgl_fragment_message_t* complete, uint32_t current_time_ms);
+
+/**
+ * \brief           Check active message attributes without admitting bytes
+ * \param[in]       manager: Fragmentation manager structure
+ * \param[in]       source_id: Source node ID
+ * \param[in]       connection_id: Production connection ID
+ * \param[in]       session_epoch: Production session epoch
+ * \param[in]       data_type: Application data type
+ * \param[in]       message_id: Fragmented message ID
+ * \param[in]       message_len: Complete message length
+ * \param[in]       reliable: Required immutable message reliability
+ * \return          XGL_OK when absent or matching, error otherwise
+ */
+xgl_error_t xgl_fragment_validate_ext_scope(
+    const xgl_fragment_manager_t* manager, uint16_t source_id,
+    uint32_t connection_id, uint32_t session_epoch, uint8_t data_type,
+    uint32_t message_id, uint32_t message_len, bool reliable);
+
+/**
  * \brief           Process reassembly timeouts
  * \param[in,out]   manager: Fragmentation manager structure
  * \param[in]       current_time_ms: Current time in milliseconds
@@ -174,6 +229,20 @@ xgl_error_t xgl_fragment_process_ext(
  */
 uint32_t xgl_fragment_process_timeouts(xgl_fragment_manager_t* manager,
                                        uint32_t current_time_ms);
+
+/**
+ * \brief           Detach expired messages and notify their scope owner
+ * \param[in,out]   manager: Fragmentation manager structure
+ * \param[in]       current_time_ms: Current time in milliseconds
+ * \param[in]       callback: Optional observer called before each release
+ * \param[in]       user_data: Borrowed observer context
+ * \return          Number of expired records freed
+ * \note            All expired records are detached before callbacks run, so
+ *                  clearing an owning scope cannot invalidate the traversal.
+ */
+uint32_t xgl_fragment_process_timeouts_scoped(
+    xgl_fragment_manager_t* manager, uint32_t current_time_ms,
+    xgl_fragment_timeout_callback_t callback, void* user_data);
 
 /**
  * \brief           Get number of active reassembly buffers

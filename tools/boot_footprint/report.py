@@ -49,6 +49,8 @@ def cache_values(build):
             "CMAKE_BUILD_TYPE", "CMAKE_TOOLCHAIN_FILE", "XGL_PROFILE",
             "XGL_FOOTPRINT_FRAME_SIZE", "XGL_FOOTPRINT_RX_SIZE", "XGL_FOOTPRINT_LTO",
             "XGL_DATALINK_RX_CHUNK_SIZE",
+            "XGL_RELIABLE_INDEX_BUCKETS", "XGL_TRANSPORT_WINDOW_CAPACITY",
+            "XGL_ENABLE_ADAPTIVE_RTO", "XGL_ALLOW_FALLBACK_MALLOC",
             "CMAKE_INTERPROCEDURAL_OPTIMIZATION") or (
                 key.startswith(("XGL_", "xgen_")) and key.endswith("_SOURCE_DIR")):
             result[key] = value
@@ -67,14 +69,20 @@ def generate_layout(args):
         "instance", "datalink", "transport", "rx_bytes", "frame_bytes", "peers", "routes",
         "links", "window", "tx_packets", "scratch_blocks", "ack_bytes",
         "wire_header_bytes", "wire_crc_bytes", "rx_chunk_bytes", "window_pool_blocks",
+        "resource_config_id", "compiled_window_capacity", "reliable_bucket_count",
+        "adaptive_rto",
     )
     if len(data) != len(names) * 4:
         raise ValueError("Unexpected target layout section size")
     values = dict(zip(names, struct.unpack("<" + "I" * len(names), data)))
-    if values["magic"] != 0x58474C42 or values["format_version"] != 5:
+    if values["magic"] != 0x58474C42 or values["format_version"] != 6:
         raise ValueError("Unsupported target layout format or endianness")
     if values["window_pool_blocks"] != 0:
         raise ValueError("The inline window must not reserve an external pool")
+    if values["compiled_window_capacity"] not in (1, 8, 16, 32, 64, 128) or (
+            values["reliable_bucket_count"] not in (1, 2, 4, 8, 16, 32)) or (
+            values["adaptive_rto"] not in (0, 1)):
+        raise ValueError("Unsupported transport resource configuration")
     if any(values[key] != 1 for key in (
             "routes", "peers", "links", "window", "tx_packets", "scratch_blocks")):
         raise ValueError("The footprint layout currently requires one route and peer")
@@ -192,6 +200,10 @@ def report_elf(args):
         "workspace_bytes": layout["workspace_bytes"],
         "layout_format_version": layout["format_version"],
         "window_pool_blocks": layout["window_pool_blocks"],
+        "resource_config_id": layout["resource_config_id"],
+        "compiled_window_capacity": layout["compiled_window_capacity"],
+        "reliable_bucket_count": layout["reliable_bucket_count"],
+        "adaptive_rto": bool(layout["adaptive_rto"]),
         "sections": sections,
         "forbidden_heap_symbols": forbidden,
         "unresolved_symbols": unresolved.splitlines() if unresolved else [],

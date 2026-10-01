@@ -42,12 +42,12 @@ class FootprintStorage(unittest.TestCase):
 
     def fixture(self):
         # Target ABI fixture; this is not a claim about the current ELF size.
-        return [0x58474C42, 5, 4, 8, 512, 20, 40, 104, 72, 204, 20, 76,
-                128, 128, 1, 1, 1, 1, 1, 1, 1, 24, 2, 32, 0]
+        return [0x58474C42, 6, 4, 8, 512, 20, 40, 104, 72, 204, 20, 76,
+                128, 128, 1, 1, 1, 1, 1, 1, 1, 24, 2, 32, 0, 67081, 1, 1, 0]
 
     def test_inline_bitmap_does_not_create_an_independent_runtime_block(self):
         layout = self.decode(self.fixture())
-        self.assertEqual(layout["format_version"], 5)
+        self.assertEqual(layout["format_version"], 6)
         self.assertEqual(layout["window_pool_blocks"], 0)
         self.assertEqual(layout["runtime_partitions"]["window"],
                          {"block_bytes": 0, "blocks": 0, "bytes": 0})
@@ -62,14 +62,12 @@ class FootprintStorage(unittest.TestCase):
 
     def test_current_layout_rejects_external_window_pool(self):
         values = self.fixture()
-        values[-1] = 1
+        values[24] = 1
         with self.assertRaises(ValueError):
             self.decode(values)
 
     def test_layout_records_resolved_transport_resource_identity(self):
         values = self.fixture()
-        values[1] = 6
-        values.extend([67081, 1, 1, 0])
         layout = self.decode(values)
         self.assertEqual(layout["resource_config_id"], 67081)
         self.assertEqual(layout["compiled_window_capacity"], 1)
