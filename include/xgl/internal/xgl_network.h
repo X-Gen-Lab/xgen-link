@@ -7,10 +7,6 @@
 #ifndef XGL_NETWORK_H
 #define XGL_NETWORK_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -22,6 +18,10 @@ extern "C" {
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Network Layer Configuration                                               */

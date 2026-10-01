@@ -7,16 +7,16 @@
 #ifndef XGL_FRAGMENT_H
 #define XGL_FRAGMENT_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "xgen/containers/list.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Fragment Constants                                                        */

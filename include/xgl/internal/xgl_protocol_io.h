@@ -10,11 +10,11 @@
 #include "xgl/internal/xgl_frame.h"
 #include "xgl/xgl_types.h"
 
+#include "xgl/internal/xgl_packet.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "xgl/internal/xgl_packet.h"
 
 /**
  * \brief           A frame borrowed until the synchronous send returns

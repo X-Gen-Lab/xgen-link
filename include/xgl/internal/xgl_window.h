@@ -7,15 +7,15 @@
 #ifndef XGL_WINDOW_H
 #define XGL_WINDOW_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Sliding Window Structure                                                  */

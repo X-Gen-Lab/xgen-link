@@ -7,10 +7,6 @@
 #ifndef XGL_RELIABLE_H
 #define XGL_RELIABLE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -24,6 +20,10 @@ extern "C" {
 /*---------------------------------------------------------------------------*/
 
 #include "xgl/xgl_config.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define XGL_RELIABLE_INDEX_BUCKETS XGL_RELIABLE_BUCKET_COUNT
 

@@ -7,11 +7,11 @@
 #ifndef XGL_ERROR_H
 #define XGL_ERROR_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stddef.h>
 
 /**
  * \brief           Protocol error codes

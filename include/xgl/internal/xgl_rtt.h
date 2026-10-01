@@ -7,12 +7,12 @@
 #ifndef XGL_RTT_H
 #define XGL_RTT_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdbool.h>
-#include <stdint.h>
 
 /*---------------------------------------------------------------------------*/
 /* RTT Configuration Constants                                               */

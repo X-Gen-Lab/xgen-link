@@ -6,16 +6,16 @@
 #ifndef XGL_DATALINK_METADATA_H
 #define XGL_DATALINK_METADATA_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "xgl/internal/xgl_wire.h"
 #include "xgl/xgl_error.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     xgl_wire_frame_view_t frame;

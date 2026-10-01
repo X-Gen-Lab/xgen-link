@@ -7,10 +7,6 @@
 #ifndef XGL_TRANSPORT_H
 #define XGL_TRANSPORT_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -27,6 +23,10 @@ extern "C" {
 #include "xgl/internal/xgl_protocol_io.h"
 #include "xgl/internal/xgl_protocol_memory.h"
 #include "xgl/internal/xgl_route.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * \brief           Reserved transport control data types

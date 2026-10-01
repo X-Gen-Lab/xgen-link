@@ -7,10 +7,6 @@
 #ifndef XGL_FRAME_H
 #define XGL_FRAME_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -21,6 +17,10 @@ extern "C" {
 #include "xgl/xgl_types.h"
 #if XGL_FEATURE_AUTH
 #include "xgl/internal/xgl_security.h"
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -158,10 +158,13 @@ static inline size_t xgl_frame_serialized_size(size_t payload_len,
            xgl_frame_auth_overhead(auth_tag_len) + payload_len + XGL_CRC16_SIZE;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 static inline bool xgl_frame_payload_budget(size_t max_frame_size,
                                             size_t extensions_len,
                                             size_t auth_tag_len,
                                             size_t* payload_budget) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (payload_budget == NULL) {
         return false;
     }

@@ -7,10 +7,6 @@
 #ifndef XGL_ROUTE_H
 #define XGL_ROUTE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -21,6 +17,10 @@ extern "C" {
 
 #if XGL_FEATURE_ROUTE_INDEX
 #include <xgen/containers/hash.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /*---------------------------------------------------------------------------*/

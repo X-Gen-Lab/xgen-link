@@ -6,16 +6,16 @@
 #ifndef XGL_WIRE_H
 #define XGL_WIRE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Wire Header Constants                                                      */

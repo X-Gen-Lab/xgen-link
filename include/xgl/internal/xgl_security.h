@@ -6,16 +6,16 @@
 #ifndef XGL_SECURITY_H
 #define XGL_SECURITY_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "xgl/internal/xgl_wire.h"
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     uint16_t source_id;

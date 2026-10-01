@@ -7,10 +7,6 @@
 #ifndef XGL_DATALINK_H
 #define XGL_DATALINK_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -23,6 +19,10 @@ extern "C" {
 #include "xgl/xgl_types.h"
 #if XGL_FEATURE_AUTH
 #include "xgl/internal/xgl_security.h"
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /*---------------------------------------------------------------------------*/

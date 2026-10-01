@@ -7,16 +7,16 @@
 #ifndef XGL_TYPES_H
 #define XGL_TYPES_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <xgen/memory/allocator.h>
 
 #include "xgl/xgl_error.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Forward Declarations                                                      */

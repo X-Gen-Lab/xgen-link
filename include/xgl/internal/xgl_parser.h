@@ -7,15 +7,15 @@
 #ifndef XGL_PARSER_H
 #define XGL_PARSER_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Parser State Machine                                                      */

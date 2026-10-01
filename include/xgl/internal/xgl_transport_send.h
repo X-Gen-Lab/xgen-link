@@ -6,15 +6,15 @@
 #ifndef XGL_TRANSPORT_SEND_H
 #define XGL_TRANSPORT_SEND_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "xgl/internal/xgl_transport.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct {
     uint16_t max_frame_size;
