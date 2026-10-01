@@ -273,7 +273,6 @@ class XglDatalinkTest : public ::testing::Test {
     uint64_t rx_header_crc_errors;
     uint64_t rx_crc16_errors;
     xgl_datalink_ctx_t ctx;
-    uint8_t rx_cache[512];
 
     static constexpr uint8_t SOURCE_ID = 0x01;
     static constexpr uint8_t TARGET_ID = 0x02;
@@ -285,7 +284,6 @@ class XglDatalinkTest : public ::testing::Test {
 
 TEST_F(XglDatalinkTest, InitSuccess) {
     xgl_datalink_ctx_t test_ctx;
-    uint8_t cache[256];
     xgl_layer_stats_t test_stats = {0};
     uint64_t header_crc = 0, crc16 = 0;
 
@@ -304,7 +302,6 @@ TEST_F(XglDatalinkTest, InitSuccess) {
 }
 
 TEST_F(XglDatalinkTest, InitNullPointer) {
-    uint8_t cache[256];
     xgl_layer_stats_t test_stats = {0};
     uint64_t header_crc = 0, crc16 = 0;
 
@@ -356,6 +353,24 @@ TEST_F(XglDatalinkTest, SendFrameNullPointer) {
     EXPECT_EQ(xgl_datalink_send(&ctx, nullptr, &frame), XGL_ERR_NULL_POINTER);
 }
 
+TEST_F(XglDatalinkTest, InplaceCapacityPrecedesPayloadAddressValidation) {
+    const uint8_t payload = 0x35;
+    xgl_frame_params_t params = {};
+    params.source_id = SOURCE_ID;
+    params.target_id = TARGET_ID;
+    params.payload = &payload;
+    params.payload_len = 1U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    uint8_t destination[1] = {};
+    EXPECT_CALL(mock_phy, tx(_, _, _)).Times(0);
+
+    EXPECT_EQ(xgl_datalink_send_inplace(&ctx, &phy_ops, &frame, destination,
+                                        sizeof(destination),
+                                        XGL_WIRE_BASE_HEADER_SIZE),
+              XGL_ERR_BUFFER_TOO_SMALL);
+}
+
 TEST_F(XglDatalinkTest, SendFramePhyError) {
     xgl_frame_t frame;
     const uint8_t payload[] = {0xAA};
@@ -388,7 +403,6 @@ TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     allocator.free = counting_free;
 
     xgl_datalink_ctx_t large_ctx;
-    uint8_t cache[1024];
     xgl_layer_stats_t large_stats = {};
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
@@ -464,7 +478,6 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     provider.tag_len = 4;
     provider.user_data = nullptr;
     xgl_datalink_ctx_t auth_ctx;
-    uint8_t cache[512] = {};
     xgl_layer_stats_t auth_stats = {};
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
@@ -524,7 +537,6 @@ TEST_F(XglDatalinkTest, ProcessFrameLeavesEndToEndAuthenticationToNetwork) {
     provider.tag_len = 4;
     provider.user_data = nullptr;
     xgl_datalink_ctx_t auth_ctx;
-    uint8_t cache[512] = {};
     xgl_layer_stats_t auth_stats = {};
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
@@ -578,7 +590,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDoesNotCommitEndpointReplayState) {
     provider.tag_len = 4;
     provider.user_data = nullptr;
     xgl_datalink_ctx_t auth_ctx;
-    uint8_t cache[512] = {};
     xgl_layer_stats_t auth_stats = {};
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
@@ -633,7 +644,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDeliversWireValidReliableCopiesUpstream) {
                              datalink_upper_receive_spy);
 
     xgl_datalink_ctx_t auth_ctx;
-    uint8_t cache[512] = {};
     xgl_layer_stats_t auth_stats = {};
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
@@ -683,7 +693,6 @@ TEST_F(XglDatalinkTest, ProcessFrameHasNoImplicitEndpointAuthenticationPolicy) {
     provider.tag_len = 4;
     provider.user_data = nullptr;
     xgl_datalink_ctx_t optional_auth_ctx;
-    uint8_t cache[512] = {};
     xgl_layer_stats_t optional_stats = {};
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;

@@ -167,6 +167,35 @@ TEST_F(XglCoverageDelivery, OversizedFrameReportsAnErrorBeforeReadingItsBody) {
               XGL_ERR_INVALID_FRAME);
 }
 
+TEST_F(XglCoverageDelivery, ParserViewRetainsTheDatalinkFrameLimit) {
+    std::vector<uint8_t> payload(XGL_DATALINK_MAX_FRAME_SIZE, 0x37);
+    xgl_frame_params_t params = {};
+    params.source_id = 2U;
+    params.target_id = 1U;
+    params.payload = payload.data();
+    params.payload_len = payload.size();
+    xgl_frame_t value = {};
+    ASSERT_EQ(xgl_frame_build(&value, &params), XGL_OK);
+    input.resize(payload.size() + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE);
+    size_t length = 0U;
+    ASSERT_EQ(xgl_frame_serialize(input.data(), input.size(), &value, &length),
+              XGL_OK);
+    std::vector<uint8_t> parser_storage(length);
+    ASSERT_EQ(
+        xgl_parser_init(&parser, parser_storage.data(), parser_storage.size()),
+        XGL_OK);
+
+    while (!input.empty()) {
+        ASSERT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 1U, 10U,
+                                           XGL_DATALINK_RX_CHUNK_SIZE),
+                  XGL_OK);
+    }
+    EXPECT_EQ(statistics.rx_packets, 0U);
+    EXPECT_EQ(statistics.rx_errors, 1U);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_EQ(errors[0], XGL_ERR_INVALID_FRAME);
+}
+
 TEST_F(XglCoverageDelivery,
        DeliveryPropagatesAdmissionAndAllowsAbsentReceiver) {
     xgl_frame_interface_t upper = {};
