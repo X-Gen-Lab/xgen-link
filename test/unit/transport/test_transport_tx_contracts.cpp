@@ -276,6 +276,21 @@ TEST_F(XglTransportTxContractTest,
 }
 
 TEST_F(XglTransportTxContractTest,
+       FailedScopeErrorPrecedesOtherScopeCapacityPressure) {
+    Transport().memory.peer = xgm_allocator_libc();
+    Transport().max_peers = 2U;
+    auto* failed = transport_get_or_create_peer_scope(&Transport(), 2U, 7U, 0U);
+    ASSERT_NE(failed, nullptr);
+    transport_fail_peer(&Transport(), instance, failed, XGL_ERR_CANCELLED);
+    ASSERT_EQ(Send(2U, 6U), XGL_OK);
+    EXPECT_EQ(Send(2U, 7U), XGL_ERR_ACK_TIMEOUT);
+    EXPECT_EQ(transport_find_peer_scope(&Transport(), 2U, 7U, 0U), failed);
+    EXPECT_TRUE(failed->failed);
+    EXPECT_EQ(hello_calls, 1U);
+    EXPECT_EQ(data_calls, 1U);
+}
+
+TEST_F(XglTransportTxContractTest,
        EmptyHelloExpiresWithIdleReclamationDisabled) {
     Hello(100U);
     ASSERT_NE(Transport().peers, nullptr);
@@ -339,6 +354,25 @@ TEST_F(XglTransportTxContractTest, HelloLeasePreservesFailedScopeIdentity) {
 }
 
 #if XGL_FEATURE_FRAGMENTATION
+TEST_F(XglTransportTxContractTest,
+       PendingMessageErrorPrecedesOtherScopeCapacityPressure) {
+    EnableFragments();
+    Transport().memory.peer = xgm_allocator_libc();
+    Transport().max_peers = 2U;
+    Transport().window_size = 1U;
+    Transport().max_tx_packets = 2U;
+    ASSERT_EQ(SendFragments(7U), XGL_OK);
+    auto* pending = transport_find_peer_scope(&Transport(), 2U, 7U, 0U);
+    ASSERT_NE(pending, nullptr);
+    ASSERT_NE(pending->tx_message.data, nullptr);
+    ASSERT_EQ(Send(2U, 6U), XGL_OK);
+    EXPECT_EQ(Send(2U, 7U), XGL_ERR_BUSY);
+    EXPECT_EQ(transport_find_peer_scope(&Transport(), 2U, 7U, 0U), pending);
+    EXPECT_NE(pending->tx_message.data, nullptr);
+    EXPECT_EQ(hello_calls, 2U);
+    EXPECT_EQ(data_calls, 2U);
+}
+
 TEST_F(XglTransportTxContractTest, FragmentBudgetRejectsBeforeHello) {
     EnableFragments();
     Transport().max_tx_message_bytes = 159U;
