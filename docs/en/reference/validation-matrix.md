@@ -5,6 +5,7 @@
 | Area | Evidence |
 | --- | --- |
 | Wire v3, TLV, CRC, unaligned spans | `test/unit/wire/test_wire.cpp`, `test/unit/datalink/test_parser.cpp`, frame properties |
+| Length overflow, borrowed SACK, failure-view clearing, and raw/stream agreement | `test/unit/wire/test_frame.cpp`, `test_wire_sack_view.cpp`, `test_wire_rx_contracts.cpp`, `test/unit/transport/test_transport_sack_view.cpp` |
 | Fixed routes and authenticated forwarding | `test/unit/network/test_route.cpp`, `test/unit/network/test_network.cpp` |
 | Exact scope, atomic ACK, RX retention, retry, RESET and close | `test/unit/transport/test_transport.cpp`, transport properties |
 | Fragment budgets, overlaps, timeout, messages larger than a window | `test/unit/transport/test_fragment.cpp`, memory properties |
@@ -39,8 +40,8 @@ Production dependency contracts now contain 11 cases, classification has an inde
 
 The Cortex-M0 probe records a real linked ELF, map, target-ABI workspace formula and stack-use files. Its results are reproducible from `tools/boot_footprint/README.md`. Native execution separately checks the layout formula against actual workspace initialization.
 
-This round's local GCC 15.2.1 MTU/RX 128 and 64 final ELFs both use 16,060 B Flash. Workspaces are 1,136/944 B; RAM including the reserved 1,024 B stack is 2,224/2,032 B; the largest single-function stack is 272 B. Against the preceding 128 baseline, Flash increases 368 B, workspace/RAM falls 32 B, and the largest stack frame falls 120 B. The 64 configuration establishes its first baseline. Both have no heap or unresolved symbols and pass their local budget policies. The 16 KiB Flash ceiling is a regression limit; the 8 KiB Flash design goal remains unmet.
+After the wire optimization, the fixed GCC 15.2.1 MTU/RX 128 and 64 final ELFs both use 15,932 B Flash, 128 B below the preceding 16,060 B baseline. Explicit LTO produces 12,600 B. Workspaces remain 1,136/944 B; RAM including the reserved 1,024 B stack remains 2,224/2,032 B. The largest single-function stack is 272 B without LTO and 312 B with LTO. All four combinations have no heap or unresolved symbols and pass separate budget policies. The normal 16 KiB and LTO 12,800 B ceilings are regression limits; the 8 KiB Flash design goal remains unmet. See [Wire optimization](wire-optimization.md) for comparisons, tradeoffs, and reproduction.
 
-The new CI matrix includes Boot/Lite capability tests, complete Embedded regression, multi-configuration installed consumers, and both ARM budget gates. Local script passes do not mean this new matrix has executed remotely; use actual results for the current commit.
+The CI matrix includes Boot/Lite capability tests, complete Embedded regression, multi-configuration installed consumers, and four ARM budget gates for MTU128/64 × LTO OFF/ON. Local script passes do not mean this new matrix has executed remotely; use actual results for the current commit.
 
 No real board, Flash power interruption, ISR nesting, full call-chain stack bound, DMA lease, production cipher provider or cross-restart freshness has been qualified. Boot update uses a host Flash model and CRC16 for accidental corruption only. Actual Linux sanitizer executions are recorded separately; do not infer them from Windows results.

@@ -5,6 +5,7 @@
 | 范围 | 依据 |
 | --- | --- |
 | wire v3、TLV、CRC、未对齐字节跨度 | `test/unit/wire/test_wire.cpp`、`test/unit/datalink/test_parser.cpp`、frame 性质测试 |
+| 长度回绕、借用 SACK、失败视图清零及 raw/stream 一致 | `test/unit/wire/test_frame.cpp`、`test_wire_sack_view.cpp`、`test_wire_rx_contracts.cpp`、`test/unit/transport/test_transport_sack_view.cpp` |
 | 固定路由及认证帧转发 | `test/unit/network/test_route.cpp`、`test/unit/network/test_network.cpp` |
 | 精确 scope、原子 ACK、RX 保留、重传、RESET 与关闭 | `test/unit/transport/test_transport.cpp`、transport 性质测试 |
 | 分片预算、重叠、超时、消息大于窗口 | `test/unit/transport/test_fragment.cpp`、memory 性质测试 |
@@ -39,8 +40,8 @@
 
 Cortex-M0 探针记录真实链接的 ELF、map、目标 ABI 工作区公式及栈使用文件，可按 `tools/boot_footprint/README.md` 复现。原生运行另行比较布局公式并执行真实初始化。
 
-本轮本地固定 GCC 15.2.1 的 MTU/RX 128 和 64 完整 ELF 均为 Flash 16,060 B；workspace 分别为 1,136/944 B，含预留 1,024 B 栈的 RAM 分别为 2,224/2,032 B，最大单函数栈为 272 B。128 相比前一轮增加 368 B Flash、减少 32 B workspace/RAM 和 120 B 单函数栈；64 是首次配置基线。两者均无堆或未解析符号，本地 policy 门槛通过。16 KiB Flash 门槛为回归限额，8 KiB Flash 设计目标尚未达到。
+wire 优化后的固定 GCC 15.2.1、MTU/RX 128 和 64 完整 ELF 均为 Flash 15,932 B，较上一轮 16,060 B 减少 128 B；启用显式 LTO 为 12,600 B。workspace 分别为 1,136/944 B，含预留 1,024 B 栈的 RAM 分别为 2,224/2,032 B，均未增加。最大单函数栈为普通模式 272 B、LTO 312 B。四组合无堆或未解析符号，通过各自独立 policy。普通 16 KiB 门槛和 LTO 12,800 B 门槛均为回归限额，8 KiB Flash 设计目标尚未达到。对照、取舍与复现见 [Wire 优化](wire-optimization.md)。
 
-新增 CI 矩阵包含 Boot/Lite 能力测试、Embedded 完整回归、多配置安装消费及两个 ARM 资源门槛；本地脚本通过不等于该新矩阵已在远端执行，须以当前提交的实际结果为准。
+CI 矩阵包含 Boot/Lite 能力测试、Embedded 完整回归、多配置安装消费及 MTU128/64 × LTO OFF/ON 四个 ARM 资源门槛；本地脚本通过不等于该新矩阵已在远端执行，须以当前提交的实际结果为准。
 
 未验收真实板卡、Flash 断电、ISR 嵌套、完整调用链栈上界、DMA lease、生产密码 provider 或跨重启新鲜性。Boot 升级使用主机 Flash 模型，CRC16 只用于意外损坏校验。Linux sanitizer 的实际运行单独归档，不能从 Windows 结果推断。

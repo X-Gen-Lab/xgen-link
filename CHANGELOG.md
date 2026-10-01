@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Checked borrowed SACK views and opt-in Cortex-M0 footprint LTO with separate mode-specific budgets.
 - Scoped zero-copy sends and side-effect-free exact layout queries, while retaining the original zero-copy request ABI.
 - Exact workspace reports by resource category, including alignment and fixed reservations.
 - An Embedded Lite profile with fragmentation and out-of-order delivery, without authentication or forwarding; installed packages expose required capabilities.
@@ -23,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reuse checked TX layouts during synchronous encoding; consolidate frame construction and remove unused private metadata fields.
+- Decode directly into the borrowed frame view and calculate header CRC incrementally; preserve complete validation and failure-output contracts.
+- Read SACK bitmaps without a transport stack copy, retaining the 64-byte acceptance limit.
 - Remove redundant private link, packet and layer-context fields; security remains the sole owner of provider and authentication policy.
 - Bound Boot logical TX metadata to 32 bytes without reducing the wire decoder's extension capacity; trim disabled statistics pointers from Boot contexts.
 - Consolidate private transport TX declarations into one header and document retry, parser deadline and resource admission contracts.
@@ -39,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject overflowing frame-size calculations and invalid extension/tag budgets before arithmetic; bound payload budgets to wire limits.
+- Keep the Boot update simulation valid when statistics are compiled out, while retaining dropped-ACK recovery and write-once checks.
 - Bound successful SACK fast retransmission per pending record, preserve deferred retries after BUSY, and count successful retries before later failures.
 - Reclaim a newly created RX peer after failed first admission and widen RTT intermediates before applying timeout bounds.
 - Expire partial parsers independently of PHY polling and RX byte budgets; keep parser deadlines visible and process all already-read bytes while reporting the first receive error.

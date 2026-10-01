@@ -1,8 +1,16 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。当前阶段为有界恢复、调度与资源优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，当前依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，本轮决策见 [ADR 0006](design/adr/0006-bounded-recovery-runtime.md)。
+更新日期：2026-10-01。当前阶段为 wire 布局、借用视图与体积优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0007](design/adr/0007-wire-layout-views.md)。
 
-## 当前：有界恢复、调度与资源优化
+## 当前：wire 布局、借用视图与体积优化
+
+在 `0e08bdf` 基础上统一 checked 长度和发送布局，修复辅助长度运算回绕；移除未使用的私有字段，集中扩展长度常量，零拷贝 helper 合入帧编码文件。SACK 改为借用视图，头 CRC 使用独立 CRC 组件的增量接口，完整接收直接解码到输出头并保持失败清零。生产源从 45 个归并为 44 个，未改变 wire v3 或公开 ABI，也未新增常驻工作区。
+
+Windows GNU Full/Embedded 各 630 项、Boot 79 项、Lite 114 项，MSVC Full 630 项、Boot 含示例 82 项通过。510 个历史测试名完整保留，29 个头分别通过 C11/C++17；Linux Full 630 项、ASan/UBSan 629 项及生产覆盖率行 92.2%、函数 99.6%、分支 81.7% 通过。静态分析、固定格式和严格 API 文档通过；各自来源和诊断配置修正见[本轮验证记录](design/validation/wire-optimization.md)。
+
+最终 Cortex-M0 普通 ELF 为 **15,932 B Flash**（原 16,060 B）；显式启用 LTO 为 **12,600 B**，最大单函数栈分别为 272/312 B。MTU128/64 workspace 仍为 1,136/944 B，含预留 1 KiB 栈的 RAM 为 2,224/2,032 B。Windows 与固定官方 Linux 工具链的四组合结果一致，无堆和未解析符号，通过各自独立预算；原 LTO 实验 12,472 B 不替代本轮实际值。pre-commit、严格站点构建和双语 QA 通过。CI 已增加 LTO 模式，尚未声明远端运行或板级验收通过，8 KiB Flash 目标仍未达到。
+
+## 历史：有界恢复、调度与资源优化
 
 在 `af9799a` 基础上修复重复 SACK 快重传、首次 RX 准入后的空 peer 占用、RTT 中间值溢出、成功发送统计和认证广播拒绝。parser 的超时维护独立于轮询和 RX 字节预算，step 返回首个错误并继续处理已读数据及可靠维护；升级示例同步处理可恢复 BUSY。
 

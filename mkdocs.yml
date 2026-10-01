@@ -104,6 +104,7 @@ nav:
           - 发布验证: zh/reference/release-validation.md
           - GitHub CI/CD: zh/reference/github-ci.md
           - 验证矩阵: zh/reference/validation-matrix.md
+          - Wire 优化: zh/reference/wire-optimization.md
           - 静态分析: zh/reference/static-analysis.md
           - 术语表: zh/reference/glossary.md
       - 贡献:
@@ -154,6 +155,7 @@ nav:
           - Release Validation: en/reference/release-validation.md
           - GitHub CI/CD: en/reference/github-ci.md
           - Validation Matrix: en/reference/validation-matrix.md
+          - Wire Optimization: en/reference/wire-optimization.md
           - Static Analysis: en/reference/static-analysis.md
           - Glossary: en/reference/glossary.md
       - Contributing:
