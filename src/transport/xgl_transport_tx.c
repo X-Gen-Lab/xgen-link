@@ -94,12 +94,11 @@ static int32_t transport_send_timeout_ms(const xgl_transport_ctx_t* ctx,
         return (int32_t)tx_data->timeout_ms;
     }
 
-    int32_t timeout_ms = (peer != NULL) ? xgl_rtt_get_rto(&peer->rtt_est) : 0;
-    if (timeout_ms == 0) {
-        timeout_ms = (int32_t)ctx->default_timeout_ms;
+    if (peer != NULL && xgl_rtt_is_initialized(&peer->rtt_est)) {
+        return xgl_rtt_get_rto(&peer->rtt_est);
     }
-
-    return timeout_ms;
+    return ctx->default_timeout_ms != 0U ? (int32_t)ctx->default_timeout_ms
+                                         : XGL_DEFAULT_RTO_MS;
 }
 
 xgl_error_t transport_queue_reliable_tx(

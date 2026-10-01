@@ -76,6 +76,11 @@ xgl_error_t transport_retransmit_reliable_packet(
         rel_packet->initial_timeout_ms, rel_packet->retry_count);
     rel_packet->send_timestamp = current_time_ms;
     rel_packet->sent = true;
+#if XGL_FEATURE_STATISTICS
+    if (ctx->tx_retries != NULL) {
+        (*ctx->tx_retries)++;
+    }
+#endif
 
     return XGL_OK;
 }
@@ -86,12 +91,10 @@ xgl_error_t transport_retransmit_reliable_packet(
  * \param[in,out]   peer: Owning peer
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current transport clock
- * \return          Number of successful retransmissions
  */
-static uint32_t transport_process_retransmission_queue(
+static void transport_process_retransmission_queue(
     xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
     xgl_handle_t handle, uint32_t current_time_ms) {
-    uint32_t retransmit_count = 0;
     xgl_reliable_queue_t* queue = &peer->reliable_queue;
     xgct_list_node_t* node;
     xgct_list_node_t* tmp;
@@ -112,17 +115,13 @@ static uint32_t transport_process_retransmission_queue(
             continue;
         }
 
-        if (transport_retransmit_reliable_packet(ctx, handle, peer, rel_packet,
-                                                 current_time_ms) == XGL_OK) {
-            retransmit_count++;
-        }
+        (void)transport_retransmit_reliable_packet(ctx, handle, peer,
+                                                   rel_packet, current_time_ms);
         /* Failure clears the entire queue. */
         if (peer->failed) {
             break;
         }
     }
-
-    return retransmit_count;
 }
 
 /**
@@ -130,20 +129,15 @@ static uint32_t transport_process_retransmission_queue(
  * \param[in,out]   ctx: Transport layer context
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current transport clock
- * \return          Number of successful retransmissions
  */
-static uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
-                                                  xgl_handle_t handle,
-                                                  uint32_t current_time_ms) {
-    uint32_t retransmit_count = 0;
-
+static void transport_process_retransmissions(xgl_transport_ctx_t* ctx,
+                                              xgl_handle_t handle,
+                                              uint32_t current_time_ms) {
     for (xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
          peer = peer->next) {
-        retransmit_count += transport_process_retransmission_queue(
-            ctx, peer, handle, current_time_ms);
+        transport_process_retransmission_queue(ctx, peer, handle,
+                                               current_time_ms);
     }
-
-    return retransmit_count;
 }
 
 /**
@@ -177,17 +171,7 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
 #endif
 
-    uint32_t retransmit_count =
-        transport_process_retransmissions(ctx, handle, current_time_ms);
-
-    /* Update retransmission statistics */
-#if XGL_FEATURE_STATISTICS
-    if (retransmit_count > 0 && ctx->tx_retries != NULL) {
-        (*ctx->tx_retries) += retransmit_count;
-    }
-#else
-    (void)retransmit_count;
-#endif
+    transport_process_retransmissions(ctx, handle, current_time_ms);
 
 #if XGL_FEATURE_FRAGMENTATION
     /* A timed-out reliable reassembly contains acknowledged bytes. Failure

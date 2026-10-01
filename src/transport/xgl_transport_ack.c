@@ -165,12 +165,35 @@ static bool transport_sack_bit_is_set(const uint8_t* bitmap, size_t bit_index) {
     return (bitmap[bit_index / 8U] & (uint8_t)(1U << (bit_index % 8U))) != 0U;
 }
 
+/**
+ * \brief           Retry a missing original transmission once before RTO
+ * recovery
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in,out]   peer: Exact packet owner
+ * \param[in,out]   packet: Outstanding packet, or NULL if already acknowledged
+ * \return          XGL_OK if suppressed or submitted, otherwise retry error
+ * \note            A successful retry closes fast recovery for this packet.
+ *                  Duplicate feedback cannot consume its remaining retry
+ * budget.
+ */
+static xgl_error_t transport_fast_retransmit(xgl_transport_ctx_t* ctx,
+                                             xgl_handle_t handle,
+                                             xgl_transport_peer_state_t* peer,
+                                             xgl_reliable_packet_t* packet) {
+    if (packet == NULL || packet->retry_count != 0U) {
+        return XGL_OK;
+    }
+    return transport_retransmit_reliable_packet(ctx, handle, peer, packet,
+                                                transport_now(ctx));
+}
+
 static xgl_error_t
 transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                              xgl_transport_peer_state_t* peer,
                              uint16_t source_id, const uint8_t* value,
-                             size_t value_len, size_t* retransmitted) {
-    if (ctx == NULL || peer == NULL || value == NULL || retransmitted == NULL) {
+                             size_t value_len) {
+    if (ctx == NULL || peer == NULL || value == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
@@ -203,17 +226,7 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     if (!has_set) {
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
             &peer->reliable_queue, base_packet, source_id);
-        if (missing == NULL) {
-            return XGL_OK;
-        }
-
-        err = transport_retransmit_reliable_packet(ctx, handle, peer, missing,
-                                                   transport_now(ctx));
-        if (err != XGL_OK) {
-            return err;
-        }
-        (*retransmitted)++;
-        return XGL_OK;
+        return transport_fast_retransmit(ctx, handle, peer, missing);
     }
 
     uint32_t now = transport_now(ctx);
@@ -234,13 +247,9 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         uint32_t packet_number = base_packet + (uint32_t)i;
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
             &peer->reliable_queue, packet_number, source_id);
-        if (missing != NULL) {
-            err = transport_retransmit_reliable_packet(ctx, handle, peer,
-                                                       missing, now);
-            if (err != XGL_OK) {
-                return err;
-            }
-            (*retransmitted)++;
+        err = transport_fast_retransmit(ctx, handle, peer, missing);
+        if (err != XGL_OK) {
+            return err;
         }
     }
 
@@ -307,15 +316,9 @@ xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
     if (acknowledgement.type == XGL_WIRE_EXT_ACK_RANGE) {
         err = transport_process_ack_range(ctx, peer, &acknowledgement);
     } else {
-        size_t retransmitted = 0U;
         err = transport_process_sack_value(ctx, handle, peer, packet->source_id,
                                            acknowledgement.value,
-                                           acknowledgement.len, &retransmitted);
-#if XGL_FEATURE_STATISTICS
-        if (err == XGL_OK && retransmitted > 0U && ctx->tx_retries != NULL) {
-            *ctx->tx_retries += retransmitted;
-        }
-#endif
+                                           acknowledgement.len);
     }
     if (err != XGL_OK) {
         return err;

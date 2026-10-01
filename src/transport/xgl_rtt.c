@@ -37,14 +37,14 @@ static inline int32_t abs_int32(int32_t value) {
  * \param[in]       max: Maximum value
  * \return          Clamped value
  */
-static inline int32_t clamp_int32(int32_t value, int32_t min, int32_t max) {
+static inline int32_t clamp_rto(int64_t value, int32_t min, int32_t max) {
     if (value < min) {
         return min;
     }
     if (value > max) {
         return max;
     }
-    return value;
+    return (int32_t)value;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -107,10 +107,11 @@ void xgl_rtt_update(xgl_rtt_estimator_t* est, int32_t measured_rtt) {
     }
 
     /* Calculate RTO = SRTT + 4 * RTTVAR (RFC 6298 Section 2.4) */
-    est->rto = est->srtt + (XGL_RTO_K_FACTOR * est->rttvar);
+    int64_t rto =
+        (int64_t)est->srtt + ((int64_t)XGL_RTO_K_FACTOR * est->rttvar);
 
     /* Clamp RTO to [MIN_RTO, MAX_RTO] (RFC 6298 Section 2.4) */
-    est->rto = clamp_int32(est->rto, XGL_MIN_RTO_MS, XGL_MAX_RTO_MS);
+    est->rto = clamp_rto(rto, XGL_MIN_RTO_MS, XGL_MAX_RTO_MS);
 }
 
 /**

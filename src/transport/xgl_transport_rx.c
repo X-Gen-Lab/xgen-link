@@ -79,7 +79,6 @@ static xgl_error_t transport_process_reliable_rx_order(
     uint32_t packet_number = packet->packet_number;
     if (!(*peer)->rx_has_packet_number_state) {
         (*peer)->rx_next_packet_number = 0U;
-        (*peer)->rx_has_packet_number_state = true;
     }
 
     if (packet_number < (*peer)->rx_next_packet_number) {
@@ -93,6 +92,9 @@ static xgl_error_t transport_process_reliable_rx_order(
         uint32_t expected_packet_number = (*peer)->rx_next_packet_number;
         xgl_error_t err = transport_cache_out_of_order_packet(
             ctx, *peer, packet, packet_number);
+        if (err == XGL_OK) {
+            (*peer)->rx_has_packet_number_state = true;
+        }
         (void)transport_send_sack(ctx, handle, *peer, packet->source_id,
                                   expected_packet_number, packet->connection_id,
                                   packet->session_epoch);
@@ -110,6 +112,29 @@ static xgl_error_t transport_process_reliable_rx_order(
     /* The in-order packet is acknowledged only after delivery/admission. */
     *decision = TRANSPORT_RX_DELIVER;
     return XGL_OK;
+}
+
+/**
+ * \brief           Roll back a new scope when no reliable history was admitted
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in]       packet: Rejected packet identifying the tentative scope
+ * \param[in]       scope_was_absent: Whether this receive created the scope
+ * \note            Existing, failed or data-owning scopes are never reclaimed.
+ */
+static void transport_release_rejected_scope(xgl_transport_ctx_t* ctx,
+                                             xgl_handle_t handle,
+                                             const xgl_packet_t* packet,
+                                             bool scope_was_absent) {
+    if (!scope_was_absent) {
+        return;
+    }
+    xgl_transport_peer_state_t* peer = transport_find_rx_peer(ctx, packet);
+    if (peer != NULL && transport_peer_can_reclaim(ctx, peer)) {
+        (void)xgl_transport_close_scope(ctx, handle, peer->peer_id,
+                                        peer->connection_id,
+                                        peer->session_epoch);
+    }
 }
 
 /**
@@ -151,6 +176,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #endif
 
     xgl_transport_peer_state_t* rx_peer = transport_find_rx_peer(ctx, packet);
+    bool scope_was_absent = rx_peer == NULL;
     if (rx_peer != NULL && rx_peer->failed) {
         return XGL_ERR_ACK_TIMEOUT;
     }
@@ -174,6 +200,10 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         err = transport_process_reliable_rx_order(ctx, handle, packet, &rx_peer,
                                                   &decision);
         if (err != XGL_OK || decision == TRANSPORT_RX_HANDLED) {
+            if (err != XGL_OK) {
+                transport_release_rejected_scope(ctx, handle, packet,
+                                                 scope_was_absent);
+            }
             return err;
         }
     }
@@ -195,11 +225,13 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     err = transport_deliver_packet(ctx, handle, packet, deliver_data,
                                    deliver_data_len);
     if (err != XGL_OK) {
+        transport_release_rejected_scope(ctx, handle, packet, scope_was_absent);
         return err;
     }
 
     if (packet->reliable == XGL_RELIABILITY_ACK_ELICITING && rx_peer != NULL) {
         uint32_t packet_number = packet->packet_number;
+        rx_peer->rx_has_packet_number_state = true;
         rx_peer->rx_next_packet_number = packet_number + 1U;
         (void)transport_send_ack(ctx, handle, packet_number, packet->source_id,
                                  packet->connection_id, packet->session_epoch);

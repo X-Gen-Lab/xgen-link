@@ -761,8 +761,7 @@ TEST_F(TransportRegressionTest, RetryExhaustionAlsoReleasesUnsentMessageBytes) {
 TEST_F(TransportRegressionTest, InvalidFragmentIsNotAcknowledged) {
     Init(1, true);
     EXPECT_EQ(Receive(0, 'a', true, 2), XGL_ERR_INVALID_FRAME);
-    ASSERT_NE(ctx.peers, nullptr);
-    EXPECT_EQ(ctx.peers->rx_next_packet_number, 0U);
+    EXPECT_EQ(ctx.peers, nullptr);
     EXPECT_EQ(spy.send_count, 0);
     EXPECT_TRUE(accepted_payloads.empty());
 }
@@ -2119,7 +2118,6 @@ TEST(XglTransportTest, FragmentReceiveUsesFragmentExtensionMetadata) {
     first_packet.connection_id = 7;
     first_packet.packet_number = 10;
     first_packet.session_epoch = 3;
-    first_packet.version = 0;
     first_packet.packet_type = XGL_PACKET_TYPE_DATA;
     first_packet.flags =
         XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
