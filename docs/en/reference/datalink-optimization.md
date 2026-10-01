@@ -2,6 +2,8 @@
 
 This work starts from `d7bbb75` and improves receive recovery, stack use and private interfaces. Wire v3, public structure ABI, profile IDs and the five independent foundation dependencies remain unchanged. Measurements use a fixed Cortex-M0 probe, not a complete product or hardware qualification.
 
+This page preserves measurements for the `fb53b99` stage. Later CRC buffer recovery semantics are described in [Datalink](../protocol/datalink.md), with new measurements in repository `design/validation/parser-resynchronization.md`. The table below does not describe subsequent commits.
+
 ## Implemented Changes
 
 | Area | Result |

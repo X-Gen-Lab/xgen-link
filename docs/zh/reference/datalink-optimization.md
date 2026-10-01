@@ -2,6 +2,8 @@
 
 本轮基于 `d7bbb75` 完善接收恢复、栈使用及内部接口。wire v3、公开结构 ABI、profile ID 和五个独立基础组件依赖保持。以下数据来自固定 Cortex-M0 探针，不能代替产品固件或板级测量。
 
+本页保留 `fb53b99` 阶段的测量。之后的 CRC 缓存重新同步语义见 [Datalink 协议](../protocol/datalink.md)，新测量见仓库 `design/validation/parser-resynchronization.md`；下表不代表后续提交的资源用量。
+
 ## 完成的改动
 
 | 范围 | 结果 |

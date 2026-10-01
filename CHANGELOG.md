@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Recover stream framing from retained bytes after malformed headers or CRC failures; consume one validated frame at a time and drain cached successors without new input. Private parser callers must advance after COMPLETE/ERROR; explicit reset still discards the cache.
 - Boot now defaults to a 32-byte PHY read chunk; other profiles retain 128 bytes. Products may explicitly select 16/32/64/128 and must account for partial reads when driving steps.
 - Datalink shares synchronous span consumption and direct wire status classification, with compact per-PHY parser state and four directional packet/frame endpoints.
 - Reuse checked TX layouts during synchronous encoding; consolidate frame construction and remove unused private metadata fields.

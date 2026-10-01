@@ -107,6 +107,12 @@ python test/cmake/test_footprint_lto.py --link-source . --work-dir out/lto-contr
 
 Boot 的 `XGL_DATALINK_RX_CHUNK_SIZE=AUTO` 解析为 32 字节；可显式选择 16/32/64/128。版本 4 布局从目标编译导出实际 `rx_chunk_bytes`，报告与预算据此拒绝缺失或冲突配置。该参数独立于 MTU/RX cache，消费方不能用冲突的预处理宏覆盖已编译值。
 
-当前 Cortex-M0 非 LTO/LTO Flash 为 15,988/12,600 B；MTU128/64 workspace 为 1,112/920 B，静态 RAM 为 1,176/984 B，含 1,024 B 预留栈的总 RAM 为 2,200/2,008 B。最大单函数栈为 192/224 B。四份 policy 已收紧 RAM 与单函数栈限额，Flash 上限仍为 16,384/12,800 B。历史基线保留 chunk128，不把读取工作量变化写成相同配置。
+`fb53b99` 阶段 Cortex-M0 非 LTO/LTO Flash 为 15,988/12,600 B；MTU128/64 workspace 为 1,112/920 B，静态 RAM 为 1,176/984 B，含 1,024 B 预留栈的总 RAM 为 2,200/2,008 B。最大单函数栈为 192/224 B。四份 policy 已收紧 RAM 与单函数栈限额，Flash 上限仍为 16,384/12,800 B。历史基线保留 chunk128，不把读取工作量变化写成相同配置。
 
 Windows 与固定官方 Linux 工具链的四组合及收紧预算均通过，无堆与未解析符号。资源、源码、测试与未完成的板级验收边界见[本轮验证记录](../../design/validation/datalink-optimization.md)。
+
+## CRC 缓存重新同步
+
+后续恢复实现复用同一 cache，并在交付后继续排空完整帧。更新后的非 LTO/LTO Flash 为 16,172/12,796 B，常驻 RAM 不变，最大单函数栈为 192/216 B。原预算保持，LTO 距 12,800 B 上限仅余 4 B；这些数字只适用于固定编译器与探针组合，不代表其他工具链具有同样余量。
+
+首版 LTO 12,912 B 的超额报告与结构精简后的验证分别保留，见[缓存重新同步验证](../../design/validation/parser-resynchronization.md)。错误恢复的 CRC 工作可能随候选数增长；资源预算通过不代替产品实时性或板级栈验收。

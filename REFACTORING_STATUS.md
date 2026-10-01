@@ -1,8 +1,16 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。当前阶段为 datalink 有界接收、单向端点与资源优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0008](design/adr/0008-datalink-runtime.md)。
+更新日期：2026-10-01。当前阶段为 parser CRC 错误后的缓存重新同步。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0009](design/adr/0009-parser-resynchronization.md)。
 
-## 当前：datalink 有界接收与资源优化
+## 当前：CRC 错误后的缓存重新同步
+
+错误只拒绝当前候选，缓存由私有 advance 入口继续寻找有效帧头；完整帧优先，无完整帧时保留最早可能半帧，包括尾部单个 `A5`。接收层同步排空多个缓存帧，仅释放已交付帧，返回首个上层错误。正常载荷内的 magic 不抢占候选，BUSY/认证拒绝不触发载荷重新同步。借用 view、固定容量和绝对期限均显式约定。
+
+17 项 parser、6 项接收恢复及 1 项完整头覆盖测试保留真实生产验证；历史私有调用迁移到 ERROR/COMPLETE 后 advance，原有测试名称不变。固定头验证共用规则，完整编码覆盖全部字节，去掉无必要的缓冲区清零；不更改 wire v3 或公开 ABI。
+
+最终结果与首版超出 LTO 预算的失败证据分别见[缓存重新同步验证](design/validation/parser-resynchronization.md)。既有 Flash/RAM 预算不放宽；没有额外常驻缓存或动态内存。本阶段仅本地提交，不推送、合并 main 或创建 tag。
+
+## 历史：datalink 有界接收与资源优化
 
 在 `d7bbb75` 基础上修复重叠 magic 候选期限和固定头超容量拒绝；将兼容 view 局部变量移出生产 feed 热路径。删除 parser 冗余 index，头长度采用 wire 原生范围；合并 metadata 包装，poll 通过同步 span 统一组帧和交付。四个实际单向接口改为独立 TX/RX 类型，实例静态绑定，公开 ABI 与 wire v3 保持。
 
