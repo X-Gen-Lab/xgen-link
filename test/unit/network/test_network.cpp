@@ -442,6 +442,48 @@ TEST_F(XglNetworkTest, LocalRxCountsAdmissionBeforeTransportAcceptance) {
     EXPECT_EQ(stats.tx_packets, 0U);
 }
 
+TEST_F(XglNetworkTest, ScopedInplaceBoundaryRetainsPayloadAndWireIdentity) {
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U, 100U, 1U),
+        XGL_OK);
+    uint8_t buffer[128] = {};
+    phy_ops.user_data = buffer;
+    phy_ops.tx = [](const uint8_t* bytes, size_t, void* user) {
+        EXPECT_EQ(bytes, static_cast<uint8_t*>(user));
+        return XGL_OK;
+    };
+    xgl_tx_zerocopy_request_t request = {};
+    request.connection_id = 7U;
+    request.session_epoch = 9U;
+    request.data.target_id = REMOTE_ID;
+    request.data.data_type = 3U;
+    request.data.data_len = 1U;
+    xgl_tx_frame_layout_t layout = {};
+    ASSERT_EQ(xgl_network_zerocopy_layout(&network_ctx, &request, &layout),
+              XGL_OK);
+    request.data.buffer = buffer;
+    request.data.buffer_size = sizeof(buffer);
+    request.data.data_offset = layout.payload_offset;
+    buffer[layout.payload_offset] = 0x47U;
+
+    EXPECT_EQ(xgl_network_send_zerocopy_scoped(&network_ctx, nullptr, nullptr),
+              XGL_ERR_NULL_POINTER);
+    ASSERT_EQ(xgl_network_send_zerocopy_scoped(&network_ctx, nullptr, &request),
+              XGL_OK);
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, buffer, layout.frame_size, nullptr),
+              XGL_OK);
+    EXPECT_EQ(view.header.connection_id, 7U);
+    EXPECT_EQ(view.session_epoch, 9U);
+    EXPECT_EQ(view.data_type, 3U);
+    EXPECT_EQ(view.payload, buffer + layout.payload_offset);
+    EXPECT_EQ(view.payload[0], 0x47U);
+    request.data.buffer_size = layout.frame_size - 1U;
+    EXPECT_EQ(xgl_network_send_zerocopy_scoped(&network_ctx, nullptr, &request),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(stats.tx_packets, 1U);
+}
+
 TEST_F(XglNetworkTest, EpochExtensionCountsAgainstRouteMtu) {
     const uint16_t mtu = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE + 1;
     ASSERT_EQ(
