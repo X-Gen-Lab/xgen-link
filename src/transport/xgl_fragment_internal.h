@@ -20,8 +20,7 @@ xgl_error_t fragment_create_reassembly_buffer(
 
 void fragment_complete_reassembly(xgl_fragment_manager_t* manager,
                                   xgl_reassembly_buffer_t* buffer,
-                                  uint8_t** complete_data,
-                                  size_t* complete_len);
+                                  xgl_fragment_message_t* complete);
 
 /**
  * \brief           Free a buffer through its owning manager

@@ -119,15 +119,10 @@ xgl_error_t fragment_create_reassembly_buffer(
 
 void fragment_complete_reassembly(xgl_fragment_manager_t* manager,
                                   xgl_reassembly_buffer_t* buffer,
-                                  uint8_t** complete_data,
-                                  size_t* complete_len) {
-    *complete_data = buffer->data;
-    *complete_len = buffer->data_len;
-
+                                  xgl_fragment_message_t* complete) {
+    complete->data = buffer->data;
+    complete->len = buffer->data_len;
     xgct_list_remove(&manager->reassembly_list, &buffer->node);
-
-    if (buffer->reserved_size <= manager->current_reassembly_bytes) {
-        manager->current_reassembly_bytes -= buffer->reserved_size;
-    }
+    /* The payload and its budget move together; only the slot is released. */
     xgm_free(manager->allocator, buffer);
 }

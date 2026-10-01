@@ -27,19 +27,19 @@ xgl_error_t xgl_fragment_process_ext(
     uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
     uint32_t fragment_offset, uint32_t message_len,
     const uint8_t* fragment_payload, size_t fragment_payload_len,
-    uint8_t** complete_data, size_t* complete_len, uint32_t current_time_ms) {
+    xgl_fragment_message_t* complete, uint32_t current_time_ms) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (manager == NULL || fragment_payload == NULL ||
         fragment_payload_len == 0U) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (complete_data == NULL || complete_len == NULL) {
+    if (complete == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    *complete_data = NULL;
-    *complete_len = 0U;
+    complete->data = NULL;
+    complete->len = 0U;
 
     xgl_error_t err = fragment_validate_ext_input(fragment_offset, message_len,
                                                   fragment_payload_len);
@@ -87,8 +87,7 @@ xgl_error_t xgl_fragment_process_ext(
     }
 
     if (buffer->received_bytes == buffer->buffer_size) {
-        fragment_complete_reassembly(manager, buffer, complete_data,
-                                     complete_len);
+        fragment_complete_reassembly(manager, buffer, complete);
         return XGL_OK;
     }
 

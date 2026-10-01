@@ -53,42 +53,36 @@ TEST_F(XglFragmentTest, ReassembleFragmentsFromFragmentExtensionMetadata) {
                   &decoded_offset, &decoded_message_len),
               XGL_OK);
 
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
-    EXPECT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 0xAABBCCDDU,
-                                       0x11223344U, 2, decoded_message_id,
-                                       decoded_offset, decoded_message_len,
-                                       part1.data(), part1.size(),
-                                       &complete_data, &complete_len, 1000),
+    xgl_fragment_message_t complete = {};
+    EXPECT_EQ(xgl_fragment_process_ext(
+                  &manager, 0x1234, 0xAABBCCDDU, 0x11223344U, 2,
+                  decoded_message_id, decoded_offset, decoded_message_len,
+                  part1.data(), part1.size(), &complete, 1000),
               XGL_ERR_BUSY);
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 1U);
 
-    EXPECT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 0xAABBCCDDU,
-                                       0x11223344U, 2, message_id, 0,
-                                       message_len, part0.data(), part0.size(),
-                                       &complete_data, &complete_len, 1001),
+    EXPECT_EQ(xgl_fragment_process_ext(
+                  &manager, 0x1234, 0xAABBCCDDU, 0x11223344U, 2, message_id, 0,
+                  message_len, part0.data(), part0.size(), &complete, 1001),
               XGL_OK);
 
-    ASSERT_NE(complete_data, nullptr);
-    ASSERT_EQ(complete_len, message_len);
-    EXPECT_EQ(std::memcmp(complete_data, "abcdefg", message_len), 0);
+    ASSERT_NE(complete.data, nullptr);
+    ASSERT_EQ(complete.len, message_len);
+    EXPECT_EQ(std::memcmp(complete.data, "abcdefg", message_len), 0);
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
 
-    xgl_fragment_free_data(&manager, complete_data);
+    xgl_fragment_release_message(&manager, &complete);
 }
 
 TEST_F(XglFragmentTest, FragmentExtensionKeyIncludesSession) {
     const uint8_t part[] = {'x', 'y'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 1, 100, 2, 77, 0, 4,
-                                       part, sizeof(part), &complete_data,
-                                       &complete_len, 1000),
+                                       part, sizeof(part), &complete, 1000),
               XGL_ERR_BUSY);
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 1, 101, 2, 77, 0, 4,
-                                       part, sizeof(part), &complete_data,
-                                       &complete_len, 1001),
+                                       part, sizeof(part), &complete, 1001),
               XGL_ERR_BUSY);
 
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 2U);
@@ -97,16 +91,13 @@ TEST_F(XglFragmentTest, FragmentExtensionKeyIncludesSession) {
 TEST_F(XglFragmentTest,
        ClearFragmentExtensionReassemblyIsScopedToConnectionSession) {
     const uint8_t part[] = {'x', 'y'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
     ASSERT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 1, 100, 2, 77, 0, 4,
-                                       part, sizeof(part), &complete_data,
-                                       &complete_len, 1000),
+                                       part, sizeof(part), &complete, 1000),
               XGL_ERR_BUSY);
     ASSERT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 2, 200, 2, 88, 0, 4,
-                                       part, sizeof(part), &complete_data,
-                                       &complete_len, 1001),
+                                       part, sizeof(part), &complete, 1001),
               XGL_ERR_BUSY);
     ASSERT_EQ(xgl_fragment_get_reassembly_count(&manager), 2U);
 
@@ -116,28 +107,24 @@ TEST_F(XglFragmentTest,
 
     const uint8_t tail[] = {'z', 'w'};
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 2, 200, 2, 88, 2, 4,
-                                       tail, sizeof(tail), &complete_data,
-                                       &complete_len, 1002),
+                                       tail, sizeof(tail), &complete, 1002),
               XGL_OK);
-    ASSERT_NE(complete_data, nullptr);
-    ASSERT_EQ(complete_len, 4U);
-    EXPECT_EQ(std::memcmp(complete_data, "xyzw", 4U), 0);
-    xgl_fragment_free_data(&manager, complete_data);
+    ASSERT_NE(complete.data, nullptr);
+    ASSERT_EQ(complete.len, 4U);
+    EXPECT_EQ(std::memcmp(complete.data, "xyzw", 4U), 0);
+    xgl_fragment_release_message(&manager, &complete);
 }
 
 TEST_F(XglFragmentTest, RejectsDuplicateByteRange) {
     const uint8_t part[] = {'x', 'y'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
     ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 4, part,
-                                       sizeof(part), &complete_data,
-                                       &complete_len, 1000),
+                                       sizeof(part), &complete, 1000),
               XGL_ERR_BUSY);
 
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 4, part,
-                                       sizeof(part), &complete_data,
-                                       &complete_len, 1001),
+                                       sizeof(part), &complete, 1001),
               XGL_ERR_BUSY);
 }
 
@@ -145,12 +132,10 @@ TEST_F(XglFragmentTest, RejectsReassemblyExceedingMaxMessageSize) {
     ASSERT_EQ(xgl_fragment_set_limits(&manager, 12, 0), XGL_OK);
 
     const uint8_t part[] = {'a', 'b'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 13, part,
-                                       sizeof(part), &complete_data,
-                                       &complete_len, 1000),
+                                       sizeof(part), &complete, 1000),
               XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
 }
@@ -159,51 +144,52 @@ TEST_F(XglFragmentTest, EnforcesAggregateReassemblyByteBudget) {
     ASSERT_EQ(xgl_fragment_set_limits(&manager, 0, 16), XGL_OK);
 
     const uint8_t part[] = {'a', 'b'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 16, part,
-                                       sizeof(part), &complete_data,
-                                       &complete_len, 1000),
+                                       sizeof(part), &complete, 1000),
               XGL_ERR_BUSY);
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 1U);
 
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 2, 2, 2, 1, 2, 0, 1, part, 1,
-                                       &complete_data, &complete_len, 1001),
+                                       &complete, 1001),
               XGL_ERR_NO_MEMORY);
 }
 
 TEST_F(XglFragmentTest, CompletedPayloadRetainsBudgetUntilRelease) {
     ASSERT_EQ(xgl_fragment_set_limits(&manager, 2, 2), XGL_OK);
     const uint8_t payload[] = {'a', 'b'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
-    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 2,
-                                       payload, sizeof(payload),
-                                       &complete_data, &complete_len, 1000),
+    xgl_fragment_message_t complete = {};
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 2, payload,
+                                       sizeof(payload), &complete, 1000),
               XGL_OK);
     EXPECT_EQ(manager.current_reassembly_bytes, 2U);
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
 
-    uint8_t* other_data = nullptr;
-    size_t other_len = 0;
-    EXPECT_EQ(xgl_fragment_process_ext(&manager, 2, 2, 2, 1, 2, 0, 2,
-                                       payload, 1, &other_data, &other_len,
-                                       1001),
+    xgl_fragment_message_t other = {};
+    EXPECT_EQ(xgl_fragment_process_ext(&manager, 2, 2, 2, 1, 2, 0, 2, payload,
+                                       1, &other, 1001),
               XGL_ERR_NO_MEMORY);
-    xgl_fragment_free_data(&manager, complete_data);
+    xgl_fragment_release_message(&manager, &complete);
+    EXPECT_EQ(manager.current_reassembly_bytes, 0U);
+    EXPECT_EQ(complete.data, nullptr);
+    EXPECT_EQ(complete.len, 0U);
+    xgl_fragment_release_message(&manager, &complete);
+    EXPECT_EQ(manager.current_reassembly_bytes, 0U);
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 2, 2, 2, 1, 2, 0, 2, payload,
+                                       sizeof(payload), &other, 1002),
+              XGL_OK);
+    xgl_fragment_release_message(&manager, &other);
     EXPECT_EQ(manager.current_reassembly_bytes, 0U);
 }
 
 TEST_F(XglFragmentTest, ReassemblyTracksReceivedRangesInsteadOfByteBitmap) {
     const std::vector<uint8_t> part(64, 0x5A);
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
-    ASSERT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 0xAABBCCDDU,
-                                       0x11223344U, 2, 0x01020304U, 128, 1024,
-                                       part.data(), part.size(), &complete_data,
-                                       &complete_len, 1000),
+    ASSERT_EQ(xgl_fragment_process_ext(
+                  &manager, 0x1234, 0xAABBCCDDU, 0x11223344U, 2, 0x01020304U,
+                  128, 1024, part.data(), part.size(), &complete, 1000),
               XGL_ERR_BUSY);
 
     ASSERT_NE(manager.reassembly_list.head, nullptr);
@@ -217,12 +203,10 @@ TEST_F(XglFragmentTest, ReassemblyTracksReceivedRangesInsteadOfByteBitmap) {
 
 TEST_F(XglFragmentTest, TimeoutHandling) {
     const uint8_t part[] = {'a', 'b'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
     ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 4, part,
-                                       sizeof(part), &complete_data,
-                                       &complete_len, 1000),
+                                       sizeof(part), &complete, 1000),
               XGL_ERR_BUSY);
 
     EXPECT_EQ(xgl_fragment_process_timeouts(&manager, 7000), 1U);
@@ -231,16 +215,13 @@ TEST_F(XglFragmentTest, TimeoutHandling) {
 
 TEST_F(XglFragmentTest, InvalidParameters) {
     const uint8_t part[] = {'a'};
-    uint8_t* complete_data = nullptr;
-    size_t complete_len = 0;
+    xgl_fragment_message_t complete = {};
 
     EXPECT_EQ(xgl_fragment_process_ext(nullptr, 1, 1, 1, 1, 1, 0, 1, part,
-                                       sizeof(part), &complete_data,
-                                       &complete_len, 0),
+                                       sizeof(part), &complete, 0),
               XGL_ERR_INVALID_PARAM);
 
     EXPECT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 2, 1, part,
-                                       sizeof(part), &complete_data,
-                                       &complete_len, 0),
+                                       sizeof(part), &complete, 0),
               XGL_ERR_INVALID_FRAME);
 }

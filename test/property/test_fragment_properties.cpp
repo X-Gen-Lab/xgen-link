@@ -53,29 +53,28 @@ TEST(XglFragmentProperties, FragmentExtensionReassemblyRoundTrip) {
         std::vector<uint8_t> data = gen.random_bytes(total_len);
         size_t split = 1U + (gen.random_uint32() % (total_len - 1U));
 
-        uint8_t* complete_data = nullptr;
-        size_t complete_len = 0;
+        xgl_fragment_message_t complete = {};
         uint32_t message_id = manager.next_message_id++;
 
         ASSERT_EQ(xgl_fragment_process_ext(
                       &manager, 0x1234, 0xABCDEF01U, 0x01020304U, 7, message_id,
                       static_cast<uint32_t>(split),
                       static_cast<uint32_t>(total_len), data.data() + split,
-                      total_len - split, &complete_data, &complete_len, 1000),
+                      total_len - split, &complete, 1000),
                   XGL_ERR_BUSY);
 
-        ASSERT_EQ(xgl_fragment_process_ext(
-                      &manager, 0x1234, 0xABCDEF01U, 0x01020304U, 7, message_id,
-                      0, static_cast<uint32_t>(total_len), data.data(), split,
-                      &complete_data, &complete_len, 1001),
+        ASSERT_EQ(xgl_fragment_process_ext(&manager, 0x1234, 0xABCDEF01U,
+                                           0x01020304U, 7, message_id, 0,
+                                           static_cast<uint32_t>(total_len),
+                                           data.data(), split, &complete, 1001),
                   XGL_OK);
 
-        ASSERT_NE(complete_data, nullptr);
-        ASSERT_EQ(complete_len, total_len);
-        EXPECT_EQ(memcmp(complete_data, data.data(), total_len), 0);
+        ASSERT_NE(complete.data, nullptr);
+        ASSERT_EQ(complete.len, total_len);
+        EXPECT_EQ(memcmp(complete.data, data.data(), total_len), 0);
         EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
 
-        xgl_fragment_free_data(&manager, complete_data);
+        xgl_fragment_release_message(&manager, &complete);
         xgl_fragment_destroy(&manager);
     }
 }

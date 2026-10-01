@@ -488,15 +488,15 @@ TEST_F(TransportRegressionTest,
     accept_blocked = true;
     ASSERT_EQ(Receive(0, 'b', true, 0), XGL_OK);
     ASSERT_EQ(Receive(1, 'c', true, 1), XGL_OK);
-    ASSERT_NE(ctx.peers->rx_pending_message, nullptr);
+    ASSERT_NE(ctx.peers->rx_pending_message.data, nullptr);
     EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 2U);
     EXPECT_EQ(ctx.peers->rx_next_packet_number, 2U);
     EXPECT_TRUE(accepted_payloads.empty());
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 101), XGL_OK);
-    ASSERT_NE(ctx.peers->rx_pending_message, nullptr);
+    ASSERT_NE(ctx.peers->rx_pending_message.data, nullptr);
     accept_blocked = false;
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 102), XGL_OK);
-    EXPECT_EQ(ctx.peers->rx_pending_message, nullptr);
+    EXPECT_EQ(ctx.peers->rx_pending_message.data, nullptr);
     EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 0U);
     ASSERT_EQ(accepted_payloads.size(), 1U);
     EXPECT_EQ(accepted_payloads[0], std::vector<uint8_t>({'b', 'c'}));
@@ -2702,7 +2702,7 @@ TEST_F(TransportRegressionTest, CompletedMessageRetainsReassemblyByteBudget) {
     ASSERT_EQ(Receive(0, 'a', true, 0), XGL_OK);
     ASSERT_EQ(Receive(1, 'b', true, 1), XGL_OK);
     EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 2U);
-    EXPECT_NE(ctx.peers->rx_pending_message, nullptr);
+    EXPECT_NE(ctx.peers->rx_pending_message.data, nullptr);
     accept_blocked = false;
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 101), XGL_OK);
     EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 0U);

@@ -46,18 +46,10 @@ static xgl_error_t transport_accept_payload(xgl_transport_ctx_t* ctx,
  */
 void transport_clear_pending_message(xgl_transport_ctx_t* ctx,
                                      xgl_transport_peer_state_t* peer) {
-    if (peer == NULL || peer->rx_pending_message == NULL) {
+    if (peer == NULL || peer->rx_pending_message.data == NULL) {
         return;
     }
-    if (ctx->fragment_mgr != NULL &&
-        ctx->fragment_mgr->current_reassembly_bytes >=
-            peer->rx_pending_message_len) {
-        ctx->fragment_mgr->current_reassembly_bytes -=
-            peer->rx_pending_message_len;
-    }
-    xgm_free(ctx->memory.reassembly_payload, peer->rx_pending_message);
-    peer->rx_pending_message = NULL;
-    peer->rx_pending_message_len = 0U;
+    xgl_fragment_release_message(ctx->fragment_mgr, &peer->rx_pending_message);
 }
 
 /**
@@ -71,12 +63,12 @@ void transport_clear_pending_message(xgl_transport_ctx_t* ctx,
 xgl_error_t transport_drain_pending_message(xgl_transport_ctx_t* ctx,
                                             xgl_handle_t handle,
                                             xgl_transport_peer_state_t* peer) {
-    if (peer->rx_pending_message == NULL) {
+    if (peer->rx_pending_message.data == NULL) {
         return XGL_OK;
     }
     xgl_error_t err = transport_accept_payload(
         ctx, handle, peer->peer_id, peer->rx_pending_message_type,
-        peer->rx_pending_message, peer->rx_pending_message_len);
+        peer->rx_pending_message.data, peer->rx_pending_message.len);
     if (err == XGL_OK) {
         transport_clear_pending_message(ctx, peer);
     } else if (err != XGL_ERR_BUSY && err != XGL_ERR_NO_MEMORY) {
@@ -108,7 +100,7 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
     uint8_t data_type = packet->data_type;
 #if XGL_FEATURE_FRAGMENTATION
     xgl_transport_peer_state_t* peer = transport_find_rx_peer(ctx, packet);
-    if (peer != NULL && peer->rx_pending_message != NULL) {
+    if (peer != NULL && peer->rx_pending_message.data != NULL) {
         return XGL_ERR_BUSY;
     }
 
@@ -119,8 +111,7 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
         if (peer == NULL) {
             return XGL_ERR_NO_MEMORY;
         }
-        uint8_t* complete_data = NULL;
-        size_t complete_len = 0;
+        xgl_fragment_message_t complete = {0};
         uint32_t message_id = 0U;
         uint32_t fragment_offset = 0U;
         uint32_t message_len = 0U;
@@ -159,21 +150,18 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
         xgl_error_t err = xgl_fragment_process_ext(
             ctx->fragment_mgr, source_id, packet->connection_id,
             packet->session_epoch, data_type, message_id, fragment_offset,
-            message_len, data, data_len, &complete_data, &complete_len,
-            transport_now(ctx));
+            message_len, data, data_len, &complete, transport_now(ctx));
 
         if (err == XGL_OK) {
             err = transport_accept_payload(ctx, handle, source_id, data_type,
-                                           complete_data, complete_len);
+                                           complete.data, complete.len);
             if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY) {
-                peer->rx_pending_message = complete_data;
-                peer->rx_pending_message_len = complete_len;
+                peer->rx_pending_message = complete;
                 peer->rx_pending_message_type = data_type;
-                ctx->fragment_mgr->current_reassembly_bytes += complete_len;
                 return XGL_OK; /* Accepted into owned storage, retry application
                                   in run. */
             }
-            xgl_fragment_free_data(ctx->fragment_mgr, complete_data);
+            xgl_fragment_release_message(ctx->fragment_mgr, &complete);
             if (err != XGL_OK) {
                 transport_fail_peer(ctx, handle, peer, err);
                 return err;

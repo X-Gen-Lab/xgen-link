@@ -91,9 +91,7 @@ typedef struct xgl_transport_peer_state_s {
     bool tx_message_retry_pending; /**< Waiting for a local-capacity retry */
     uint32_t
         tx_message_retry_started_ms; /**< Retry delay start; zero is valid */
-    uint8_t* rx_pending_message;     /**< Owned complete message awaiting
-                                        application capacity */
-    size_t rx_pending_message_len;
+    xgl_fragment_message_t rx_pending_message; /**< Owned completed RX bytes */
     uint8_t rx_pending_message_type;
 #endif
 } xgl_transport_peer_state_t;

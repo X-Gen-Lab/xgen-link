@@ -33,6 +33,16 @@ typedef struct {
     size_t end;   /**< Exclusive byte offset */
 } xgl_fragment_received_range_t;
 
+/**
+ * \brief           Owned completed bytes, still charged to the manager budget
+ * \note            Transfer by value only when relinquishing the old owner.
+ *                  Release before destroying the owning manager.
+ */
+typedef struct {
+    uint8_t* data; /**< Owned payload, NULL after release */
+    size_t len;    /**< Payload size and retained budget */
+} xgl_fragment_message_t;
+
 /*---------------------------------------------------------------------------*/
 /* Reassembly Buffer Structure                                               */
 /*---------------------------------------------------------------------------*/
@@ -149,8 +159,7 @@ void xgl_fragment_destroy(xgl_fragment_manager_t* manager);
  * \param[in]       message_len: Complete message length
  * \param[in]       fragment_payload: Fragment payload bytes
  * \param[in]       fragment_payload_len: Fragment payload length
- * \param[out]      complete_data: Pointer to complete data when ready
- * \param[out]      complete_len: Complete data length when ready
+ * \param[out]      complete: Owned completed message, empty while incomplete
  * \param[in]       current_time_ms: Current explicit time in milliseconds; zero
  * is valid
  * \return          XGL_OK if complete, XGL_ERR_BUSY if waiting, error otherwise
@@ -160,7 +169,7 @@ xgl_error_t xgl_fragment_process_ext(
     uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
     uint32_t fragment_offset, uint32_t message_len,
     const uint8_t* fragment_payload, size_t fragment_payload_len,
-    uint8_t** complete_data, size_t* complete_len, uint32_t current_time_ms);
+    xgl_fragment_message_t* complete, uint32_t current_time_ms);
 
 /**
  * \brief           Process reassembly timeouts
@@ -198,12 +207,13 @@ size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
                                            uint32_t session_epoch);
 
 /**
- * \brief           Free complete data allocated by xgl_fragment_process_ext
- * \param[in]       manager: Fragmentation manager structure
- * \param[in]       data: Data pointer to free
+ * \brief           Release completed payload and its reserved byte budget
+ * \param[in,out]   manager: Original owning manager, alive until release
+ * \param[in,out]   message: Owned message, cleared after release
+ * \note            Releasing an empty message is a no-op.
  */
-void xgl_fragment_free_data(const xgl_fragment_manager_t* manager,
-                            uint8_t* data);
+void xgl_fragment_release_message(xgl_fragment_manager_t* manager,
+                                  xgl_fragment_message_t* message);
 
 #ifdef __cplusplus
 }

@@ -111,11 +111,13 @@ size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
     return cleared;
 }
 
-void xgl_fragment_free_data(const xgl_fragment_manager_t* manager,
-                            uint8_t* data) {
-    if (manager == NULL || data == NULL) {
+void xgl_fragment_release_message(xgl_fragment_manager_t* manager,
+                                  xgl_fragment_message_t* message) {
+    if (manager == NULL || message == NULL || message->data == NULL) {
         return;
     }
-
-    xgm_free(manager->data_allocator, data);
+    manager->current_reassembly_bytes -= message->len;
+    xgm_free(manager->data_allocator, message->data);
+    message->data = NULL;
+    message->len = 0U;
 }

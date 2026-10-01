@@ -81,7 +81,8 @@ transport_peer_has_pending_data(const xgl_transport_ctx_t* ctx,
     }
 #endif
 #if XGL_FEATURE_FRAGMENTATION
-    if (peer->rx_pending_message != NULL || peer->tx_message.data != NULL) {
+    if (peer->rx_pending_message.data != NULL ||
+        peer->tx_message.data != NULL) {
         return true;
     }
     if (ctx->fragment_mgr != NULL) {
