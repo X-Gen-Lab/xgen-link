@@ -22,10 +22,11 @@ xgl_error_t xgl_wire_encode_ack_range_ext_value(uint8_t* buffer,
         return XGL_ERR_NULL_POINTER;
     }
 
-    size_t required_size = 9U + (range_count * 4U);
-    if (required_size > UINT8_MAX) {
+    if (range_count > (UINT8_MAX - 9U) / 4U) {
         return XGL_ERR_INVALID_PARAM;
     }
+
+    size_t required_size = 9U + (range_count * 4U);
 
     if (buffer_size < required_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
