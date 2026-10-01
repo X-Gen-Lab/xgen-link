@@ -40,9 +40,6 @@ struct xgl_network_ctx_s;
  * \brief           Data link layer context structure
  */
 typedef struct xgl_datalink_ctx_s {
-    xgl_parser_t parser;            /**< Frame parser */
-    uint8_t* rx_cache;              /**< RX cache buffer */
-    size_t rx_cache_size;           /**< RX cache size */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer */
     uint64_t* rx_crc16_errors;      /**< Frame CRC16 error counter pointer */
@@ -52,8 +49,7 @@ typedef struct xgl_datalink_ctx_s {
     const xgm_allocator_t* allocator; /**< Allocator for temporary TX buffers */
     uint16_t source_id;               /**< Local source ID */
 #if XGL_FEATURE_AUTH
-    xgl_security_ctx_t
-        security; /**< Explicit trusted endpoint security state */
+    xgl_security_ctx_t* security; /**< Borrowed instance security state */
 #endif
 
     /* Layer interface for decoupled communication */
@@ -64,8 +60,6 @@ typedef struct xgl_datalink_ctx_s {
  * \brief           Data link layer configuration structure
  */
 typedef struct {
-    uint8_t* rx_cache;              /**< RX cache buffer */
-    size_t rx_cache_size;           /**< RX cache size */
     uint16_t source_id;             /**< Local source ID */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
     uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer (can
@@ -79,10 +73,11 @@ typedef struct {
     xgl_handle_t
         owner_handle; /**< Owning protocol instance handle (can be NULL) */
     const xgm_allocator_t*
-        allocator;      /**< Allocator for temporary TX buffers; NULL
-                                   fallback is build-policy controlled */
-    bool auth_required; /**< Require authenticated production frames */
-    xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
+        allocator; /**< Allocator for temporary TX buffers; NULL
+                              fallback is build-policy controlled */
+#if XGL_FEATURE_AUTH
+    xgl_security_ctx_t* security; /**< Borrowed instance security state */
+#endif
 } xgl_datalink_config_t;
 
 /*---------------------------------------------------------------------------*/
@@ -110,6 +105,22 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
                               const xgl_frame_t* frame);
 
 /**
+ * \brief           Encode in caller storage and submit without moving payload
+ * \param[in,out]   ctx: Shared datalink services
+ * \param[in]       phy: Synchronous transmit operations
+ * \param[in]       frame: Borrowed logical frame
+ * \param[in,out]   buffer: Caller frame storage
+ * \param[in]       buffer_size: Available storage bytes
+ * \param[in]       payload_offset: Payload offset fixed by the caller
+ * \return          XGL_OK or a layout, security or driver error
+ */
+xgl_error_t xgl_datalink_send_inplace(xgl_datalink_ctx_t* ctx,
+                                      xgl_phy_ops_t* phy,
+                                      const xgl_frame_t* frame, uint8_t* buffer,
+                                      size_t buffer_size,
+                                      size_t payload_offset);
+
+/**
  * \brief           Send raw frame buffer via physical layer
  * \param[in]       ctx: Data link layer context
  * \param[in]       phy: Physical layer operations
@@ -120,17 +131,6 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
 xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
                                   const uint8_t* frame_buffer,
                                   size_t frame_len);
-
-/**
- * \brief           Receive and parse frames from physical layer
- * \param[in,out]   ctx: Data link layer context
- * \param[in]       phy: Physical layer operations
- * \param[in]       current_time_ms: Current time in milliseconds
- * \param[in]       timeout_ms: Parser timeout in milliseconds
- * \return          XGL_OK on success, error code otherwise
- */
-xgl_error_t xgl_datalink_receive(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
-                                 uint32_t current_time_ms, uint32_t timeout_ms);
 
 /**
  * \brief           Poll one PHY using its own parser and shared link policy

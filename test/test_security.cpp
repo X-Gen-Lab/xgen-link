@@ -189,8 +189,8 @@ class XglSecuritySessionTest : public ::testing::Test {
     }
 
     xgl_error_t Sign() {
-        return xgl_frame_serialize_authenticated(bytes, sizeof(bytes), &frame,
-                                                 &sender, &length);
+        return xgl_security_serialize_frame(bytes, sizeof(bytes), &frame,
+                                            &sender, &length);
     }
 
     xgl_error_t Verify() {
@@ -285,9 +285,8 @@ TEST_F(XglSecuritySessionTest, ProviderFailureAndWrongLengthConsumeSequences) {
 
 TEST_F(XglSecuritySessionTest, CapacityFailureDoesNotCallProvider) {
     Install();
-    EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 55, &frame, &sender, &length),
-        XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 55, &frame, &sender, &length),
+              XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(spy.sign_calls, 0U);
     EXPECT_EQ(sender.sessions[0].tx_next_seq, 0U);
 }
@@ -411,8 +410,8 @@ TEST_F(XglSecuritySessionTest, OppositeDirectionsHaveDistinctNonceDomains) {
     ASSERT_EQ(Verify(), XGL_OK);
     frame.header.source_id = 2;
     frame.header.target_id = 1;
-    ASSERT_EQ(xgl_frame_serialize_authenticated(bytes, sizeof(bytes), &frame,
-                                                &receiver, &length),
+    ASSERT_EQ(xgl_security_serialize_frame(bytes, sizeof(bytes), &frame,
+                                           &receiver, &length),
               XGL_OK);
     EXPECT_EQ(spy.last_sequence, 0U);
     EXPECT_NE(spy.nonce, forward_nonce);

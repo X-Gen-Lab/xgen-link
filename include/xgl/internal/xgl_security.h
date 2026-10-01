@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "xgl/internal/xgl_frame.h"
 #include "xgl/internal/xgl_wire.h"
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
@@ -128,7 +129,34 @@ xgl_error_t xgl_security_verify_frame(xgl_security_ctx_t* ctx,
 xgl_error_t xgl_security_sign_frame(xgl_security_ctx_t* ctx, uint8_t* buffer,
                                     size_t capacity, size_t aad_len,
                                     size_t payload_len, size_t* frame_len);
-#endif
+
+/**
+ * \brief           Resolve the single authentication policy used by TX layers
+ * \param[in]       required: Instance authentication policy
+ * \param[in]       provider: Borrowed authentication provider, or NULL
+ * \param[in]       flags: Logical frame flags
+ * \param[out]      tag_len: Valid output for the planned trailer size
+ * \return          XGL_OK or XGL_ERR_INVALID_PARAM for an unusable provider
+ */
+xgl_error_t xgl_security_frame_tag_len(bool required,
+                                       const xgl_auth_provider_t* provider,
+                                       uint8_t flags, size_t* tag_len);
+
+/**
+ * \brief           Encode and authenticate a frame through one wire layout
+ * \param[out]      buffer: Destination frame storage
+ * \param[in]       buffer_size: Available bytes
+ * \param[in]       frame: Borrowed frame fields, extensions and payload
+ * \param[in,out]   security: Borrowed trusted session state
+ * \param[out]      bytes_written: Complete frame length on success
+ * \return          XGL_OK, or an encoding, provider or session error
+ */
+xgl_error_t xgl_security_serialize_frame(uint8_t* buffer, size_t buffer_size,
+                                         const xgl_frame_t* frame,
+                                         xgl_security_ctx_t* security,
+                                         size_t* bytes_written);
+
+#endif /* XGL_FEATURE_AUTH */
 
 #ifdef __cplusplus
 }

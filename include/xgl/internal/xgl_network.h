@@ -62,7 +62,8 @@ struct xgl_datalink_ctx_s;
  * \brief           Network layer context structure
  */
 typedef struct xgl_network_ctx_s {
-    uint16_t local_id;              /**< Local node ID */
+    uint16_t local_id;     /**< Local node ID */
+    size_t max_frame_size; /**< Instance frame limit; zero uses the route MTU */
     xgl_route_table_t* route_table; /**< Route table */
 
     /* Layer interfaces for decoupled communication */
@@ -76,10 +77,8 @@ typedef struct xgl_network_ctx_s {
 #if XGL_FEATURE_AUTH
     bool auth_required; /**< Require authenticated routed frames */
     const xgl_auth_provider_t*
-        auth_provider; /**< End-to-end authentication provider */
-#if XGL_FEATURE_AUTH
-    xgl_security_ctx_t* security; /**< Local receive security state */
-#endif
+        auth_provider;            /**< End-to-end authentication provider */
+    xgl_security_ctx_t* security; /**< Borrowed instance security state */
 #endif
 #if XGL_FEATURE_FORWARDING
     const xgm_allocator_t*
@@ -91,7 +90,8 @@ typedef struct xgl_network_ctx_s {
  * \brief           Network layer configuration structure
  */
 typedef struct {
-    uint16_t local_id;              /**< Local node ID */
+    uint16_t local_id;     /**< Local node ID */
+    size_t max_frame_size; /**< Instance frame limit; zero uses the route MTU */
     xgl_route_table_t* route_table; /**< Route table */
     xgl_packet_interface_t*
         upper_layer; /**< Upper layer interface (can be NULL) */
@@ -133,6 +133,18 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
  * link layer
  */
 xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet);
+
+/**
+ * \brief           Route and synchronously submit caller-owned frame storage
+ * \param[in,out]   ctx: Network context
+ * \param[in]       handle: Instance passed to synchronous callbacks
+ * \param[in,out]   request: Borrowed payload and exact frame headroom
+ * \return          XGL_OK, or an argument, route, layout or submission error
+ * \note            Reliable transmission is excluded from this entry point.
+ */
+xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
+                                      xgl_handle_t handle,
+                                      const xgl_tx_data_zerocopy_t* request);
 
 /**
  * \brief           Receive and process packet from data link layer

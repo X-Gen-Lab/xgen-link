@@ -22,6 +22,9 @@ extern "C" {
 typedef struct {
     const xgl_frame_t* frame;
     xgl_phy_ops_t* phy;
+    uint8_t* buffer;       /**< Caller frame storage for in-place encoding */
+    size_t buffer_size;    /**< Available caller storage bytes */
+    size_t payload_offset; /**< Required unchanged payload position */
     const uint8_t*
         serialized;        /**< Borrowed complete frame when frame is NULL */
     size_t serialized_len; /**< Complete frame bytes submitted unchanged */

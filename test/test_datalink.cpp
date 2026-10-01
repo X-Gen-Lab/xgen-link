@@ -252,8 +252,6 @@ class XglDatalinkTest : public ::testing::Test {
 
         /* Initialize datalink context */
         xgl_datalink_config_t config = {};
-        config.rx_cache = rx_cache;
-        config.rx_cache_size = sizeof(rx_cache);
         config.source_id = SOURCE_ID;
         config.stats = &stats;
         config.rx_header_crc_errors = &rx_header_crc_errors;
@@ -292,8 +290,6 @@ TEST_F(XglDatalinkTest, InitSuccess) {
     uint64_t header_crc = 0, crc16 = 0;
 
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &test_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -313,8 +309,6 @@ TEST_F(XglDatalinkTest, InitNullPointer) {
     uint64_t header_crc = 0, crc16 = 0;
 
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &test_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -399,8 +393,6 @@ TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &large_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -477,8 +469,6 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -486,8 +476,9 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     config.upper_layer = nullptr;
     config.error_callback = nullptr;
     config.callback_user_data = nullptr;
-    config.auth_required = true;
-    config.auth_provider = &provider;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, SOURCE_ID, true, &provider), XGL_OK);
+    config.security = &security;
     config.allocator = xgm_allocator_libc();
     ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
 
@@ -504,7 +495,7 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
 
     auto trusted = test_session_config(TARGET_ID);
-    ASSERT_EQ(xgl_security_session_install(&auth_ctx.security, &trusted),
+    ASSERT_EQ(xgl_security_session_install(auth_ctx.security, &trusted),
               XGL_OK);
     EXPECT_CALL(mock_phy, tx(_, _, _))
         .WillOnce([&provider](const uint8_t* data, size_t len, void*) {
@@ -538,8 +529,6 @@ TEST_F(XglDatalinkTest, ProcessFrameLeavesEndToEndAuthenticationToNetwork) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -547,8 +536,9 @@ TEST_F(XglDatalinkTest, ProcessFrameLeavesEndToEndAuthenticationToNetwork) {
     config.upper_layer = nullptr;
     config.error_callback = nullptr;
     config.callback_user_data = nullptr;
-    config.auth_required = true;
-    config.auth_provider = &provider;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, SOURCE_ID, true, &provider), XGL_OK);
+    config.security = &security;
     ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
 
     xgl_frame_t frame;
@@ -593,8 +583,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDoesNotCommitEndpointReplayState) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -602,8 +590,9 @@ TEST_F(XglDatalinkTest, ProcessFrameDoesNotCommitEndpointReplayState) {
     config.upper_layer = nullptr;
     config.error_callback = nullptr;
     config.callback_user_data = nullptr;
-    config.auth_required = true;
-    config.auth_provider = &provider;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, SOURCE_ID, true, &provider), XGL_OK);
+    config.security = &security;
     ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
 
     xgl_frame_t frame;
@@ -649,8 +638,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDeliversWireValidReliableCopiesUpstream) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &auth_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -658,8 +645,9 @@ TEST_F(XglDatalinkTest, ProcessFrameDeliversWireValidReliableCopiesUpstream) {
     config.upper_layer = &upper_layer;
     config.error_callback = nullptr;
     config.callback_user_data = nullptr;
-    config.auth_required = true;
-    config.auth_provider = &provider;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, SOURCE_ID, true, &provider), XGL_OK);
+    config.security = &security;
     ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
 
     xgl_frame_t frame;
@@ -700,8 +688,6 @@ TEST_F(XglDatalinkTest, ProcessFrameHasNoImplicitEndpointAuthenticationPolicy) {
     uint64_t header_crc = 0;
     uint64_t crc16 = 0;
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.source_id = SOURCE_ID;
     config.stats = &optional_stats;
     config.rx_header_crc_errors = &header_crc;
@@ -709,8 +695,10 @@ TEST_F(XglDatalinkTest, ProcessFrameHasNoImplicitEndpointAuthenticationPolicy) {
     config.upper_layer = nullptr;
     config.error_callback = nullptr;
     config.callback_user_data = nullptr;
-    config.auth_required = false;
-    config.auth_provider = &provider;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, SOURCE_ID, false, &provider),
+              XGL_OK);
+    config.security = &security;
     ASSERT_EQ(xgl_datalink_init(&optional_auth_ctx, &config), XGL_OK);
 
     xgl_frame_t frame;

@@ -18,6 +18,7 @@ namespace {
 class XglCoverageDelivery : public ::testing::Test {
   protected:
     xgl_datalink_ctx_t context = {};
+    xgl_parser_t parser = {};
     xgl_layer_stats_t statistics = {};
     xgl_phy_ops_t phy = {};
     uint8_t cache[128] = {};
@@ -31,8 +32,7 @@ class XglCoverageDelivery : public ::testing::Test {
     std::vector<xgl_error_t> errors;
 
     void SetUp() override {
-        ASSERT_EQ(xgl_parser_init(&context.parser, cache, sizeof(cache)),
-                  XGL_OK);
+        ASSERT_EQ(xgl_parser_init(&parser, cache, sizeof(cache)), XGL_OK);
         context.stats = &statistics;
         context.callback_user_data = this;
         context.error_callback = [](xgl_handle_t, xgl_error_t error,
@@ -72,50 +72,52 @@ class XglCoverageDelivery : public ::testing::Test {
 };
 
 TEST_F(XglCoverageDelivery, InvalidPollArgumentsNeverCallTheDriver) {
-    EXPECT_EQ(xgl_datalink_receive(nullptr, &phy, 0, 10), XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_datalink_poll_parser(nullptr, &context.parser, &phy, 0, 10, 8),
-        XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_datalink_poll_parser(nullptr, &parser, &phy, 0, 10,
+                                       XGL_DATALINK_RX_CHUNK_SIZE),
+              XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_datalink_poll_parser(nullptr, &parser, &phy, 0, 10, 8),
+              XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_datalink_poll_parser(&context, nullptr, &phy, 0, 10, 8),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_datalink_poll_parser(&context, &context.parser, nullptr, 0, 10, 8),
-        XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, nullptr, 0, 10, 8),
+              XGL_ERR_NULL_POINTER);
     phy.rx = nullptr;
-    EXPECT_EQ(xgl_datalink_receive(&context, &phy, 0, 10),
+    EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 0, 10,
+                                       XGL_DATALINK_RX_CHUNK_SIZE),
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(reads, 0U);
 }
 
 TEST_F(XglCoverageDelivery, PollHonorsCapacityAndPropagatesDriverFailures) {
-    EXPECT_EQ(
-        xgl_datalink_poll_parser(&context, &context.parser, &phy, 0, 10, 0),
-        XGL_OK);
+    EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 0, 10, 0),
+              XGL_OK);
     EXPECT_EQ(reads, 0U);
     read_result = XGL_ERR_BUSY;
-    EXPECT_EQ(
-        xgl_datalink_poll_parser(&context, &context.parser, &phy, 0, 10, 3),
-        XGL_ERR_BUSY);
+    EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 0, 10, 3),
+              XGL_ERR_BUSY);
     EXPECT_EQ(requested, 3U);
     read_result = XGL_OK;
     exceed_capacity = true;
-    EXPECT_EQ(xgl_datalink_receive(&context, &phy, 0, 10),
+    EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 0, 10,
+                                       XGL_DATALINK_RX_CHUNK_SIZE),
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(requested, static_cast<size_t>(XGL_DATALINK_RX_CHUNK_SIZE));
-    EXPECT_EQ(context.parser.cache_len, 0U);
+    EXPECT_EQ(parser.cache_len, 0U);
 }
 
 TEST_F(XglCoverageDelivery, TimedOutPartialFramesResetWithOptionalObservers) {
     for (bool observers : {true, false}) {
         context.stats = observers ? &statistics : nullptr;
         context.error_callback = observers ? context.error_callback : nullptr;
-        ASSERT_EQ(xgl_parser_feed_byte(&context.parser, XGL_WIRE_MAGIC_0, 1),
+        ASSERT_EQ(xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_0, 1),
                   XGL_PARSE_RESULT_INCOMPLETE);
-        ASSERT_EQ(xgl_parser_feed_byte(&context.parser, XGL_WIRE_MAGIC_1, 1),
+        ASSERT_EQ(xgl_parser_feed_byte(&parser, XGL_WIRE_MAGIC_1, 1),
                   XGL_PARSE_RESULT_INCOMPLETE);
-        EXPECT_EQ(xgl_datalink_receive(&context, &phy, 30, 10), XGL_OK);
-        EXPECT_EQ(context.parser.cache_len, 0U);
-        EXPECT_EQ(context.parser.state, XGL_PARSE_MAGIC);
+        EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 30, 10,
+                                           XGL_DATALINK_RX_CHUNK_SIZE),
+                  XGL_OK);
+        EXPECT_EQ(parser.cache_len, 0U);
+        EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     }
     EXPECT_EQ(statistics.rx_errors, 1U);
     ASSERT_EQ(errors.size(), 1U);
@@ -190,9 +192,11 @@ TEST_F(XglCoverageDelivery, ParserDropsCorruptInputAndAcceptsTheNextFrame) {
         input.back() ^= 1U;
         input.insert(input.end(), frame, frame + frame_size);
         while (!input.empty()) {
-            EXPECT_EQ(xgl_datalink_receive(&context, &phy, 1, 10), XGL_OK);
+            EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 1, 10,
+                                               XGL_DATALINK_RX_CHUNK_SIZE),
+                      XGL_OK);
         }
-        EXPECT_EQ(context.parser.cache_len, 0U);
+        EXPECT_EQ(parser.cache_len, 0U);
     }
     EXPECT_EQ(statistics.rx_errors, 1U);
     EXPECT_EQ(statistics.rx_packets, 1U);
@@ -225,14 +229,12 @@ TEST_F(XglCoverageDelivery, InitRequiresStorageStatisticsAndUsableCapacity) {
     EXPECT_EQ(xgl_datalink_init(nullptr, &config), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_datalink_init(&context, nullptr), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_datalink_init(&context, &config), XGL_ERR_NULL_POINTER);
-    config.rx_cache = cache;
-    EXPECT_EQ(xgl_datalink_init(&context, &config), XGL_ERR_NULL_POINTER);
     config.stats = &statistics;
     config.source_id = 1;
-    EXPECT_EQ(xgl_datalink_init(&context, &config), XGL_ERR_BUFFER_TOO_SMALL);
-    config.rx_cache_size = sizeof(cache);
     EXPECT_EQ(xgl_datalink_init(&context, &config), XGL_OK);
-    EXPECT_EQ(context.rx_cache, cache);
+    EXPECT_EQ(xgl_parser_init(&parser, cache, 0U), XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_parser_init(&parser, cache, sizeof(cache)), XGL_OK);
+    EXPECT_EQ(parser.cache, cache);
     EXPECT_EQ(context.stats, &statistics);
 }
 

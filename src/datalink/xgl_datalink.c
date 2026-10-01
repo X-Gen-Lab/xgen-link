@@ -23,19 +23,11 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (config->rx_cache == NULL || config->stats == NULL) {
+    if (config->stats == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-#if !XGL_FEATURE_AUTH
-    if (config->auth_required) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#endif
-
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_datalink_ctx_t));
-    ctx->rx_cache = config->rx_cache;
-    ctx->rx_cache_size = config->rx_cache_size;
     ctx->stats = config->stats;
     ctx->rx_header_crc_errors = config->rx_header_crc_errors;
     ctx->rx_crc16_errors = config->rx_crc16_errors;
@@ -46,20 +38,8 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
     ctx->owner_handle = config->owner_handle;
     ctx->allocator = config->allocator;
 #if XGL_FEATURE_AUTH
-    xgl_error_t security_err =
-        xgl_security_init(&ctx->security, config->source_id,
-                          config->auth_required, config->auth_provider);
-    if (security_err != XGL_OK) {
-        return security_err;
-    }
+    ctx->security = config->security;
 #endif
-
-    /* Initialize parser */
-    xgl_error_t err =
-        xgl_parser_init(&ctx->parser, config->rx_cache, config->rx_cache_size);
-    if (err != XGL_OK) {
-        return err;
-    }
 
     return XGL_OK;
 }
@@ -90,6 +70,12 @@ static xgl_error_t datalink_send_impl(void* ctx, xgl_handle_t handle,
         return xgl_datalink_send_raw(dl_ctx, send_data->phy,
                                      send_data->serialized,
                                      send_data->serialized_len);
+    }
+
+    if (send_data->buffer != NULL) {
+        return xgl_datalink_send_inplace(
+            dl_ctx, send_data->phy, send_data->frame, send_data->buffer,
+            send_data->buffer_size, send_data->payload_offset);
     }
 
     /* Forward to datalink send function */

@@ -163,11 +163,14 @@ static bool plan_initialization(const xgl_config_t* config,
         return false;
     }
 #endif
-    if (!add_initial(plan, config->memory.rx_buffer_size,
-                     links != 0U ? links : 1U) ||
+    if (!add_initial(plan, config->memory.rx_buffer_size, links) ||
         !multiply_size(links, sizeof(xgl_instance_link_t), &bytes) ||
         !add_initial(plan, bytes, links != 0U ? 1U : 0U)) {
         return false;
+    }
+    /* A route-free instance has a valid empty service without reserving bytes. */
+    if (plan->initial_count == 0U) {
+        plan->initial_count = 1U;
     }
     return xgm_size_class_measure(plan->initial, plan->initial_count,
                                   &plan->initialization_size,

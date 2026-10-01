@@ -162,8 +162,6 @@ class XglNetworkTest : public ::testing::Test {
         phy_ops.user_data = &phy_tx_count;
 
         xgl_datalink_config_t datalink_config = {};
-        datalink_config.rx_cache = datalink_cache;
-        datalink_config.rx_cache_size = sizeof(datalink_cache);
         datalink_config.stats = &datalink_stats;
         datalink_config.allocator = xgm_allocator_libc();
         ASSERT_EQ(xgl_datalink_init(&datalink_ctx, &datalink_config), XGL_OK);
@@ -713,8 +711,6 @@ TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
     uint8_t cache[256] = {};
     xgl_layer_stats_t datalink_stats = {};
     xgl_datalink_config_t config = {};
-    config.rx_cache = cache;
-    config.rx_cache_size = sizeof(cache);
     config.stats = &datalink_stats;
     xgl_datalink_ctx_t datalink = {};
     ASSERT_EQ(xgl_datalink_init(&datalink, &config), XGL_OK);
@@ -949,8 +945,8 @@ TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
 
     std::vector<uint8_t> encoded(256);
     size_t encoded_len = 0;
-    ASSERT_EQ(xgl_frame_serialize_authenticated(encoded.data(), encoded.size(),
-                                                &frame, &sender, &encoded_len),
+    ASSERT_EQ(xgl_security_serialize_frame(encoded.data(), encoded.size(),
+                                           &frame, &sender, &encoded_len),
               XGL_OK);
     encoded.resize(encoded_len);
     xgl_wire_header_t original = {};

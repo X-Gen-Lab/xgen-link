@@ -108,7 +108,6 @@ endif()
 set(XGL_SOURCES
     # Public API orchestration
     src/api/xgl_instance.c
-    src/api/xgl_instance_lifecycle.c
     src/api/xgl_instance_links.c
     src/api/xgl_workspace.c
     src/api/xgl_runtime.c
@@ -124,9 +123,8 @@ set(XGL_SOURCES
     src/wire/xgl_wire_ext.c
     src/wire/xgl_wire.c
     src/wire/xgl_frame.c
-    src/wire/xgl_frame_auth.c
+    src/security/xgl_security_frame.c
     src/wire/xgl_frame_zerocopy.c
-    src/wire/xgl_parser_extensions.c
     src/wire/xgl_parser.c
 
     # Security
@@ -191,7 +189,7 @@ set(XGL_SOURCES
 #-----------------------------------------------------------------------------
 
 if(NOT XGL_FEATURE_AUTH)
-    list(REMOVE_ITEM XGL_SOURCES src/security/xgl_security.c src/wire/xgl_frame_auth.c)
+    list(REMOVE_ITEM XGL_SOURCES src/security/xgl_security.c src/security/xgl_security_frame.c)
 endif()
 if(NOT XGL_FEATURE_FRAGMENTATION)
     list(FILTER XGL_SOURCES EXCLUDE REGEX "src/transport/xgl_fragment.*\\.c$")

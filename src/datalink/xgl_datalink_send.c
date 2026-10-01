@@ -35,19 +35,11 @@ static xgl_error_t datalink_auth_tag_len(const xgl_datalink_ctx_t* ctx,
                                          size_t* auth_tag_len) {
     *auth_tag_len = 0U;
 #if XGL_FEATURE_AUTH
-    if (!ctx->security.auth_required &&
-        (frame->header.flags & XGL_WIRE_FLAG_AUTHENTICATED) == 0U) {
-        return XGL_OK;
-    }
-
-    if (ctx->security.provider == NULL ||
-        ctx->security.provider->sign == NULL ||
-        ctx->security.provider->tag_len == 0U ||
-        ctx->security.provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    *auth_tag_len = ctx->security.provider->tag_len;
+    const xgl_security_ctx_t* security = ctx->security;
+    return xgl_security_frame_tag_len(
+        security != NULL && security->auth_required,
+        security != NULL ? security->provider : NULL, frame->header.flags,
+        auth_tag_len);
 #else
     (void)ctx;
     (void)frame;
@@ -63,8 +55,11 @@ static xgl_error_t datalink_auth_tag_len(const xgl_datalink_ctx_t* ctx,
  * \return          XGL_OK on success, error code otherwise
  * \note            The PHY must finish reading the frame before tx returns.
  */
-xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
-                              const xgl_frame_t* frame) {
+static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
+                                          xgl_phy_ops_t* phy,
+                                          const xgl_frame_t* frame,
+                                          uint8_t* buffer, size_t capacity,
+                                          size_t payload_offset) {
     if (ctx == NULL || phy == NULL || frame == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -85,10 +80,23 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
         return err;
     }
 
-    size_t frame_size = xgl_frame_serialized_size(
-        frame->payload_len, frame->extensions_len, auth_tag_len);
-
-    uint8_t* frame_buffer = (uint8_t*)xgm_alloc(ctx->allocator, frame_size);
+    xgl_frame_layout_t layout;
+    err = xgl_frame_measure(frame, auth_tag_len, &layout);
+    if (err != XGL_OK) {
+        datalink_count_tx_error(ctx);
+        return err;
+    }
+    const bool owned = buffer == NULL;
+    if (!owned && (payload_offset != layout.header_len ||
+                   frame->payload != buffer + payload_offset)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    if (!owned && capacity < layout.frame_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    const size_t frame_size = owned ? layout.frame_len : capacity;
+    uint8_t* frame_buffer =
+        owned ? xgm_alloc(ctx->allocator, frame_size) : buffer;
     if (frame_buffer == NULL) {
         datalink_count_tx_error(ctx);
         datalink_report_tx_error(ctx, XGL_ERR_NO_MEMORY,
@@ -99,8 +107,8 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
     size_t bytes_written = 0U;
 #if XGL_FEATURE_AUTH
     if (auth_tag_len != 0U) {
-        err = xgl_frame_serialize_authenticated(frame_buffer, frame_size, frame,
-                                                &ctx->security, &bytes_written);
+        err = xgl_security_serialize_frame(frame_buffer, frame_size, frame,
+                                           ctx->security, &bytes_written);
     } else
 #endif
     {
@@ -110,13 +118,37 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
     if (err != XGL_OK) {
         datalink_count_tx_error(ctx);
         datalink_report_tx_error(ctx, err, "Frame serialization failed");
-        xgm_free(ctx->allocator, frame_buffer);
+        if (owned) {
+            xgm_free(ctx->allocator, frame_buffer);
+        }
         return err;
     }
 
     err = xgl_datalink_send_raw(ctx, phy, frame_buffer, bytes_written);
-    xgm_free(ctx->allocator, frame_buffer);
+    if (owned) {
+        xgm_free(ctx->allocator, frame_buffer);
+    }
     return err;
+}
+
+/** \brief           Encode using the bounded datalink scratch service. */
+xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
+                              const xgl_frame_t* frame) {
+    return datalink_encode_submit(ctx, phy, frame, NULL, 0U, 0U);
+}
+
+/** \brief           Use caller storage without allocation or payload movement.
+ */
+xgl_error_t xgl_datalink_send_inplace(xgl_datalink_ctx_t* ctx,
+                                      xgl_phy_ops_t* phy,
+                                      const xgl_frame_t* frame, uint8_t* buffer,
+                                      size_t buffer_size,
+                                      size_t payload_offset) {
+    if (buffer == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    return datalink_encode_submit(ctx, phy, frame, buffer, buffer_size,
+                                  payload_offset);
 }
 
 xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,

@@ -118,9 +118,11 @@ TEST_F(XglLayeredStatsTest, MemoryUsageFieldsPresent) {
     xgl_error_t err = xgl_stats_get(handle, &stats);
     ASSERT_EQ(err, XGL_OK);
 
-    /* Verify memory usage fields exist */
-    EXPECT_EQ(stats.memory_used, 0);
-    EXPECT_EQ(stats.memory_peak, 0);
+    /* The bounded workspace is reserved for the complete instance lifetime. */
+    xgl_memory_requirements_t memory = {};
+    ASSERT_EQ(xgl_memory_requirements(&config, &memory), XGL_OK);
+    EXPECT_EQ(stats.memory_used, memory.size);
+    EXPECT_EQ(stats.memory_peak, memory.size);
 }
 
 /*---------------------------------------------------------------------------*/

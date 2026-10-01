@@ -44,8 +44,8 @@ static inline xgl_error_t test_serialize_trusted_frame(
                                       frame->header.connection_id,
                                       metadata.session_epoch, key);
     err = xgl_security_session_install(&security, &config);
-    return err == XGL_OK ? xgl_frame_serialize_authenticated(
-                               buffer, capacity, frame, &security, written)
+    return err == XGL_OK ? xgl_security_serialize_frame(buffer, capacity, frame,
+                                                        &security, written)
                          : err;
 }
 

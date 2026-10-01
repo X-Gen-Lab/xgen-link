@@ -11,13 +11,13 @@
 
 #include "xgl_network_internal.h"
 
+#if XGL_FEATURE_FORWARDING
 static void network_count_rx_drop(xgl_network_ctx_t* ctx) {
     if (ctx->stats != NULL) {
         ctx->stats->rx_dropped++;
     }
 }
 
-#if XGL_FEATURE_FORWARDING
 static xgl_error_t network_lookup_forward_route(xgl_network_ctx_t* ctx,
                                                 xgl_handle_t handle,
                                                 uint16_t target_id,

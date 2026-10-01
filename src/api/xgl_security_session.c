@@ -20,7 +20,7 @@ xgl_install_security_session(xgl_handle_t handle,
         return XGL_ERR_NOT_INITIALIZED;
     }
 #if XGL_FEATURE_AUTH
-    return xgl_security_session_install(&handle->layers.datalink_ctx.security,
+    return xgl_security_session_install(&handle->security,
                                         config);
 #else
     return XGL_ERR_UNSUPPORTED;
@@ -39,7 +39,7 @@ xgl_error_t xgl_close_security_session(xgl_handle_t handle, uint16_t remote_id,
     }
 #if XGL_FEATURE_AUTH
     xgl_error_t error =
-        xgl_security_session_close(&handle->layers.datalink_ctx.security,
+        xgl_security_session_close(&handle->security,
                                    remote_id, connection_id, session_epoch);
     if (error != XGL_OK) {
         return error;
@@ -63,7 +63,7 @@ xgl_error_t xgl_close_peer(xgl_handle_t handle, uint16_t remote_id,
         return XGL_ERR_NOT_INITIALIZED;
     }
 #if XGL_FEATURE_AUTH
-    const xgl_security_ctx_t* security = &handle->layers.datalink_ctx.security;
+    const xgl_security_ctx_t* security = &handle->security;
     for (size_t i = 0U; i < XGL_SECURITY_SESSION_CAPACITY; ++i) {
         const xgl_security_session_t* session = &security->sessions[i];
         if (session->active && session->config.remote_id == remote_id &&

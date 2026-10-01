@@ -29,17 +29,14 @@ size_t xgl_instance_count_links(const xgl_config_t* config) {
 }
 
 /**
- * \brief           Release link storage and secondary receive caches
+ * \brief           Release every link's receive storage and descriptors
  */
 void xgl_instance_destroy_links(xgl_handle_t handle) {
     if (handle == NULL) {
         return;
     }
     for (size_t i = 0; i < handle->link_count; ++i) {
-        /* The first cache is owned by the datalink compatibility context. */
-        if (handle->links[i].rx_cache != handle->layers.datalink_ctx.rx_cache) {
-            xgm_free(handle->allocator, handle->links[i].rx_cache);
-        }
+        xgm_free(handle->allocator, handle->links[i].rx_cache);
     }
     xgm_free(handle->allocator, handle->links);
     handle->links = NULL;
@@ -88,10 +85,8 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
         link->phy = route->phy;
         link->poll_interval_ms = interval;
         link->read_freq_hz = route->read_freq_hz;
-        link->rx_cache = index == 0U
-                             ? handle->layers.datalink_ctx.rx_cache
-                             : xgm_alloc(handle->allocator,
-                                         handle->config->memory.rx_buffer_size);
+        link->rx_cache = xgm_alloc(handle->allocator,
+                                   handle->config->memory.rx_buffer_size);
         if (link->rx_cache == NULL) {
             xgl_instance_destroy_links(handle);
             return XGL_ERR_NO_MEMORY;

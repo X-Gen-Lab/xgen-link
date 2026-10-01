@@ -83,6 +83,9 @@ struct xgl_instance {
     /* Protocol Stack Layers (Unified Management)                            */
     /*-----------------------------------------------------------------------*/
     xgl_layer_contexts_t layers; /**< Unified layer contexts and interfaces */
+#if XGL_FEATURE_AUTH
+    xgl_security_ctx_t security; /**< Endpoint state shared by all PHY links */
+#endif
 
     /*-----------------------------------------------------------------------*/
     /* Statistics                                                            */

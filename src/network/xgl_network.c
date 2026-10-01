@@ -36,6 +36,7 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_network_ctx_t));
     ctx->local_id = config->local_id;
+    ctx->max_frame_size = config->max_frame_size;
     ctx->route_table = config->route_table;
     ctx->upper_layer = config->upper_layer;
     ctx->lower_layer = config->lower_layer;

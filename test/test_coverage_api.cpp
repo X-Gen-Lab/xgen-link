@@ -368,6 +368,11 @@ TEST(XglCoverageApi, FailedInitializationReleasesEachAllocationOnlyOnce) {
     auto provider = coverage_provider();
     provider.sign = nullptr;
     config.auth_provider = &provider;
+    CoveragePhy state;
+    auto phy = coverage_phy(&state);
+    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
+    config.route_table = &route;
+    config.route_table_len = 1U;
     config.memory.allocator = &workspace.service;
     ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
     xgl_handle_t handle = xgl_create(&config);
@@ -378,10 +383,11 @@ TEST(XglCoverageApi, FailedInitializationReleasesEachAllocationOnlyOnce) {
     handle->allocator = &initialization.service;
     EXPECT_EQ(xgl_init(handle), XGL_ERR_INVALID_PARAM);
     EXPECT_FALSE(handle->initialized);
-    EXPECT_EQ(initialization.allocations, 1U);
-    EXPECT_EQ(initialization.releases, 1U);
+    EXPECT_GT(initialization.allocations, 0U);
+    EXPECT_EQ(initialization.releases, initialization.allocations);
     EXPECT_TRUE(initialization.live.empty());
-    EXPECT_EQ(handle->layers.datalink_ctx.rx_cache, nullptr);
+    EXPECT_EQ(handle->links, nullptr);
+    EXPECT_EQ(handle->link_count, 0U);
     xgl_destroy(handle);
     EXPECT_EQ(initialization.duplicate_releases, 0U);
     EXPECT_EQ(workspace.allocations, 1U);
@@ -619,68 +625,68 @@ TEST(XglCoverageApi, AuthenticatedFrameBuilderRejectsInvalidBorrowedInputs) {
     uint8_t bytes[300] = {}, extensions[15] = {};
     size_t written = 0;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(nullptr, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(nullptr, 300, &frame, &ctx, &written),
         XGL_ERR_NULL_POINTER);
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, nullptr, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, nullptr, &ctx, &written),
         XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_frame_serialize_authenticated(bytes, 300, &frame, nullptr,
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, nullptr,
                                                 &written),
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, nullptr),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, nullptr),
         XGL_ERR_NULL_POINTER);
     ctx.provider = nullptr;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_NULL_POINTER);
     ctx.provider = &provider;
     ctx.busy = true;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_BUSY);
     ctx.busy = false;
     frame.payload_len = 1;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_NULL_POINTER);
     frame.payload = bytes;
     frame.payload_len = UINT16_MAX + 1U;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_BUFFER_TOO_SMALL);
     frame.payload_len = 0;
     provider.tag_len = 0;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_INVALID_PARAM);
     provider.tag_len = XGL_AUTH_TAG_MAX_LEN + 1;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_INVALID_PARAM);
     provider.tag_len = 4;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 38, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 38, &frame, &ctx, &written),
         XGL_ERR_BUFFER_TOO_SMALL);
     frame.header.source_id = 0;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_INVALID_PARAM);
     frame.header.source_id = 1;
     frame.extensions = extensions;
     frame.extensions_len = sizeof(extensions);
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_INVALID_FRAME);
     extensions[0] = XGL_WIRE_EXT_SECURITY;
     extensions[1] = 13;
     extensions[14] = 4;
     EXPECT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_ERR_INVALID_FRAME);
     frame.extensions_len = 0;
     ASSERT_EQ(
-        xgl_frame_serialize_authenticated(bytes, 300, &frame, &ctx, &written),
+        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
         XGL_OK);
     EXPECT_EQ(written, 45U);
 }

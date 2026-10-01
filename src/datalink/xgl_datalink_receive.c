@@ -10,22 +10,24 @@
 #include <xgl/xgl_config.h>
 #include <xgl/xgl_error.h>
 
-/**
- * \brief           Poll a PHY through the compatibility context parser
- * \param[in,out]   ctx: Shared datalink context
- * \param[in]       phy: Physical layer operations
- * \param[in]       current_time_ms: Current time in milliseconds
- * \param[in]       timeout_ms: Parser timeout in milliseconds
- * \return          XGL_OK on success, error code otherwise
+/** \brief           Deliver one validated borrowed view without decoding again.
  */
-xgl_error_t xgl_datalink_receive(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
-                                 uint32_t current_time_ms,
-                                 uint32_t timeout_ms) {
-    if (ctx == NULL) {
-        return XGL_ERR_NULL_POINTER;
+static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
+                                         const xgl_wire_frame_view_t* view) {
+    if (ctx->stats != NULL) {
+        ctx->stats->rx_packets++;
+        ctx->stats->rx_bytes += view->frame_len;
     }
-    return xgl_datalink_poll_parser(ctx, &ctx->parser, phy, current_time_ms,
-                                    timeout_ms, XGL_DATALINK_RX_CHUNK_SIZE);
+    if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
+        xgl_frame_rx_message_t message = {
+            .frame_buf = view->frame_buf,
+            .frame_len = view->frame_len,
+            .view = view,
+        };
+        return ctx->upper_layer->receive(ctx->upper_layer->ctx,
+                                         ctx->owner_handle, &message);
+    }
+    return XGL_OK;
 }
 
 /* Parameter order follows the documented protocol fields and units. */
@@ -84,19 +86,13 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
         return XGL_OK;
     }
 
+    xgl_wire_frame_view_t view;
     for (size_t i = 0; i < rx_len; i++) {
-        xgl_parse_result_t result =
-            xgl_parser_feed_byte(parser, rx_buffer[i], current_time_ms);
+        xgl_parse_result_t result = xgl_parser_feed_byte_view(
+            parser, rx_buffer[i], current_time_ms, &view);
 
         if (result == XGL_PARSE_RESULT_COMPLETE) {
-            uint8_t* frame_buffer = NULL;
-            size_t frame_len = 0;
-
-            err = xgl_parser_get_frame(parser, &frame_buffer, &frame_len);
-            if (err == XGL_OK) {
-                xgl_datalink_process_frame(ctx, frame_buffer, frame_len);
-            }
-
+            (void)datalink_deliver_view(ctx, &view);
             xgl_parser_reset(parser);
 
         } else if (result == XGL_PARSE_RESULT_ERROR) {
@@ -152,19 +148,5 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return err;
     }
 
-    if (ctx->stats != NULL) {
-        ctx->stats->rx_packets++;
-        ctx->stats->rx_bytes += frame_len;
-    }
-
-    if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
-        xgl_frame_rx_message_t frame_data = {.frame_buf = frame_buffer,
-                                             .frame_len = frame_len,
-                                             .view = &metadata.frame};
-
-        return ctx->upper_layer->receive(ctx->upper_layer->ctx,
-                                         ctx->owner_handle, &frame_data);
-    }
-
-    return XGL_OK;
+    return datalink_deliver_view(ctx, &metadata.frame);
 }

@@ -187,19 +187,19 @@ network_validate_auth_tx_budget(xgl_network_ctx_t* ctx,
                                 const xgl_route_item_t* route) {
     size_t auth_tag_len = 0U;
 #if XGL_FEATURE_AUTH
-    if (ctx->auth_required) {
-        if (ctx->auth_provider == NULL || ctx->auth_provider->sign == NULL ||
-            ctx->auth_provider->tag_len == 0U ||
-            ctx->auth_provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
-            network_count_tx_error(ctx);
-            return XGL_ERR_INVALID_PARAM;
-        }
-        auth_tag_len = ctx->auth_provider->tag_len;
+    xgl_error_t error =
+        xgl_security_frame_tag_len(ctx->auth_required, ctx->auth_provider,
+                                   frame->header.flags, &auth_tag_len);
+    if (error != XGL_OK) {
+        network_count_tx_error(ctx);
+        return error;
     }
 #endif
 
-    if (xgl_frame_serialized_size(frame->payload_len, frame->extensions_len,
-                                  auth_tag_len) > route->max_frame_size) {
+    const size_t frame_size = xgl_frame_serialized_size(
+        frame->payload_len, frame->extensions_len, auth_tag_len);
+    if (frame_size > route->max_frame_size ||
+        (ctx->max_frame_size != 0U && frame_size > ctx->max_frame_size)) {
         network_count_tx_error(ctx);
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
@@ -207,16 +207,21 @@ network_validate_auth_tx_budget(xgl_network_ctx_t* ctx,
     return XGL_OK;
 }
 
-static xgl_error_t network_send_frame_to_lower(xgl_network_ctx_t* ctx,
-                                               xgl_handle_t handle,
-                                               const xgl_packet_t* packet,
-                                               xgl_frame_t* frame) {
+static xgl_error_t
+network_send_frame_to_lower(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                            const xgl_packet_t* packet, xgl_frame_t* frame,
+                            const xgl_tx_data_zerocopy_t* inplace) {
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         network_count_tx_error(ctx);
         return XGL_ERR_INVALID_PARAM;
     }
 
     xgl_frame_tx_message_t send_data = {.frame = frame, .phy = packet->phy};
+    if (inplace != NULL) {
+        send_data.buffer = inplace->buffer;
+        send_data.buffer_size = inplace->buffer_size;
+        send_data.payload_offset = inplace->data_offset;
+    }
 
     xgl_error_t err =
         ctx->lower_layer->send(ctx->lower_layer->ctx, handle, &send_data);
@@ -226,9 +231,10 @@ static xgl_error_t network_send_frame_to_lower(xgl_network_ctx_t* ctx,
     return err;
 }
 
-xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
-                                         xgl_handle_t handle,
-                                         xgl_packet_t* packet) {
+static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
+                                       xgl_handle_t handle,
+                                       xgl_packet_t* packet,
+                                       const xgl_tx_data_zerocopy_t* inplace) {
     if (ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -255,7 +261,7 @@ xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
     }
     packet->version = XGL_PROTOCOL_VERSION;
 
-    if (ctx->stats != NULL) {
+    if (inplace == NULL && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += packet->data->data_len;
     }
@@ -273,9 +279,88 @@ xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
         return err;
     }
 
-    return network_send_frame_to_lower(ctx, handle, packet, &frame);
+    err = network_send_frame_to_lower(ctx, handle, packet, &frame, inplace);
+    if (inplace != NULL && err == XGL_OK && ctx->stats != NULL) {
+        ctx->stats->tx_packets++;
+        ctx->stats->tx_bytes += packet->data->data_len;
+    }
+    return err;
+}
+
+xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
+                                         xgl_handle_t handle,
+                                         xgl_packet_t* packet) {
+    return network_send_packet(ctx, handle, packet, NULL);
 }
 
 xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet) {
     return xgl_network_send_with_handle(ctx, NULL, packet);
+}
+
+/**
+ * \brief           Validate zero-copy transmission data
+ * \param[in]       tx_data: Borrowed caller buffer and send parameters
+ * \return          XGL_OK when lengths and offsets are valid
+ */
+static xgl_error_t
+validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
+    if (tx_data == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (tx_data->buffer == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (tx_data->data_len == 0) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    if (tx_data->data_offset < XGL_FRAME_HEADER_SIZE) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    if (tx_data->data_offset > tx_data->buffer_size ||
+        tx_data->data_len > tx_data->buffer_size - tx_data->data_offset ||
+        XGL_CRC16_SIZE >
+            tx_data->buffer_size - tx_data->data_offset - tx_data->data_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    if (tx_data->priority > 7) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    return XGL_OK;
+}
+
+/**
+ * \brief           Apply shared routing and framing to caller-owned TX storage
+ */
+xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
+                                      xgl_handle_t handle,
+                                      const xgl_tx_data_zerocopy_t* request) {
+    if (ctx == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    xgl_error_t error = validate_tx_data_zerocopy(request);
+    if (error != XGL_OK) {
+        return error;
+    }
+    if (request->reliable) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    xgl_packet_data_t data = {
+        .data = request->buffer + request->data_offset,
+        .data_len = request->data_len,
+    };
+    xgl_packet_t packet = {
+        .source_id = ctx->local_id,
+        .target_id = request->target_id,
+        .data_type = request->data_type,
+        .packet_type = XGL_PACKET_TYPE_DATA,
+        .priority = request->priority,
+        .data = &data,
+    };
+    return network_send_packet(ctx, handle, &packet, request);
 }

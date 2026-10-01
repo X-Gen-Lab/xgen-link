@@ -12,8 +12,25 @@
 
 #include <string.h>
 #include <xgen/memory/allocator.h>
+#if XGL_ALLOW_FALLBACK_MALLOC
+#include <xgen/memory/libc_allocator.h>
+#endif
 
 #include "xgl_instance_internal.h"
+
+/**
+ * \brief           Unwind complete or partially initialized instance resources
+ */
+static void instance_release_resources(xgl_handle_t handle) {
+    xgl_transport_destroy(&handle->layers.transport_ctx);
+    xgl_instance_destroy_links(handle);
+    xgl_route_table_destroy(&handle->route_table);
+    memset(&handle->layers, 0, sizeof(handle->layers));
+#if XGL_FEATURE_AUTH
+    memset(&handle->security, 0, sizeof(handle->security));
+#endif
+    handle->initialized = false;
+}
 
 /*---------------------------------------------------------------------------*/
 /* Instance Initialization                                                   */
@@ -57,22 +74,25 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
                                    handle->config->route_table,
                                    handle->config->route_table_len);
         if (err != XGL_OK) {
-            goto cleanup_route_table;
+            goto cleanup;
         }
     }
 
-    /* Allocate RX buffer for datalink layer */
-    size_t rx_buffer_size = handle->config->memory.rx_buffer_size;
-    uint8_t* rx_buffer = (uint8_t*)xgm_alloc(handle->allocator, rx_buffer_size);
-    if (rx_buffer == NULL) {
-        err = XGL_ERR_NO_MEMORY;
-        goto cleanup_route_table;
+    err = xgl_instance_init_links(handle);
+    if (err != XGL_OK) {
+        goto cleanup;
     }
+#if XGL_FEATURE_AUTH
+    err = xgl_security_init(&handle->security, handle->config->source_id,
+                            handle->config->auth_required,
+                            handle->config->auth_provider);
+    if (err != XGL_OK) {
+        goto cleanup;
+    }
+#endif
 
     /* Initialize data link layer */
     xgl_datalink_config_t datalink_config = {
-        .rx_cache = rx_buffer,
-        .rx_cache_size = handle->config->protocol.max_frame_size,
         .source_id = handle->config->source_id,
         .stats = &handle->stats.datalink,
         .rx_header_crc_errors = &handle->stats.rx_header_crc_errors,
@@ -82,20 +102,19 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .callback_user_data = handle->config->callback_user_data,
         .owner_handle = handle,
         .allocator = handle->memory->scratch,
-        .auth_required = handle->config->auth_required,
-        .auth_provider = handle->config->auth_provider};
+    };
+#if XGL_FEATURE_AUTH
+    datalink_config.security = &handle->security;
+#endif
     err = xgl_datalink_init(&handle->layers.datalink_ctx, &datalink_config);
     if (err != XGL_OK) {
-        goto cleanup_rx_buffer;
+        goto cleanup;
     }
-
-    err = xgl_instance_init_links(handle);
-    if (err != XGL_OK)
-        goto cleanup_datalink;
 
     /* Initialize network layer */
     xgl_network_config_t network_config = {
         .local_id = handle->config->source_id,
+        .max_frame_size = handle->config->protocol.max_frame_size,
         .route_table = &handle->route_table,
         .upper_layer = NULL, /* Will be set after transport layer init */
         .lower_layer = NULL, /* Will be set after creating datalink interface */
@@ -106,11 +125,11 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .auth_provider = handle->config->auth_provider,
         .allocator = handle->memory->scratch};
 #if XGL_FEATURE_AUTH
-    network_config.security = &handle->layers.datalink_ctx.security;
+    network_config.security = &handle->security;
 #endif
     err = xgl_network_init(&handle->layers.network_ctx, &network_config);
     if (err != XGL_OK) {
-        goto cleanup_datalink;
+        goto cleanup;
     }
 
     /* Initialize transport layer */
@@ -147,27 +166,27 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     };
     err = xgl_transport_init(&handle->layers.transport_ctx, &transport_config);
     if (err != XGL_OK) {
-        goto cleanup_network;
+        goto cleanup;
     }
 
     /* Create layer interfaces */
     err = xgl_datalink_get_interface(&handle->layers.datalink_ctx,
                                      &handle->layers.datalink_iface);
     if (err != XGL_OK) {
-        goto cleanup_transport;
+        goto cleanup;
     }
 
     err = xgl_network_get_interfaces(&handle->layers.network_ctx,
                                      &handle->layers.network_packet_iface,
                                      &handle->layers.network_frame_iface);
     if (err != XGL_OK) {
-        goto cleanup_transport;
+        goto cleanup;
     }
 
     err = xgl_transport_get_interface(&handle->layers.transport_ctx,
                                       &handle->layers.transport_iface);
     if (err != XGL_OK) {
-        goto cleanup_transport;
+        goto cleanup;
     }
 
     /* Wire up layer interfaces */
@@ -182,32 +201,61 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     /* Mark as initialized */
     handle->initialized = true;
 
-    /* Initialize codec registry and register user-provided codecs */
-
     return XGL_OK;
 
-    /* Cleanup on error -- each label destroys the layer that was successfully
-     * initialized *before* the failure point.                            */
-
-cleanup_transport:
-    xgl_transport_destroy(&handle->layers.transport_ctx);
-
-cleanup_network:
-    /* Network context is embedded; no heap resources to release */
-    memset(&handle->layers.network_ctx, 0, sizeof(handle->layers.network_ctx));
-
-cleanup_datalink:
-    xgl_instance_destroy_links(handle);
-
-cleanup_rx_buffer:
-    memset(&handle->layers.datalink_ctx, 0,
-           sizeof(handle->layers.datalink_ctx));
-    xgm_free(handle->allocator, rx_buffer);
-
-cleanup_route_table:
-    xgl_route_table_destroy(&handle->route_table);
-
 cleanup:
-
+    instance_release_resources(handle);
     return err;
+}
+
+/**
+ * \brief           Reserve one complete workspace through an explicit backend
+ * \details         The immutable configuration is borrowed until destruction.
+ *                  Protocol initialization is deferred to xgl_init().
+ */
+xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
+                                uint32_t abi_version,
+                                uint32_t build_config_id) {
+    xgl_memory_requirements_t requirements;
+    xgl_error_t err = xgl_memory_requirements_checked(
+        config, config_size, abi_version, build_config_id, &requirements);
+    if (err != XGL_OK) {
+        return NULL;
+    }
+
+    const xgm_allocator_t* allocator = config->memory.allocator;
+#if XGL_ALLOW_FALLBACK_MALLOC
+    if (allocator == NULL) {
+        allocator = xgm_allocator_libc();
+    }
+#endif
+    if (!xgm_allocator_is_valid(allocator)) {
+        return NULL;
+    }
+
+    void* storage = xgm_alloc(allocator, requirements.size);
+    if (storage == NULL) {
+        return NULL;
+    }
+    xgl_handle_t handle;
+    err = xgl_workspace_prepare(config, storage, requirements.size, allocator,
+                                &handle);
+    if (err != XGL_OK) {
+        xgm_free(allocator, storage);
+        return NULL;
+    }
+    return handle;
+}
+
+/**
+ * \brief           Release protocol resources and an owned workspace exactly once
+ */
+void xgl_destroy(xgl_handle_t handle) {
+    if (handle == NULL) {
+        return;
+    }
+    instance_release_resources(handle);
+    if (!handle->caller_owned) {
+        xgm_free(handle->storage_allocator, handle);
+    }
 }
