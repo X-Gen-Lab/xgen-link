@@ -201,21 +201,28 @@ xgl_error_t transport_send_packet_view(
  * \param[in]       handle: Protocol instance handle
  * \param[in]       tx_data: Borrowed application request
  * \param[out]      peer: Exact reliable owner, or NULL for unreliable traffic
+ * \param[out]      created: Whether this request reserved the peer
  * \return          XGL_OK or admission error
  */
-static xgl_error_t
-transport_prepare_reliable_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
-                                const xgl_tx_data_t* tx_data,
-                                xgl_transport_peer_state_t** peer) {
+static xgl_error_t transport_prepare_reliable_send(
+    xgl_transport_ctx_t* ctx, xgl_handle_t handle, const xgl_tx_data_t* tx_data,
+    xgl_transport_peer_state_t** peer, bool* created) {
     *peer = NULL;
+    *created = false;
 
     if (!tx_data->reliable) {
         return XGL_OK;
     }
 
-    *peer = transport_get_or_create_peer_scope(ctx, tx_data->target_id,
-                                               tx_data->connection_id,
-                                               tx_data->session_epoch);
+    *peer = transport_find_peer_scope(ctx, tx_data->target_id,
+                                      tx_data->connection_id,
+                                      tx_data->session_epoch);
+    if (*peer == NULL) {
+        *peer = transport_get_or_create_peer_scope(ctx, tx_data->target_id,
+                                                   tx_data->connection_id,
+                                                   tx_data->session_epoch);
+        *created = *peer != NULL;
+    }
     if (*peer == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
@@ -250,6 +257,24 @@ transport_prepare_reliable_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     return err;
 }
 
+/**
+ * \brief           Return a new scope that never accepted reliable data
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in]       peer: Scope considered for rollback
+ * \param[in]       created: Whether the current request reserved this scope
+ */
+static void transport_rollback_new_peer(xgl_transport_ctx_t* ctx,
+                                        xgl_handle_t handle,
+                                        xgl_transport_peer_state_t* peer,
+                                        bool created) {
+    if (created && peer != NULL && transport_peer_can_reclaim(ctx, peer)) {
+        (void)xgl_transport_close_scope(ctx, handle, peer->peer_id,
+                                        peer->connection_id,
+                                        peer->session_epoch);
+    }
+}
+
 xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                const xgl_tx_data_t* tx_data) {
     if (ctx == NULL || tx_data == NULL || tx_data->data == NULL) {
@@ -260,7 +285,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_UNSUPPORTED;
     }
 
-    if (tx_data->data_len == 0U || tx_data->timeout_ms > INT32_MAX) {
+    if (tx_data->data_len == 0U || tx_data->timeout_ms > INT32_MAX ||
+        (tx_data->reliable && tx_data->target_id == UINT16_MAX)) {
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -297,8 +323,11 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 
     /* Validate the complete frame budget before reserving a scope or HELLO. */
     xgl_transport_peer_state_t* peer = NULL;
-    err = transport_prepare_reliable_send(ctx, handle, tx_data, &peer);
+    bool created = false;
+    err =
+        transport_prepare_reliable_send(ctx, handle, tx_data, &peer, &created);
     if (err != XGL_OK) {
+        transport_rollback_new_peer(ctx, handle, peer, created);
         return err;
     }
 
@@ -329,6 +358,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
 
     if (err != XGL_OK) {
+        transport_rollback_new_peer(ctx, handle, peer, created);
         return err;
     }
 
