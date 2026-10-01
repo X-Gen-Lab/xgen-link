@@ -392,6 +392,59 @@ TEST_F(TransportRegressionTest, DuplicateAckIsIdempotent) {
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 0U);
 }
 
+TEST_F(TransportRegressionTest, SackCommitsAllAcknowledgementsBeforeBusyRetry) {
+    Init();
+    ctx.max_tx_packets = 3;
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Send(), XGL_OK);
+
+    const uint8_t bitmap[] = {0x06};
+    uint8_t value[16] = {}, extensions[20] = {};
+    size_t value_len = 0, extensions_len = 0;
+    ASSERT_EQ(xgl_wire_encode_sack_ext_value(value, sizeof(value), 0, bitmap,
+                                             sizeof(bitmap), &value_len),
+              XGL_OK);
+    ASSERT_EQ(xgl_wire_encode_ext(extensions, sizeof(extensions),
+                                  XGL_WIRE_EXT_SACK, value, value_len,
+                                  &extensions_len),
+              XGL_OK);
+    xgl_packet_t packet = {};
+    packet.source_id = 2;
+    packet.target_id = 1;
+    packet.packet_type = XGL_PACKET_TYPE_ACK;
+    packet.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    packet.reliable = XGL_RELIABILITY_ACK_ONLY;
+    packet.extensions = extensions;
+    packet.extensions_len = extensions_len;
+
+    spy.busy_data_attempts = 1;
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_BUSY);
+    EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
+    EXPECT_EQ(ctx.peers->tx_window.send_base_packet_number, 0U);
+    EXPECT_EQ(retries, 0U);
+    EXPECT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Ack(0, 1), XGL_OK);
+    EXPECT_EQ(ctx.peers->tx_window.send_base_packet_number, 3U);
+}
+
+TEST_F(TransportRegressionTest, InvalidSendPlanDoesNotConsumePeerOrEmitHello) {
+    Init();
+    ctx.max_peers = 1;
+    const uint8_t payload[256] = {};
+    xgl_tx_data_t tx = {};
+    tx.target_id = 2;
+    tx.connection_id = 77;
+    tx.data = payload;
+    tx.data_len = sizeof(payload);
+    tx.reliable = true;
+
+    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(ctx.peers, nullptr);
+    EXPECT_EQ(spy.send_count, 0);
+    EXPECT_EQ(Send(), XGL_OK);
+}
+
 TEST_F(TransportRegressionTest, BusyInOrderPacketIsNotAcknowledged) {
     Init();
     accept_blocked = true;
