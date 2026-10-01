@@ -138,8 +138,7 @@ xgl_error_t transport_queue_reliable_tx(
     err = xgl_reliable_set_packet_extensions(&peer->reliable_queue, *rel_packet,
                                              extensions, extensions_len);
     if (err != XGL_OK) {
-        (void)xgl_reliable_remove_packet_number(
-            &peer->reliable_queue, packet_number, tx_data->target_id);
+        (void)xgl_reliable_remove_owned(&peer->reliable_queue, *rel_packet);
         *rel_packet = NULL;
     }
 
@@ -177,8 +176,7 @@ xgl_error_t transport_send_packet_view(
     if (err != XGL_OK) {
         transport_count_send_error(ctx);
         if (tx_data->reliable && peer != NULL) {
-            (void)xgl_reliable_remove_packet_number(
-                &peer->reliable_queue, packet_number, tx_data->target_id);
+            (void)xgl_reliable_remove_owned(&peer->reliable_queue, *rel_packet);
             *rel_packet = NULL;
         }
         return err;
@@ -362,8 +360,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         if (err == XGL_OK) {
             err = transport_announce_peer(ctx, handle, peer);
             if (err != XGL_OK && rel_packet != NULL) {
-                (void)xgl_reliable_remove_packet_number(
-                    &peer->reliable_queue, packet_number, tx_data->target_id);
+                (void)xgl_reliable_remove_owned(&peer->reliable_queue,
+                                                rel_packet);
                 rel_packet = NULL;
             }
         }

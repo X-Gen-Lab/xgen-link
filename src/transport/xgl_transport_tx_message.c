@@ -247,8 +247,7 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
     }
     if (err != XGL_OK) {
         if (packet != NULL) {
-            (void)xgl_reliable_remove_packet_number(
-                &peer->reliable_queue, packet->packet_number, peer->peer_id);
+            (void)xgl_reliable_remove_owned(&peer->reliable_queue, packet);
         }
         transport_clear_tx_message(ctx, peer);
         return err;
