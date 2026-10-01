@@ -230,8 +230,8 @@ static xgl_error_t transport_process_sack_value(
     xgct_list_node_t *node, *next;
     XGCT_LIST_FOR_EACH_SAFE(&peer->reliable_queue.wait_ack_list, node, next) {
         /* The queue owns this intrusive record. */
-        /* NOLINTNEXTLINE(bugprone-casting-through-void) */
         xgl_reliable_packet_t* packet =
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         if (packet->packet_number >= view.base_packet) {
             size_t bit = packet->packet_number - view.base_packet;
@@ -245,8 +245,8 @@ static xgl_error_t transport_process_sack_value(
 
     XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
         /* The queue owns this intrusive record. */
-        /* NOLINTNEXTLINE(bugprone-casting-through-void) */
         xgl_reliable_packet_t* packet =
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         if (packet->target_id == source_id &&
             packet->packet_number >= view.base_packet &&
