@@ -17,16 +17,18 @@ extern "C" {
  * \brief           Protocol error codes
  */
 typedef enum {
-    XGL_OK = 0,                     /**< Success */
+    XGL_OK = 0, /**< Success */
 
     /*-----------------------------------------------------------------------*/
     /* Parameter errors (1-99)                                               */
     /*-----------------------------------------------------------------------*/
-    XGL_ERR_INVALID_PARAM = 1,      /**< Invalid parameter */
-    XGL_ERR_NULL_POINTER = 2,       /**< Null pointer */
-    XGL_ERR_NOT_INITIALIZED = 3,    /**< Not initialized */
-    XGL_ERR_ALREADY_INITIALIZED = 4,/**< Already initialized */
-    XGL_ERR_NOT_FOUND = 5,          /**< Requested item not found */
+    XGL_ERR_INVALID_PARAM = 1,       /**< Invalid parameter */
+    XGL_ERR_NULL_POINTER = 2,        /**< Null pointer */
+    XGL_ERR_NOT_INITIALIZED = 3,     /**< Not initialized */
+    XGL_ERR_ALREADY_INITIALIZED = 4, /**< Already initialized */
+    XGL_ERR_NOT_FOUND = 5,           /**< Requested item not found */
+    XGL_ERR_UNSUPPORTED =
+        6, /**< Capability not provided by this configuration */
 
     /*-----------------------------------------------------------------------*/
     /* Memory errors (100-199)                                               */
@@ -38,28 +40,28 @@ typedef enum {
     /*-----------------------------------------------------------------------*/
     /* Network errors (200-299)                                              */
     /*-----------------------------------------------------------------------*/
-    XGL_ERR_ROUTE_NOT_FOUND = 200,  /**< Route not found */
-    XGL_ERR_TX_FAILED = 201,        /**< Transmission failed */
-    XGL_ERR_TIMEOUT = 202,          /**< Operation timeout */
-    XGL_ERR_ACK_TIMEOUT = 203,      /**< ACK timeout */
-    XGL_ERR_TTL_EXPIRED = 204,      /**< Packet TTL expired */
+    XGL_ERR_ROUTE_NOT_FOUND = 200, /**< Route not found */
+    XGL_ERR_TX_FAILED = 201,       /**< Transmission failed */
+    XGL_ERR_TIMEOUT = 202,         /**< Operation timeout */
+    XGL_ERR_ACK_TIMEOUT = 203,     /**< ACK timeout */
+    XGL_ERR_TTL_EXPIRED = 204,     /**< Packet TTL expired */
 
     /*-----------------------------------------------------------------------*/
     /* Protocol errors (300-399)                                             */
     /*-----------------------------------------------------------------------*/
-    XGL_ERR_INVALID_FRAME = 300,    /**< Invalid frame */
-    XGL_ERR_CRC_FAILED = 301,       /**< CRC check failed */
-    XGL_ERR_INVALID_VERSION = 302,  /**< Invalid version */
-    XGL_ERR_INVALID_DATA_TYPE = 303,/**< Invalid data type */
-    XGL_ERR_SEQUENCE_ERROR = 304,   /**< Packet number/window error */
+    XGL_ERR_INVALID_FRAME = 300,     /**< Invalid frame */
+    XGL_ERR_CRC_FAILED = 301,        /**< CRC check failed */
+    XGL_ERR_INVALID_VERSION = 302,   /**< Invalid version */
+    XGL_ERR_INVALID_DATA_TYPE = 303, /**< Invalid data type */
+    XGL_ERR_SEQUENCE_ERROR = 304,    /**< Packet number/window error */
 
     /*-----------------------------------------------------------------------*/
     /* State errors (400-499)                                                */
     /*-----------------------------------------------------------------------*/
-    XGL_ERR_BUSY = 400,             /**< Resource busy */
-    XGL_ERR_QUEUE_FULL = 401,       /**< Queue full */
-    XGL_ERR_WINDOW_FULL = 402,      /**< Sliding window full */
-
+    XGL_ERR_BUSY = 400,        /**< Resource busy */
+    XGL_ERR_QUEUE_FULL = 401,  /**< Queue full */
+    XGL_ERR_WINDOW_FULL = 402, /**< Sliding window full */
+    XGL_ERR_CANCELLED = 403,   /**< Explicitly closed pending transmission */
 } xgl_error_t;
 
 /**

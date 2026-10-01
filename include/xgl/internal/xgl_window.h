@@ -11,8 +11,9 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 
@@ -22,15 +23,17 @@ extern "C" {
 
 /**
  * \brief           Sliding window structure for flow control
- * \note            Implements a sliding window protocol for reliable transmission
- *                  with ACK tracking and window advancement
+ * \note            Implements reliable transmission with ACK tracking and
+ *                  window advancement. The caller serializes all operations.
  */
 typedef struct {
-    uint8_t window_size;            /**< Maximum window size */
-    uint32_t send_base_packet_number; /**< Base packet number of sending window */
-    uint32_t next_packet_number;    /**< Next packet number to send */
-    bool* ack_received;             /**< ACK bitmap (dynamically allocated) */
-    xgl_allocator_t* allocator;     /**< Allocator used for ACK bitmap */
+    uint8_t window_size; /**< Maximum window size */
+    uint8_t ack_head;    /**< Physical bit corresponding to the window base */
+    uint32_t
+        send_base_packet_number; /**< Base packet number of sending window */
+    uint32_t next_packet_number; /**< Next packet number to send */
+    uint8_t* ack_received;       /**< Packed ACK storage owned by allocator */
+    const xgm_allocator_t* allocator; /**< Allocator used for ACK bitmap */
 } xgl_sliding_window_t;
 
 /*---------------------------------------------------------------------------*/
@@ -38,43 +41,27 @@ typedef struct {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Initialize sliding window
- * \param[in,out]   window: Sliding window structure
- * \param[in]       window_size: Maximum window size
- * \return          XGL_OK on success, error code otherwise
- */
-xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size);
-
-/**
  * \brief           Initialize sliding window with an explicit allocator
- * \param[in,out]   window: Sliding window structure
- * \param[in]       window_size: Maximum window size
- * \param[in]       allocator: Allocator for ACK bitmap; NULL fallback is build-policy controlled
+ * \param[in,out]   window: Uninitialized or previously destroyed window
+ * \param[in]       window_size: Maximum window size, from 1 to 128
+ * \param[in]       allocator: Borrowed allocator descriptor and context that
+ *                  must remain valid until window destruction
  * \return          XGL_OK on success, error code otherwise
+ * \note            Destroy a live window before initializing it again.
+ *                  Failure leaves the supplied window unchanged. The window
+ *                  and allocator descriptor must be separate stable objects.
  */
 xgl_error_t xgl_window_init_with_allocator(xgl_sliding_window_t* window,
                                            uint8_t window_size,
-                                           xgl_allocator_t* allocator);
+                                           const xgm_allocator_t* allocator);
 
 /**
  * \brief           Destroy sliding window and free resources
  * \param[in,out]   window: Sliding window structure
+ * \note            Call only after successful initialization or on a
+ *                  zero-initialized window. Repeated destruction is safe.
  */
 void xgl_window_destroy(xgl_sliding_window_t* window);
-
-/**
- * \brief           Check if window allows sending
- * \param[in]       window: Sliding window structure
- * \return          true if can send, false if window is full
- */
-bool xgl_window_can_send(const xgl_sliding_window_t* window);
-
-/**
- * \brief           Advance window base on ACK reception
- * \param[in,out]   window: Sliding window structure
- * \return          Number of positions advanced
- */
-uint8_t xgl_window_advance_base(xgl_sliding_window_t* window);
 
 /**
  * \brief           Get current window usage

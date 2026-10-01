@@ -1,53 +1,47 @@
 # Resource Model
 
-XGL targets bounded embedded systems. Production delivery must explain peak memory, runtime allocation, and queue budgets.
+Every instance owns one bounded workspace. The protocol describes resource ownership and capacities; reusable allocation algorithms belong to the independent xgen-memory library.
 
 ## Allocation Phases
 
-| Phase | Description |
+`xgl_memory_requirements()` validates the configuration and returns exact `size` and `alignment`. The layout includes the instance, pool descriptors, initialization objects, and all runtime slots.
+
+`xgl_init_static()` prepares and initializes caller-owned aligned storage without calling `memory.allocator`. `xgl_create()` uses the configured `xgm_allocator_t` once for the entire workspace, then returns an uninitialized handle; call `xgl_init()` next. Both paths use the same partition plan.
+
+After preparation, init, sends, receive processing, and cleanup use only the workspace. `xgl_destroy()` returns dynamic storage to the original backend once; static storage remains owned by the caller. Borrowed configuration and contexts must outlive destruction.
+
+## Independent Resource Pools
+
+| Resource | Reservation |
 | --- | --- |
-| init | Instance, route, parser, reliable, fragment, replay window |
-| TX | Normal single-frame sends should avoid runtime allocation |
-| RX | Normal single-frame receives should avoid runtime allocation |
-| reliable | Retransmission data and queue nodes |
-| fragment | Fragment arrays, reassembly buffers, and ranges |
+| Routes and links | Fixed route arrays; one parser cache per distinct PHY |
+| Route index | Preallocated hash buckets/nodes in embedded/full; absent in boot |
+| Peer and window | One peer object and window storage per peer capacity |
+| Reliable TX | Separate packet and payload slots per global TX capacity |
+| Frame scratch | One complete-frame scratch slot for synchronous, non-reentrant I/O |
+| Out-of-order RX | Separate node, payload, and extension slots per RX capacity |
+| Fragmented TX | One maximum-message slot per peer; extension slots per TX capacity |
+| Reassembly | One descriptor per reassembly slot |
+| Retained RX messages | Maximum-message slots for reassembly slots plus peers |
 
-## No-Heap Profile
+Each category has its own `xgm_pool_t` service. A small payload cannot consume a peer or control-record reservation. Freed slots are reusable with no heap fallback or runtime expansion.
 
-When `XGL_ALLOW_FALLBACK_MALLOC=OFF`, a NULL allocator must fail closed. `xgl_noheap_smoke` validates strict profile behavior.
+Fragment byte budgets are shared admission limits, not variable-size arenas. The fixed reservations include completed RX messages retained while the application is busy. These conservative reservations may exceed the configured concurrent byte budget.
 
-## Preset Resources
+## Capacity and Failure
 
-| Preset | TX Pool | RX Buffer | Window | Max Frame | Fragment |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Tiny | 1024 | 160 | 2 | 128 | off |
-| Small | 2048 | 288 | 4 | 256 | on |
-| Medium | 4096 | 544 | 8 | 512 | on |
-| Large | 8192 | 1056 | 16 | 1024 | on |
-| Production | 8192 | 1056 | 16 | 1024 | on + auth required |
+Window capacity is per peer; TX and out-of-order capacity are global. Exhaustion yields a bounded failure or deferred work, not an automatic resize. Reliable fragmented messages can exceed the packet window: retained message bytes feed later packets as ACKs release slots.
 
-These are SDK starting points, not board-certified values. Final values must come from target link MTU, payload size, window, fragment concurrency, and authentication tag length.
+A scope is identified by remote node, connection ID, and epoch. Recovery must not silently restart sequence numbers within an old scope. Close the old scope, drain old unauthenticated traffic, and use a new epoch; authenticated recovery closes the trusted session and installs fresh trusted parameters. See [Send API](send-api.md).
 
-## Budget Traceability
+## No-Heap Builds
 
-| Budget | Config/source field | Validation/test evidence |
-| --- | --- | --- |
-| TX pool | `config.memory.tx_pool_size` | `src/api/xgl_config.c`, `test/test_config.cpp` |
-| RX buffer | `config.memory.rx_buffer_size` | must be at least `config.protocol.max_frame_size`; `test/test_config.cpp` |
-| Route MTU | `xgl_route_item_t.max_frame_size` | forwarding rejects oversized frames; `test/test_network.cpp` |
-| Reliable queue | `config.protocol.window_size`, `config.protocol.max_retry_count` | `test/test_reliable.cpp`, `test/test_window.cpp` |
-| Fragment buffers | `xgl_fragment_init()`, `xgl_fragment_set_limits()` | `test/test_fragment.cpp` |
-| Auth overhead | `xgl_auth_provider_t.tag_len` plus SECURITY_EXT | `test/test_datalink.cpp`, `test/test_send.cpp` |
+Select `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` and `-DXGM_BUILD_LIBC_ALLOCATOR=OFF` for production without libc allocation. Use static initialization, or provide an explicit context allocator for the single workspace reservation. NULL fallback, when enabled, is resolved only at the create boundary.
 
-## Production Checklist
+A protocol no-heap claim does not cover application drivers or authentication providers. Inspect the final linked firmware, including those components.
 
-- allocator call counts
-- TX/RX peak usage
-- reliable queue peak usage
-- reassembly budget peak usage
-- stack high-water mark
-- footprint report
+## Measurement
 
-## Runtime Determinism
+Only `requirements.size` is the total byte count. `runtime_blocks` counts slots across all categories; `runtime_block_size` is the largest stride. Multiplying them does not describe the partitioned layout.
 
-The strict production profile aims for no allocator calls after init for normal single-frame TX/RX. Reliable transport and fragmentation may need additional pool resources; if the target forbids runtime allocation, fixed pools must cover reliable packets, RX buffered packets, and reassembly buffers.
+ABI, profile, route count, frame size, and all capacities affect RAM. The Cortex-M0 probe in `tools/boot_footprint` generates target layout constants and links real API paths, with map, stack, and heap-symbol reports. Account separately for BSP memory, application buffers, ISR nesting, and total call-stack depth.

@@ -1,60 +1,60 @@
 /**
  * \file            bare_metal_port.c
- * \brief           Bare-metal xgen-link porting skeleton
+ * \brief           Caller-clock bare-metal integration skeleton
+ * \author          X-Gen Lab
  */
+#include <xgl/xgl.h>
 
-#include "xgl/xgl.h"
+/* Implement these in the board application. RX must return immediately. */
+extern uint32_t board_millis(void);
+extern xgl_error_t board_uart_write_sync(const uint8_t* data, size_t length);
+extern size_t board_uart_read_available(uint8_t* data, size_t capacity);
 
-static xgl_error_t board_uart_write(const uint8_t* data, size_t len) {
-    (void)data;
-    (void)len;
+/**
+ * \brief           Complete transmission or copy bytes into driver-owned
+ * storage
+ * \param[in]       data: Borrowed frame, invalid after this callback returns
+ * \param[in]       length: Frame length
+ * \param[in]       context: Board driver context, unused by this skeleton
+ * \return          Board driver status
+ */
+static xgl_error_t bare_metal_tx(const uint8_t* data, size_t length,
+                                 void* context) {
+    (void)context;
+    return board_uart_write_sync(data, length);
+}
+
+/**
+ * \brief           Read available bytes without waiting for a frame
+ * \param[out]      data: Caller RX buffer
+ * \param[in,out]   length: Capacity on entry, bytes copied on return
+ * \param[in]       context: Board driver context, unused by this skeleton
+ * \return          XGL_OK
+ */
+static xgl_error_t bare_metal_rx(uint8_t* data, size_t* length, void* context) {
+    (void)context;
+    *length = board_uart_read_available(data, *length);
     return XGL_OK;
 }
 
-static size_t board_uart_read(uint8_t* data, size_t max_len) {
-    (void)data;
-    (void)max_len;
-    return 0;
-}
+/** \brief           Public PHY descriptor kept alive by the board application.
+ */
+xgl_phy_ops_t xgl_bare_metal_phy = {bare_metal_tx, bare_metal_rx, NULL};
 
-static xgl_error_t bare_metal_tx(const uint8_t* data, size_t len, void* user_data) {
-    (void)user_data;
-    return board_uart_write(data, len);
-}
-
-static xgl_error_t bare_metal_rx(uint8_t* buffer, size_t* len, void* user_data) {
-    (void)user_data;
-    if (buffer == NULL || len == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    *len = board_uart_read(buffer, *len);
-    return XGL_OK;
-}
-
-void xgl_bare_metal_poll_example(void) {
-    xgl_phy_ops_t phy = {
-        .tx = bare_metal_tx,
-        .rx = bare_metal_rx,
-        .user_data = NULL
-    };
-    xgl_route_item_t routes[] = {
-        { .target_id = 2, .phy = &phy, .max_frame_size = 128, .read_freq_hz = 100, .metric = 1 }
-    };
-
-    xgl_config_t config;
-    xgl_config_get_preset_tiny(&config);
-    config.source_id = 1;
-    config.route_table = routes;
-    config.route_table_len = 1;
-
-    xgl_handle_t handle = xgl_create(&config);
-    if (handle == NULL || xgl_init(handle) != XGL_OK) {
-        xgl_destroy(handle);
-        return;
-    }
-
+/**
+ * \brief           Poll an instance initialized in application-owned static
+ * workspace
+ * \param[in]       handle: Initialized handle; config and descriptors outlive
+ * this loop
+ * \return          First runtime error
+ */
+xgl_error_t xgl_bare_metal_poll_example(xgl_handle_t handle) {
+    const xgl_work_budget_t budget = {128U, 1000U};
     for (;;) {
-        xgl_run(handle, 100);
+        xgl_error_t error = xgl_step(handle, board_millis(), &budget);
+        if (error != XGL_OK) {
+            return error;
+        }
+        /* The board may sleep until RX IRQ or xgl_next_timeout() expires. */
     }
 }

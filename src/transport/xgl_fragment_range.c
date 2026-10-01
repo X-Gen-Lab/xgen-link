@@ -7,8 +7,7 @@
 #include "xgl_fragment_internal.h"
 
 static bool fragment_range_overlaps(const xgl_fragment_received_range_t* range,
-                                    size_t start,
-                                    size_t end) {
+                                    size_t start, size_t end) {
     return range != NULL && start < range->end && end > range->start;
 }
 
@@ -24,16 +23,29 @@ static void fragment_remove_range_at(xgl_reassembly_buffer_t* buffer,
     buffer->received_range_count--;
 }
 
+/**
+ * \brief           Insert a disjoint range or identify a fully covered
+ *                  duplicate
+ * \param[in,out]   buffer: Reassembly buffer with sorted disjoint ranges
+ * \param[in]       start: Inclusive new range start
+ * \param[in]       end: Exclusive new range end
+ * \return          XGL_OK on insertion, BUSY for full coverage, INVALID_FRAME
+ *                  for partial overlap, or NO_MEMORY when ranges are exhausted
+ */
 xgl_error_t fragment_insert_received_range(xgl_reassembly_buffer_t* buffer,
-                                           size_t start,
-                                           size_t end) {
+                                           size_t start, size_t end) {
     if (buffer == NULL || start >= end) {
         return XGL_ERR_INVALID_PARAM;
     }
 
     for (size_t i = 0; i < buffer->received_range_count; ++i) {
-        if (fragment_range_overlaps(&buffer->received_ranges[i], start, end)) {
-            return XGL_ERR_BUSY;
+        const xgl_fragment_received_range_t* range =
+            &buffer->received_ranges[i];
+        if (fragment_range_overlaps(range, start, end)) {
+            if (start >= range->start && end <= range->end) {
+                return XGL_ERR_BUSY;
+            }
+            return XGL_ERR_INVALID_FRAME;
         }
     }
 

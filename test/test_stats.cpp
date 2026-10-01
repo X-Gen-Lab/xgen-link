@@ -4,6 +4,8 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
+
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
 
@@ -12,13 +14,14 @@
 /*---------------------------------------------------------------------------*/
 
 class XglStatsTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         /* Get default configuration */
         xgl_config_get_default(&config);
         config.source_id = 1;
 
         /* Create and initialize instance */
+        xgl_test_use_host_allocator(&config);
         handle = xgl_create(&config);
         ASSERT_NE(handle, nullptr);
 
@@ -80,6 +83,7 @@ TEST_F(XglStatsTest, GetStatsFromUninitializedInstance) {
     xgl_config_get_default(&temp_config);
     temp_config.source_id = 2;
 
+    xgl_test_use_host_allocator(&temp_config);
     xgl_handle_t temp_handle = xgl_create(&temp_config);
     ASSERT_NE(temp_handle, nullptr);
 
@@ -152,6 +156,7 @@ TEST_F(XglStatsTest, ResetStatsFromUninitializedInstance) {
     xgl_config_get_default(&temp_config);
     temp_config.source_id = 2;
 
+    xgl_test_use_host_allocator(&temp_config);
     xgl_handle_t temp_handle = xgl_create(&temp_config);
     ASSERT_NE(temp_handle, nullptr);
 
@@ -210,6 +215,7 @@ TEST_F(XglStatsTest, StatsIsolationBetweenInstances) {
     xgl_config_get_default(&config2);
     config2.source_id = 2;
 
+    xgl_test_use_host_allocator(&config2);
     xgl_handle_t handle2 = xgl_create(&config2);
     ASSERT_NE(handle2, nullptr);
 

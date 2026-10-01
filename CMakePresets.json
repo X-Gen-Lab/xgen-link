@@ -2,7 +2,7 @@
   "version": 3,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 21,
+    "minor": 24,
     "patch": 0
   },
   "configurePresets": [
@@ -115,18 +115,27 @@
       }
     },
     {
-      "name": "gcc-test-threadsafe",
-      "displayName": "GCC Thread-Safe Test",
-      "description": "Test build with XGL_THREAD_SAFE and XGL_PLATFORM_POSIX",
-      "inherits": "gcc-base",
+      "name": "boot",
+      "inherits": "base",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "XGL_BUILD_TESTS": "ON",
-        "XGL_BUILD_EXAMPLES": "ON",
-        "XGL_BUILD_DOCS": "OFF",
-        "XGL_ENABLE_COVERAGE": "OFF",
-        "CMAKE_C_FLAGS": "-DXGL_THREAD_SAFE -DXGL_PLATFORM_POSIX",
-        "CMAKE_CXX_FLAGS": "-DXGL_THREAD_SAFE -DXGL_PLATFORM_POSIX"
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "XGL_PROFILE": "boot",
+        "XGL_BUILD_TESTS": "OFF",
+        "XGL_BUILD_EXAMPLES": "OFF",
+        "XGL_ALLOW_FALLBACK_MALLOC": "OFF",
+        "XGM_BUILD_LIBC_ALLOCATOR": "OFF"
+      }
+    },
+    {
+      "name": "embedded",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "XGL_PROFILE": "embedded",
+        "XGL_BUILD_TESTS": "OFF",
+        "XGL_BUILD_EXAMPLES": "OFF",
+        "XGL_ALLOW_FALLBACK_MALLOC": "OFF",
+        "XGM_BUILD_LIBC_ALLOCATOR": "OFF"
       }
     }
   ],
@@ -174,10 +183,12 @@
       "description": "Build with AddressSanitizer"
     },
     {
-      "name": "gcc-test-threadsafe",
-      "configurePreset": "gcc-test-threadsafe",
-      "displayName": "Thread-Safe Test Build",
-      "description": "Build with thread safety enabled"
+      "name": "boot",
+      "configurePreset": "boot"
+    },
+    {
+      "name": "embedded",
+      "configurePreset": "embedded"
     }
   ],
   "testPresets": [
@@ -209,10 +220,15 @@
       }
     },
     {
-      "name": "gcc-test-threadsafe",
-      "configurePreset": "gcc-test-threadsafe",
-      "displayName": "Run Thread-Safe Tests",
-      "description": "Run tests with thread safety enabled",
+      "name": "boot",
+      "configurePreset": "boot",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "embedded",
+      "configurePreset": "embedded",
       "output": {
         "outputOnFailure": true
       }

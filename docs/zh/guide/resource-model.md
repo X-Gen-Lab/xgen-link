@@ -1,53 +1,47 @@
 # 资源模型
 
-XGL 面向有边界的嵌入式系统。生产交付必须说明内存峰值、运行时分配和队列预算。
+每个实例拥有一个有界 workspace。协议描述资源归属和容量；可复用的分配算法由独立的 xgen-memory 提供。
 
 ## 分配阶段
 
-| 阶段 | 说明 |
+`xgl_memory_requirements()` 校验配置，返回精确的 `size` 和 `alignment`。布局包括实例、池描述符、初始化对象和全部运行时槽位。
+
+`xgl_init_static()` 准备并初始化调用者提供的对齐存储，不调用 `memory.allocator`。`xgl_create()` 通过配置的 `xgm_allocator_t` 一次性申请整个 workspace，返回尚未初始化的 handle，随后须调用 `xgl_init()`。两条路径共用同一分区计划。
+
+准备完成后，初始化、发送、接收处理及清理都只使用 workspace。`xgl_destroy()` 将动态存储一次性归还原 backend；静态存储仍归调用者所有。借用的配置和上下文必须活到销毁结束。
+
+## 独立资源池
+
+| 资源 | 预留方式 |
 | --- | --- |
-| init | 创建实例、route、parser、reliable、fragment、replay window |
-| TX | 普通单帧发送应避免运行时分配 |
-| RX | 普通单帧接收应避免运行时分配 |
-| reliable | 保存重传数据和队列节点 |
-| fragment | 管理分片数组、重组 buffer 和 ranges |
+| 路由和链路 | 固定路由数组；每个独立 PHY 一个 parser cache |
+| 路由索引 | embedded/full 预分配 hash 桶和节点；boot 不包含 |
+| Peer 和窗口 | 每个 peer 容量一个 peer 对象及窗口存储 |
+| 可靠 TX | 按全局 TX 容量分别预留包记录和 payload 槽 |
+| 帧 scratch | 同步且不可重入的 I/O 共用一个完整帧槽 |
+| 乱序 RX | 按 RX 容量分别预留节点、payload 和扩展槽 |
+| 分片 TX | 每个 peer 一个最大消息槽；每个 TX 容量一个扩展槽 |
+| 重组 | 每个重组槽一个描述符 |
+| 保留的 RX 消息 | 最大消息槽数为重组槽数加 peer 数 |
 
-## No-Heap Profile
+每类资源拥有独立的 `xgm_pool_t` 服务，小 payload 不能占用 peer 或控制记录的预留容量。释放的槽位可以复用，不回退 heap，也不在运行期扩容。
 
-`XGL_ALLOW_FALLBACK_MALLOC=OFF` 时，NULL allocator 必须 fail closed。`xgl_noheap_smoke` 用于验证严格 profile 行为。
+分片字节预算是共享接纳上限，不是可变大小 arena。固定预留还覆盖应用繁忙时保留的已完成 RX 消息。这种保守预留可能大于配置的并发字节预算。
 
-## 预设资源
+## 容量和失败
 
-| Preset | TX Pool | RX Buffer | Window | Max Frame | Fragment |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Tiny | 1024 | 160 | 2 | 128 | off |
-| Small | 2048 | 288 | 4 | 256 | on |
-| Medium | 4096 | 544 | 8 | 512 | on |
-| Large | 8192 | 1056 | 16 | 1024 | on |
-| Production | 8192 | 1056 | 16 | 1024 | on + auth required |
+窗口容量属于单个 peer，TX 和乱序容量属于整个实例。耗尽时返回有界失败或延后推进，不自动扩容。可靠分片消息可以超过包窗口：ACK 释放槽位后，再从保留的消息副本生成后续包。
 
-这些是 SDK 起点，不是目标板认证值。最终值必须来自目标链路 MTU、负载大小、窗口、分片并发数和认证 tag 长度。
+scope 由远端节点、connection ID 和 epoch 标识。恢复时不能在旧 scope 内静默重置序列号。应关闭旧 scope、排空未认证链路旧流量并使用新 epoch；认证模式则关闭可信会话并安装新的可信参数。参见[发送 API](send-api.md)。
 
-## Budget 追溯
+## 无 Heap 构建
 
-| Budget | 配置/源码字段 | 验证/测试证据 |
-| --- | --- | --- |
-| TX pool | `config.memory.tx_pool_size` | `src/api/xgl_config.c`, `test/test_config.cpp` |
-| RX buffer | `config.memory.rx_buffer_size` | 必须至少等于 `config.protocol.max_frame_size`；`test/test_config.cpp` |
-| Route MTU | `xgl_route_item_t.max_frame_size` | 转发拒绝超大 frame；`test/test_network.cpp` |
-| Reliable queue | `config.protocol.window_size`, `config.protocol.max_retry_count` | `test/test_reliable.cpp`, `test/test_window.cpp` |
-| Fragment buffers | `xgl_fragment_init()`, `xgl_fragment_set_limits()` | `test/test_fragment.cpp` |
-| Auth overhead | `xgl_auth_provider_t.tag_len` 加 SECURITY_EXT | `test/test_datalink.cpp`, `test/test_send.cpp` |
+生产构建使用 `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` 和 `-DXGM_BUILD_LIBC_ALLOCATOR=OFF` 禁止 libc 分配。采用静态初始化，或提供带上下文的显式分配器，只申请一次 workspace。启用 NULL fallback 时，也只在 create 边界解析。
 
-## 生产 Checklist
+协议的无 heap 结论不涵盖应用驱动和认证 provider，应检查包含这些组件的最终固件链接结果。
 
-- allocator 调用计数。
-- TX/RX 峰值。
-- reliable queue 峰值。
-- reassembly budget 峰值。
-- stack high-water mark。
-- footprint report。
+## 测量
 
-## 运行时确定性
+只有 `requirements.size` 表示总字节数。`runtime_blocks` 是所有类别槽数之和；`runtime_block_size` 是最大槽位步长，两者相乘不能描述实际分区布局。
 
-严格生产 profile 的目标是 init 后普通单帧 TX/RX 不触发 allocator。可靠传输和分片可能需要额外池化资源；若目标系统禁止运行时分配，必须用固定池覆盖 reliable packet、rx buffered packet 和 reassembly buffer。
+ABI、profile、路由数、帧大小及全部容量都会影响 RAM。`tools/boot_footprint` 中的 Cortex-M0 工程导出目标布局常量，链接真实 API 路径，并输出 map、栈和堆符号报告。BSP、应用缓冲、ISR 嵌套及完整调用链栈须另外核算。

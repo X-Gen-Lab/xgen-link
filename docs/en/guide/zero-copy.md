@@ -1,29 +1,31 @@
 # Zero-Copy
 
-`xgl_send_zerocopy()` is designed for single-frame, unreliable sends using caller-owned writable buffers.
+`xgl_send_zerocopy_at()` builds a single unreliable frame in caller-owned writable storage. It does not introduce asynchronous buffer ownership.
 
 ## Supported Scope
 
-- True zero-copy: single-frame unreliable send.
-- Reliable zero-copy: rejected with `XGL_ERR_INVALID_PARAM`; use `xgl_send()` when ACK/retry semantics are required.
+The current API supports single-frame, unreliable transmission. `reliable=true` is rejected with `XGL_ERR_INVALID_PARAM`; use `xgl_send_at()` for reliable or fragmented messages.
 
-## Buffer Requirements
+The zero-copy descriptor has no connection/epoch fields and uses the default scope. Authenticated use requires a trusted session for that scope. Use the regular send API when explicit connection/epoch selection is needed.
 
-- Buffer must be writable.
-- Payload must reserve space for header and required extensions.
-- When `auth_required` is true, reserve SECURITY_EXT and authentication trailer space.
-- Route MTU must fit the final frame.
+## Buffer Layout
 
-## Offset Rules
+Reserve the exact header offset before payload and trailer capacity after it:
 
-Unauthenticated single-frame sends place payload at `XGL_FRAME_HEADER_SIZE` when `data_type == 0`. When `data_type != 0`, reserve DATA_TYPE_EXT as well, so the offset is `XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE`. Authenticated paths also reserve SECURITY_EXT, adding 15 bytes. Do not write magic or CRC manually; let the protocol stack fill them.
+| Part | Bytes |
+| --- | ---: |
+| Base header | `XGL_FRAME_HEADER_SIZE` (24) |
+| Nonzero data type | `XGL_DATA_TYPE_EXT_SIZE` (3) |
+| Authentication security extension, if enabled | 15 |
+| Authentication tag, if enabled | Provider tag length |
+| Final CRC | `XGL_CRC16_SIZE` (2) |
+
+`data_offset` must equal the base header plus enabled extensions. `buffer_size` must cover offset, payload, tag, and CRC without overflow; the full serialized frame must fit the route MTU. The stack writes header and CRC, so do not construct them separately.
 
 ## Ownership
 
-The caller buffer must remain valid until the PHY TX callback returns. The zero-copy path bypasses transport and network send processing, then updates their TX statistics explicitly after the raw datalink send succeeds.
+The caller may reuse storage after `xgl_send_zerocopy_at()` returns. PHY TX must finish reading or copying it before returning, even when backed by DMA. This interface reduces frame assembly copies; a driver's private DMA copy may still be necessary.
 
-## Common Misuse
+## Failure Handling
 
-- No header reservation.
-- Provider has no tag length while authentication is required.
-- Passing reliable data to `xgl_send_zerocopy()` instead of using `xgl_send()`.
+Check the returned status. Do not pass immutable memory, omit required headroom, or retain callback pointers. A local success is not evidence of remote delivery. Calls and recovery must follow the same serialization rules as normal sending.

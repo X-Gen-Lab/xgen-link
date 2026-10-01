@@ -7,17 +7,19 @@
 #ifndef MOCK_ALLOCATOR_H
 #define MOCK_ALLOCATOR_H
 
-#include <gmock/gmock.h>
 #include <xgl/xgl.h>
-#include <map>
+
 #include <cstdlib>
+#include <gmock/gmock.h>
+#include <map>
 
 /**
  * \brief           Mock allocator class for testing custom allocator usage
  */
 class MockAllocator {
-public:
-    MockAllocator() : total_allocated_(0), total_freed_(0) {}
+  public:
+    MockAllocator() : total_allocated_(0), total_freed_(0) {
+    }
 
     /**
      * \brief           Mock malloc function
@@ -32,27 +34,37 @@ public:
     /**
      * \brief           Get C-style allocator interface
      */
-    xgl_allocator_t* get_allocator() {
-        allocator_.malloc = [](size_t size) -> void* {
-            return current_instance_->malloc_wrapper(size);
+    const xgm_allocator_t* get_allocator() {
+        service_.ctx = this;
+        service_.alloc = [](void* ctx, size_t size) -> void* {
+            return static_cast<MockAllocator*>(ctx)->malloc_wrapper(size);
         };
-        allocator_.free = [](void* ptr) {
-            current_instance_->free_wrapper(ptr);
+        service_.free = [](void* ctx, void* ptr) {
+            static_cast<MockAllocator*>(ctx)->free_wrapper(ptr);
         };
-        allocator_.user_data = this;
-        current_instance_ = this;
-        return &allocator_;
+        return &service_;
     }
 
     /**
      * \brief           Get allocation statistics
      */
-    size_t get_total_allocated() const { return total_allocated_; }
-    size_t get_total_freed() const { return total_freed_; }
-    size_t get_current_allocated() const { return total_allocated_ - total_freed_; }
-    size_t get_alloc_count() const { return allocations_.size(); }
+    size_t get_total_allocated() const {
+        return total_allocated_;
+    }
 
-private:
+    size_t get_total_freed() const {
+        return total_freed_;
+    }
+
+    size_t get_current_allocated() const {
+        return total_allocated_ - total_freed_;
+    }
+
+    size_t get_alloc_count() const {
+        return allocations_.size();
+    }
+
+  private:
     void* malloc_wrapper(size_t size) {
         void* ptr = malloc_impl(size);
         if (ptr != nullptr) {
@@ -73,12 +85,10 @@ private:
         }
     }
 
-    xgl_allocator_t allocator_;
+    xgm_allocator_t service_{};
     std::map<void*, size_t> allocations_;
     size_t total_allocated_;
     size_t total_freed_;
-
-    static thread_local MockAllocator* current_instance_;
 };
 
 #endif /* MOCK_ALLOCATOR_H */

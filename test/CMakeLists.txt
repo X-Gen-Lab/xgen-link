@@ -2,50 +2,38 @@
 # Google Test and Google Mock integration
 # Author: X-Gen Lab
 
+if(CMAKE_CROSSCOMPILING)
+    message(FATAL_ERROR "GoogleTest requires a separate native host build")
+endif()
+
 #-----------------------------------------------------------------------------
 # Google Test Setup
 #-----------------------------------------------------------------------------
 
-include(FetchContent)
-
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.14.0
-)
-
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(googletest)
+find_package(GTest 1.16.0 EXACT CONFIG REQUIRED)
 
 #-----------------------------------------------------------------------------
 # Test Sources
 #-----------------------------------------------------------------------------
 
 set(TEST_SOURCES
+    test_main.cpp
+    test_cpp17_presets.cpp
+    test_coverage_wire.cpp
+    test_coverage_api.cpp
+    test_coverage_delivery.cpp
     # Core tests
     test_types.cpp
-    test_crc.cpp
-    test_serialize.cpp
-    test_list.cpp
-    test_hashtable.cpp
-    test_mempool.cpp
-    test_tiered_pool.cpp
-    test_packet_pool.cpp
-    test_allocator.cpp
     test_instance.cpp
     test_config.cpp
+    test_creation_policy.cpp
     test_footprint.cpp
-    test_codec.cpp
     test_send.cpp
     test_stats.cpp
     test_security.cpp
 
     # Architecture improvement tests
     test_layered_stats.cpp
-    test_time_provider.cpp
 
     # Data link tests
     test_frame.cpp
@@ -60,24 +48,19 @@ set(TEST_SOURCES
     # Transport tests
     test_rtt.cpp
     test_window.cpp
+    test_window_storage.cpp
     test_reliable.cpp
     test_fragment.cpp
     test_transport.cpp
     test_timeout_control.cpp
 
     # Platform tests
-    test_mutex.cpp
-    test_time.cpp
-    test_atomic.cpp
-    test_platform.cpp
 
     # Integration tests
     integration/test_integration.cpp
 
     # Property tests
     property/test_memory_properties.cpp
-    property/test_crc_properties.cpp
-    property/test_serialization_properties.cpp
     property/test_frame_properties.cpp
     property/test_network_properties.cpp
     property/test_transport_properties.cpp
@@ -85,6 +68,7 @@ set(TEST_SOURCES
     property/test_instance_properties.cpp
     property/test_error_properties.cpp
     property/test_alignment_properties.cpp
+    property/test_generator.cpp
 )
 
 #-----------------------------------------------------------------------------
@@ -106,13 +90,14 @@ add_executable(xgl_tests
     ${MOCK_SOURCES}
 )
 
+
 target_link_libraries(xgl_tests
     PRIVATE
         xgl
+        xgm::libc_allocator
+        ${XGL_PRIVATE_DEPENDENCIES}
         GTest::gtest
-        GTest::gtest_main
         GTest::gmock
-        GTest::gmock_main
 )
 
 target_include_directories(xgl_tests
@@ -124,18 +109,23 @@ target_include_directories(xgl_tests
 
 # Fix PDB locking issues on Windows with parallel compilation
 if(MSVC)
-    target_compile_options(xgl_tests PRIVATE /FS)
+    target_compile_options(xgl_tests PRIVATE /FS /permissive-)
+else()
+    target_compile_options(xgl_tests PRIVATE -pedantic-errors)
 endif()
 
 #-----------------------------------------------------------------------------
 # CTest Entry
 #-----------------------------------------------------------------------------
 
-add_test(NAME xgl_tests COMMAND xgl_tests)
-set_tests_properties(xgl_tests PROPERTIES
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    TIMEOUT 30
+include(GoogleTest)
+gtest_discover_tests(xgl_tests
+    DISCOVERY_MODE POST_BUILD
+    TEST_LIST xgl_discovered_tests
+    PROPERTIES TIMEOUT 30
 )
+set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/classify_tests.cmake")
 
 #-----------------------------------------------------------------------------
 # Custom Test Targets
@@ -143,7 +133,8 @@ set_tests_properties(xgl_tests PROPERTIES
 
 # Run all tests
 add_custom_target(run_tests
-    COMMAND xgl_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -L xgl
+        --no-tests=error --output-on-failure
     DEPENDS xgl_tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running all tests..."
@@ -151,7 +142,8 @@ add_custom_target(run_tests
 
 # Run property tests only
 add_custom_target(run_property_tests
-    COMMAND xgl_tests --gtest_filter=*Property*
+    COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -L property
+        --no-tests=error --output-on-failure
     DEPENDS xgl_tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running property tests..."
@@ -159,7 +151,8 @@ add_custom_target(run_property_tests
 
 # Run unit tests only
 add_custom_target(run_unit_tests
-    COMMAND xgl_tests --gtest_filter=-*Property*
+    COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -L unit
+        --no-tests=error --output-on-failure
     DEPENDS xgl_tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running unit tests..."
@@ -167,7 +160,8 @@ add_custom_target(run_unit_tests
 
 # Run architecture improvement tests only
 add_custom_target(run_architecture_tests
-    COMMAND xgl_tests --gtest_filter=*LayeredStats*:*TimeProvider*
+    COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -R XglLayeredStatsTest
+        --no-tests=error --output-on-failure
     DEPENDS xgl_tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running architecture improvement tests..."
@@ -193,7 +187,7 @@ if(XGL_BUILD_BENCHMARKS)
         benchmark/bench_throughput.cpp
         mocks/mock_phy.cpp
     )
-    target_link_libraries(bench_throughput PRIVATE xgl GTest::gmock)
+    target_link_libraries(bench_throughput PRIVATE xgl xgm::libc_allocator GTest::gmock)
     target_include_directories(bench_throughput
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -205,7 +199,7 @@ if(XGL_BUILD_BENCHMARKS)
         benchmark/bench_latency.cpp
         mocks/mock_phy.cpp
     )
-    target_link_libraries(bench_latency PRIVATE xgl GTest::gmock)
+    target_link_libraries(bench_latency PRIVATE xgl xgm::libc_allocator GTest::gmock)
     target_include_directories(bench_latency
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -217,7 +211,7 @@ if(XGL_BUILD_BENCHMARKS)
         benchmark/bench_memory.cpp
         mocks/mock_phy.cpp
     )
-    target_link_libraries(bench_memory PRIVATE xgl GTest::gmock)
+    target_link_libraries(bench_memory PRIVATE xgl xgm::libc_allocator GTest::gmock)
     target_include_directories(bench_memory
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}

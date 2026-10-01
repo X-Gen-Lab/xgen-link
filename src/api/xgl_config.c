@@ -4,26 +4,26 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/xgl.h>
 #include <xgl/internal/xgl_network.h>
+#include <xgl/xgl.h>
+
 #include <string.h>
+#include <xgen/memory/allocator.h>
 
 /*---------------------------------------------------------------------------*/
 /* Configuration Limits                                                      */
 /*---------------------------------------------------------------------------*/
 
-#define XGL_MIN_TX_POOL_SIZE        512     /**< Minimum TX pool size */
-#define XGL_MAX_TX_POOL_SIZE        65536   /**< Maximum TX pool size */
-#define XGL_MIN_RX_BUFFER_SIZE      64      /**< Minimum RX buffer size */
-#define XGL_MAX_RX_BUFFER_SIZE      4096    /**< Maximum RX buffer size */
-#define XGL_MIN_ACK_TIMEOUT_MS      100     /**< Minimum ACK timeout */
-#define XGL_MAX_ACK_TIMEOUT_MS      10000   /**< Maximum ACK timeout */
-#define XGL_MIN_RETRY_COUNT         1       /**< Minimum retry count */
-#define XGL_MAX_RETRY_COUNT         10      /**< Maximum retry count */
-#define XGL_MIN_WINDOW_SIZE         1       /**< Minimum window size */
-#define XGL_MAX_WINDOW_SIZE         32      /**< Maximum window size */
-#define XGL_MIN_FRAME_SIZE          64      /**< Minimum frame size */
-#define XGL_MAX_FRAME_SIZE          2048    /**< Maximum frame size */
+#define XGL_MIN_RX_BUFFER_SIZE 64    /**< Minimum RX buffer size */
+#define XGL_MAX_RX_BUFFER_SIZE 4096  /**< Maximum RX buffer size */
+#define XGL_MIN_ACK_TIMEOUT_MS 100   /**< Minimum ACK timeout */
+#define XGL_MAX_ACK_TIMEOUT_MS 10000 /**< Maximum ACK timeout */
+#define XGL_MIN_RETRY_COUNT    1     /**< Minimum retry count */
+#define XGL_MAX_RETRY_COUNT    10    /**< Maximum retry count */
+#define XGL_MIN_WINDOW_SIZE    1     /**< Minimum window size */
+#define XGL_MAX_WINDOW_SIZE    32    /**< Maximum window size */
+#define XGL_MIN_FRAME_SIZE     64    /**< Minimum frame size */
+#define XGL_MAX_FRAME_SIZE     2048  /**< Maximum frame size */
 
 /*---------------------------------------------------------------------------*/
 /* Configuration API                                                         */
@@ -32,7 +32,8 @@
 /**
  * \brief           Get default configuration
  * \details         Fills configuration structure with sensible defaults
- *                  Uses medium preset as default (suitable for most applications)
+ *                  Uses medium preset as default (suitable for most
+ * applications)
  */
 void xgl_config_get_default(xgl_config_t* config) {
     /* Validate parameter */
@@ -40,11 +41,34 @@ void xgl_config_get_default(xgl_config_t* config) {
         return;
     }
 
-    /* Use medium preset as default */
+    /* Select defaults that are supported by the compiled profile. */
+#if !XGL_FEATURE_FRAGMENTATION
+    xgl_config_get_preset_boot(config);
+    return;
+#else
     xgl_config_t default_config = XGL_CONFIG_PRESET_MEDIUM;
 
     /* Copy to output */
     memcpy(config, &default_config, sizeof(xgl_config_t));
+#endif
+}
+
+/**
+ * \brief           Configure the bounded single-peer boot transport
+ * \param[out]      config: Destination configuration, or NULL
+ */
+void xgl_config_get_preset_boot(xgl_config_t* config) {
+    if (config == NULL) {
+        return;
+    }
+    xgl_config_t preset = XGL_CONFIG_PRESET_TINY;
+    preset.name = "boot";
+    preset.protocol.window_size = 1U;
+    preset.features.max_peers = 1U;
+    preset.features.max_tx_packets = 1U;
+    preset.features.max_rx_buffered_packets = 0U;
+    preset.memory.rx_buffer_size = 128U;
+    memcpy(config, &preset, sizeof(*config));
 }
 
 /**
@@ -93,7 +117,8 @@ void xgl_config_get_preset_medium(xgl_config_t* config) {
 /**
  * \brief           Get large configuration preset
  * \details         Optimized for 256KB+ RAM, 512KB+ Flash
- *                  Encryption is reserved and not implemented in the current release.
+ *                  Encryption is reserved and not implemented in the current
+ * release.
  */
 void xgl_config_get_preset_large(xgl_config_t* config) {
     if (config == NULL) {
@@ -124,7 +149,8 @@ void xgl_config_get_preset_production(xgl_config_t* config) {
 /**
  * \brief           Validate configuration parameters
  * \details         Checks all configuration parameters for validity
- *                  Returns specific error codes for different validation failures
+ *                  Returns specific error codes for different validation
+ * failures
  */
 xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     /* Check for NULL pointer */
@@ -137,13 +163,29 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (config->memory.tx_pool_size < XGL_MIN_TX_POOL_SIZE ||
-        config->memory.tx_pool_size > XGL_MAX_TX_POOL_SIZE) {
+    if (config->memory.rx_buffer_size < XGL_MIN_RX_BUFFER_SIZE ||
+        config->memory.rx_buffer_size > XGL_MAX_RX_BUFFER_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (config->memory.rx_buffer_size < XGL_MIN_RX_BUFFER_SIZE ||
-        config->memory.rx_buffer_size > XGL_MAX_RX_BUFFER_SIZE) {
+    if (config->features.max_peers == 0U ||
+        config->features.max_tx_packets == 0U ||
+        config->features.peer_idle_timeout_ms >= UINT32_C(0x80000000)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#if XGL_FEATURE_OUT_OF_ORDER
+    if (config->protocol.window_size > 1U &&
+        config->features.max_rx_buffered_packets == 0U) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#endif
+    if (config->features.enable_fragmentation &&
+        (config->features.max_message_size == 0U ||
+         config->features.max_reassembly_slots == 0U ||
+         config->features.max_reassembly_bytes == 0U ||
+         config->features.max_tx_message_bytes == 0U ||
+         config->features.max_message_size >
+             config->features.max_reassembly_bytes)) {
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -169,21 +211,34 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
 
     /* Validate frame size is larger than header */
-    if (config->protocol.max_frame_size < XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
+    if (config->protocol.max_frame_size <
+        XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (config->features.enable_compression || config->features.enable_encryption) {
+    if (config->features.enable_compression ||
+        config->features.enable_encryption) {
         return XGL_ERR_INVALID_PARAM;
     }
+
+#if !XGL_FEATURE_AUTH
+    if (config->auth_required) {
+        return XGL_ERR_UNSUPPORTED;
+    }
+#endif
+#if !XGL_FEATURE_FRAGMENTATION
+    if (config->features.enable_fragmentation) {
+        return XGL_ERR_UNSUPPORTED;
+    }
+#endif
+#if !XGL_FEATURE_OUT_OF_ORDER
+    if (config->protocol.window_size != 1U ||
+        config->features.max_peers != 1U || config->route_table_len > 1U) {
+        return XGL_ERR_UNSUPPORTED;
+    }
+#endif
 
     if (config->auth_required) {
-        if (config->memory.allocator == NULL ||
-            config->memory.allocator->malloc == NULL ||
-            config->memory.allocator->free == NULL) {
-            return XGL_ERR_INVALID_PARAM;
-        }
-
         if (config->auth_provider == NULL ||
             config->auth_provider->sign == NULL ||
             config->auth_provider->verify == NULL) {
@@ -196,12 +251,6 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
         }
     }
 
-#ifndef XGL_THREAD_SAFE
-    if (config->features.thread_safe) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#endif
-
     /* Validate RX buffer is large enough for the configured full frame.
      * max_frame_size includes header, payload, and CRC16.
      */
@@ -211,7 +260,8 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
 
     /* Validate routing configuration */
-    if (config->route_table_len > 0 && config->route_table == NULL) {
+    if (config->route_table_len > UINT16_MAX ||
+        (config->route_table_len > 0 && config->route_table == NULL)) {
         return XGL_ERR_INVALID_PARAM;
     }
 

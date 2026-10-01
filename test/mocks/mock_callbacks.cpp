@@ -20,10 +20,9 @@ xgl_error_callback_t MockCallbacks::get_error_callback() {
 }
 
 void MockCallbacks::rx_callback_wrapper(xgl_handle_t handle, uint16_t source_id,
-                                       uint8_t data_type,
-                                       const uint8_t* data, size_t len,
-                                       void* user_data) {
-    (void)user_data;  /* Unused parameter */
+                                        uint8_t data_type, const uint8_t* data,
+                                        size_t len, void* user_data) {
+    (void)user_data; /* Unused parameter */
 
     if (current_instance_ == nullptr) {
         return;
@@ -37,13 +36,15 @@ void MockCallbacks::rx_callback_wrapper(xgl_handle_t handle, uint16_t source_id,
     current_instance_->rx_records_.push_back(record);
 
     /* Call mock implementation */
-    current_instance_->rx_callback_impl(handle, source_id,
-                                       data_type, data, len);
+    current_instance_->rx_callback_impl(handle, source_id, data_type, data,
+                                        len);
 }
 
-void MockCallbacks::error_callback_wrapper(xgl_handle_t handle, xgl_error_t error,
-                                          const char* message, void* user_data) {
-    (void)user_data;  /* Unused parameter */
+void MockCallbacks::error_callback_wrapper(xgl_handle_t handle,
+                                           xgl_error_t error,
+                                           const char* message,
+                                           void* user_data) {
+    (void)user_data; /* Unused parameter */
 
     if (current_instance_ == nullptr) {
         return;

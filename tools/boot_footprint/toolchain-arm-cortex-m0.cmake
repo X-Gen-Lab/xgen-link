@@ -1,0 +1,13 @@
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR cortex-m0)
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+find_program(CMAKE_C_COMPILER arm-none-eabi-gcc REQUIRED)
+find_program(CMAKE_ASM_COMPILER arm-none-eabi-gcc REQUIRED)
+set(CMAKE_C_FLAGS_INIT
+    "-mcpu=cortex-m0 -mthumb -ffunction-sections -fdata-sections -fstack-usage -fno-unwind-tables -fno-asynchronous-unwind-tables")
+set(CMAKE_ASM_FLAGS_INIT "-mcpu=cortex-m0 -mthumb")
+set(CMAKE_EXE_LINKER_FLAGS_INIT "-mcpu=cortex-m0 -mthumb")
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)

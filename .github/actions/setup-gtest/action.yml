@@ -1,0 +1,21 @@
+name: Prepare GoogleTest
+description: Explicitly build the fixed host test dependency before configuring xgen-link
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        source_dir="$RUNNER_TEMP/xgen-googletest"
+        build_dir="$RUNNER_TEMP/xgen-googletest-build"
+        install_dir="$RUNNER_TEMP/xgen-googletest-install"
+        git init "$source_dir"
+        git -C "$source_dir" remote add origin https://github.com/google/googletest.git
+        git -C "$source_dir" fetch --depth 1 origin ff6133ab49b364a883a55ba75c39e520fea6245b
+        git -C "$source_dir" checkout --detach FETCH_HEAD
+        cmake -S "$source_dir" -B "$build_dir" -G Ninja \
+          -DCMAKE_BUILD_TYPE=Debug -DBUILD_GMOCK=ON -DINSTALL_GTEST=ON \
+          -Dgtest_force_shared_crt=ON -DCMAKE_INSTALL_PREFIX="$install_dir"
+        cmake --build "$build_dir" --parallel 2
+        cmake --install "$build_dir"
+        echo "GTest_ROOT=$install_dir" >> "$GITHUB_ENV"

@@ -5,24 +5,26 @@
  * \note            Validates: Requirements 19.2
  */
 
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
+#include "test_host_allocator.h"
+
 #include <xgl/xgl.h>
-#include <xgl/internal/xgl_codec.h>
-#include <mock_phy.h>
-#include <mock_callbacks.h>
-#include <vector>
-#include <thread>
+
 #include <chrono>
 #include <cstring>
 #include <deque>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <mock_callbacks.h>
+#include <mock_phy.h>
 #include <mutex>
+#include <thread>
+#include <vector>
 
 using ::testing::_;
-using ::testing::Return;
-using ::testing::Invoke;
 using ::testing::AtLeast;
+using ::testing::Invoke;
 using ::testing::NiceMock;
+using ::testing::Return;
 
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */
@@ -32,7 +34,7 @@ using ::testing::NiceMock;
  * \brief           Integration test fixture
  */
 class XglIntegrationTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         /* Setup default configuration */
         xgl_config_get_default(&config1_);
@@ -62,6 +64,8 @@ protected:
         }
     }
 
+    uint32_t now_ms_ = 0U;
+    const xgl_work_budget_t budget_ = {1024U, 1000U};
     xgl_config_t config1_;
     xgl_config_t config2_;
     xgl_route_item_t route1_;
@@ -80,6 +84,7 @@ protected:
  */
 TEST_F(XglIntegrationTest, BasicInstanceLifecycle) {
     /* Create instance */
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
 
@@ -107,11 +112,13 @@ TEST_F(XglIntegrationTest, BasicInstanceLifecycle) {
  */
 TEST_F(XglIntegrationTest, MultipleIndependentInstances) {
     /* Create first instance */
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
     /* Create second instance */
+    xgl_test_use_host_allocator(&config2_);
     handle2_ = xgl_create(&config2_);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
@@ -145,7 +152,7 @@ TEST_F(XglIntegrationTest, ConfigurationValidation) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 
     /* Test invalid configuration - zero pool size */
-    config.memory.tx_pool_size = 0;
+    config.features.max_tx_packets = 0;
     EXPECT_NE(xgl_config_validate(&config), XGL_OK);
 
     /* Test invalid configuration - zero window size */
@@ -166,7 +173,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     xgl_config_get_preset_tiny(&config);
     config.source_id = 1;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.memory.tx_pool_size, 1024);
+    EXPECT_EQ(config.features.max_tx_packets, 2U);
     EXPECT_EQ(config.protocol.max_frame_size, 128);
     EXPECT_FALSE(config.features.enable_fragmentation);
 
@@ -174,7 +181,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     xgl_config_get_preset_small(&config);
     config.source_id = 1;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.memory.tx_pool_size, 2048);
+    EXPECT_EQ(config.features.max_tx_packets, 4U);
     EXPECT_EQ(config.protocol.max_frame_size, 256);
     EXPECT_TRUE(config.features.enable_fragmentation);
 
@@ -182,7 +189,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     xgl_config_get_preset_medium(&config);
     config.source_id = 1;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.memory.tx_pool_size, 4096);
+    EXPECT_EQ(config.features.max_tx_packets, 16U);
     EXPECT_EQ(config.protocol.max_frame_size, 512);
     EXPECT_FALSE(config.features.enable_compression);
 
@@ -190,7 +197,7 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     xgl_config_get_preset_large(&config);
     config.source_id = 1;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.memory.tx_pool_size, 8192);
+    EXPECT_EQ(config.features.max_tx_packets, 64U);
     EXPECT_EQ(config.protocol.max_frame_size, 1024);
     EXPECT_FALSE(config.features.enable_encryption);
 }
@@ -200,18 +207,19 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Test xgl_run function
+ * \brief           Test xgl_step function
  * \note            Validates: Requirements 19.2
  */
 TEST_F(XglIntegrationTest, RuntimeProcessing) {
     /* Create and initialize instance */
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
-    /* Call xgl_run multiple times - should not crash */
+    /* Call xgl_step multiple times - should not crash */
     for (int i = 0; i < 10; ++i) {
-        xgl_run(handle1_, 100);
+        xgl_step(handle1_, now_ms_ += 10U, &budget_);
     }
 
     /* Verify instance is still valid */
@@ -225,18 +233,20 @@ TEST_F(XglIntegrationTest, RuntimeProcessing) {
  */
 TEST_F(XglIntegrationTest, MultiInstanceRuntimeProcessing) {
     /* Create two instances */
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
+    xgl_test_use_host_allocator(&config2_);
     handle2_ = xgl_create(&config2_);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     /* Process both instances */
     for (int i = 0; i < 10; ++i) {
-        xgl_run(handle1_, 100);
-        xgl_run(handle2_, 100);
+        xgl_step(handle1_, now_ms_ += 10U, &budget_);
+        xgl_step(handle2_, now_ms_ += 10U, &budget_);
     }
 
     /* Verify both instances are still valid */
@@ -260,11 +270,11 @@ TEST_F(XglIntegrationTest, NullHandleErrorHandling) {
     EXPECT_NE(xgl_stats_get(nullptr, &stats), XGL_OK);
     EXPECT_NE(xgl_stats_reset(nullptr), XGL_OK);
 
-    /* xgl_run should handle null gracefully */
-    xgl_run(nullptr, 100);  /* Should not crash */
+    /* xgl_step should handle null gracefully */
+    xgl_step(nullptr, now_ms_ += 10U, &budget_); /* Should not crash */
 
     /* xgl_destroy should handle null gracefully */
-    xgl_destroy(nullptr);  /* Should not crash */
+    xgl_destroy(nullptr); /* Should not crash */
 }
 
 /**
@@ -273,6 +283,7 @@ TEST_F(XglIntegrationTest, NullHandleErrorHandling) {
  */
 TEST_F(XglIntegrationTest, InitializationErrors) {
     /* Test double initialization */
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
@@ -286,21 +297,14 @@ TEST_F(XglIntegrationTest, InitializationErrors) {
  * \note            Validates: Requirements 19.2, 2.2
  */
 TEST_F(XglIntegrationTest, MemoryAllocationFailure) {
-    /* Create instance with very large pool size */
     xgl_config_t config;
     xgl_config_get_default(&config);
-    config.source_id = 1;
-    config.memory.tx_pool_size = 1024 * 1024 * 1024;  /* 1GB - likely to fail */
-
-    xgl_handle_t handle = xgl_create(&config);
-    if (handle != nullptr) {
-        /* If creation succeeded, initialization might fail */
-        xgl_error_t err = xgl_init(handle);
-        /* Either init fails or succeeds, both are acceptable */
-        (void)err;
-        xgl_destroy(handle);
-    }
-    /* Test passes if we don't crash */
+    config.features.max_tx_packets = SIZE_MAX;
+    xgl_memory_requirements_t requirements{};
+    EXPECT_EQ(xgl_memory_requirements(&config, &requirements),
+              XGL_ERR_INVALID_PARAM);
+    xgl_test_use_host_allocator(&config);
+    EXPECT_EQ(xgl_create(&config), nullptr);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -320,7 +324,7 @@ TEST_F(XglIntegrationTest, VersionInformation) {
     /* Test version integer */
     uint32_t version_int = xgl_version_int();
     EXPECT_EQ(version_int, XGL_VERSION_INT);
-    EXPECT_EQ(version_int, 20000);  /* 2.0.0 */
+    EXPECT_EQ(version_int, 30000); /* SDK 3; wire version is independent. */
 }
 
 /*---------------------------------------------------------------------------*/
@@ -335,6 +339,7 @@ TEST_F(XglIntegrationTest, RapidInstanceLifecycle) {
     const int iterations = 100;
 
     for (int i = 0; i < iterations; ++i) {
+        xgl_test_use_host_allocator(&config1_);
         xgl_handle_t handle = xgl_create(&config1_);
         ASSERT_NE(handle, nullptr);
         ASSERT_EQ(xgl_init(handle), XGL_OK);
@@ -349,6 +354,7 @@ TEST_F(XglIntegrationTest, RapidInstanceLifecycle) {
  * \note            Validates: Requirements 19.2, 11.1, 11.2, 11.3
  */
 TEST_F(XglIntegrationTest, StatisticsUnderLoad) {
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
@@ -381,18 +387,15 @@ struct E2eRxTracker {
     std::vector<E2eRxRecord> records;
 };
 
-static void e2e_rx_callback(xgl_handle_t handle,
-                             uint16_t source_id,
-                             uint8_t data_type,
-                             const uint8_t* data,
-                             size_t len,
-                             void* user_data) {
+static void e2e_rx_callback(xgl_handle_t handle, uint16_t source_id,
+                            uint8_t data_type, const uint8_t* data, size_t len,
+                            void* user_data) {
     (void)handle;
     auto* tracker = static_cast<E2eRxTracker*>(user_data);
     if (tracker != nullptr && data != nullptr && len > 0) {
         std::lock_guard<std::mutex> lock(tracker->mu);
-        tracker->records.push_back({source_id, data_type,
-                                    std::vector<uint8_t>(data, data + len)});
+        tracker->records.push_back(
+            {source_id, data_type, std::vector<uint8_t>(data, data + len)});
     }
 }
 
@@ -409,20 +412,18 @@ TEST_F(XglIntegrationTest, UnreliableSingleHop) {
     xgl_phy_ops_t phy_b = loopback.get_phy_b();
 
     /* Configure routes */
-    xgl_route_item_t route_a = {
-        .target_id = 2,
-        .phy = &phy_a,
-        .max_frame_size = 256,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
-    xgl_route_item_t route_b = {
-        .target_id = 1,
-        .phy = &phy_b,
-        .max_frame_size = 256,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
+    xgl_route_item_t route_a = {};
+    route_a.target_id = 2;
+    route_a.phy = &phy_a;
+    route_a.max_frame_size = 256;
+    route_a.read_freq_hz = 100;
+    route_a.metric = 1;
+    xgl_route_item_t route_b = {};
+    route_b.target_id = 1;
+    route_b.phy = &phy_b;
+    route_b.max_frame_size = 256;
+    route_b.read_freq_hz = 100;
+    route_b.metric = 1;
 
     config1_.route_table = &route_a;
     config1_.route_table_len = 1;
@@ -434,30 +435,31 @@ TEST_F(XglIntegrationTest, UnreliableSingleHop) {
     config2_.callback_user_data = &rx_tracker_b;
 
     /* Create and init both instances */
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
+    xgl_test_use_host_allocator(&config2_);
     handle2_ = xgl_create(&config2_);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     /* A sends unreliable data to B */
     const uint8_t payload[] = {'H', 'e', 'l', 'l', 'o'};
-    xgl_tx_data_t tx_data = {
-        .target_id = 2,
-        .data_type = 1,
-        .data = payload,
-        .data_len = sizeof(payload),
-        .reliable = false,
-        .priority = 0,
-        .timeout_ms = 0
-    };
-    ASSERT_EQ(xgl_send(handle1_, &tx_data), XGL_OK);
+    xgl_tx_data_t tx_data = {};
+    tx_data.target_id = 2;
+    tx_data.data_type = 1;
+    tx_data.data = payload;
+    tx_data.data_len = sizeof(payload);
+    tx_data.reliable = false;
+    tx_data.priority = 0;
+    tx_data.timeout_ms = 0;
+    ASSERT_EQ(xgl_send_at(handle1_, &tx_data, now_ms_), XGL_OK);
 
     /* Run A to flush TX, then run B to receive */
-    xgl_run(handle1_, 100);
-    xgl_run(handle2_, 100);
+    xgl_step(handle1_, now_ms_ += 10U, &budget_);
+    xgl_step(handle2_, now_ms_ += 10U, &budget_);
 
     /* Verify B received the data */
     ASSERT_EQ(rx_tracker_b.records.size(), 1U);
@@ -469,27 +471,26 @@ TEST_F(XglIntegrationTest, UnreliableSingleHop) {
 
 /**
  * \brief           End-to-end reliable send with ACK
- * \details         A sends reliable -> B receives -> ACK flows back -> A's queue drains
+ * \details         A sends reliable -> B receives -> ACK flows back -> A's
+ * queue drains
  */
 TEST_F(XglIntegrationTest, ReliableWithAck) {
     LoopbackPhyPair loopback;
     xgl_phy_ops_t phy_a = loopback.get_phy_a();
     xgl_phy_ops_t phy_b = loopback.get_phy_b();
 
-    xgl_route_item_t route_a = {
-        .target_id = 2,
-        .phy = &phy_a,
-        .max_frame_size = 256,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
-    xgl_route_item_t route_b = {
-        .target_id = 1,
-        .phy = &phy_b,
-        .max_frame_size = 256,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
+    xgl_route_item_t route_a = {};
+    route_a.target_id = 2;
+    route_a.phy = &phy_a;
+    route_a.max_frame_size = 256;
+    route_a.read_freq_hz = 100;
+    route_a.metric = 1;
+    xgl_route_item_t route_b = {};
+    route_b.target_id = 1;
+    route_b.phy = &phy_b;
+    route_b.max_frame_size = 256;
+    route_b.read_freq_hz = 100;
+    route_b.metric = 1;
 
     config1_.route_table = &route_a;
     config1_.route_table_len = 1;
@@ -500,31 +501,32 @@ TEST_F(XglIntegrationTest, ReliableWithAck) {
     config2_.rx_callback = e2e_rx_callback;
     config2_.callback_user_data = &rx_tracker_b;
 
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
+    xgl_test_use_host_allocator(&config2_);
     handle2_ = xgl_create(&config2_);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     /* A sends reliable data to B */
     const uint8_t payload[] = {'R', 'E', 'L'};
-    xgl_tx_data_t tx_data = {
-        .target_id = 2,
-        .data_type = 1,
-        .data = payload,
-        .data_len = sizeof(payload),
-        .reliable = true,
-        .priority = 0,
-        .timeout_ms = 500
-    };
-    ASSERT_EQ(xgl_send(handle1_, &tx_data), XGL_OK);
+    xgl_tx_data_t tx_data = {};
+    tx_data.target_id = 2;
+    tx_data.data_type = 1;
+    tx_data.data = payload;
+    tx_data.data_len = sizeof(payload);
+    tx_data.reliable = true;
+    tx_data.priority = 0;
+    tx_data.timeout_ms = 500;
+    ASSERT_EQ(xgl_send_at(handle1_, &tx_data, now_ms_), XGL_OK);
 
     /* Run multiple cycles to deliver data and ACK */
     for (int i = 0; i < 5; ++i) {
-        xgl_run(handle1_, 100);
-        xgl_run(handle2_, 100);
+        xgl_step(handle1_, now_ms_ += 10U, &budget_);
+        xgl_step(handle2_, now_ms_ += 10U, &budget_);
     }
 
     /* Verify B received the data */
@@ -541,7 +543,8 @@ TEST_F(XglIntegrationTest, ReliableWithAck) {
 
 /**
  * \brief           End-to-end fragmented message test
- * \details         A sends oversized payload -> B reassembles -> rx_callback gets complete data
+ * \details         A sends oversized payload -> B reassembles -> rx_callback
+ * gets complete data
  */
 TEST_F(XglIntegrationTest, FragmentedMessage) {
     LoopbackPhyPair loopback;
@@ -554,20 +557,18 @@ TEST_F(XglIntegrationTest, FragmentedMessage) {
     config2_.features.enable_fragmentation = true;
     config2_.protocol.max_frame_size = 64;
 
-    xgl_route_item_t route_a = {
-        .target_id = 2,
-        .phy = &phy_a,
-        .max_frame_size = 64,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
-    xgl_route_item_t route_b = {
-        .target_id = 1,
-        .phy = &phy_b,
-        .max_frame_size = 64,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
+    xgl_route_item_t route_a = {};
+    route_a.target_id = 2;
+    route_a.phy = &phy_a;
+    route_a.max_frame_size = 64;
+    route_a.read_freq_hz = 100;
+    route_a.metric = 1;
+    xgl_route_item_t route_b = {};
+    route_b.target_id = 1;
+    route_b.phy = &phy_b;
+    route_b.max_frame_size = 64;
+    route_b.read_freq_hz = 100;
+    route_b.metric = 1;
 
     config1_.route_table = &route_a;
     config1_.route_table_len = 1;
@@ -578,10 +579,12 @@ TEST_F(XglIntegrationTest, FragmentedMessage) {
     config2_.rx_callback = e2e_rx_callback;
     config2_.callback_user_data = &rx_tracker_b;
 
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
+    xgl_test_use_host_allocator(&config2_);
     handle2_ = xgl_create(&config2_);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
@@ -592,21 +595,20 @@ TEST_F(XglIntegrationTest, FragmentedMessage) {
         payload[i] = static_cast<uint8_t>(i & 0xFF);
     }
 
-    xgl_tx_data_t tx_data = {
-        .target_id = 2,
-        .data_type = 0,
-        .data = payload.data(),
-        .data_len = payload.size(),
-        .reliable = false,
-        .priority = 0,
-        .timeout_ms = 0
-    };
-    ASSERT_EQ(xgl_send(handle1_, &tx_data), XGL_OK);
+    xgl_tx_data_t tx_data = {};
+    tx_data.target_id = 2;
+    tx_data.data_type = 0;
+    tx_data.data = payload.data();
+    tx_data.data_len = payload.size();
+    tx_data.reliable = false;
+    tx_data.priority = 0;
+    tx_data.timeout_ms = 0;
+    ASSERT_EQ(xgl_send_at(handle1_, &tx_data, now_ms_), XGL_OK);
 
     /* Run multiple cycles to deliver all fragments */
     for (int i = 0; i < 20; ++i) {
-        xgl_run(handle1_, 100);
-        xgl_run(handle2_, 100);
+        xgl_step(handle1_, now_ms_ += 10U, &budget_);
+        xgl_step(handle2_, now_ms_ += 10U, &budget_);
     }
 
     /* Verify B received the complete reassembled data */
@@ -629,40 +631,32 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
     xgl_phy_ops_t phy_c = link_bc.get_phy_b();
 
     /* A has route to C via phy_a (which goes to B) */
-    xgl_route_item_t route_a = {
-        .target_id = 3,
-        .phy = &phy_a,
-        .max_frame_size = 256,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
+    xgl_route_item_t route_a = {};
+    route_a.target_id = 3;
+    route_a.phy = &phy_a;
+    route_a.max_frame_size = 256;
+    route_a.read_freq_hz = 100;
+    route_a.metric = 1;
 
     /* B has routes: from A (rx) and to C (tx) */
-    xgl_route_item_t routes_b[] = {
-        {
-            .target_id = 1,
-            .phy = &phy_b_from_a,
-            .max_frame_size = 256,
-            .read_freq_hz = 100,
-            .metric = 1
-        },
-        {
-            .target_id = 3,
-            .phy = &phy_b_to_c,
-            .max_frame_size = 256,
-            .read_freq_hz = 100,
-            .metric = 1
-        }
-    };
+    xgl_route_item_t routes_b[] = {{/* target_id */ 1,
+                                    /* phy */ &phy_b_from_a,
+                                    /* max_frame_size */ 256,
+                                    /* read_freq_hz */ 100,
+                                    /* metric */ 1},
+                                   {/* target_id */ 3,
+                                    /* phy */ &phy_b_to_c,
+                                    /* max_frame_size */ 256,
+                                    /* read_freq_hz */ 100,
+                                    /* metric */ 1}};
 
     /* C has route to B */
-    xgl_route_item_t route_c = {
-        .target_id = 2,
-        .phy = &phy_c,
-        .max_frame_size = 256,
-        .read_freq_hz = 100,
-        .metric = 1
-    };
+    xgl_route_item_t route_c = {};
+    route_c.target_id = 2;
+    route_c.phy = &phy_c;
+    route_c.max_frame_size = 256;
+    route_c.read_freq_hz = 100;
+    route_c.metric = 1;
 
     config1_.source_id = 1;
     config1_.route_table = &route_a;
@@ -692,36 +686,38 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
     config_c.rx_callback = e2e_rx_callback;
     config_c.callback_user_data = &rx_tracker_c;
 
+    xgl_test_use_host_allocator(&config1_);
     handle1_ = xgl_create(&config1_);
     ASSERT_NE(handle1_, nullptr);
     ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
+    xgl_test_use_host_allocator(&config_b);
     handle2_ = xgl_create(&config_b);
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
+    xgl_test_use_host_allocator(&config_c);
     xgl_handle_t handle3 = xgl_create(&config_c);
     ASSERT_NE(handle3, nullptr);
     ASSERT_EQ(xgl_init(handle3), XGL_OK);
 
     /* A sends unreliable data to C (target_id=3) */
     const uint8_t payload[] = {'M', 'H', 'o', 'p'};
-    xgl_tx_data_t tx_data = {
-        .target_id = 3,
-        .data_type = 1,
-        .data = payload,
-        .data_len = sizeof(payload),
-        .reliable = false,
-        .priority = 0,
-        .timeout_ms = 0
-    };
-    ASSERT_EQ(xgl_send(handle1_, &tx_data), XGL_OK);
+    xgl_tx_data_t tx_data = {};
+    tx_data.target_id = 3;
+    tx_data.data_type = 1;
+    tx_data.data = payload;
+    tx_data.data_len = sizeof(payload);
+    tx_data.reliable = false;
+    tx_data.priority = 0;
+    tx_data.timeout_ms = 0;
+    ASSERT_EQ(xgl_send_at(handle1_, &tx_data, now_ms_), XGL_OK);
 
     /* Run multiple cycles: A -> B -> C */
     for (int i = 0; i < 10; ++i) {
-        xgl_run(handle1_, 100);
-        xgl_run(handle2_, 100);
-        xgl_run(handle3, 100);
+        xgl_step(handle1_, now_ms_ += 10U, &budget_);
+        xgl_step(handle2_, now_ms_ += 10U, &budget_);
+        xgl_step(handle3, now_ms_ += 10U, &budget_);
     }
 
     /* Verify C received the data (forwarded through B) */
@@ -732,139 +728,46 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
     xgl_destroy(handle3);
 }
 
-/*---------------------------------------------------------------------------*/
-/* Codec Wiring Tests                                                        */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Simple XOR codec for testing codec wiring
- * \details         XORs each byte with 0x42 on encode and again on decode
- *                  (symmetric operation, demonstrates encode/decode roundtrip)
- */
-static xgl_error_t xor_encode(const uint8_t* input, size_t input_len,
-                              uint8_t* output, size_t* output_len,
-                              void* user_data) {
-    (void)user_data;
-    if (*output_len < input_len) {
-        return XGL_ERR_NO_MEMORY;
+TEST(XglPhyStreamTest, LoopbackPreservesPartialReadsInBothDirections) {
+    LoopbackPhyPair pair;
+    auto a = pair.get_phy_a();
+    auto b = pair.get_phy_b();
+    std::vector<uint8_t> bytes(301);
+    for (size_t i = 0; i < bytes.size(); ++i) {
+        bytes[i] = static_cast<uint8_t>(i);
     }
-    for (size_t i = 0; i < input_len; i++) {
-        output[i] = input[i] ^ 0x42;
+    for (bool reverse : {false, true}) {
+        auto& tx = reverse ? b : a;
+        auto& rx = reverse ? a : b;
+        ASSERT_EQ(tx.tx(bytes.data(), bytes.size(), tx.user_data), XGL_OK);
+        std::vector<uint8_t> received;
+        for (;;) {
+            uint8_t chunk[64];
+            size_t length = sizeof(chunk);
+            ASSERT_EQ(rx.rx(chunk, &length, rx.user_data), XGL_OK);
+            if (length == 0) {
+                break;
+            }
+            received.insert(received.end(), chunk, chunk + length);
+        }
+        EXPECT_EQ(received, bytes);
     }
-    *output_len = input_len;
-    return XGL_OK;
 }
 
-static xgl_error_t xor_decode(const uint8_t* input, size_t input_len,
-                              uint8_t* output, size_t* output_len,
-                              void* user_data) {
-    /* XOR is symmetric: decode == encode */
-    return xor_encode(input, input_len, output, output_len, user_data);
-}
-
-class RxCodecTracker {
-public:
-    struct RxRecord {
-        uint16_t source_id;
-        uint8_t data_type;
-        std::vector<uint8_t> data;
-    };
-
-    std::vector<RxRecord> records;
-
-    static void callback(xgl_handle_t handle, uint16_t source_id,
-                         uint8_t data_type, const uint8_t* data, size_t len,
-                         void* user_data) {
-        (void)handle;
-        auto* tracker = static_cast<RxCodecTracker*>(user_data);
-        tracker->records.push_back({source_id, data_type,
-                                    std::vector<uint8_t>(data, data + len)});
+TEST(XglPhyStreamTest, FifoPreservesPartialReads) {
+    FifoPhy fifo;
+    auto phy = fifo.get_phy_ops();
+    std::vector<uint8_t> bytes(301, 0xAD);
+    fifo.enqueue_rx(bytes.data(), bytes.size());
+    std::vector<uint8_t> received;
+    for (;;) {
+        uint8_t chunk[64];
+        size_t length = sizeof(chunk);
+        ASSERT_EQ(phy.rx(chunk, &length, phy.user_data), XGL_OK);
+        if (length == 0) {
+            break;
+        }
+        received.insert(received.end(), chunk, chunk + length);
     }
-};
-
-/**
- * \brief           Test that codec registry is properly wired into instance
- * \details         Registers an XOR codec, sends compressed data, verifies
- *                  the codec is invoked and data roundtrips correctly.
- */
-TEST_F(XglIntegrationTest, CodecRegistryWiredAndRoundtrip) {
-    /* Create XOR codec */
-    xgl_codec_t xor_codec = {};
-    xor_codec.id = 1;
-    xor_codec.kind = XGL_CODEC_KIND_COMPRESSION;
-    xor_codec.encode = xor_encode;
-    xor_codec.decode = xor_decode;
-    xor_codec.user_data = nullptr;
-
-    /* Setup loopback PHY between A and B */
-    LoopbackPhyPair phy_pair;
-    xgl_phy_ops_t phy_a = phy_pair.get_phy_a();
-    xgl_phy_ops_t phy_b = phy_pair.get_phy_b();
-
-    xgl_route_item_t route_a = {
-        .target_id = 2,
-        .phy = &phy_a,
-        .max_frame_size = 256,
-        .read_freq_hz = 1000,
-        .metric = 1
-    };
-
-    xgl_route_item_t route_b = {
-        .target_id = 1,
-        .phy = &phy_b,
-        .max_frame_size = 256,
-        .read_freq_hz = 1000,
-        .metric = 1
-    };
-
-    RxCodecTracker rx_tracker;
-
-    /* Configure and create instance A with codec */
-    xgl_config_t config_a = config1_;
-    config_a.codecs = &xor_codec;
-    config_a.codecs_len = 1;
-    config_a.route_table = &route_a;
-    config_a.route_table_len = 1;
-
-    xgl_destroy(handle1_);
-    handle1_ = xgl_create(&config_a);
-    ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-
-    /* Configure and create instance B with rx callback */
-    xgl_config_t config_b = config2_;
-    config_b.rx_callback = RxCodecTracker::callback;
-    config_b.callback_user_data = &rx_tracker;
-    config_b.route_table = &route_b;
-    config_b.route_table_len = 1;
-
-    xgl_destroy(handle2_);
-    handle2_ = xgl_create(&config_b);
-    ASSERT_NE(handle2_, nullptr);
-    ASSERT_EQ(xgl_init(handle2_), XGL_OK);
-
-    /* Send data with compression_id = 1 (XOR codec) */
-    const uint8_t payload[] = "Hello, Codec!";
-    xgl_tx_data_t tx_data = {
-        .target_id = 2,
-        .data_type = 0,
-        .data = payload,
-        .data_len = sizeof(payload) - 1,  /* Exclude null terminator */
-        .reliable = false,
-        .priority = 0,
-        .timeout_ms = 0,
-        .connection_id = 0,
-        .session_epoch = 0,
-        .compression_id = 1  /* Request XOR compression */
-    };
-    ASSERT_EQ(xgl_send(handle1_, &tx_data), XGL_OK);
-
-    /* Run multiple cycles to allow data transfer */
-    for (int i = 0; i < 10; ++i) {
-        xgl_run(handle1_, 100);
-        xgl_run(handle2_, 100);
-    }
-
-    /* Verify data was transmitted (PHY activity occurred) */
-    EXPECT_GE(phy_pair.get_a_tx_count(), 1U);
+    EXPECT_EQ(received, bytes);
 }

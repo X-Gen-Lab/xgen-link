@@ -29,15 +29,27 @@ brew install cmake git
 git clone <repository-url>
 cd xgen-link
 
-# Configure with CMake preset
-cmake --preset debug
+# Configure against five explicitly installed foundation packages and GoogleTest
+cmake --preset debug \
+  -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
 
 # Build
 cmake --build build/debug
 
 # Run tests
-ctest --preset test
+ctest --test-dir build/debug --output-on-failure
 ```
+
+The production root consumes compatible parent-provided targets or installed
+packages. It does not select source checkouts or contain foundation submodules.
+For standalone source development, use the [dev harness](dev/README.md) with all
+five explicit `XGL_DEV_*_SOURCE_DIR` paths and `cmake -S dev`; the removed
+`XGL_*_SOURCE_DIR` production variables fail configuration. The fixed inputs in
+`dev/dependencies.json` belong to link development and CI, not product version
+selection. Products provide each package once before adding link, or supply an
+installed SDK through `CMAKE_PREFIX_PATH`. Examples, smoke tests, and release
+helpers default to disabled when link is consumed as a subdirectory.
 
 ### IDE Setup
 
@@ -70,7 +82,7 @@ ctest --preset test
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Make your changes
-4. Ensure tests pass: `ctest --preset test`
+4. Ensure tests pass in the configured directory, for example `ctest --test-dir build/debug --output-on-failure`
 5. Follow code style guidelines
 6. Commit with conventional commits: `feat(transport): add congestion control`
 7. Push and create a Pull Request
@@ -149,14 +161,14 @@ test(network): add routing table tests
 
 ### Testing Requirements
 
-**All contributions must include appropriate tests.** Testing is critical for maintaining protocol reliability.
+Behavior changes use TDD: record a reproducing RED, implement the smallest GREEN, then refactor and rerun relevant regressions. C/C++ host tests use GoogleTest/GoogleMock 1.16.0 and strict C++17. Documentation and formatting do not require artificial RED tests. See [testing and quality](docs/en/contributing/testing.md) for individual discovery, replay seeds and shared gates.
 
 #### When Adding New Features
 
 1. **Unit Tests Required**: Write unit tests for new functionality
 2. **Integration Tests**: Add integration tests for cross-layer features
 3. **Property Tests**: Consider property-based tests for protocol correctness
-4. **Test Coverage**: Maintain or improve overall coverage
+4. **Test Coverage**: Production line, function and branch coverage must each reach 80%
 
 #### When Modifying Existing Code
 
@@ -170,18 +182,25 @@ test(network): add routing table tests
 #### Quick Start
 
 ```bash
-# Configure with tests enabled
-cmake --preset debug
+# Configure with tests enabled and previously prepared dependencies
+cmake --preset debug \
+  -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
 
 # Build
 cmake --build build/debug
 
 # Run all tests
-ctest --preset test
+ctest --test-dir build/debug --output-on-failure
 
 # Or run test executable directly
 ./build/debug/test/xgl_tests
 ```
+
+For a dev harness build, run CTest in its own build directory. Its protocol test
+executable is under `build/dev-<profile>/link/test/`; use the actual configuration
+subdirectory when required by a multi-config generator. Do not reuse a root
+build cache for the dev harness or between toolchains.
 
 #### Running Specific Tests
 
@@ -193,7 +212,7 @@ ctest --preset test
 ./build/debug/test/xgl_tests --gtest_filter="TransportTest.BasicSend"
 
 # Run with verbose output
-./build/debug/test/xgl_tests --gtest_verbose
+ctest --test-dir build/debug --verbose
 ```
 
 ### Writing Tests
@@ -214,51 +233,21 @@ test/
 
 ```cpp
 /**
- * \file            test_transport.cpp
- * \brief           Transport layer unit tests
+ * \file            test_config.cpp
+ * \brief           Public configuration validation contracts
  */
 
 #include <gtest/gtest.h>
+#include <xgl/xgl.h>
 
-extern "C" {
-#include "xgl/xgl.h"
-#include "xgl/internal/xgl_transport.h"
-}
-
-class TransportTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        xgl_config_get_default(&config);
-        handle = xgl_create(&config);
-        ASSERT_NE(nullptr, handle);
-    }
-
-    void TearDown() override {
-        if (handle != nullptr) {
-            xgl_destroy(handle);
-        }
-    }
-
-    xgl_config_t config;
-    xgl_handle_t handle = nullptr;
-};
-
-TEST_F(TransportTest, BasicInitialization) {
-    ASSERT_EQ(XGL_OK, xgl_init(handle));
-}
-
-TEST_F(TransportTest, SendPacket) {
-    uint8_t data[] = {0x01, 0x02, 0x03};
-    xgl_tx_data_t tx_data = {
-        .target_id = 2,
-        .data_type = 0x01,
-        .data = data,
-        .data_len = sizeof(data),
-        .reliable = true
-    };
-    ASSERT_EQ(XGL_OK, xgl_send(handle, &tx_data));
+TEST(Configuration, RejectsMissingConfiguration) {
+    EXPECT_EQ(xgl_config_validate(nullptr), XGL_ERR_NULL_POINTER);
 }
 ```
+
+Use real protocol transitions for stateful behavior and explicit test adapters for
+PHY, time and allocation failures. Keep borrowed objects alive until destruction.
+Examples must compile as C++17 and use the current public API.
 
 ### Test Best Practices
 
@@ -274,7 +263,7 @@ TEST_F(TransportTest, SendPacket) {
 Before submitting a PR, verify:
 
 - [ ] All new code has corresponding tests
-- [ ] All tests pass locally: `ctest --preset test`
+- [ ] All tests pass locally in the selected build directory
 - [ ] Code follows style guidelines (run clang-format)
 - [ ] No compiler warnings
 - [ ] Documentation is updated

@@ -1,48 +1,20 @@
-# XGL Documentation
+# xgen-link SDK 3
 
-XGL is a production-oriented reliable multi-node protocol stack for resource-constrained MCUs. It provides a v2 wire format, multi-PHY routing, reliable delivery, ACK ranges, SACK, authentication, bounded fragment reassembly, and low-power runtime deadlines.
+Portable C11 protocol layers with explicit resource limits. Generic capabilities come from independent xgen-status, xgen-bytes, xgen-crc, xgen-memory, and xgen-containers packages. See [Build and test](getting-started/build-and-test.md) for preparation.
 
-## Current Capabilities
+## Architecture
 
-- 24-byte fixed wire header with explicit offset-based encoding.
-- 16-bit node IDs and 32-bit packet numbers.
-- TLV extensions for session, ACK range, SACK, fragment, security, and route metadata.
-- Connection-scoped peer state keyed by `target_id + connection_id + session_epoch`.
-- Production authentication provider requirements, including authenticated zero-copy behavior.
-- `xgl_next_deadline_ms()` for bare-metal and RTOS sleep scheduling.
+Static and allocator initialization share one workspace layout and state machine. The application supplies time, serializes instance access and implements synchronous PHY callbacks. Wire v3 separates reliable DATA numbering from authentication sequencing.
 
-## Boundaries
+## Start here
 
-- Single-frame payload length is still limited by `uint16_t payload_len`.
-- Large messages use FRAGMENT_EXT.
-- Compression and encryption are reserved codec capabilities and are rejected by the production path until fully wired.
-- Broadcast and multicast address ranges are reserved; the current reliable path is unicast-focused.
+- [Build and test](getting-started/build-and-test.md)
+- [Quick start](getting-started/quick-start.md)
+- [Migration](guide/modular-migration.md)
+- [Public API](reference/public-api.md)
+- [Architecture](protocol/architecture.md)
+- [Validation matrix](reference/validation-matrix.md)
 
-## Recommended Reading
+## Product boundary
 
-### SDK Users
-
-1. [Quick Start](getting-started/quick-start.md)
-2. [Configuration](guide/configuration.md)
-3. [Send API](guide/send-api.md)
-4. [Zero-Copy](guide/zero-copy.md)
-5. [Low-Power Runtime](guide/low-power-runtime.md)
-
-### Protocol Maintainers
-
-1. [Architecture](protocol/architecture.md)
-2. [Implementation Map](protocol/implementation-map.md)
-3. [State Machines](protocol/state-machines.md)
-4. [Wire Format](protocol/wire-format.md)
-5. [TLV Extensions](protocol/extensions.md)
-6. [Reliability](protocol/reliability.md)
-7. [Security](protocol/security.md)
-8. [Validation Matrix](reference/validation-matrix.md)
-
-### MCU Release Owners
-
-1. [Porting](guide/porting.md)
-2. [Resource Model](guide/resource-model.md)
-3. [Production Checklist](guide/production-checklist.md)
-4. [Release Validation](reference/release-validation.md)
-5. [Static Analysis](reference/static-analysis.md)
+Boot excludes authentication, fragmentation, forwarding and out-of-order retention. Embedded/Full provide those bounded capabilities. Compression, payload encryption and asynchronous DMA ownership are not implemented. PHY TX must finish consuming or copying bytes before returning. Board integration and production authentication require application-specific validation.

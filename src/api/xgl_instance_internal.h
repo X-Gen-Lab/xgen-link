@@ -11,18 +11,16 @@
 extern "C" {
 #endif
 
-#include <xgl/xgl.h>
-#include <xgl/internal/xgl_tiered_pool.h>
-#include <xgl/internal/xgl_packet_pool.h>
-#include <xgl/internal/xgl_route.h>
-#include <xgl/internal/xgl_window.h>
-#include <xgl/internal/xgl_rtt.h>
-#include <xgl/internal/xgl_parser.h>
 #include <xgl/internal/xgl_datalink.h>
 #include <xgl/internal/xgl_network.h>
+#include <xgl/internal/xgl_parser.h>
+#include <xgl/internal/xgl_protocol_io.h>
+#include <xgl/internal/xgl_protocol_memory.h>
+#include <xgl/internal/xgl_route.h>
+#include <xgl/internal/xgl_rtt.h>
 #include <xgl/internal/xgl_transport.h>
-#include <xgl/internal/xgl_layer_interface.h>
-#include <xgl/internal/xgl_codec.h>
+#include <xgl/internal/xgl_window.h>
+#include <xgl/xgl.h>
 
 /*---------------------------------------------------------------------------*/
 /* Internal Instance Structure                                               */
@@ -30,10 +28,7 @@ extern "C" {
 
 /**
  * \brief           Unified layer contexts manager
- * \details         Manages all protocol layer contexts and interfaces in one place.
- *                  This structure provides a clean separation between layer contexts
- *                  and their interfaces, following the design pattern from
- *                  LAYER_DECOUPLING_DESIGN.md
+ * \details         Owns layer state and typed synchronous boundaries.
  */
 typedef struct xgl_layer_contexts_s {
     /* Layer contexts - embedded directly */
@@ -42,95 +37,72 @@ typedef struct xgl_layer_contexts_s {
     xgl_transport_ctx_t transport_ctx; /**< Transport layer context */
 
     /* Layer interfaces for decoupled communication */
-    xgl_layer_interface_t datalink_iface;  /**< Datalink interface */
-    xgl_layer_interface_t network_iface;   /**< Network interface */
-    xgl_layer_interface_t transport_iface; /**< Transport interface */
+    xgl_frame_interface_t datalink_iface;
+    xgl_frame_interface_t network_frame_iface;
+    xgl_packet_interface_t network_packet_iface;
+    xgl_packet_interface_t transport_iface;
 } xgl_layer_contexts_t;
 
 /**
  * \brief           Protocol instance internal structure
  */
+typedef struct {
+    xgl_phy_ops_t* phy;
+    xgl_parser_t parser;
+    uint8_t* rx_cache;
+    uint32_t poll_interval_ms;
+    uint32_t read_freq_hz;
+    uint32_t last_poll_ms;
+    bool polled;
+} xgl_instance_link_t;
+
 struct xgl_instance {
     /*-----------------------------------------------------------------------*/
     /* Configuration                                                         */
     /*-----------------------------------------------------------------------*/
-    xgl_config_t config;            /**< Instance configuration */
-    bool initialized;               /**< Initialization flag */
+    const xgl_config_t* config; /**< Instance configuration */
+    bool initialized;           /**< Initialization flag */
+    bool caller_owned;          /**< Instance resides inside caller workspace */
 
     /*-----------------------------------------------------------------------*/
     /* Memory Management                                                     */
     /*-----------------------------------------------------------------------*/
-    xgl_allocator_t* allocator;     /**< Memory allocator */
-    xgl_tiered_pool_t tx_pool;      /**< Tiered TX memory pool */
-    xgl_packet_pool_t packet_pool;  /**< Packet object pool */
+    const xgm_allocator_t* allocator;
+    const xgm_allocator_t* storage_allocator;
+    const xgl_protocol_memory_t* memory;
 
     /*-----------------------------------------------------------------------*/
     /* Routing                                                               */
     /*-----------------------------------------------------------------------*/
-    xgl_route_table_t route_table;  /**< Route table */
+    xgl_route_table_t route_table; /**< Route table */
 
-    uint32_t* route_last_read_ms;   /**< Last RX polling timestamp per configured route */
-    size_t route_last_read_count;   /**< Number of route polling timestamps */
+    xgl_instance_link_t* links; /**< One RX parser per unique PHY */
+    size_t link_count;
 
     /*-----------------------------------------------------------------------*/
     /* Protocol Stack Layers (Unified Management)                            */
     /*-----------------------------------------------------------------------*/
-    xgl_layer_contexts_t layers;    /**< Unified layer contexts and interfaces */
+    xgl_layer_contexts_t layers; /**< Unified layer contexts and interfaces */
 
     /*-----------------------------------------------------------------------*/
     /* Statistics                                                            */
     /*-----------------------------------------------------------------------*/
-    xgl_statistics_t stats;         /**< Protocol statistics */
-
-    /*-----------------------------------------------------------------------*/
-    /* Codec Registry                                                        */
-    /*-----------------------------------------------------------------------*/
-    xgl_codec_registry_t codec_registry; /**< Instance-scoped codec registry */
-    xgl_codec_t codec_storage[4];   /**< Storage for up to 4 registered codecs */
-
-    /*-----------------------------------------------------------------------*/
-    /* Thread Safety                                                         */
-    /*-----------------------------------------------------------------------*/
-#ifdef XGL_THREAD_SAFE
-    xgl_mutex_t mutex;              /**< Instance mutex */
-#endif
+    xgl_statistics_t stats; /**< Protocol statistics */
 };
 
-/*---------------------------------------------------------------------------*/
-/* Thread-Safety Guard Macros (internal only)                                */
-/*---------------------------------------------------------------------------*/
+xgl_error_t xgl_instance_init_links(xgl_handle_t handle);
+void xgl_instance_destroy_links(xgl_handle_t handle);
 
 /**
- * \brief           Lock instance mutex if thread-safe mode is active
- * \return          XGL_OK on success, error code on lock failure
+ * \brief           Prepare caller storage without initializing protocol layers
  */
-static inline xgl_error_t xgl_instance_lock(xgl_handle_t h) {
-#ifdef XGL_THREAD_SAFE
-    if (h->config.features.thread_safe) {
-        return xgl_mutex_lock(&h->mutex);
-    }
-#else
-    (void)h;
-#endif
-    return XGL_OK;
-}
-
-/**
- * \brief           Unlock instance mutex if thread-safe mode is active
- */
-static inline void xgl_instance_unlock(xgl_handle_t h) {
-#ifdef XGL_THREAD_SAFE
-    if (h->config.features.thread_safe) {
-        xgl_mutex_unlock(&h->mutex);
-    }
-#else
-    (void)h;
-#endif
-}
+xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
+                                  size_t storage_size,
+                                  const xgm_allocator_t* storage_allocator,
+                                  xgl_handle_t* handle);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* XGL_INSTANCE_INTERNAL_H */
-

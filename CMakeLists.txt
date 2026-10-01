@@ -22,8 +22,8 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-# C++20 for tests (required for designated initializers)
-set(CMAKE_CXX_STANDARD 20)
+# Standard C++17 for host tests
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -254,6 +254,8 @@ if(XGL_BUILD_NOHEAP_SMOKE)
     target_link_libraries(xgl_static_workspace_smoke PRIVATE xgl_noheap)
     enable_testing()
     add_test(NAME xgl_static_workspace_smoke COMMAND xgl_static_workspace_smoke)
+    set_tests_properties(xgl_static_workspace_smoke PROPERTIES
+        LABELS integration TIMEOUT 30)
 endif()
 
 if(XGL_BUILD_FOOTPRINT_REPORT)
@@ -272,29 +274,14 @@ if(XGL_BUILD_FOOTPRINT_REPORT)
 endif()
 
 if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
-    find_program(XGL_CPPCHECK_EXE NAMES cppcheck)
-    if(XGL_CPPCHECK_EXE)
-        add_custom_target(xgl_static_analysis
-            COMMAND ${XGL_CPPCHECK_EXE}
-                --enable=warning,style,performance,portability
-                --std=c11
-                --inline-suppr
-                --error-exitcode=1
-                "--project=${CMAKE_BINARY_DIR}/compile_commands.json"
-                "--file-filter=${CMAKE_CURRENT_SOURCE_DIR}/src/*"
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            COMMENT "Analyzing protocol sources with their actual compile configuration"
-            COMMAND_EXPAND_LISTS
-            VERBATIM
-        )
-    else()
-        add_custom_target(xgl_static_analysis
-            COMMAND ${CMAKE_COMMAND} -E echo "cppcheck not found; install cppcheck to run the embedded C static analysis baseline"
-            COMMAND ${CMAKE_COMMAND} -E false
-            COMMENT "Static analysis baseline is unavailable"
-            VERBATIM
-        )
-    endif()
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_custom_target(xgl_static_analysis
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/quality.py
+            cppcheck --build-dir ${CMAKE_BINARY_DIR}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Running the shared static-analysis policy on the actual build"
+        VERBATIM
+    )
 endif()
 
 if(XGL_BUILD_SDK_CONSUMER_SMOKE)
@@ -348,12 +335,14 @@ if(XGL_BUILD_SDK_CONSUMER_SMOKE)
             -D XGL_DEPENDENCY_HINTS=${XGL_SDK_DEPENDENCY_HINTS}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
     )
-    set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES TIMEOUT 60)
+    set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES
+        LABELS integration TIMEOUT 60)
 endif()
 
 if(TARGET xgl_noheap_smoke)
     add_test(NAME xgl_noheap_smoke COMMAND xgl_noheap_smoke)
-    set_tests_properties(xgl_noheap_smoke PROPERTIES TIMEOUT 30)
+    set_tests_properties(xgl_noheap_smoke PROPERTIES
+        LABELS integration TIMEOUT 30)
 endif()
 
 if(XGL_BUILD_RELEASE_VALIDATION_TARGET)

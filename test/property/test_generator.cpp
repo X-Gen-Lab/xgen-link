@@ -26,3 +26,27 @@ TEST(PropertyGeneratorTest, DifferentSeedsProduceDifferentSequences) {
     PropertyTestGenerator second(19U);
     EXPECT_NE(first.random_bytes(32U), second.random_bytes(32U));
 }
+
+TEST(PropertyGeneratorTest, DefaultGeneratorUsesTheRecordedTestStream) {
+    PropertyTestGenerator actual;
+    PropertyTestGenerator replay(property_test_seed());
+    EXPECT_EQ(actual.random_bytes(128U), replay.random_bytes(128U));
+}
+
+TEST(PropertySeedTest, ParsesUnsignedDecimalBoundariesWithoutTruncation) {
+    uint32_t seed = 17U;
+    ASSERT_TRUE(property_parse_seed("0", seed));
+    EXPECT_EQ(seed, 0U);
+    ASSERT_TRUE(property_parse_seed("4294967295", seed));
+    EXPECT_EQ(seed, UINT32_MAX);
+}
+
+TEST(PropertySeedTest, RejectsInvalidTextAndPreservesThePreviousSeed) {
+    uint32_t seed = 17U;
+    EXPECT_FALSE(property_parse_seed(nullptr, seed));
+    for (const char* invalid :
+         {"", "-1", "+1", " 1", "1 ", "0x17", "1x", "4294967296"}) {
+        EXPECT_FALSE(property_parse_seed(invalid, seed)) << invalid;
+        EXPECT_EQ(seed, 17U);
+    }
+}

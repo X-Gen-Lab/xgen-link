@@ -1,202 +1,23 @@
-# Security Model
+# Security
 
-Production configuration requires authentication by default. Tests and debug builds may explicitly disable it, but release profiles should enable `auth_required`.
+Authentication is an optional compiled capability in embedded and full profiles. The current Boot profile omits it. Authentication protects unicast traffic; this implementation does not provide payload encryption or a key-establishment protocol.
 
-`auth_required=false` means unauthenticated frames are allowed. It does not mean authenticated frames are ignored: any frame carrying AUTHENTICATED/SECURITY_EXT must verify successfully before delivery.
+## Trusted Associations
 
-## Auth Provider
+The application explicitly installs `(remote_id, connection_id, session_epoch)` with directional TX/RX keys, nonce prefixes, TX initial sequence and RX minimum sequence. Received HELLO, SESSION metadata or a valid CRC never installs trust. Authenticated frames with unknown, closed or mismatched associations fail closed. Plain frames are governed by `auth_required`: when it is false, closing an association does not prohibit plaintext traffic.
 
-`xgl_auth_provider_t` provides:
+Closing a security session keeps a tombstone. Installing reserves each directional `(key_id, nonce_prefix)` domain immediately. Reinstalling the same scope or reusing a reserved domain in the same security context is rejected; closed slots are not recycled as fresh security slots. Capacity is a build limit: four sessions for embedded and sixteen for full. The library compares key IDs, not provider key material. The application must prevent different IDs from aliasing the same actual key with a reused prefix. Fresh trusted keys or persistent freshness state are required across process/MCU restart; clearing RAM with fixed keys and prefixes permits nonce reuse.
 
-- `sign`
-- `verify`
-- `tag_len`, capped by `XGL_AUTH_TAG_MAX_LEN`
-- `user_data`
+## Authentication Attempt
 
-Initialization must fail when `auth_required=true` and the provider is missing, `tag_len == 0`, or `tag_len > XGL_AUTH_TAG_MAX_LEN`.
-Authenticated configurations must also provide `memory.allocator` with both
-`malloc` and `free`; `xgl_config_validate()` rejects production auth when that
-allocator contract is missing.
+SECURITY value is `LE32(key_id) || LE64(security_seq) || u8(tag_length)`. The provider receives versioned `xgl_auth_input_t`, including the exact endpoints, connection, epoch, sequence and a 12-byte nonce: `BE32(installed_directional_prefix) || BE64(security_seq)`.
 
-## AAD and Payload
+AAD is the entire encoded header and TLVs, with TTL byte 6 and header-CRC bytes 22–23 zeroed. Every other AAD byte and every payload byte is authenticated. Tags have the provider's fixed declared length. A sign attempt reserves a new sequence before the provider call; failure does not roll it back. `UINT64_MAX` can be used once, then the association is exhausted. Reliable retransmission keeps DATA numbering but always signs a newly composed frame.
 
-The base header and extensions are authenticated as AAD after applying the authentication-mode canonicalization rules below. Payload is authenticated but not encrypted. CRC provides fast error detection; the authentication tag prevents forgery, tampering, and replay.
+## Receive and Forwarding
 
-## Authentication Modes
+CRC/layout validation precedes authentication. Replay is checked against a candidate 64-bit receive window; only successful tag verification commits that candidate. Duplicate authentication sequences are rejected, including byte-identical replay. A legitimate retransmission uses a fresh security sequence and is deduplicated later by transport DATA numbering.
 
-XGL distinguishes two security models:
+Local network delivery verifies security before transport mutation. A forwarding node changes TTL and CRCs while preserving the end-to-end tag; TTL is excluded from AAD by canonicalization. RESET and transport close never reset replay or TX security counters. Callbacks are synchronous and must not reenter or destroy the active instance.
 
-| Mode | Verifier | Forwarding behavior | Authentication domain |
-| --- | --- | --- | --- |
-| Hop-by-hop authentication | Every hop | Each forwarding node verifies and re-signs | May include the current wire header, including `ttl` and `header_crc16` |
-| End-to-end authentication | Final destination, after datalink checks | Forwarding nodes must not re-sign | Must exclude hop-mutable and link-check fields |
-
-Current XGL uses **end-to-end authentication** for authenticated frames. The source signs, the destination verifies, and intermediate nodes only update forwarding metadata and CRCs.
-
-### End-to-End Canonical AAD
-
-End-to-end authentication signs a canonical view of the wire AAD:
-
-- `ttl` is treated as zero because it is decremented on every forwarded hop.
-- `header_crc16` is treated as zero because it is recomputed whenever hop-mutable header bytes change.
-- `frame_crc16` is not part of the authentication input because it is placed after the authentication trailer.
-- Stable base-header fields, stable TLV extensions, and payload bytes remain authenticated.
-
-| Field/material | Auth input treatment | Reason | Evidence |
-| --- | --- | --- | --- |
-| Base header bytes | Included as AAD | Binds stable routing/session/packet identity | `src/wire/xgl_wire.c` |
-| `ttl` | Included as zero | Forwarding decrements TTL per hop | `src/wire/xgl_wire.c`, `src/network/xgl_network_receive.c` |
-| `header_crc16` | Included as zero | Header CRC is recomputed when TTL changes | `src/wire/xgl_wire.c` |
-| TLV extensions | Included as AAD | Binds session, security, fragment, route, and data-type metadata | `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c` |
-| Payload | Included as payload input | Protects application/fragment data | `src/wire/xgl_wire.c` |
-| Authentication tag | Not included in its own input | It is generated by the provider | `src/wire/xgl_wire.c` |
-| Frame CRC16 | Not included | It is serialized after the auth trailer | `src/wire/xgl_wire.c`, `src/wire/xgl_frame_auth.c` |
-
-Any future extension whose value changes at each hop must either be excluded by the same canonicalization rule or be protected by a separate hop-by-hop authentication mechanism. Do not silently add hop-mutable fields to the end-to-end AAD.
-
-## Decision: End-to-End Auth
-
-The protocol chooses end-to-end authentication for the current `AUTHENTICATED`/`SECURITY_EXT` path.
-
-Reasons:
-
-- Intermediate nodes can forward without access to the originator's signing key.
-- The authentication tag continues to protect payload and stable routing/session identity across multiple hops.
-- TTL and CRC remain datalink/network maintenance fields rather than application-security fields.
-
-Consequences:
-
-- Forwarding must recompute header CRC and frame CRC after TTL changes.
-- Forwarding must preserve the original authentication tag.
-- A separate hop-by-hop tag would be needed if a deployment requires each link to authenticate the immediate previous hop.
-
-## Authentication Trailer
-
-The authentication trailer is placed after payload and before frame CRC. SECURITY_EXT records `key_id`, `nonce_id`, and `tag_len`. The provider declares a fixed tag length so the signing path does not need a trial signature followed by a second signature.
-
-## Verification Order
-
-1. Check magic, version, header_len, and payload_len.
-2. Verify header CRC.
-3. Parse SECURITY_EXT.
-4. Verify authentication trailer when authentication is required or when the frame declares authentication.
-5. Check replay window for verified authenticated frames.
-6. Enter network/transport semantic handling.
-
-Any failure prevents payload delivery.
-
-## Replay Window
-
-Anti-replay key:
-
-```text
-source_id + connection_id + session_epoch + packet_number
-```
-
-Replay results are tri-state:
-
-- new authenticated packets enter network/transport handling;
-- duplicate ACK-eliciting reliable packets may enter transport so the receiver can regenerate ACK/SACK after a lost ACK, but transport duplicate detection must not deliver payload again;
-- non-reliable duplicates, old-session packets, wrong-connection packets, and packets older than the replay window are dropped before network/transport.
-
-## Multi-Hop Forwarding
-
-TTL is a hop-mutable field. After forwarding changes TTL, the implementation recomputes `header_crc16` and `frame_crc16` and preserves the original authentication tag. Verification remains valid because the end-to-end AAD canonicalizes TTL and header CRC before calling the provider.
-
-## Reserved
-
-Encryption is reserved. Do not treat `enable_encryption` as an available production encryption path.
-
-## Key Boundary
-
-XGL does not persist keys or define key derivation. Production applications implement key storage, rotation, key id mapping, and hardware security module integration inside the auth provider.
-
-## Replay Window Algorithm
-
-### Data Structure
-
-```text
-xgl_replay_window_t
-├── received_bitmap (uint64_t — 64-bit bitmap)
-└── window_size     (uint8_t — window size, default 64)
-```
-
-### Slot Allocation
-
-Datalink layer maintains 16 replay window slots (`XGL_DATALINK_REPLAY_WINDOW_COUNT = 16`), each 64 bits (`XGL_DATALINK_REPLAY_WINDOW_SIZE = 64`). Slots are indexed by `(connection_id, session_epoch)`.
-
-### Tri-State Verdict
-
-| State | Condition | Behavior |
-| --- | --- | --- |
-| NEW | First seen for this peer/session; allocate idle slot | Accept frame, set corresponding bitmap bit |
-| VALID | `packet_number` within window range and bitmap bit is 0 | Accept frame, set corresponding bitmap bit |
-| DUPLICATE | `packet_number` within window range and bitmap bit is 1 | Drop, count |
-| OUT_OF_WINDOW | `packet_number` outside window range | Drop |
-
-### Sliding Update
-
-When `packet_number > base + window_size`, bitmap is right-shifted by `packet_number - base` bits and base is updated.
-
-### Capacity Decision
-
-16 slots × 64 bits = supports up to 16 concurrent authenticated connections with 64 in-flight packets each. This is sufficient for MCU scenarios.
-
-### Evidence
-
-`src/security/xgl_security.c`, `include/xgl/internal/xgl_security.h`, `include/xgl/internal/xgl_datalink.h`
-
-## Security Threat Model
-
-### Threat Classification (STRIDE)
-
-| Threat | Specific scenario | XGL defense |
-| --- | --- | --- |
-| **Spoofing** | Attacker forges source node to send malicious frames | Authentication: AUTHENTICATED flag + auth provider verification |
-| **Tampering** | Man-in-the-middle modifies frame contents | CRC16 check + authentication trailer (tampering causes CRC or auth tag failure) |
-| **Repudiation** | Sender denies sending a frame | No persistent signatures currently; relies on runtime auth provider |
-| **Information Disclosure** | Frame contents are eavesdropped | ENCRYPTED flag reserved; current production path rejects encrypted frames |
-| **Denial of Service (DoS)** | Flood of invalid frames consumes resources | Parser timeout + CRC check + replay window filtering |
-| **Elevation of Privilege** | Unauthorized node injects control frames | Authentication requirement + connection_id isolation |
-
-### Replay Attack Defense
-
-1. Each authenticated connection maintains an independent replay window (64-bit bitmap)
-2. Received packet_numbers are marked in the bitmap
-3. Duplicate packet_numbers are immediately dropped
-4. 16 slots support up to 16 concurrent authenticated connections
-
-### DoS Defense
-
-| Attack | Defense |
-| --- | --- |
-| Invalid frame flood | Parser CRC check drops quickly, no upper-layer processing |
-| Authenticated spoofed frame flood | Replay window rejects duplicate packet_numbers |
-| Oversized frames | Parser cache size limit |
-| Slow connections | Parser timeout (1000 ms) resets state |
-
-### Known Limitations
-
-| Limitation | Description |
-| --- | --- |
-| No encryption | ENCRYPTED flag reserved but not implemented; frame contents are plaintext |
-| No perfect forward secrecy | Key compromise exposes all frames using that key (if encryption were enabled) |
-| Limited replay window capacity | 16 slots × 64 bits; high-concurrency scenarios may overflow |
-| No rate limiting | High-speed flooding may exhaust CPU time before CRC check |
-
-### Security Recommendations
-
-1. **Enable authentication in production** (`auth_required = true`)
-2. Auth provider implementations should use secure key storage (HSM/TEE)
-3. Rotate authentication keys periodically
-4. Monitor `rx_auth_failures` and `rx_replay_duplicates` counters
-5. In security-sensitive scenarios, consider implementing end-to-end encryption at the application layer
-
-## Traceability
-
-| Rule | Source | Tests |
-| --- | --- | --- |
-| Auth provider validation and tag length bounds | `src/api/xgl_config.c` | `test/test_config.cpp` |
-| SECURITY_EXT encoding and auth trailer placement | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_wire_ext.c` | `test/test_wire.cpp`, `test/test_frame.cpp` |
-| Canonical AAD with TTL/header CRC zeroed | `src/wire/xgl_wire.c` | `test/test_datalink.cpp`, `test/test_network.cpp` |
-| Datalink auth verification and replay classification | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | `test/test_datalink.cpp`, `test/test_security.cpp` |
+Verification: `test/test_security.cpp`.

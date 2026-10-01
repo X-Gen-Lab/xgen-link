@@ -1,120 +1,63 @@
 # 测试策略
 
-本文档描述 XGL 协议栈的测试架构、各类测试的设计意图和覆盖策略。
+## 归属
 
-## 测试分层
+各独立基础仓库负责自身行为：xgen-memory 的分配器/池、xgen-containers 的容器、xgen-crc 的校验、xgen-bytes 的字节读写，以及 xgen-status 的通用状态。协议测试覆盖 wire 编码、分层接口、路由、peer 状态、分片、安全及公开实例行为。删除公共组件包装时同时删除对应的重复协议测试；协议对公共服务的真实集成仍需验证。
 
-```text
-┌─────────────────────────────────────────┐
-│ Integration Tests (1 文件)               │
-│  端到端协议栈行为验证                      │
-├─────────────────────────────────────────┤
-│ Property-Based Tests (11 文件)           │
-│  不变量验证、模糊输入、边界条件              │
-├─────────────────────────────────────────┤
-│ Unit Tests (30+ 文件)                    │
-│  各模块独立功能验证                        │
-├─────────────────────────────────────────┤
-│ Mocks (3 对文件)                         │
-│  PHY、回调、分配器的可控替代                │
-└─────────────────────────────────────────┘
+## 回归场景
+
+用真实协议状态转换验证 ACK 原子性、保留 RX 所有权、背压、重传及显式 scope 关闭。容量测试检查精确工作区测量、不足或未对齐拒绝、一次后端预留、运行回收及销毁。静态认证双端验证重传使用新安全序号、应用只交付一次。
+
+## 执行
+
+通过 CTest 运行协议测试、主机示例、静态生命周期及安装后的 C 消费者。Boot 和 Embedded 分开配置，参见[验证矩阵](../reference/validation-matrix.md)。随机性质测试补充固定回归，不能代替 sanitizer、fuzz 或硬件验收。
+
+安装依赖后可使用根工程 presets；独立源码开发使用 `cmake -S dev` 和五个 `XGL_DEV_*_SOURCE_DIR`，具体见[构建与测试](../getting-started/build-and-test.md)。dev 的 CTest 根目录为对应 `build/dev-<profile>`；正式模块作为产品子目录时默认不添加示例、smoke 或发布辅助。新入口和旧阶段结果分别记录。
+
+## 风格
+
+遵循仓库 clang-format 和 Doxygen 格式。新增测试应证明不变量或缺陷回归，不复制实现。测试必须保持配置/PHY 的借用生命周期并显式传入时间。
+
+空行规则采用工程规范 C-020、C-021 和 DOC-013：独立定义和公共 API 文档组之间空一行，Doxygen 与对应声明紧邻；函数内按语义分段。clang-format 19.1.5 负责定义间隔和多余空行，共享 xgen-quality 的 `format` 入口补充常见公共 C 头的结构检查；不推断函数体的业务阶段。
+
+显式安装 `tools/quality.json` 固定提交对应的 xgen-quality 0.1.0 包后执行：
+
+```sh
+python tools/quality.py format
+python tools/quality.py text
+python tools/quality.py test --build-dir build/dev-full
+python tools/quality.py cppcheck --build-dir build/dev-full
+python tools/quality.py tidy --build-dir build/dev-full
+python tools/quality.py docs
+python -m pre_commit run --all-files
 ```
 
-## Property-Based Testing
+检查只读，不会下载或改写源码。主动整理使用 clang-format 19.1.5 的 `-i`；公共声明分组按诊断和规范人工调整。编译数据库必须来自实际工具链和显式开发依赖。CI 默认使用官方仓库，允许通过仓库变量覆盖，所有源码固定完整提交。实际本地与远端结果分别记录在根目录 `REFACTORING_STATUS.md`。
 
-XGL 使用自定义 property-based 测试框架(`test/property/property_framework.h`),通过随机输入验证协议栈的不变量。
+## TDD 与测试清单
 
-### 测试文件与验证的不变量
+行为变更先增加能重现需求或缺陷的失败测试，记录 RED，再实现最小修复并验证 GREEN，最后整理实现并重跑相关回归。既有行为的覆盖补充、纯文档和排版不人为制造失败。
 
-| 文件 | 验证的不变量 |
-| --- | --- |
-| `test_alignment_properties.cpp` | 内存对齐:所有结构体在目标对齐边界上正确访问 |
-| `test_crc_properties.cpp` | CRC 计算:相同数据始终产生相同 CRC;不同数据产生不同 CRC |
-| `test_error_properties.cpp` | 错误处理:所有 API 在非法参数下返回明确错误码,不崩溃 |
-| `test_fragment_properties.cpp` | 分片重组:任意分片顺序重组后数据一致;超时正确清理 |
-| `test_frame_properties.cpp` | 帧编解码:encode → decode 往返一致;字段边界正确处理 |
-| `test_instance_properties.cpp` | 实例生命周期:create → run → destroy 无泄漏;重复 init 安全 |
-| `test_memory_properties.cpp` | 内存分配:alloc/free 配对;pool 耗尽返回 NULL;峰值统计正确 |
-| `test_network_properties.cpp` | 网络层:路由查找正确;TTL 递减;转发 CRC 重算 |
-| `test_serialization_properties.cpp` | 序列化:TLV 编解码往返一致;边界长度正确处理 |
-| `test_transport_properties.cpp` | 传输层:可靠发送 ACK 后释放;超时重传;窗口满阻塞 |
+主机测试使用 GoogleTest/GoogleMock 1.16.0 和严格 C++17。`gtest_discover_tests` 逐个登记用例；分类脚本为其添加 `xgl`、`unit` 或 `integration` 标签，性质测试另加 `property`。示例、静态生命周期和安装消费也属于 `integration`。`test/cmake/baseline_tests.txt` 保存迁移前的 510 个用例名称，发现阶段逐名检查，不能用新增数量掩盖历史用例丢失。共享测试入口拒绝空集合、禁用、跳过、重复或失败的测试。
 
-### Property 测试模式
+## 性质测试回放
 
-每个 property 测试遵循:
+种子优先级为命令行 `--xgl_property_seed=N`、环境变量 `XGL_PROPERTY_SEED`、固定默认值 `5785420`。无效或超出无符号整数范围的输入必须报错。每个测试使用稳定的独立随机流，过滤执行不改变其随机输入。JUnit 记录基础种子与测试流，失败时输出可复制的回放命令：
 
-1. **定义不变量**:描述期望成立的条件。
-2. **生成随机输入**:使用确定性种子生成随机参数。
-3. **执行操作**:在随机输入上执行协议操作。
-4. **验证不变量**:断言不变量在操作后仍然成立。
-5. **记录种子**:失败时记录随机种子,可精确复现。
-
-## Mock 设计
-
-### mock_phy
-
-模拟物理层收发,用于在无硬件环境下测试 datalink 和 network 层:
-
-- `mock_phy_init()`:初始化 mock PHY,配置发送/接收缓冲区。
-- `mock_phy_get_tx_buffer()`:获取发送的数据,用于验证帧格式。
-- `mock_phy_enqueue_rx()`:注入接收数据,模拟远端发送。
-- `mock_phy_reset()`:重置状态。
-
-### mock_callbacks
-
-模拟应用层回调:
-
-- `mock_rx_callback`:记录收到的数据,用于验证交付正确性。
-- `mock_error_callback`:记录错误,用于验证错误处理。
-
-### mock_allocator
-
-模拟内存分配器:
-
-- `mock_allocator_init()`:初始化,可配置分配失败点。
-- `mock_allocator_set_fail_after()`:设置第 N 次分配后失败,测试内存耗尽路径。
-- `mock_allocator_get_alloc_count()`:查询分配次数。
-
-## 集成测试
-
-`test/integration/test_integration.cpp` 验证完整协议栈的端到端行为:
-
-1. 创建实例 + 配置路由 + 注册回调。
-2. 通过 mock PHY 注入接收数据。
-3. 调用 `xgl_run()` 驱动协议栈。
-4. 验证应用层收到正确的数据。
-5. 验证统计计数器正确。
-
-## 测试构建
-
-```bash
-# 构建测试
-cmake --preset dev
-cmake --build build-dev --target xgl_tests
-
-# 运行测试
-ctest --test-dir build-dev --output-on-failure
-
-# 运行特定测试
-./build-dev/test/xgl_tests --gtest_filter="TestName"
+```sh
+./build/dev-full/link/test/xgl_tests --gtest_filter='XglFrameProperties.*' --xgl_property_seed=5785420
+ctest --test-dir build/dev-full -L property --output-on-failure
 ```
 
-## 覆盖率
+Windows 加 `.exe`，多配置生成器使用实际配置子目录。
 
-构建时启用覆盖率:
+## 覆盖率与验收
 
-```bash
-cmake --preset dev -DENABLE_COVERAGE=ON
-cmake --build build-dev
-ctest --test-dir build-dev
-gcovr build-dev --root .
+在独立的原生 GNU 构建目录启用 `-DXGL_ENABLE_COVERAGE=ON`，仅对生产 `xgl` target 插桩；依赖、GoogleTest 和测试代码不计入协议覆盖率。更换源码或编译配置后清理旧计数或新建构建目录，再执行全部测试：
+
+```sh
+python tools/quality.py test --build-dir build/coverage
+python tools/quality.py coverage --build-dir build/coverage --gcov-executable gcov
 ```
 
-## 证据
-
-| 组件 | 源码 | 测试 |
-| --- | --- | --- |
-| Property framework | `test/property/property_framework.h` | `test/property/test_*.cpp` |
-| Mock PHY | `test/mocks/mock_phy.cpp` | `test/integration/test_integration.cpp` |
-| Mock callbacks | `test/mocks/mock_callbacks.cpp` | `test/integration/test_integration.cpp` |
-| Mock allocator | `test/mocks/mock_allocator.cpp` | `test/integration/test_integration.cpp` |
+行、函数和分支覆盖率分别至少 80%，不能用平均值替代其中一项，也不能通过排除难测的生产文件过关。非原生 GNU 编译器请求该覆盖率选项时明确拒绝。报告归档于 `out/reports`；主机、安装消费、sanitizer、ARM ELF 和硬件结论分别记录。

@@ -4,6 +4,8 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
+
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
 
@@ -12,13 +14,14 @@
 /*---------------------------------------------------------------------------*/
 
 class XglLayeredStatsTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         /* Get default configuration */
         xgl_config_get_default(&config);
         config.source_id = 1;
 
         /* Create and initialize instance */
+        xgl_test_use_host_allocator(&config);
         handle = xgl_create(&config);
         ASSERT_NE(handle, nullptr);
 
@@ -189,8 +192,8 @@ TEST_F(XglLayeredStatsTest, DatalinkLayerSemantics) {
      */
 
     /* Verify CRC error counters are at protocol level, not layer level */
-    EXPECT_EQ(stats.rx_header_crc_errors, 0);   /* Protocol-specific */
-    EXPECT_EQ(stats.rx_crc16_errors, 0);  /* Protocol-specific */
+    EXPECT_EQ(stats.rx_header_crc_errors, 0); /* Protocol-specific */
+    EXPECT_EQ(stats.rx_crc16_errors, 0);      /* Protocol-specific */
 }
 
 /**
@@ -313,8 +316,7 @@ TEST_F(XglLayeredStatsTest, TotalPacketsAcrossLayers) {
     stats.transport.tx_packets = 90;
 
     /* Calculate total (for analysis purposes) */
-    uint64_t total_tx = stats.datalink.tx_packets +
-                        stats.network.tx_packets +
+    uint64_t total_tx = stats.datalink.tx_packets + stats.network.tx_packets +
                         stats.transport.tx_packets;
 
     EXPECT_EQ(total_tx, 285);
@@ -340,12 +342,15 @@ TEST_F(XglLayeredStatsTest, ErrorRatePerLayer) {
     stats.transport.tx_errors = 2;
 
     /* Calculate error rates */
-    double dl_error_rate = (double)stats.datalink.tx_errors / stats.datalink.tx_packets;
-    double net_error_rate = (double)stats.network.tx_errors / stats.network.tx_packets;
-    double trans_error_rate = (double)stats.transport.tx_errors / stats.transport.tx_packets;
+    double dl_error_rate =
+        (double)stats.datalink.tx_errors / stats.datalink.tx_packets;
+    double net_error_rate =
+        (double)stats.network.tx_errors / stats.network.tx_packets;
+    double trans_error_rate =
+        (double)stats.transport.tx_errors / stats.transport.tx_packets;
 
-    EXPECT_NEAR(dl_error_rate, 0.05, 0.001);    /* 5% */
-    EXPECT_NEAR(net_error_rate, 0.0316, 0.001); /* ~3.16% */
+    EXPECT_NEAR(dl_error_rate, 0.05, 0.001);      /* 5% */
+    EXPECT_NEAR(net_error_rate, 0.0316, 0.001);   /* ~3.16% */
     EXPECT_NEAR(trans_error_rate, 0.0217, 0.001); /* ~2.17% */
 }
 
@@ -388,4 +393,3 @@ TEST_F(XglLayeredStatsTest, StatisticsStructureSize) {
     /* Verify layer stats are part of total */
     EXPECT_GE(stats_size, 3 * layer_stats_size);
 }
-

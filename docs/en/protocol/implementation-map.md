@@ -1,98 +1,31 @@
 # Implementation Map
 
-This page maps protocol design to source directories, public headers, key functions, and tests. Start here when you need to understand where a protocol rule is implemented.
+This map identifies protocol owners. Public applications include `<xgl/xgl.h>`; internal headers are implementation boundaries, not compatibility aliases for removed utilities.
 
-## Layers to Directories
+## Source Ownership
 
-| Layer | Source directory | Public/advanced headers | Main implementation | Invariant |
-| --- | --- | --- | --- | --- |
-| API | `src/api` | `xgl.h`, `xgl_config.h`, `xgl_types.h` | `xgl_instance.c`, `xgl_runtime.c`, `xgl_send.c`, `xgl_stats.c`, `xgl_config.c` | Users enter through handle, config, send, run, and stats APIs |
-| Wire | `src/wire` | `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_frame.h`, `xgl/internal/xgl_parser.h` | `xgl_wire.c`, `xgl_wire_ext.c`, `xgl_frame.c`, `xgl_frame_zerocopy.c`, `xgl_parser.c`, `xgl_crc.c` | Wire encoding is offset-based, not packed-struct based |
-| Security | `src/security` | `xgl/internal/xgl_security.h` | `xgl_security.c` | Replay windows are scoped by source, connection, session, and packet |
-| Datalink | `src/datalink` | `xgl/internal/xgl_datalink.h` | `xgl_datalink.c`, `xgl_datalink_send.c`, `xgl_datalink_receive.c` | Frames that fail CRC/auth/replay do not enter network |
-| Network | `src/network` | `xgl/internal/xgl_network.h`, `xgl/internal/xgl_route.h` | `xgl_network.c`, `xgl_network_send.c`, `xgl_network_receive.c`, `xgl_network_metadata.c`, `xgl_route.c` | Routing, TTL, MTU, and forwarding are resolved here |
-| Transport | `src/transport` | `xgl/internal/xgl_transport.h`, `xgl/internal/xgl_reliable.h`, `xgl/internal/xgl_window.h`, `xgl/internal/xgl_fragment.h`, `xgl/internal/xgl_rtt.h` | `xgl_transport.c`, `xgl_transport_send.c`, `xgl_transport_send_plan.c`, `xgl_transport_send_fragment.c`, `xgl_transport_receive.c`, `xgl_transport_peer.c`, `xgl_transport_control.c`, `xgl_transport_ack.c`, `xgl_transport_retransmit.c`, `xgl_transport_rx_order.c`, `xgl_reliable.c`, `xgl_reliable_ack.c`, `xgl_window.c`, `xgl_fragment.c`, `xgl_fragment_range.c`, `xgl_rtt.c` | Reliable state is scoped by peer key and delivered in order |
-| Memory | `src/memory` | allocator/pool headers | allocator, mempool, packet pool, tiered pool | Production/no-heap profiles must not silently fall back to heap |
-| Platform | `src/platform` | time/mutex/atomic/platform headers | time, mutex, atomic, platform hooks | ISRs enqueue only; protocol work runs in task/main loop |
-
-## TX Path
-
-| Step | Code | Responsibility | Failure conditions |
-| --- | --- | --- | --- |
-| Parameter checks | `src/api/xgl_send.c` | Validate handle, payload, target, length, zero-copy constraints | NULL, oversized payload, insufficient authenticated zero-copy reservation |
-| Peer/packet number | `src/transport/xgl_transport_peer.c`, `src/transport/xgl_transport_send.c` | Create scoped peer state and assign 32-bit packet numbers | peer allocation failure, full window |
-| Fragmentation | `src/transport/xgl_transport_send_plan.c`, `src/transport/xgl_transport_send_fragment.c`, `src/transport/xgl_fragment.c` | Plan fragment budget, send `FRAGMENT_EXT`, and reassemble oversized payloads | message too large, budget exceeded |
-| Reliable queue | `src/transport/xgl_reliable.c`, `src/transport/xgl_reliable_ack.c` | Retain packets until ACKed and support ACK/SACK lookup | queue full, allocation failure |
-| Route lookup | `src/network/xgl_network_send.c`, `src/network/xgl_route.c` | Find egress route and enforce route MTU | no route, MTU exceeded, invalid TTL |
-| Frame build | `src/wire/xgl_frame.c`, `src/wire/xgl_frame_zerocopy.c` | Build v2 header, TLVs, payload, CRC/auth trailer | header/ext overflow, missing auth provider |
-| PHY send | `src/datalink/xgl_datalink_send.c` | Send serialized frame | PHY error |
-
-## RX Path
-
-| Step | Code | Responsibility | Failure policy |
-| --- | --- | --- | --- |
-| Byte-stream parser | `src/wire/xgl_parser.c` | Resync on magic and collect header, TLVs, payload, trailer | reset parser and continue searching |
-| Header/TLV decode | `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c` | Validate offsets, lengths, CRC, extension encoding | drop, do not deliver |
-| Auth/replay | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | Verify tag and classify replay as new, reliable duplicate, or reject | reject bad frames; allow reliable duplicates only for transport ACK recovery |
-| Local or forward | `src/network/xgl_network_receive.c` | Deliver locally or decrement TTL, recompute CRC, and forward | drop on TTL, route, or MTU failure |
-| Reliability | `src/transport/xgl_transport_receive.c`, `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_rx_order.c`, `src/transport/xgl_transport_retransmit.c` | Process ACK/SACK, buffer out-of-order packets, filter duplicates | wrong connection/session does not pollute other peers |
-| Reassembly | `src/transport/xgl_fragment.c`, `src/transport/xgl_fragment_range.c` | Reassemble by source, connection, session, and message | clean up on budget, timeout, or invalid overlap |
-| App callback | `src/api/xgl_runtime.c`, `src/transport/xgl_transport_receive.c` | Deliver ordered complete payload | callback must not block the protocol loop |
-
-## Extension Ownership
-
-| Extension | Encoding | Semantic consumer | Main rule |
-| --- | --- | --- | --- |
-| `SESSION_EXT` | `xgl_wire_encode/decode_session_ext_value` | datalink, network, transport, fragment | Session epoch scopes replay, peer, and reassembly state |
-| `ACK_RANGE_EXT` | `xgl_wire_encode/decode_ack_range_ext_value` | transport reliable | Releases multiple packet numbers |
-| `SACK_EXT` | `xgl_wire_encode/decode_sack_ext_value` | transport reliable | Preserves holes and triggers fast retransmit |
-| `FRAGMENT_EXT` | `xgl_wire_encode/decode_fragment_ext_value` | fragment manager | Fragment metadata is not stored inside payload |
-| `SECURITY_EXT` | `xgl_wire_encode/decode_security_ext_value` | frame, datalink, network | Carries key, nonce/material, and tag length metadata; the tag is end-to-end and is not regenerated by forwarding |
-| `ROUTE_EXT` | `xgl_wire_encode/decode_route_ext_value` | network/routing | Carries route epoch, previous hop, next hop, and metric |
-| `TIMESTAMP_EXT` | enum only | TODO | TODO(xgen-link): confirm TIMESTAMP_EXT value format and whether it is reserved or intentionally unimplemented. |
-| `DATA_TYPE_EXT` | `xgl_wire_encode_ext` | network, transport | Carries application data_type on DATA packets or control subtype on CONTROL packets without overloading packet_type |
-
-## Public vs Internal API
-
-Normal SDK users should depend on:
-
-- `include/xgl/xgl.h`
-- `include/xgl/xgl_config.h`
-- `include/xgl/xgl_types.h`
-- `include/xgl/xgl_error.h`
-
-Internal protocol headers live under `include/xgl/internal`. Wire, parser, reliable, window, and fragment headers are for protocol maintenance, tests, or advanced integrations. They should not be documented as stable user ABI and are not installed by the SDK package.
-
-## Test Mapping
-
-| Capability | Primary tests |
+| Contract | Main source |
 | --- | --- |
-| 24-byte header/TLV | `test/test_wire.cpp`, `test/test_frame.cpp`, `test/property/test_frame_properties.cpp` |
-| Parser resync/malformed frames | `test/test_parser.cpp`, `test/property/test_serialization_properties.cpp` |
-| Auth/replay | `test/test_security.cpp`, `test/test_datalink.cpp` |
-| Route/TTL/MTU | `test/test_network.cpp`, `test/test_route.cpp`, `test/property/test_network_properties.cpp` |
-| Reliable/ACK/SACK/window | `test/test_transport.cpp`, `test/test_reliable.cpp`, `test/test_window.cpp`, `test/property/test_transport_properties.cpp` |
-| Fragmentation/budget | `test/test_fragment.cpp`, `test/property/test_fragment_properties.cpp` |
-| Memory/no-heap/footprint | `test/test_allocator.cpp`, `test/test_mempool.cpp`, `test/test_packet_pool.cpp`, `test/test_footprint.cpp`, `tools/noheap_smoke.c` |
+| ABI validation, lifecycle, public stepping | `src/api/` |
+| Static workspace planning and resource services | `src/api/xgl_workspace.c` |
+| Exact peer lifecycle and close | `src/transport/xgl_transport_peer.c` |
+| Atomic ACK validation and application | `src/transport/xgl_transport_ack.c` |
+| Deadline collection and periodic work | `src/transport/xgl_transport_runtime.c` |
+| Production retransmission | `src/transport/xgl_transport_retransmit.c` |
+| Owned message pump | `src/transport/xgl_transport_send_fragment.c` |
+| Receive ordering and retained delivery | `src/transport/xgl_transport_rx_order.c`, `xgl_transport_delivery.c` |
+| Fragment coverage and reassembly | `src/transport/xgl_fragment_*.c` |
+| Route lookup and local/forward delivery | `src/network/` |
+| Canonical frame layout and TLVs | `src/wire/` |
+| Directional session state and authentication | `src/security/` |
+| Incremental framing and synchronous PHY | `src/datalink/` |
 
-## Protocol Rule Traceability
+## Internal Interfaces
 
-| Protocol rule | Primary source | Primary tests | Design doc |
-| --- | --- | --- | --- |
-| Header offsets and little-endian encoding | `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c` | `test/test_wire.cpp`, `test/test_crc.cpp` | `wire-format.md` |
-| Parser resync, body length, auth trailer length | `src/wire/xgl_parser.c`, `src/wire/xgl_parser_extensions.c` | `test/test_parser.cpp` | `state-machines.md`, `wire-format.md` |
-| End-to-end auth canonicalizes TTL/header CRC | `src/wire/xgl_wire.c`, `src/wire/xgl_frame_auth.c` | `test/test_datalink.cpp`, `test/test_network.cpp` | `security.md` |
-| Replay key uses source, connection, session, packet | `src/security/xgl_security.c`, `src/datalink/xgl_datalink_receive.c` | `test/test_security.cpp`, `test/test_datalink.cpp` | `security.md` |
-| Address validation and broadcast local delivery | `src/network/xgl_network.c`, `include/xgl/internal/xgl_network.h` | `test/test_network.cpp` | `routing.md` |
-| Forwarding decrements TTL and recomputes CRCs | `src/network/xgl_network_receive.c` | `test/test_network.cpp` | `routing.md`, `security.md` |
-| ACK range/SACK release reliable queue entries | `src/transport/xgl_transport_ack.c`, `src/transport/xgl_transport_sack.c`, `src/transport/xgl_reliable_ack.c` | `test/test_reliable.cpp`, `test/test_transport.cpp` | `reliability.md`, `extensions.md` |
-| Peer scope uses remote peer id plus connection/session | `src/transport/xgl_transport_peer.c`, `src/transport/xgl_transport_receive_peer.c` | `test/test_transport.cpp` | `reliability.md` |
-| Fragment budget accounts for TLVs, auth, and CRC | `src/transport/xgl_transport_send_plan.c` | `test/test_transport.cpp` | `fragmentation.md` |
-| Reassembly key and cleanup scope | `src/transport/xgl_fragment_reassembly.c`, `src/transport/xgl_fragment_maintenance.c` | `test/test_fragment.cpp`, `test/test_transport.cpp` | `fragmentation.md`, `state-machines.md` |
+`xgl_protocol_io.h` separates packet and frame interfaces using typed arguments. Transport supplies a receive interface and submits logical packets to network. `xgl_packet.h` contains borrowed protocol views. `xgl_protocol_memory.h` describes resource-class services; it does not implement an allocator.
 
-## Maintenance Rules
+The reliable queue stores records and indexes them. It does not acknowledge scopes independently or retransmit raw PHY frames. Peer-owned transport code performs these state transitions through the current network/security path.
 
-- Wire field changes must update `include/xgl/internal/xgl_wire.h`, `src/wire/xgl_wire.c`, `src/wire/xgl_wire_ext.c`, wire format docs, and offset tests.
-- Reliability semantic changes must update peer key docs, ACK/SACK docs, transport tests, and release validation.
-- Authentication boundary changes must update security docs, zero-copy docs, and datalink/network tests.
-- Config default changes must update config presets, quick start, and Doxygen public API.
+## Verification Boundaries
+
+Unit tests cover ACK validation, scope isolation, cancellation, owned payload lifetime and capacity rejection. Transport properties exercise the production retry path. Static workspace properties use bounded services across multi-window fragmented delivery and receiver backpressure. Wire/security tests assert byte layouts, nonce/AAD construction and replay behavior. SDK/profile smoke builds check the installed public API separately from internal unit fixtures.

@@ -9,93 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Core Architecture
-- Layer interface abstraction for modular protocol stack composition
-- Time provider interface for platform-independent timing operations
-- Configuration header (xgl_config.h) for compile-time settings
-- Enhanced error code system with detailed error types
-- Layer type enumeration for protocol stack layers
-
-#### Platform Abstraction
-- Platform-specific time provider implementation
-- Improved platform abstraction layer
-
-#### API Enhancements
-- Allocator API with alignment support and statistics tracking
-- Timeout control and retransmission management in transport layer
-- Flow control and congestion management features
-- Enhanced fragmentation with improved reassembly logic
-- Improved acknowledgment handling and tracking
-
-#### Testing
-- New property-based test suites:
-  - Alignment property tests for memory operations
-  - Error handling property tests
-  - Fragment property tests for packet fragmentation
-  - Instance property tests for lifecycle management
-- Expanded property-based testing coverage:
-  - Comprehensive frame property tests
-  - Memory allocation property tests
-  - Network layer property tests with routing scenarios
-  - Significantly expanded transport layer property tests
-- New unit test suites:
-  - Layered statistics tests for per-layer metrics
-  - Time provider tests for platform abstraction
-  - Timeout control tests for retransmission logic
-- Enhanced integration tests with end-to-end scenarios
-
-#### Documentation
-- README files for all example applications:
-  - Echo server documentation with usage instructions
-  - File transfer example documentation
-  - Multi-node example documentation
-- Build and run instructions for examples
-- Troubleshooting and configuration guides
-
-#### Development Tools
-- VSCode workspace settings for consistent development environment
+- Caller-owned static workspace with exact size/alignment queries and bounded resource accounting.
+- Explicit monotonic-time send/step/deadline APIs and per-link receive budgets.
+- Trusted directional authentication sessions, replay protection and nonce-domain retirement.
+- Full, Embedded and Boot build profiles, installed C consumer checks and Cortex-M0 footprint probes.
+- Explicit standalone `dev` assembly with fixed development dependency inputs.
+- Individual GoogleTest discovery, preserved historical test inventory and reproducible property seeds.
+- Shared text, formatting, test inventory, Cppcheck, clang-tidy, strict public API documentation and production coverage gates.
 
 ### Changed
 
-#### Core Implementation
-- Refactored instance management with layer interface support
-- Improved send path with better error handling
-- Enhanced configuration system for new layer architecture
-- Optimized memory allocation patterns
+- Consume independent status, bytes, CRC, memory and containers packages through compatible parent targets or installed packages.
+- Use C11 production code and strict C++17 host tests; public configuration presets support both languages.
+- Allocate reliable ACK state as a compact bitset and reuse bounded workspace across static and allocator-backed initialization.
+- Instrument only protocol production objects for native GNU coverage, including Windows; reject unsupported requests explicitly.
 
-#### Protocol Layers
-- Standardized function signatures across all layers (datalink, network, transport)
-- Enhanced frame processing with improved validation
-- Improved routing table management
-- Optimized packet processing flow
-- Enhanced error recovery mechanisms in transport layer
+### Fixed
 
-#### Examples
-- Improved echo server with better error handling
-- Enhanced file transfer with progress tracking
-- Added advanced scenarios to multi-node example
-- Updated examples to use new API features
-- Improved user interface and logging
-
-#### Testing
-- Updated all unit tests to match new API signatures
-- Enhanced mock implementations:
-  - Mock allocator with alignment and statistics support
-  - Mock callbacks with layer interface compatibility
-  - Mock PHY with realistic behavior simulation
-- Improved test coverage for error conditions
-- Enhanced assertions and validation logic
-
-#### Build System
-- Updated CMake configuration for new source files
-- Improved test build configuration
-- Updated example build settings
-- Better dependency management
+- Reject oversized ACK range counts before length multiplication can overflow.
+- Validate dependency identity, ABI, target kind and same-package version consistency before consumption.
 
 ### Removed
-- Obsolete workspace configuration file (moved to .vscode directory)
 
----
+- Generic foundation implementations, old core dependency, nested production submodules and implicit source-directory dependency selection.
+- Protocol-owned platform time, mutex and timer wrappers; callers provide time and serialized access.
 
 ## [1.0.0] - 2026-01-XX
 
@@ -213,4 +150,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CMake 3.21+ build system
 - Cross-platform support (Windows, Linux, macOS)
 - Compiler support: GCC, Clang, MSVC
-

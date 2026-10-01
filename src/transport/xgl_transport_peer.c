@@ -5,39 +5,27 @@
 
 #include <string.h>
 
-#include "xgl/internal/xgl_time.h"
 #include "xgl_transport_internal.h"
-xgl_transport_peer_state_t *transport_find_peer(xgl_transport_ctx_t *ctx,
-                                                uint16_t peer_id)
-{
-    if (ctx == NULL) {
-        return NULL;
-    }
 
-    xgl_transport_peer_state_t *peer = ctx->peers;
-    while (peer != NULL) {
-        if (peer->peer_id == peer_id) {
-            return peer;
-        }
-        peer = peer->next;
-    }
-
-    return NULL;
-}
-
-xgl_transport_peer_state_t *transport_find_peer_scope(xgl_transport_ctx_t *ctx,
+/**
+ * \brief           Find an exact node, connection and epoch owner
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       peer_id: Remote endpoint
+ * \param[in]       connection_id: Connection identity, including zero
+ * \param[in]       session_epoch: Session epoch, including zero
+ * \return          Matching owner, or NULL
+ */
+xgl_transport_peer_state_t* transport_find_peer_scope(xgl_transport_ctx_t* ctx,
                                                       uint16_t peer_id,
                                                       uint32_t connection_id,
-                                                      uint32_t session_epoch)
-{
+                                                      uint32_t session_epoch) {
     if (ctx == NULL) {
         return NULL;
     }
 
-    xgl_transport_peer_state_t *peer = ctx->peers;
+    xgl_transport_peer_state_t* peer = ctx->peers;
     while (peer != NULL) {
-        if (peer->peer_id == peer_id && peer->has_connection_scope &&
-            peer->connection_id == connection_id &&
+        if (peer->peer_id == peer_id && peer->connection_id == connection_id &&
             peer->session_epoch == session_epoch) {
             return peer;
         }
@@ -47,123 +35,118 @@ xgl_transport_peer_state_t *transport_find_peer_scope(xgl_transport_ctx_t *ctx,
     return NULL;
 }
 
-static xgl_transport_peer_state_t *transport_get_or_create_peer_internal(
-    xgl_transport_ctx_t *ctx, uint16_t peer_id, uint32_t connection_id,
-    uint32_t session_epoch, bool has_connection_scope)
-{
-    xgl_transport_peer_state_t *peer =
-        has_connection_scope ? transport_find_peer_scope(
-                                   ctx, peer_id, connection_id, session_epoch)
-                             : transport_find_peer(ctx, peer_id);
+/**
+ * \brief           Find a peer or allocate one within the configured peer limit
+ * \param[in,out]   ctx: Transport layer context
+ * \param[in]       peer_id: Remote node ID
+ * \param[in]       connection_id: Connection identity
+ * \param[in]       session_epoch: Session identity
+ * \return          Owned peer state, or NULL when capacity is unavailable
+ */
+xgl_transport_peer_state_t*
+transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
+                                   uint32_t connection_id,
+                                   uint32_t session_epoch) {
+    xgl_transport_peer_state_t* peer =
+        transport_find_peer_scope(ctx, peer_id, connection_id, session_epoch);
     if (peer != NULL) {
         return peer;
     }
 
-    peer = (xgl_transport_peer_state_t *) transport_malloc(
-        ctx->allocator, sizeof(xgl_transport_peer_state_t));
+    size_t count = 0U;
+    for (peer = ctx->peers; peer != NULL; peer = peer->next) {
+        count++;
+    }
+    if (count >= ctx->max_peers) {
+        return NULL;
+    }
+
+    peer = (xgl_transport_peer_state_t*)xgm_alloc(
+        ctx->memory.peer, sizeof(xgl_transport_peer_state_t));
     if (peer == NULL) {
         return NULL;
     }
 
     memset(peer, 0, sizeof(*peer));
     peer->peer_id = peer_id;
-    peer->has_connection_scope = has_connection_scope;
-    peer->connection_id = has_connection_scope ? connection_id : 0U;
-    peer->session_epoch = has_connection_scope ? session_epoch : 0U;
-    peer->session_id = (uint16_t) (ctx->next_session_id & XGL_SESSION_ID_MASK);
-    if (peer->session_id == 0U) {
-        peer->session_id = 1U;
-    }
-    ctx->next_session_id =
-        (uint16_t) ((peer->session_id + 1U) & XGL_SESSION_ID_MASK);
-    if (ctx->next_session_id == 0U) {
-        ctx->next_session_id = 1U;
-    }
+    peer->connection_id = connection_id;
+    peer->session_epoch = session_epoch;
+    peer->last_active_ms = transport_now(ctx);
     xgl_rtt_init(&peer->rtt_est);
 
     xgl_error_t err = xgl_window_init_with_allocator(
-        &peer->tx_window, ctx->window.window_size, ctx->allocator);
+        &peer->tx_window, ctx->window_size, ctx->memory.window);
     if (err != XGL_OK) {
-        transport_free(ctx->allocator, peer);
+        xgm_free(ctx->memory.peer, peer);
         return NULL;
     }
 
-    err = xgl_reliable_init(&peer->reliable_queue, ctx->max_retry_count,
-                            ctx->allocator);
+    err = xgl_reliable_init(&peer->reliable_queue, ctx->memory.tx_packet);
     if (err != XGL_OK) {
         xgl_window_destroy(&peer->tx_window);
-        transport_free(ctx->allocator, peer);
+        xgm_free(ctx->memory.peer, peer);
         return NULL;
     }
 
+    peer->reliable_queue.data_allocator = ctx->memory.tx_payload;
+#if XGL_FEATURE_FRAGMENTATION
+    peer->reliable_queue.extensions_allocator = ctx->memory.tx_extensions;
+#endif
     peer->next = ctx->peers;
     ctx->peers = peer;
     return peer;
 }
 
-xgl_transport_peer_state_t *
-transport_get_or_create_peer(xgl_transport_ctx_t *ctx, uint16_t peer_id)
-{
-    return transport_get_or_create_peer_internal(ctx, peer_id, 0U, 0U, false);
-}
-
-xgl_transport_peer_state_t *
-transport_get_or_create_peer_scope(xgl_transport_ctx_t *ctx, uint16_t peer_id,
-                                   uint32_t connection_id,
-                                   uint32_t session_epoch)
-{
-    return transport_get_or_create_peer_internal(ctx, peer_id, connection_id,
-                                                 session_epoch, true);
-}
-
-void transport_destroy_peers(xgl_transport_ctx_t *ctx)
-{
+void transport_destroy_peers(xgl_transport_ctx_t* ctx) {
     if (ctx == NULL) {
         return;
     }
 
-    xgl_transport_peer_state_t *peer = ctx->peers;
+    xgl_transport_peer_state_t* peer = ctx->peers;
     while (peer != NULL) {
-        xgl_transport_peer_state_t *next = peer->next;
-        transport_clear_rx_buffered(ctx, peer);
-        xgl_reliable_destroy(&peer->reliable_queue);
+        xgl_transport_peer_state_t* next = peer->next;
+        transport_clear_peer_data(ctx, peer);
         xgl_window_destroy(&peer->tx_window);
-        transport_free(ctx->allocator, peer);
+        xgm_free(ctx->memory.peer, peer);
         peer = next;
     }
     ctx->peers = NULL;
 }
 
 /**
- * \brief           Reclaim peer states that have been idle beyond the configured
- *                  timeout and have no pending reliable or buffered RX state.
+ * \brief           Reclaim peer states that have been idle beyond the
+ *                  configured timeout without ever using reliable DATA numbers.
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       current_time_ms: Explicit current time
  * \return          Number of peers reclaimed.
  */
-uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t *ctx,
-                                      uint32_t current_time_ms)
-{
+uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
+                                      uint32_t current_time_ms) {
     if (ctx == NULL || ctx->peer_idle_timeout_ms == 0U) {
         return 0U;
     }
 
     uint32_t reclaimed = 0U;
-    xgl_transport_peer_state_t **prev = &ctx->peers;
-    xgl_transport_peer_state_t *peer = ctx->peers;
+    xgl_transport_peer_state_t** prev = &ctx->peers;
+    xgl_transport_peer_state_t* peer = ctx->peers;
 
     while (peer != NULL) {
-        xgl_transport_peer_state_t *next = peer->next;
+        xgl_transport_peer_state_t* next = peer->next;
 
-        /* Skip peers that still hold pending reliable packets or buffered
-         * out-of-order RX data -- those must not be reclaimed.           */
+        /* Accepted DATA history survives idle time so the same scope cannot
+         * restart its packet numbers or lose duplicate suppression. */
         bool has_pending = !xgl_reliable_is_empty(&peer->reliable_queue) ||
-                           peer->rx_buffered != NULL;
+                           transport_peer_has_pending_data(ctx, peer) ||
+                           peer->failed ||
+                           peer->tx_window.next_packet_number != 0U ||
+                           peer->rx_has_packet_number_state;
 
         uint32_t idle_ms = current_time_ms - peer->last_active_ms;
         if (!has_pending && idle_ms >= ctx->peer_idle_timeout_ms) {
             *prev = next;
             xgl_reliable_destroy(&peer->reliable_queue);
             xgl_window_destroy(&peer->tx_window);
-            transport_free(ctx->allocator, peer);
+            xgm_free(ctx->memory.peer, peer);
             reclaimed++;
         } else {
             prev = &peer->next;
@@ -175,50 +158,93 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t *ctx,
     return reclaimed;
 }
 
-void transport_reset_peer_state(xgl_transport_ctx_t *ctx,
-                                xgl_transport_peer_state_t *peer,
-                                uint16_t session_id, uint32_t connection_id,
-                                uint32_t session_epoch)
-{
-    if (ctx == NULL || peer == NULL) {
-        return;
-    }
-
-    peer->session_id = (uint16_t) (session_id & XGL_SESSION_ID_MASK);
-    peer->hello_sent = false;
-    peer->session_established = true;
+/**
+ * \brief           Release all data owned by one scope without reusing its
+ * numbers
+ * \param[in,out]   ctx: Transport context
+ * \param[in,out]   peer: Exact owner whose identity and failure state are
+ * retained
+ */
+void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
+                               xgl_transport_peer_state_t* peer) {
     xgl_reliable_clear(&peer->reliable_queue);
-    xgl_window_reset(&peer->tx_window);
-    xgl_window_reset(&ctx->window);
-    if (ctx->fragment_mgr != NULL) {
-        (void) xgl_fragment_clear_reassembly_scope(
-            ctx->fragment_mgr, peer->peer_id, connection_id, session_epoch);
-    }
-    xgl_rtt_init(&peer->rtt_est);
-    peer->rx_next_packet_number = 0U;
-    peer->rx_has_packet_number_state = false;
+#if XGL_FEATURE_OUT_OF_ORDER
     transport_clear_rx_buffered(ctx, peer);
-    peer->last_active_ms = xgl_time_ms();
+#endif
+#if XGL_FEATURE_FRAGMENTATION
+    transport_clear_pending_message(ctx, peer);
+    transport_clear_tx_message(ctx, peer);
+    if (ctx->fragment_mgr != NULL) {
+        (void)xgl_fragment_clear_reassembly_scope(
+            ctx->fragment_mgr, peer->peer_id, peer->connection_id,
+            peer->session_epoch);
+    }
+#else
+    (void)ctx;
+#endif
 }
 
-void transport_update_peer_deadline(xgl_transport_peer_state_t *peer)
-{
-    if (peer == NULL) {
+/**
+ * \brief           Fail a peer and release all transport-owned outstanding data
+ * \param[in,out]   ctx: Transport layer context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in,out]   peer: Peer that requires a new epoch before further traffic
+ * \param[in]       error: Failure reported once to the application
+ */
+void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                         xgl_transport_peer_state_t* peer, xgl_error_t error) {
+    if (ctx == NULL || peer == NULL || peer->failed) {
         return;
     }
+    peer->failed = true;
+    transport_clear_peer_data(ctx, peer);
 
-    peer->earliest_deadline_ms = 0U;
+    transport_count_send_error(ctx);
+    xgl_transport_report_error(ctx, handle, error,
+                               "Reliable peer failed; new epoch required");
+}
 
-    xgl_list_node_t *node;
-    XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
-        const xgl_reliable_packet_t *pkt =
-            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        if (pkt->send_timestamp != 0U && pkt->timeout_ms > 0) {
-            uint32_t abs_deadline = pkt->send_timestamp + (uint32_t)pkt->timeout_ms;
-            if (peer->earliest_deadline_ms == 0U ||
-                (int32_t)(abs_deadline - peer->earliest_deadline_ms) < 0) {
-                peer->earliest_deadline_ms = abs_deadline;
-            }
-        }
+/**
+ * \brief           Close one exact scope and return its peer storage
+ * reservation
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       handle: Protocol instance handle for cancellation reporting
+ * \param[in]       remote_id: Remote endpoint
+ * \param[in]       connection_id: Connection identity
+ * \param[in]       session_epoch: Session epoch being retired
+ * \return          XGL_OK, XGL_ERR_NOT_FOUND, or XGL_ERR_NULL_POINTER
+ * \note            The caller closes authentication first, or drains
+ * unauthenticated old traffic and changes epoch before reusing this
+ * reservation.
+ */
+xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
+                                      xgl_handle_t handle, uint16_t remote_id,
+                                      uint32_t connection_id,
+                                      uint32_t session_epoch) {
+    if (ctx == NULL) {
+        return XGL_ERR_NULL_POINTER;
     }
+    xgl_transport_peer_state_t** link = &ctx->peers;
+    while (*link != NULL) {
+        xgl_transport_peer_state_t* peer = *link;
+        if (peer->peer_id == remote_id &&
+            peer->connection_id == connection_id &&
+            peer->session_epoch == session_epoch) {
+            bool cancelled = !peer->failed &&
+                             (!xgl_reliable_is_empty(&peer->reliable_queue) ||
+                              transport_peer_has_pending_data(ctx, peer));
+            *link = peer->next;
+            transport_clear_peer_data(ctx, peer);
+            xgl_window_destroy(&peer->tx_window);
+            xgm_free(ctx->memory.peer, peer);
+            if (cancelled) {
+                xgl_transport_report_error(
+                    ctx, handle, XGL_ERR_CANCELLED,
+                    "Transport scope closed with pending data");
+            }
+            return XGL_OK;
+        }
+        link = &peer->next;
+    }
+    return XGL_ERR_NOT_FOUND;
 }

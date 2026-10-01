@@ -7,19 +7,20 @@
 #ifndef MOCK_PHY_H
 #define MOCK_PHY_H
 
-#include <gmock/gmock.h>
-#include <xgl/xgl.h>
-#include <vector>
-#include <deque>
-#include <mutex>
 #include <cstring>
+#include <deque>
+#include <gmock/gmock.h>
+#include <mutex>
+#include <vector>
+#include <xgl/xgl.h>
 
 /**
  * \brief           Mock physical layer class for testing
  */
 class MockPhy {
-public:
-    MockPhy() : tx_count_(0), rx_count_(0) {}
+  public:
+    MockPhy() : tx_count_(0), rx_count_(0) {
+    }
 
     /**
      * \brief           Mock transmit function
@@ -54,26 +55,36 @@ public:
      * \brief           Get transmitted data
      * \return          Vector of transmitted bytes
      */
-    const std::vector<uint8_t>& get_tx_data() const { return tx_data_; }
+    const std::vector<uint8_t>& get_tx_data() const {
+        return tx_data_;
+    }
 
     /**
      * \brief           Clear transmitted data
      */
-    void clear_tx_data() { tx_data_.clear(); }
+    void clear_tx_data() {
+        tx_data_.clear();
+    }
 
     /**
      * \brief           Get transmission count
      */
-    size_t get_tx_count() const { return tx_count_; }
+    size_t get_tx_count() const {
+        return tx_count_;
+    }
 
     /**
      * \brief           Get reception count
      */
-    size_t get_rx_count() const { return rx_count_; }
+    size_t get_rx_count() const {
+        return rx_count_;
+    }
 
-private:
-    static xgl_error_t tx_wrapper(const uint8_t* data, size_t len, void* user_data);
-    static xgl_error_t rx_wrapper(uint8_t* buffer, size_t* len, void* user_data);
+  private:
+    static xgl_error_t tx_wrapper(const uint8_t* data, size_t len,
+                                  void* user_data);
+    static xgl_error_t rx_wrapper(uint8_t* buffer, size_t* len,
+                                  void* user_data);
 
     xgl_phy_ops_t phy_ops_;
     std::vector<uint8_t> tx_data_;
@@ -86,36 +97,42 @@ private:
 
 /**
  * \brief           Loopback PHY pair that wires two instances together
- * \details         Instance A's TX connects to instance B's RX buffer and vice versa.
- *                  TX callback enqueues frame bytes; RX callback dequeues them.
+ * \details         Instance A's TX connects to instance B's RX buffer and vice
+ * versa. TX callback enqueues frame bytes; RX callback dequeues them.
  */
 class LoopbackPhyPair {
-public:
+  public:
     LoopbackPhyPair() = default;
 
     /**
      * \brief           Get PHY ops for node A
-     * \details         A's tx goes to B's rx queue; A's rx reads from A's incoming queue
+     * \details         A's tx goes to B's rx queue; A's rx reads from A's
+     * incoming queue
      */
     xgl_phy_ops_t get_phy_a();
 
     /**
      * \brief           Get PHY ops for node B
-     * \details         B's tx goes to A's rx queue; B's rx reads from B's incoming queue
+     * \details         B's tx goes to A's rx queue; B's rx reads from B's
+     * incoming queue
      */
     xgl_phy_ops_t get_phy_b();
 
     /**
      * \brief           Get total frames sent by A
      */
-    size_t get_a_tx_count() const { return a_tx_count_; }
+    size_t get_a_tx_count() const {
+        return a_tx_count_;
+    }
 
     /**
      * \brief           Get total frames sent by B
      */
-    size_t get_b_tx_count() const { return b_tx_count_; }
+    size_t get_b_tx_count() const {
+        return b_tx_count_;
+    }
 
-private:
+  private:
     static xgl_error_t tx_a(const uint8_t* data, size_t len, void* user_data);
     static xgl_error_t rx_a(uint8_t* buffer, size_t* len, void* user_data);
     static xgl_error_t tx_b(const uint8_t* data, size_t len, void* user_data);
@@ -135,10 +152,11 @@ private:
 
 /**
  * \brief           Simple FIFO PHY for single-direction loopback
- * \details         tx enqueues frames, rx dequeues them. Used for multi-hop chains.
+ * \details         tx enqueues frames, rx dequeues them. Used for multi-hop
+ * chains.
  */
 class FifoPhy {
-public:
+  public:
     FifoPhy() = default;
 
     xgl_phy_ops_t get_phy_ops();
@@ -147,9 +165,11 @@ public:
     void enqueue_rx(const uint8_t* data, size_t len);
 
     /** Get number of frames transmitted */
-    size_t get_tx_count() const { return tx_count_; }
+    size_t get_tx_count() const {
+        return tx_count_;
+    }
 
-private:
+  private:
     static xgl_error_t tx_cb(const uint8_t* data, size_t len, void* user_data);
     static xgl_error_t rx_cb(uint8_t* buffer, size_t* len, void* user_data);
 

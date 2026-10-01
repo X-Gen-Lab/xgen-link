@@ -1,62 +1,45 @@
 # 生产检查表
 
-本页用于 MCU 或多节点系统上线前的工程审查。每个项目都应能在代码、配置、测试或运行日志中找到证据。
+验收针对确定的配置、目标 ABI、驱动和 provider。应将这些输入与产物一起保存。
 
-## 配置
+## 构建和配置
 
-- `source_id` 非 0，且不使用保留地址段。
-- route table 覆盖所有目标节点，`max_frame_size` 与 PHY MTU 一致。
-- `auth_required=true`，并提供有效 `auth_provider`。
-- `auth_key_id` 与设备密钥管理系统一致。
-- `enable_encryption` 和 `enable_compression` 保持关闭，直到 codec/security model 完整接入。
-- production/noheap profile 中 allocator 行为明确，不隐式回退到 malloc。
+- 由产品统一准备并记录 status、bytes、CRC、memory、containers 五包的提交、脏状态或安装来源；产品采用子模块时由产品 gitlink 固定版本。link 只消费预提供 targets 或安装包，不读取开发清单替产品选择依赖。
+- 库和消费者使用匹配的 profile/ABI 头文件。
+- 校验显式容量及精确 workspace 大小和对齐。
+- 借用的配置和上下文保持不可变并活到 destroy。
+
+## I/O 和执行
+
+- 串行化全部实例调用；回调绝不重入或销毁实例。
+- 验证同步整帧 PHY 接纳，包括 DMA 适配层。
+- 验证非阻塞、有界 RX，以及每条链路独立 parser。
+- 发送、step 和 timeout 查询统一使用单调毫秒时钟。
+
+## 可靠性和恢复
+
+- 验证 ACK 丢失、重复、乱序、满窗口和 PHY BUSY。
+- 验证已保留可靠/分片数据时的应用 BUSY。
+- 验证超过窗口的分片消息和全局资源耗尽。
+- 显式退役失败 scope，以新 epoch 重连；排空未认证旧流量。
+- 区分本地接纳与远端应用完成。
 
 ## 安全
 
-- auth provider 的 `tag_len` 固定，且满足 `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`。
-- `sign` 和 `verify` 对 header/extensions/payload 使用相同 AAD 边界。
-- 端到端认证会规范化逐跳可变字段：TTL 和 header CRC 被排除，frame CRC 位于 tag 输入之外。
-- key id、nonce/material id 的生成和轮换由应用或安全模块管理。
-- replay window 容量满足最大乱序窗口。
-- 多跳 forwarding 场景已验证 TTL 修改后保留 auth tag，并重算 header/frame CRC。
-- 错误认证、被拒绝的重放、错误 session 和错误 connection 的包不会 ACK；可靠重复包可补 ACK，但不得再次交付。
+- 使用所选 profile 的可信会话 API 和经过审查的 provider。
+- 按传入的双向 nonce/密钥身份认证完整 AAD 和 payload。
+- 保证重启后的新鲜性，禁止密钥/nonce 域复用。
+- 遵守会话容量和保留占用记录；接收帧不能建立信任。
+- 关闭保留的压缩和 payload 加密功能。
 
-## 可靠性
+## 内存和时序
 
-- reliable window 大小与链路 RTT、带宽和 RAM 预算匹配。
-- retry limit 与应用容忍延迟匹配。
-- ACK range/SACK 在 loss/reorder/duplicate 注入下通过。
-- RESET/CLOSE 只清目标 peer/connection/session。
-- 应用 callback 不阻塞协议主循环。
+- 检查最终 ELF 是否混入堆服务。
+- RAM 核算包含 workspace、应用/驱动缓冲、provider 状态、BSP 和栈。
+- 在目标上测量完整调用链与 ISR 嵌套，单函数报告不足以代替。
+- 验证溢出拒绝、容量回收、时钟回绕和最坏 step 耗时。
+- 用产品真实链接 map 确认 Flash/RAM 限额。
 
-## 内存
+## 发布证据
 
-- peer state、reliable queue、rx buffer、fragment reassembly 的上限可计算。
-- fragment global budget 和 per-peer budget 均已配置。
-- worst-case payload、fragment 数量和 route MTU 有容量分析。
-- noheap smoke 通过。
-- footprint report 符合目标 MCU RAM/Flash。
-
-## 实时性和功耗
-
-- ISR 只把 PHY RX 数据入队，不直接调用 parser/auth/transport。
-- 主循环或 RTOS task 调用 `xgl_run()`。
-- 使用 `xgl_next_deadline_ms()` 计算 sleep 时间。
-- time provider 单调递增，并处理 wraparound。
-- PHY send/receive 不在协议锁内长时间阻塞。
-
-## 诊断
-
-- 统计项能区分 CRC、auth、replay、route、MTU、timeout、fragment budget 错误。
-- release build 保留必要的错误回调。
-- 现场日志不输出密钥、tag 原文或敏感 payload。
-- 长时 soak 覆盖多节点转发、重传和分片。
-
-## 发布
-
-- `ctest --preset gcc-test --output-on-failure` 通过。
-- `xgl_release_validation` 通过。
-- `xgl_docs` 通过。
-- cppcheck 已安装并通过。
-- SDK consumer smoke 通过。
-- 工作区无未解释的源码改动。
+保存构建参数、编译器版本、依赖版本、map/ELF、测试报告和硬件观察结果。独立 Boot 消费者提供链接及资源证据，不能代替真实板卡测试或 Boot 升级断电验证。

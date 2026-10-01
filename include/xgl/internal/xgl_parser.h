@@ -11,11 +11,11 @@
 extern "C" {
 #endif
 
+#include "xgl/xgl_error.h"
+#include "xgl/xgl_types.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include "xgl/xgl_types.h"
-#include "xgl/xgl_error.h"
 
 /*---------------------------------------------------------------------------*/
 /* Parser State Machine                                                      */
@@ -25,19 +25,19 @@ extern "C" {
  * \brief           Parser state enumeration
  */
 typedef enum {
-    XGL_PARSE_MAGIC,              /**< Searching for production magic */
-    XGL_PARSE_HEADER,           /**< Receiving frame header */
-    XGL_PARSE_PAYLOAD,          /**< Receiving payload data */
-    XGL_PARSE_CRC,              /**< Receiving CRC16 */
+    XGL_PARSE_MAGIC,   /**< Searching for production magic */
+    XGL_PARSE_HEADER,  /**< Receiving frame header */
+    XGL_PARSE_PAYLOAD, /**< Receiving payload data */
+    XGL_PARSE_CRC,     /**< Receiving CRC16 */
 } xgl_parse_state_t;
 
 /**
  * \brief           Parser result enumeration
  */
 typedef enum {
-    XGL_PARSE_RESULT_INCOMPLETE,    /**< Frame incomplete, need more data */
-    XGL_PARSE_RESULT_COMPLETE,      /**< Frame complete and valid */
-    XGL_PARSE_RESULT_ERROR,         /**< Parse error occurred */
+    XGL_PARSE_RESULT_INCOMPLETE, /**< Frame incomplete, need more data */
+    XGL_PARSE_RESULT_COMPLETE,   /**< Frame complete and valid */
+    XGL_PARSE_RESULT_ERROR,      /**< Parse error occurred */
 } xgl_parse_result_t;
 
 /**
@@ -52,7 +52,8 @@ typedef struct {
     uint32_t timestamp;         /**< Timestamp when parsing started (ms) */
     size_t expected_header_len; /**< Expected fixed + extension header length */
     uint16_t expected_payload_len; /**< Expected payload length from header */
-    uint8_t expected_auth_tag_len; /**< Expected authentication trailer length */
+    uint8_t
+        expected_auth_tag_len; /**< Expected authentication trailer length */
 } xgl_parser_t;
 
 /*---------------------------------------------------------------------------*/
@@ -62,7 +63,7 @@ typedef struct {
 /**
  * \brief           Default parser timeout in milliseconds
  */
-#define XGL_PARSER_TIMEOUT_MS   1000
+#define XGL_PARSER_TIMEOUT_MS 1000
 
 /*---------------------------------------------------------------------------*/
 /* Parser Functions                                                          */
@@ -75,8 +76,7 @@ typedef struct {
  * \param[in]       cache_size: Size of cache buffer
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_parser_init(xgl_parser_t* parser,
-                            uint8_t* cache_buffer,
+xgl_error_t xgl_parser_init(xgl_parser_t* parser, uint8_t* cache_buffer,
                             size_t cache_size);
 
 /**
@@ -92,8 +92,7 @@ void xgl_parser_reset(xgl_parser_t* parser);
  * \param[in]       current_time_ms: Current time in milliseconds
  * \return          Parse result (incomplete, complete, or error)
  */
-xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
-                                        uint8_t byte,
+xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
                                         uint32_t current_time_ms);
 
 /**
@@ -104,8 +103,7 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
  * \return          true if timeout occurred, false otherwise
  */
 bool xgl_parser_check_timeout(const xgl_parser_t* parser,
-                              uint32_t current_time_ms,
-                              uint32_t timeout_ms);
+                              uint32_t current_time_ms, uint32_t timeout_ms);
 
 /**
  * \brief           Get parsed frame data
@@ -115,15 +113,15 @@ bool xgl_parser_check_timeout(const xgl_parser_t* parser,
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_parser_get_frame(const xgl_parser_t* parser,
-                                 uint8_t** frame_buffer,
-                                 size_t* frame_len);
+                                 uint8_t** frame_buffer, size_t* frame_len);
 
 /**
  * \brief           Get parser state (for debugging)
  * \param[in]       parser: Parser structure
  * \return          Current parser state
  */
-static inline xgl_parse_state_t xgl_parser_get_state(const xgl_parser_t* parser) {
+static inline xgl_parse_state_t
+xgl_parser_get_state(const xgl_parser_t* parser) {
     return parser ? parser->state : XGL_PARSE_MAGIC;
 }
 

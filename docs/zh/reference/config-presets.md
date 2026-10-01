@@ -1,23 +1,23 @@
 # 配置预设
 
-| Preset | 目标 | 认证 | 说明 |
+profile 定义编译能力上限，preset 在上限内提供显式运行容量。不支持的能力由配置校验拒绝。
+
+## 编译档位
+
+| 档位 | 认证 | 分片 / 转发 / 乱序 | xgen-memory libc 默认值 |
 | --- | --- | --- | --- |
-| Tiny | 小 MCU | 默认关闭 | 最小资源占用 |
-| Small | 小型应用 | 默认关闭 | 更大 buffer |
-| Medium | 常规 MCU | 默认关闭 | 平衡吞吐和资源 |
-| Large | Host/大 MCU | 默认关闭 | 更大窗口和 buffer |
-| Production | 发布配置 | 默认开启 | 要求 auth provider |
+| boot | 不支持 | 不支持 | 关闭 |
+| embedded | 支持，4 个会话槽 | 支持 | 关闭 |
+| full | 支持，16 个会话槽 | 支持 | 开启 |
 
-生产发布应从 Production preset 开始，再按目标板资源收紧。
+## 运行容量
 
-## 精确默认值
-
-| Preset | ACK Timeout | Retry | Window | Max Frame | TX Pool | RX Buffer |
+| 预设 | MTU | 窗口 | Peer | 保留 TX | 保留 RX | 消息字节 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Tiny | 1000 ms | 3 | 2 | 128 | 1024 | 160 |
-| Small | 1000 ms | 5 | 4 | 256 | 2048 | 288 |
-| Medium | 1000 ms | 5 | 8 | 512 | 4096 | 544 |
-| Large | 1000 ms | 7 | 16 | 1024 | 8192 | 1056 |
-| Production | 1000 ms | 7 | 16 | 1024 | 8192 | 1056 |
+| boot | 128 | 1 | 1 | 1 | 0 | 禁用 |
+| tiny | 128 | 2 | 1 | 2 | 2 | 禁用 |
+| small | 256 | 4 | 2 | 4 | 4 | 1024 |
+| medium | 512 | 8 | 8 | 16 | 16 | 4096 |
+| large / production | 1024 | 16 | 16 | 64 | 64 | 16384 |
 
-所有 preset 默认关闭 compression/encryption。Production 默认 `auth_required=true`，`auth_key_id=1`。
+Production 还要求认证 provider，并在流量开始前显式安装可信会话。共享消息预算与重组槽限制同时生效；查阅 `xgl_feature_config_t`，使用 `xgl_memory_requirements()` 测量实际配置。预设名称不是实测 MCU RAM/Flash 保证。

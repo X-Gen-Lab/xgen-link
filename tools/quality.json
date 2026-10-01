@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "standard_version": "1.0.0",
+  "quality_version": "0.1.0",
+  "quality_source": {
+    "revision": "ddd42d4b7eb8c8b744a019015d6ad412f78c10fe"
+  },
+  "public_headers": [
+    "include/xgl/xgl.h",
+    "include/xgl/xgl_config.h",
+    "include/xgl/xgl_error.h",
+    "include/xgl/xgl_types.h"
+  ],
+  "production_directories": ["src"],
+  "scope": {
+    "directories": ["include", "src", "test", "examples", "tools", "cmake", "dev", "docs", ".github"]
+  }
+}

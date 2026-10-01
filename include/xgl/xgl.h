@@ -1,212 +1,52 @@
 /**
  * \file            xgl.h
- * \brief           xgen-link Protocol Stack - Main Public API
+ * \brief           Portable synchronous protocol API
  * \author          X-Gen Lab
- * \version         2.0.0
- * \date            2026-02-28
- *
- * \copyright       Copyright (c) 2026 X-Gen Lab
- *
- * \details         xgen-link is a modern, robust, and highly configurable
- *                  communication protocol stack designed for resource-constrained
- *                  embedded systems. It provides reliable data transmission with
- *                  support for multiple instances, thread safety, adaptive
- *                  retransmission, and comprehensive error handling.
- *
- * \par Features
- *                  - Multi-instance architecture for multiple communication channels
- *                  - Production v2 multi-node reliable communication loop
- *                  - Reliable and unreliable transmission with ACK timeout handling
- *                  - Adaptive retransmission with RTT estimation (RFC 6298)
- *                  - Sliding window flow control
- *                  - Packet fragmentation and reassembly
- *                  - Optional thread safety for RTOS environments
- *                  - Configurable memory pools for deterministic allocation
- *                  - Comprehensive error handling and statistics
- *                  - Platform abstraction for portability
- *                  - Minimal footprint: 32KB RAM, 50KB Flash (tiny config)
- *
- * \par Quick Start Example
- * \code{.c}
- * #include "xgl/xgl.h"
- *
- * // Physical layer callbacks
- * xgl_error_t uart_tx(const uint8_t* data, size_t len, void* user_data) {
- *     // Send data via UART
- *     return XGL_OK;
- * }
- *
- * xgl_error_t uart_rx(uint8_t* buffer, size_t* len, void* user_data) {
- *     // Receive data from UART
- *     return XGL_OK;
- * }
- *
- * // Receive callback
- * void on_receive(xgl_handle_t handle, uint16_t source_id, uint8_t data_type,
- *                 const uint8_t* data, size_t len, void* user_data) {
- *     printf("Received %zu bytes from node %d\n", len, source_id);
- * }
- *
- * int main(void) {
- *     // Setup physical layer
- *     xgl_phy_ops_t phy = {
- *         .tx = uart_tx,
- *         .rx = uart_rx,
- *         .user_data = NULL
- *     };
- *
- *     // Setup route table
- *     xgl_route_item_t routes[] = {
- *         { .target_id = 2, .phy = &phy, .max_frame_size = 256, .read_freq_hz = 100 }
- *     };
- *
- *     // Get default configuration
- *     xgl_config_t config;
- *     xgl_config_get_default(&config);
- *     config.source_id = 1;
- *     config.route_table = routes;
- *     config.route_table_len = 1;
- *     config.rx_callback = on_receive;
- *
- *     // Create and initialize protocol instance
- *     xgl_handle_t handle = xgl_create(&config);
- *     if (handle == NULL) {
- *         return -1;
- *     }
- *
- *     if (xgl_init(handle) != XGL_OK) {
- *         xgl_destroy(handle);
- *         return -1;
- *     }
- *
- *     // Send data
- *     xgl_tx_data_t tx_data = {
- *         .target_id = 2,
- *         .data_type = 0x01,
- *         .data = (const uint8_t*)"Hello",
- *         .data_len = 5,
- *         .reliable = true,
- *         .priority = 0
- *     };
- *     xgl_send(handle, &tx_data);
- *
- *     // Main loop
- *     while (1) {
- *         xgl_run(handle, 100);  // Call at 100 Hz
- *         delay_ms(10);
- *     }
- *
- *     // Cleanup
- *     xgl_destroy(handle);
- *     return 0;
- * }
- * \endcode
- *
- * \par Zero-Copy Example
- * \note            Single-frame unreliable sends are framed in the caller
- *                  buffer and passed directly to the PHY. Reliable zero-copy
- *                  requests are rejected; use xgl_send() for ACK/retry
- *                  semantics.
- * \note            When auth_required is true, zero-copy requires
- *                  auth_provider.tag_len to be within
- *                  (0, XGL_AUTH_TAG_MAX_LEN] and the payload must
- *                  start after DATA_TYPE_EXT (when data_type is non-zero)
- *                  plus SECURITY_EXT.
- * \code{.c}
- * // Allocate buffer with header space
- * uint8_t buffer[XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE + 100];
- *
- * // Write data after header space
- * size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE;
- * memcpy(buffer + data_offset, "Hello", 5);
- *
- * // Send without copying
- * xgl_tx_data_zerocopy_t tx_data = {
- *     .buffer = buffer,
- *     .buffer_size = sizeof(buffer),
- *     .data_offset = data_offset,
- *     .data_len = 5,
- *     .target_id = 2,
- *     .data_type = 0x01,
- *     .reliable = false,
- *     .priority = 0
- * };
- * xgl_send_zerocopy(handle, &tx_data);
- * \endcode
- *
- * \par Multi-Instance Example
- * \code{.c}
- * // Create multiple independent instances
- * xgl_handle_t uart_handle = xgl_create(&uart_config);
- * xgl_handle_t spi_handle = xgl_create(&spi_config);
- *
- * xgl_init(uart_handle);
- * xgl_init(spi_handle);
- *
- * // Each instance operates independently
- * xgl_send(uart_handle, &uart_tx_data);
- * xgl_send(spi_handle, &spi_tx_data);
- *
- * // Process each instance
- * xgl_run(uart_handle, 100);
- * xgl_run(spi_handle, 100);
- * \endcode
+ * \details         Calls on the same instance must be serialized by the caller.
+ *                  Callbacks execute synchronously and must not reenter it.
+ *                  Configuration, PHY descriptors, providers and their contexts
+ *                  are borrowed and must remain valid until destruction.
  */
 
 #ifndef XGL_H
 #define XGL_H
 
+#include <xgl/xgl_config.h>
+#include <xgl/xgl_error.h>
+#include <xgl/xgl_types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-
-/*---------------------------------------------------------------------------*/
-/* Public Header Includes                                                    */
-/*---------------------------------------------------------------------------*/
-
-/* Public API types, errors, and configuration constants */
-#include "xgl/xgl_error.h"
-#include "xgl/xgl_types.h"
-#include "xgl/xgl_config.h"
-
-/*---------------------------------------------------------------------------*/
-/* Version Information                                                       */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Protocol major version
- * \note            Incremented for breaking API changes
- */
-#define XGL_VERSION_MAJOR       2
+/** \brief           Protocol major version; changes can break compatibility. */
+#define XGL_VERSION_MAJOR 3
 
 /**
  * \brief           Protocol minor version
  * \note            Incremented for new features (backward compatible)
  */
-#define XGL_VERSION_MINOR       0
+#define XGL_VERSION_MINOR 0
 
 /**
  * \brief           Protocol patch version
  * \note            Incremented for bug fixes
  */
-#define XGL_VERSION_PATCH       0
+#define XGL_VERSION_PATCH 0
 
 /**
  * \brief           Protocol version string
  */
-#define XGL_VERSION_STRING      "2.0.0"
+#define XGL_VERSION_STRING "3.0.0"
 
 /**
- * \brief           Protocol version as integer (MAJOR * 10000 + MINOR * 100 + PATCH)
+ * \brief           Protocol version as integer (MAJOR * 10000 + MINOR * 100 +
+ * PATCH)
  * \note            Useful for compile-time version checks
  */
-#define XGL_VERSION_INT         ((XGL_VERSION_MAJOR * 10000) + \
-                                 (XGL_VERSION_MINOR * 100) + \
-                                 XGL_VERSION_PATCH)
+#define XGL_VERSION_INT                                                        \
+    ((XGL_VERSION_MAJOR * 10000) + (XGL_VERSION_MINOR * 100) +                 \
+     XGL_VERSION_PATCH)
 
 /**
  * \brief           Check if protocol version is at least the specified version
@@ -215,37 +55,27 @@ extern "C" {
  * \param[in]       patch: Patch version
  * \return          1 if current version >= specified version, 0 otherwise
  */
-#define XGL_VERSION_CHECK(major, minor, patch) \
+#define XGL_VERSION_CHECK(major, minor, patch)                                 \
     (XGL_VERSION_INT >= ((major) * 10000 + (minor) * 100 + (patch)))
 
 /**
- * \brief           No scheduled protocol deadline
- * \details         Returned by xgl_next_deadline_ms() when the instance has no
- *                  route polling, retransmission, or reassembly deadline.
+ * \brief           Reserve a workspace after checking consumer ABI constants
+ * \param[in]       config: Immutable configuration borrowed until destruction
+ * \param[in]       config_size: Size of the consumer's configuration structure
+ * \param[in]       abi_version: Consumer configuration ABI version
+ * \param[in]       build_config_id: Consumer compiled profile identifier
+ * \return          Reserved handle, or NULL for invalid input/allocation
+ * failure
+ * \note            Call xgl_init() before using the reserved instance.
  */
-#define XGL_NO_DEADLINE_MS      UINT32_MAX
-
-/**
- * \brief           Get protocol version string at runtime
- * \return          Version string (e.g., "2.0.0")
- */
-const char* xgl_version_string(void);
-
-/**
- * \brief           Get protocol version as integer at runtime
- * \return          Version integer (MAJOR * 10000 + MINOR * 100 + PATCH)
- */
-uint32_t xgl_version_int(void);
-
-/*---------------------------------------------------------------------------*/
-/* Instance Management API                                                   */
-/*---------------------------------------------------------------------------*/
+xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
+                                uint32_t abi_version, uint32_t build_config_id);
 
 /**
  * \brief           Create a new protocol instance
  * \param[in]       config: Configuration structure
  * \return          Instance handle on success, NULL on failure
- * \note            The configuration is copied internally
+ * \note            The immutable configuration is borrowed until xgl_destroy()
  * \note            Use xgl_init() to initialize the instance after creation
  * \note            Memory is allocated through config.memory.allocator. When
  *                  XGL_ALLOW_FALLBACK_MALLOC is enabled, NULL allocator uses
@@ -266,420 +96,266 @@ uint32_t xgl_version_int(void);
  * }
  * \endcode
  */
-xgl_handle_t xgl_create(const xgl_config_t* config);
+static inline xgl_handle_t xgl_create(const xgl_config_t* config) {
+    return xgl_create_checked(config, sizeof(xgl_config_t),
+                              XGL_CONFIG_ABI_VERSION, XGL_BUILD_CONFIG_ID);
+}
 
 /**
- * \brief           Initialize protocol instance
- * \param[in]       handle: Instance handle
+ * \brief           Storage requirements for a static protocol instance
+ */
+typedef struct {
+    size_t size; /**< Total caller storage, including instance and all pools */
+    size_t alignment;      /**< Required storage address alignment */
+    size_t runtime_blocks; /**< Sum of reusable slots across the typed pools */
+    size_t runtime_block_size; /**< Largest aligned runtime slot; pools have
+                                  different strides */
+} xgl_memory_requirements_t;
+
+/**
+ * \brief           Query the exact static workspace layout after ABI validation
+ * \details         Accounts for every enabled protocol capacity and alignment.
+ *                  No heap fallback or runtime expansion is performed.
+ *                  Only size is the exact total; runtime_blocks multiplied by
+ *                  runtime_block_size is not a workspace size.
+ * \param[in]       config: Configuration supported by the static storage plan
+ * \param[in]       config_size: Size of the caller's configuration structure
+ * \param[in]       abi_version: Caller configuration ABI version
+ * \param[in]       build_config_id: Caller compiled profile identifier
+ * \param[out]      requirements: Required size, alignment, and runtime capacity
+ * \return          XGL_OK, XGL_ERR_UNSUPPORTED, or configuration/ABI error
+ */
+xgl_error_t
+xgl_memory_requirements_checked(const xgl_config_t* config, size_t config_size,
+                                uint32_t abi_version, uint32_t build_config_id,
+                                xgl_memory_requirements_t* requirements);
+
+/**
+ * \brief           Query requirements using the consumer header's ABI constants
+ * \param[in]       config: Configuration supported by the static storage plan
+ * \param[out]      requirements: Required size, alignment, and runtime capacity
+ * \return          XGL_OK, XGL_ERR_UNSUPPORTED, or configuration/ABI error
+ */
+static inline xgl_error_t
+xgl_memory_requirements(const xgl_config_t* config,
+                        xgl_memory_requirements_t* requirements) {
+    return xgl_memory_requirements_checked(config, sizeof(xgl_config_t),
+                                           XGL_CONFIG_ABI_VERSION,
+                                           XGL_BUILD_CONFIG_ID, requirements);
+}
+
+/**
+ * \brief           Initialize the protocol inside caller-owned storage
+ * \note            The workspace must remain at a fixed address until destroy.
+ *                  It must not overlap the configuration or referenced objects.
+ *                  The config, PHY descriptors and callback contexts must
+ * remain valid and configuration arrays must not be mutated while in use.
+ * \param[in]       config: Configuration supported by the static storage plan
+ * \param[in]       config_size: Size of the caller's configuration structure
+ * \param[in]       abi_version: Caller configuration ABI version
+ * \param[in]       build_config_id: Caller compiled profile identifier
+ * \param[in]       workspace: Aligned caller-owned storage
+ * \param[in]       workspace_size: Available bytes from workspace
+ * \param[out]      handle: Instance handle, or NULL on failure
+ * \return          XGL_OK or validation/capacity error; failure clears handle
+ */
+xgl_error_t xgl_init_static_checked(const xgl_config_t* config,
+                                    size_t config_size, uint32_t abi_version,
+                                    uint32_t build_config_id, void* workspace,
+                                    size_t workspace_size,
+                                    xgl_handle_t* handle);
+
+/**
+ * \brief           Initialize with the consumer header's ABI constants
+ * \param[in]       config: Configuration supported by the static storage plan
+ * \param[in]       workspace: Aligned caller-owned storage
+ * \param[in]       workspace_size: Available bytes from workspace
+ * \param[out]      handle: Instance handle, or NULL on failure
  * \return          XGL_OK on success, error code otherwise
- * \note            Must be called after xgl_create() and before using instance
- * \note            Allocates all internal resources and initializes layers
- * \note            If initialization fails, partial resources are cleaned up
- * \warning         Do not use instance if initialization fails
- *
- * \par Example
- * \code{.c}
- * xgl_error_t err = xgl_init(handle);
- * if (err != XGL_OK) {
- *     printf("Initialization failed: %s\n", xgl_error_string(err));
- *     xgl_destroy(handle);
- *     return -1;
- * }
- * \endcode
+ */
+static inline xgl_error_t xgl_init_static(const xgl_config_t* config,
+                                          void* workspace,
+                                          size_t workspace_size,
+                                          xgl_handle_t* handle) {
+    return xgl_init_static_checked(config, sizeof(xgl_config_t),
+                                   XGL_CONFIG_ABI_VERSION, XGL_BUILD_CONFIG_ID,
+                                   workspace, workspace_size, handle);
+}
+
+/**
+ * \brief           Initialize the layers in a previously reserved workspace
+ * \param[in]       handle: Instance returned by xgl_create()
+ * \return          XGL_OK, NULL_POINTER, ALREADY_INITIALIZED, or resource error
  */
 xgl_error_t xgl_init(xgl_handle_t handle);
 
 /**
- * \brief           Destroy protocol instance and free all resources
- * \param[in]       handle: Instance handle
- * \note            Frees all allocated memory and invalidates the handle
- * \note            Safe to call with NULL handle
- * \note            Automatically cleans up pending packets and timers
- * \warning         Do not use handle after calling this function
- *
- * \par Example
- * \code{.c}
- * xgl_destroy(handle);
- * handle = NULL;  // Good practice
- * \endcode
+ * \brief           Release protocol resources without freeing borrowed storage
+ * \param[in]       handle: Instance to destroy; NULL is ignored
+ * \pre             No operation or callback may still be using the instance.
  */
 void xgl_destroy(xgl_handle_t handle);
 
-/*---------------------------------------------------------------------------*/
-/* Configuration API                                                         */
-/*---------------------------------------------------------------------------*/
+/**
+ * \brief           Read the library version used at link time
+ * \return          Read-only version string with static lifetime
+ */
+const char* xgl_version_string(void);
 
 /**
- * \brief           Get default configuration
- * \param[out]      config: Configuration structure to fill
- * \note            Fills configuration with sensible defaults
- * \note            User should modify as needed before calling xgl_create()
- * \note            Default values: 4KB TX pool, 512B RX buffer, 5 retries
- *
- * \par Example
- * \code{.c}
- * xgl_config_t config;
- * xgl_config_get_default(&config);
- *
- * // Customize as needed
- * config.source_id = 1;
- * config.protocol.max_retry_count = 3;
- * config.features.thread_safe = true;  // Requires XGL_THREAD_SAFE at build time
- * \endcode
+ * \brief           Read the library version as an integer
+ * \return          MAJOR * 10000 + MINOR * 100 + PATCH
+ */
+uint32_t xgl_version_int(void);
+
+/**
+ * \brief           Select defaults supported by the compiled profile
+ * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
 void xgl_config_get_default(xgl_config_t* config);
 
 /**
- * \brief           Get tiny configuration preset
- * \param[out]      config: Configuration structure to fill
- * \note            Optimized for 32KB RAM, 50KB Flash
- * \note            Minimal features, suitable for very constrained MCUs
- * \note            Values: 1KB TX pool, 160B RX buffer, 128B max frame
- *
- * \par Example
- * \code{.c}
- * xgl_config_t config;
- * xgl_config_get_preset_tiny(&config);
- * config.source_id = 1;  // Customize local node ID as needed
- * \endcode
+ * \brief           Select one peer, one TX slot, and 128-byte frames
+ * \param[out]      config: Configuration to overwrite; NULL is ignored
+ */
+void xgl_config_get_preset_boot(xgl_config_t* config);
+
+/**
+ * \brief           Select the tiny bounded protocol configuration
+ * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
 void xgl_config_get_preset_tiny(xgl_config_t* config);
 
 /**
- * \brief           Get small configuration preset
- * \param[out]      config: Configuration structure to fill
- * \note            Optimized for 64KB RAM, 100KB Flash
- * \note            Includes fragmentation support
- * \note            Values: 2KB TX pool, 288B RX buffer, 256B max frame
+ * \brief           Select the small bounded protocol configuration
+ * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
 void xgl_config_get_preset_small(xgl_config_t* config);
 
 /**
- * \brief           Get medium configuration preset
- * \param[out]      config: Configuration structure to fill
- * \note            Optimized for 128KB RAM, 256KB Flash
- * \note            Includes fragmentation; compression is reserved and not implemented yet
- * \note            Values: 4KB TX pool, 544B RX buffer, 512B max frame
+ * \brief           Select the medium bounded protocol configuration
+ * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
 void xgl_config_get_preset_medium(xgl_config_t* config);
 
 /**
- * \brief           Get large configuration preset
- * \param[out]      config: Configuration structure to fill
- * \note            Optimized for 256KB+ RAM, 512KB+ Flash
- * \note            Encryption is reserved and not implemented yet
- * \note            Values: 8KB TX pool, 1056B RX buffer, 1024B max frame
+ * \brief           Select the large bounded protocol configuration
+ * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
 void xgl_config_get_preset_large(xgl_config_t* config);
 
 /**
- * \brief           Get production configuration preset
- * \param[out]      config: Configuration structure to fill
- * \note            Requires authentication by default. Set auth_provider before
- *                  validating or creating an instance.
- * \note            Values: 8KB TX pool, 1056B RX buffer, 1024B max frame
+ * \brief           Select authenticated defaults; a provider must be supplied
+ * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
 void xgl_config_get_preset_production(xgl_config_t* config);
 
 /**
- * \brief           Validate configuration parameters
- * \param[in]       config: Configuration structure to validate
- * \return          XGL_OK if valid, error code otherwise
- * \note            Checks all parameters for validity
- * \note            Should be called before xgl_create()
- * \note            Validates: pool sizes, retry counts, window size, etc.
- *
- * \par Example
- * \code{.c}
- * xgl_config_t config;
- * xgl_config_get_default(&config);
- * config.source_id = 1;
- *
- * xgl_error_t err = xgl_config_validate(&config);
- * if (err != XGL_OK) {
- *     printf("Invalid configuration: %s\n", xgl_error_string(err));
- *     return -1;
- * }
- * \endcode
+ * \brief           Validate configuration and the compiled capability ceiling
+ * \param[in]       config: Configuration to validate without modifying it
+ * \return          XGL_OK, NULL_POINTER, INVALID_PARAM, or UNSUPPORTED
  */
 xgl_error_t xgl_config_validate(const xgl_config_t* config);
 
-/*---------------------------------------------------------------------------*/
-/* Send API                                                                  */
-/*---------------------------------------------------------------------------*/
-
 /**
- * \brief           Send data (standard mode with copy)
- * \param[in]       handle: Instance handle
- * \param[in]       tx_data: Transmission data structure
- * \return          XGL_OK on success, error code otherwise
- * \note            Data is copied internally
- * \note            Supports reliable and unreliable transmission
- * \note            Automatic fragmentation if data exceeds max frame size
- * \warning         Blocks if sliding window is full (returns XGL_ERR_WINDOW_FULL)
- *
- * \par Example - Reliable Send
- * \code{.c}
- * const char* message = "Hello, World!";
- * xgl_tx_data_t tx_data = {
- *     .target_id = 2,
- *     .data_type = 0x01,
- *     .data = (const uint8_t*)message,
- *     .data_len = strlen(message),
- *     .reliable = true,
- *     .priority = 0
- * };
- *
- * xgl_error_t err = xgl_send(handle, &tx_data);
- * if (err != XGL_OK) {
- *     printf("Send failed: %s\n", xgl_error_string(err));
- * }
- * \endcode
- *
- * \par Example - Unreliable Send
- * \code{.c}
- * uint8_t sensor_data[4] = {0x12, 0x34, 0x56, 0x78};
- * xgl_tx_data_t tx_data = {
- *     .target_id = 2,
- *     .data_type = 0x02,
- *     .data = sensor_data,
- *     .data_len = sizeof(sensor_data),
- *     .reliable = false,  // No ACK required
- *     .priority = 5       // Higher priority
- * };
- * xgl_send(handle, &tx_data);
- * \endcode
+ * \brief           Submit data at the caller's monotonic millisecond time
+ * \param[in]       handle: Initialized instance
+ * \param[in]       tx_data: Payload and addressing borrowed during this call
+ * \param[in]       now_ms: Same clock used by xgl_step(), wrapping modulo 2^32
+ * \return          XGL_OK when accepted, or validation/capacity/driver error
+ * \note            Reliable data is copied to bounded protocol-owned storage.
+ *                  Successful submission does not mean remote delivery.
  */
-xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data);
+xgl_error_t xgl_send_at(xgl_handle_t handle, const xgl_tx_data_t* tx_data,
+                        uint32_t now_ms);
 
 /**
- * \brief           Send data through the zero-copy-compatible API
- * \param[in]       handle: Instance handle
- * \param[in]       tx_data: Zero-copy transmission data structure
- * \return          XGL_OK on success, error code otherwise
- * \note            Buffer must reserve XGL_FRAME_HEADER_SIZE bytes plus
- *                  XGL_DATA_TYPE_EXT_SIZE when data_type is non-zero.
- * \note            Unreliable single-frame sends are framed in the caller buffer
- *                  and transmitted without an intermediate frame copy.
- * \note            Authenticated zero-copy requires data_offset to equal
- *                  XGL_FRAME_HEADER_SIZE + optional XGL_DATA_TYPE_EXT_SIZE
- *                  + SECURITY_EXT(15 bytes)
- *                  and requires config.auth_provider->tag_len to be within
- *                  (0, XGL_AUTH_TAG_MAX_LEN].
- * \note            Reliable zero-copy requests are rejected. Use xgl_send()
- *                  when retransmission storage is required.
- *
- * \par Example
- * \code{.c}
- * // Allocate buffer with header space
- * uint8_t buffer[XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE + 100];
- *
- * // Write data after header space
- * size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE;
- * uint8_t* data_ptr = buffer + data_offset;
- * memcpy(data_ptr, "Zero-copy data", 14);
- *
- * // Send without copying
- * xgl_tx_data_zerocopy_t tx_data = {
- *     .buffer = buffer,
- *     .buffer_size = sizeof(buffer),
- *     .data_offset = data_offset,
- *     .data_len = 14,
- *     .target_id = 2,
- *     .data_type = 0x01,
- *     .reliable = false,
- *     .priority = 0
- * };
- *
- * xgl_error_t err = xgl_send_zerocopy(handle, &tx_data);
- * if (err != XGL_OK) {
- *     printf("Zero-copy send failed: %s\n", xgl_error_string(err));
- * }
- * \endcode
+ * \brief           Send with caller-provided synchronous frame workspace
+ * \param[in]       handle: Initialized instance
+ * \param[in]       tx_data: Writable frame workspace and payload description
+ * \param[in]       now_ms: Same clock used by xgl_step()
+ * \return          XGL_OK on acceptance, or validation/capacity/driver error
+ * \note            The PHY must stop reading before tx returns. Reliable data
+ *                  sends are unsupported by this zero-copy entry point.
  */
-xgl_error_t xgl_send_zerocopy(xgl_handle_t handle,
-                              const xgl_tx_data_zerocopy_t* tx_data);
-
-/*---------------------------------------------------------------------------*/
-/* Statistics API                                                            */
-/*---------------------------------------------------------------------------*/
+xgl_error_t xgl_send_zerocopy_at(xgl_handle_t handle,
+                                 const xgl_tx_data_zerocopy_t* tx_data,
+                                 uint32_t now_ms);
 
 /**
- * \brief           Get protocol statistics
- * \param[in]       handle: Instance handle
- * \param[out]      stats: Statistics structure to fill
- * \return          XGL_OK on success, error code otherwise
- * \note            Statistics are updated atomically
- * \note            Includes TX/RX counters, errors, RTT metrics, memory usage
- *
- * \par Example
- * \code{.c}
- * xgl_statistics_t stats;
- * xgl_error_t err = xgl_stats_get(handle, &stats);
- * if (err == XGL_OK) {
- *     printf("Transport TX packets: %llu\n", stats.transport.tx_packets);
- *     printf("Transport RX packets: %llu\n", stats.transport.rx_packets);
- *     printf("Datalink TX errors: %llu\n", stats.datalink.tx_errors);
- *     printf("Datalink RX errors: %llu\n", stats.datalink.rx_errors);
- *     printf("TX retries: %llu\n", stats.tx_retries);
- *     printf("Avg RTT: %u ms\n", stats.avg_rtt_ms);
- *     printf("Memory used: %zu bytes\n", stats.memory_used);
- * }
- * \endcode
+ * \brief           Poll due links and advance protocol deadlines
+ * \param[in]       handle: Initialized instance
+ * \param[in]       now_ms: Monotonic time; elapsed intervals must stay below
+ * 2^31
+ * \param[in]       budget: Per-link RX byte budget and parser timeout
+ * \return          First receive or transport error, or XGL_OK
+ */
+xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
+                     const xgl_work_budget_t* budget);
+
+/**
+ * \brief           Query the next relative protocol or link deadline
+ * \param[in]       handle: Initialized instance
+ * \param[in]       now_ms: Current monotonic time
+ * \param[out]      delay_ms: Relative delay; zero means work is already due
+ * \return          True if a deadline exists; false leaves delay_ms unchanged
+ */
+bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms, uint32_t* delay_ms);
+
+/**
+ * \brief           Install an explicitly trusted directional security session
+ * \param[in]       handle: Initialized instance
+ * \param[in]       config: Trusted session parameters copied into the instance
+ * \return          XGL_OK, UNSUPPORTED, or validation/capacity error
+ * \note            The application must prevent key/nonce-domain reuse across
+ *                  restarts using persistent state or fresh trusted keys.
+ *                  Ordinary received frames cannot install sessions.
+ */
+xgl_error_t
+xgl_install_security_session(xgl_handle_t handle,
+                             const xgl_security_session_config_t* config);
+
+/**
+ * \brief           Close a session while retaining its nonce-domain tombstone
+ * \param[in]       handle: Initialized instance
+ * \param[in]       remote_id: Peer identifier
+ * \param[in]       connection_id: Connection identifier
+ * \param[in]       session_epoch: Installed trusted epoch
+ * \return          XGL_OK, UNSUPPORTED, NOT_FOUND, or validation error
+ */
+xgl_error_t xgl_close_security_session(xgl_handle_t handle, uint16_t remote_id,
+                                       uint32_t connection_id,
+                                       uint32_t session_epoch);
+
+/**
+ * \brief           Cancel a peer's pending TX and release its capacity
+ * \param[in]       handle: Initialized instance
+ * \param[in]       remote_id: Peer identifier
+ * \param[in]       connection_id: Connection identifier
+ * \param[in]       session_epoch: Exact peer epoch to release
+ * \return          XGL_OK, NOT_FOUND, or validation error
+ * \note            For authenticated peers, close the security session instead.
+ *                  Otherwise the caller must drain old link traffic and choose
+ *                  a new epoch before reconnecting. Pending TX reports
+ * CANCELLED.
+ */
+xgl_error_t xgl_close_peer(xgl_handle_t handle, uint16_t remote_id,
+                           uint32_t connection_id, uint32_t session_epoch);
+
+/**
+ * \brief           Copy counters under caller-serialized instance access
+ * \param[in]       handle: Initialized instance
+ * \param[out]      stats: Destination for a snapshot of all counters
+ * \return          XGL_OK, XGL_ERR_NULL_POINTER, or XGL_ERR_NOT_INITIALIZED
  */
 xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats);
 
 /**
- * \brief           Reset protocol statistics
- * \param[in]       handle: Instance handle
- * \return          XGL_OK on success, error code otherwise
- * \note            Resets all counters to zero atomically
- * \note            Does not affect protocol operation
- *
- * \par Example
- * \code{.c}
- * // Reset statistics at start of test
- * xgl_stats_reset(handle);
- *
- * // Run test...
- *
- * // Get statistics after test
- * xgl_statistics_t stats;
- * xgl_stats_get(handle, &stats);
- * \endcode
+ * \brief           Clear all counters under caller-serialized instance access
+ * \param[in]       handle: Initialized instance
+ * \return          XGL_OK, XGL_ERR_NULL_POINTER, or XGL_ERR_NOT_INITIALIZED
  */
 xgl_error_t xgl_stats_reset(xgl_handle_t handle);
-
-/*---------------------------------------------------------------------------*/
-/* Runtime Processing                                                        */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Run protocol processing (call periodically)
- * \param[in]       handle: Instance handle
- * \param[in]       freq_hz: Calling frequency in Hz
- * \note            Handles timeouts, retransmissions, and RX processing
- * \note            Call from a main loop or protocol task. PHY/timer ISRs
- *                  should only enqueue bytes or signal that work is due.
- * \note            Typical frequencies: 10-1000 Hz depending on requirements
- * \note            Higher frequency = lower latency, higher CPU usage
- * \warning         Must be called regularly for protocol to function
- *
- * \par Example - Main Loop (Bare Metal)
- * \code{.c}
- * while (1) {
- *     xgl_run(handle, 100);  // Call at 100 Hz
- *     delay_ms(10);          // 10ms delay = 100 Hz
- * }
- * \endcode
- *
- * \par Example - RTOS Timer Wakes Protocol Task
- * \code{.c}
- * void timer_callback(void* arg) {
- *     xgl_handle_t handle = (xgl_handle_t)arg;
- *     signal_protocol_task(handle);
- * }
- *
- * void protocol_task(void* arg) {
- *     xgl_handle_t handle = (xgl_handle_t)arg;
- *     while (1) {
- *         wait_for_protocol_signal();
- *         xgl_run(handle, 1000);  // Task context, 1000 Hz timer source
- *     }
- * }
- *
- * // Setup 1ms timer
- * timer_start(1, timer_callback, handle);
- * \endcode
- *
- * \par Example - Multiple Instances
- * \code{.c}
- * while (1) {
- *     xgl_run(uart_handle, 100);
- *     xgl_run(spi_handle, 100);
- *     delay_ms(10);
- * }
- * \endcode
- */
-void xgl_run(xgl_handle_t handle, uint32_t freq_hz);
-
-/**
- * \brief           Get milliseconds until the next protocol processing deadline
- * \param[in]       handle: Instance handle
- * \return          Milliseconds until the next required xgl_run() wakeup, 0 if
- *                  work is already due, or XGL_NO_DEADLINE_MS when idle.
- * \note            Intended for low-power main loops and RTOS tasks. PHY ISRs
- *                  should only enqueue bytes; call xgl_run() from task/main
- *                  context when this deadline expires or new RX data arrives.
- */
-uint32_t xgl_next_deadline_ms(xgl_handle_t handle);
-
-/*---------------------------------------------------------------------------*/
-/* Best Practices and Usage Notes                                            */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \par Thread Safety
- *      When thread_safe is enabled in configuration:
- *      - The library must be built with XGL_THREAD_SAFE
- *      - All API functions are thread-safe
- *      - Multiple threads can call xgl_send() concurrently
- *      - xgl_run() can be called from a different thread than xgl_send()
- *      - Callbacks are invoked with mutex held (keep them short)
- *
- * \par Memory Management
- *      - Use custom allocator for deterministic allocation
- *      - Memory pools eliminate heap fragmentation
- *      - Single-frame unreliable zero-copy TX uses the caller frame buffer
- *      - Reliable sends use xgl_send(); zero-copy accepts only unreliable data
- *      - All memory is freed on xgl_destroy()
- *
- * \par Error Handling
- *      - Always check return values from API functions
- *      - Register error callback for asynchronous errors
- *      - Use xgl_error_string() to get human-readable error messages
- *      - Check statistics for error counters
- *
- * \par Performance Optimization
- *      - Prefer zero-copy for single-frame unreliable TX when caller buffers
- *        can reserve header and CRC space
- *      - Adjust window size based on RTT and bandwidth
- *      - Use unreliable transmission for time-sensitive data
- *      - Call xgl_run() at appropriate frequency (higher = lower latency)
- *
- * \par Porting to New Platform
- *      1. Implement physical layer callbacks (tx/rx)
- *      2. Implement platform abstraction (xgl_time_ms, xgl_delay_ms)
- *      3. Implement mutex functions if thread safety needed
- *      4. Test with property-based tests
- *
- * \par Common Pitfalls
- *      - Forgetting to call xgl_run() periodically
- *      - Not reserving header space for zero-copy buffers
- *      - Blocking in callbacks (keep them short)
- *      - Not checking return values
- *      - Using handle after xgl_destroy()
- *
- * \par Resource Requirements
- *      Tiny:   32KB RAM,  50KB Flash  (basic features)
- *      Small:  64KB RAM, 100KB Flash  (+ fragmentation)
- *      Medium: 128KB RAM, 256KB Flash (compression reserved)
- *      Large:  256KB RAM, 512KB Flash (encryption reserved)
- *
- * \par Typical Use Cases
- *      - Sensor networks (unreliable, low power)
- *      - Industrial control (reliable, real-time)
- *      - Firmware updates (reliable, fragmentation)
- *      - Multi-node networks (routing, forwarding)
- *      - UART/SPI/I2C/CAN communication
- *
- * \par Further Reading
- *      - User Guide: docs/en/getting-started/quick-start.md
- *      - Architecture: docs/en/protocol/architecture.md
- *      - Porting Guide: docs/en/guide/porting.md
- *      - Examples: examples/
- *      - API Reference: https://x-gen-lab.github.io/xgen-link/
- */
 
 #ifdef __cplusplus
 }

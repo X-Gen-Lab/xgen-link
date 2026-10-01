@@ -1,19 +1,22 @@
+#include <xgen/memory/libc_allocator.h>
 /**
  * \file            test_route.cpp
  * \brief           Route table unit tests
  * \author          X-Gen Lab
  */
 
-#include <gtest/gtest.h>
 #include <xgl/internal/xgl_route.h>
 #include <xgl/xgl_error.h>
+
 #include <cstring>
+#include <gtest/gtest.h>
 
 /*---------------------------------------------------------------------------*/
 /* Test PHY Operations                                                       */
 /*---------------------------------------------------------------------------*/
 
-static xgl_error_t test_phy_tx(const uint8_t* data, size_t len, void* user_data) {
+static xgl_error_t test_phy_tx(const uint8_t* data, size_t len,
+                               void* user_data) {
     (void)data;
     (void)len;
     (void)user_data;
@@ -32,7 +35,7 @@ static xgl_error_t test_phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
 /*---------------------------------------------------------------------------*/
 
 class XglRouteTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         /* Initialize PHY operations */
         phy_ops.tx = test_phy_tx;
@@ -40,7 +43,8 @@ protected:
         phy_ops.user_data = nullptr;
 
         /* Initialize route table */
-        xgl_error_t err = xgl_route_table_init(&route_table, 4, nullptr);
+        xgl_error_t err =
+            xgl_route_table_init(&route_table, 4, xgm_allocator_libc());
         ASSERT_EQ(err, XGL_OK);
     }
 
@@ -66,7 +70,7 @@ protected:
 TEST_F(XglRouteTest, InitializeRouteTable) {
     xgl_route_table_t table;
 
-    xgl_error_t err = xgl_route_table_init(&table, 8, nullptr);
+    xgl_error_t err = xgl_route_table_init(&table, 8, xgm_allocator_libc());
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(table.route_count, 0);
@@ -77,14 +81,14 @@ TEST_F(XglRouteTest, InitializeRouteTable) {
 }
 
 TEST_F(XglRouteTest, InitializeWithNullPointer) {
-    xgl_error_t err = xgl_route_table_init(nullptr, 8, nullptr);
+    xgl_error_t err = xgl_route_table_init(nullptr, 8, xgm_allocator_libc());
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
 TEST_F(XglRouteTest, InitializeWithZeroCapacity) {
     xgl_route_table_t table;
 
-    xgl_error_t err = xgl_route_table_init(&table, 0, nullptr);
+    xgl_error_t err = xgl_route_table_init(&table, 0, xgm_allocator_libc());
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(table.route_count, 0);
@@ -98,44 +102,46 @@ TEST_F(XglRouteTest, InitializeWithZeroCapacity) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglRouteTest, AddSingleRoute) {
-    xgl_error_t err = xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops,
-                                         MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_error_t err =
+        xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, MAX_FRAME_SIZE,
+                            READ_FREQ_HZ, METRIC_DEFAULT);
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(route_table.route_count, 1);
 }
 
 TEST_F(XglRouteTest, AddMultipleRoutes) {
-    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops,
-                       MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
-    xgl_route_table_add(&route_table, TARGET_ID_2, &phy_ops,
-                       MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
-    xgl_route_table_add(&route_table, TARGET_ID_3, &phy_ops,
-                       MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, MAX_FRAME_SIZE,
+                        READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_route_table_add(&route_table, TARGET_ID_2, &phy_ops, MAX_FRAME_SIZE,
+                        READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_route_table_add(&route_table, TARGET_ID_3, &phy_ops, MAX_FRAME_SIZE,
+                        READ_FREQ_HZ, METRIC_DEFAULT);
 
     EXPECT_EQ(route_table.route_count, 3);
 }
 
 TEST_F(XglRouteTest, AddRouteWithNullTable) {
-    xgl_error_t err = xgl_route_table_add(nullptr, TARGET_ID_1, &phy_ops,
-                                         MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_error_t err =
+        xgl_route_table_add(nullptr, TARGET_ID_1, &phy_ops, MAX_FRAME_SIZE,
+                            READ_FREQ_HZ, METRIC_DEFAULT);
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
 TEST_F(XglRouteTest, AddRouteWithNullPhy) {
-    xgl_error_t err = xgl_route_table_add(&route_table, TARGET_ID_1, nullptr,
-                                         MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_error_t err =
+        xgl_route_table_add(&route_table, TARGET_ID_1, nullptr, MAX_FRAME_SIZE,
+                            READ_FREQ_HZ, METRIC_DEFAULT);
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglRouteTest, AddDuplicateRouteUpdates) {
     /* Add initial route */
-    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops,
-                       256, 100, 1);
+    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, 256, 100, 1);
 
     /* Add same target with different parameters */
-    xgl_error_t err = xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops,
-                                         512, 200, 2);
+    xgl_error_t err =
+        xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, 512, 200, 2);
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(route_table.route_count, 1);  // Should not increase
@@ -148,16 +154,29 @@ TEST_F(XglRouteTest, AddDuplicateRouteUpdates) {
     EXPECT_EQ(route->metric, 2);
 }
 
-TEST_F(XglRouteTest, AddRouteTriggersDynamicGrowth) {
-    /* Add more routes than initial capacity */
-    for (uint8_t i = 0; i < 10; i++) {
-        xgl_error_t err = xgl_route_table_add(&route_table, i, &phy_ops,
-                                             MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
-        EXPECT_EQ(err, XGL_OK);
+TEST_F(XglRouteTest, FullRouteTableRejectsGrowthAndRetainsExistingRoutes) {
+    for (uint16_t i = 0; i < 4; ++i) {
+        ASSERT_EQ(xgl_route_table_add(&route_table, i, &phy_ops, MAX_FRAME_SIZE,
+                                      READ_FREQ_HZ, METRIC_DEFAULT),
+                  XGL_OK);
     }
-
-    EXPECT_EQ(route_table.route_count, 10);
-    EXPECT_GE(route_table.route_capacity, 10);
+    const auto* storage = route_table.routes;
+    EXPECT_EQ(xgl_route_table_add(&route_table, 4, &phy_ops, MAX_FRAME_SIZE,
+                                  READ_FREQ_HZ, METRIC_DEFAULT),
+              XGL_ERR_QUEUE_FULL);
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 4U);
+    EXPECT_EQ(route_table.route_capacity, 4U);
+    for (uint16_t i = 0; i < 4; ++i) {
+        ASSERT_NE(xgl_route_table_lookup(&route_table, i), nullptr);
+    }
+    ASSERT_EQ(xgl_route_table_remove(&route_table, 1), XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, 4, &phy_ops, 128, 100, 1),
+              XGL_OK);
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 4U);
+    EXPECT_EQ(xgl_route_table_lookup(&route_table, 1), nullptr);
+    EXPECT_NE(xgl_route_table_lookup(&route_table, 4), nullptr);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -165,8 +184,8 @@ TEST_F(XglRouteTest, AddRouteTriggersDynamicGrowth) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglRouteTest, LookupExistingRoute) {
-    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops,
-                       MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, MAX_FRAME_SIZE,
+                        READ_FREQ_HZ, METRIC_DEFAULT);
 
     xgl_route_item_t* route = xgl_route_table_lookup(&route_table, TARGET_ID_1);
 
@@ -195,9 +214,12 @@ TEST_F(XglRouteTest, LookupAfterMultipleAdds) {
     xgl_route_table_add(&route_table, TARGET_ID_3, &phy_ops, 1024, 300, 3);
 
     /* Lookup each route */
-    xgl_route_item_t* route1 = xgl_route_table_lookup(&route_table, TARGET_ID_1);
-    xgl_route_item_t* route2 = xgl_route_table_lookup(&route_table, TARGET_ID_2);
-    xgl_route_item_t* route3 = xgl_route_table_lookup(&route_table, TARGET_ID_3);
+    xgl_route_item_t* route1 =
+        xgl_route_table_lookup(&route_table, TARGET_ID_1);
+    xgl_route_item_t* route2 =
+        xgl_route_table_lookup(&route_table, TARGET_ID_2);
+    xgl_route_item_t* route3 =
+        xgl_route_table_lookup(&route_table, TARGET_ID_3);
 
     ASSERT_NE(route1, nullptr);
     ASSERT_NE(route2, nullptr);
@@ -213,8 +235,8 @@ TEST_F(XglRouteTest, LookupAfterMultipleAdds) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglRouteTest, RemoveExistingRoute) {
-    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops,
-                       MAX_FRAME_SIZE, READ_FREQ_HZ, METRIC_DEFAULT);
+    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, MAX_FRAME_SIZE,
+                        READ_FREQ_HZ, METRIC_DEFAULT);
 
     xgl_error_t err = xgl_route_table_remove(&route_table, TARGET_ID_1);
 
@@ -259,10 +281,11 @@ TEST_F(XglRouteTest, RemoveMiddleRoute) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglRouteTest, UpdateMetric) {
-    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops,
-                       MAX_FRAME_SIZE, READ_FREQ_HZ, 1);
+    xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, MAX_FRAME_SIZE,
+                        READ_FREQ_HZ, 1);
 
-    xgl_error_t err = xgl_route_table_update_metric(&route_table, TARGET_ID_1, 5);
+    xgl_error_t err =
+        xgl_route_table_update_metric(&route_table, TARGET_ID_1, 5);
 
     EXPECT_EQ(err, XGL_OK);
 
@@ -299,11 +322,9 @@ TEST_F(XglRouteTest, ClearRouteTable) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglRouteTest, LoadRoutes) {
-    xgl_route_item_t routes[] = {
-        {TARGET_ID_1, &phy_ops, 256, 100, 1},
-        {TARGET_ID_2, &phy_ops, 512, 200, 2},
-        {TARGET_ID_3, &phy_ops, 1024, 300, 3}
-    };
+    xgl_route_item_t routes[] = {{TARGET_ID_1, &phy_ops, 256, 100, 1},
+                                 {TARGET_ID_2, &phy_ops, 512, 200, 2},
+                                 {TARGET_ID_3, &phy_ops, 1024, 300, 3}};
 
     xgl_error_t err = xgl_route_table_load(&route_table, routes, 3);
 
@@ -321,10 +342,8 @@ TEST_F(XglRouteTest, LoadRoutesReplacesExisting) {
     xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, 128, 50, 1);
 
     /* Load new routes */
-    xgl_route_item_t routes[] = {
-        {TARGET_ID_2, &phy_ops, 512, 200, 2},
-        {TARGET_ID_3, &phy_ops, 1024, 300, 3}
-    };
+    xgl_route_item_t routes[] = {{TARGET_ID_2, &phy_ops, 512, 200, 2},
+                                 {TARGET_ID_3, &phy_ops, 1024, 300, 3}};
 
     xgl_error_t err = xgl_route_table_load(&route_table, routes, 2);
 
@@ -367,6 +386,9 @@ TEST_F(XglRouteTest, IsEmpty) {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglRouteTest, LookupPerformanceWithManyRoutes) {
+    xgl_route_table_destroy(&route_table);
+    ASSERT_EQ(xgl_route_table_init(&route_table, 100, xgm_allocator_libc()),
+              XGL_OK);
     /* Add many routes */
     for (uint8_t i = 0; i < 100; i++) {
         xgl_route_table_add(&route_table, i, &phy_ops, 256, 100, 1);

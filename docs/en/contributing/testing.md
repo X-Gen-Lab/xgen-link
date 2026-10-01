@@ -1,120 +1,63 @@
-# Testing Strategy
+# Testing strategy
 
-This document describes the XGL protocol stack's test architecture, the design intent of each test category, and coverage strategy.
+## Ownership
 
-## Test Layering
+Each independent foundation repository owns its behavior: allocators/pools in xgen-memory, containers in xgen-containers, checksums in xgen-crc, byte access in xgen-bytes, and generic statuses in xgen-status. Protocol tests exercise wire encoding, layer boundaries, routing, peer state, fragmentation, security and public instance behavior. Removing generic wrappers also removes their duplicate protocol tests; real integration with those services still requires protocol validation.
 
-```text
-┌─────────────────────────────────────────┐
-│ Integration Tests (1 file)              │
-│  End-to-end protocol stack behavior     │
-├─────────────────────────────────────────┤
-│ Property-Based Tests (11 files)         │
-│  Invariant verification, fuzz, boundary │
-├─────────────────────────────────────────┤
-│ Unit Tests (30+ files)                  │
-│  Per-module functional verification     │
-├─────────────────────────────────────────┤
-│ Mocks (3 pairs)                         │
-│  PHY, callbacks, allocator substitutes  │
-└─────────────────────────────────────────┘
+## Regression cases
+
+Use real protocol transitions for ACK atomicity, retained RX ownership, backpressure, retry and explicit scope close. Capacity tests cover exact workspace measurement, undersized/alignment rejection, one backend reservation, runtime reuse and destruction. Static authenticated endpoints verify fresh security sequence on retransmission and exactly-once application delivery.
+
+## Running
+
+Use CTest for protocol tests, host examples, static lifecycle and installed C consumer checks. Configure the Boot and Embedded profiles separately. See the [validation matrix](../reference/validation-matrix.md). Randomized property tests complement fixed regressions; they are not a substitute for sanitizer, fuzz or hardware qualification.
+
+Use root presets after installing dependencies, or use `cmake -S dev` with all five `XGL_DEV_*_SOURCE_DIR` paths for source development as described in [Build and test](../getting-started/build-and-test.md). CTest runs from the corresponding `build/dev-<profile>` root. Product subdirectory consumption does not add examples, smoke tests, or release helpers by default. Record new-entry results separately from previous stages.
+
+## Style
+
+Follow the repository clang-format and Doxygen format. New tests should demonstrate an invariant or a regression, not duplicate implementation code. Tests must preserve the borrowed configuration/PHY lifetimes and pass explicit time.
+
+Blank-line layout follows engineering rules C-020, C-021 and DOC-013: separate independent definitions and public API documentation groups with one blank line, keep Doxygen adjacent to its declaration, and group function statements by meaning. clang-format 19.1.5 handles definition separation and excess blank lines. The shared xgen-quality `format` entry adds bounded structural checks for common public C headers; it does not infer business phases inside function bodies.
+
+Explicitly install xgen-quality 0.1.0 from the revision pinned in `tools/quality.json`, then run:
+
+```sh
+python tools/quality.py format
+python tools/quality.py text
+python tools/quality.py test --build-dir build/dev-full
+python tools/quality.py cppcheck --build-dir build/dev-full
+python tools/quality.py tidy --build-dir build/dev-full
+python tools/quality.py docs
+python -m pre_commit run --all-files
 ```
 
-## Property-Based Testing
+Checks are read-only. Apply clang-format 19.1.5 with `-i` explicitly. Analysis uses the real toolchain compilation database. CI defaults to official repositories, accepts repository-variable overrides, and pins full source revisions. Root `REFACTORING_STATUS.md` records actual local and remote evidence separately.
 
-XGL uses a custom property-based testing framework (`test/property/property_framework.h`) that verifies protocol stack invariants with randomized inputs.
+## TDD and test inventory
 
-### Test Files and Verified Invariants
+For behavior changes, reproduce the requirement or defect with a failing test, record RED, implement the smallest correction, verify GREEN, then refactor and rerun relevant regressions. Do not manufacture failures for existing-behavior coverage, documentation, or formatting changes.
 
-| File | Verified invariant |
-| --- | --- |
-| `test_alignment_properties.cpp` | Memory alignment: all structs are correctly accessed at target alignment boundaries |
-| `test_crc_properties.cpp` | CRC computation: same data always produces same CRC; different data produces different CRC |
-| `test_error_properties.cpp` | Error handling: all APIs return explicit error codes for invalid parameters, no crashes |
-| `test_fragment_properties.cpp` | Fragment reassembly: any fragment order reassembles consistently; timeout cleanup correct |
-| `test_frame_properties.cpp` | Frame encode/decode: encode → decode round-trip consistent; field boundaries handled correctly |
-| `test_instance_properties.cpp` | Instance lifecycle: create → run → destroy no leaks; repeated init safe |
-| `test_memory_properties.cpp` | Memory allocation: alloc/free paired; pool exhaustion returns NULL; peak stats correct |
-| `test_network_properties.cpp` | Network layer: route lookup correct; TTL decremented; forwarding CRC recomputed |
-| `test_serialization_properties.cpp` | Serialization: TLV encode/decode round-trip consistent; boundary lengths handled correctly |
-| `test_transport_properties.cpp` | Transport: reliable send releases after ACK; retransmission on timeout; window-full blocks |
+Host tests use GoogleTest/GoogleMock 1.16.0 and strict C++17. `gtest_discover_tests` registers individual cases; classification assigns `xgl` and `unit` or `integration`, with an additional `property` label for randomized properties. Examples, static lifecycle and installed consumption are integration tests. `test/cmake/baseline_tests.txt` retains all 510 original names; discovery checks every name rather than trusting only a growing count. The shared runner rejects empty, disabled, skipped, duplicate or failed cases.
 
-### Property Test Pattern
+## Property replay
 
-Each property test follows:
+Seed precedence is `--xgl_property_seed=N`, then `XGL_PROPERTY_SEED`, then the fixed default `5785420`. Invalid or out-of-range unsigned values are rejected. Each test derives its own stable stream, so filtering does not change its input. JUnit records both the base seed and test stream. Failures print a replay command:
 
-1. **Define invariant**: Describe the condition expected to hold.
-2. **Generate random input**: Use deterministic seeds to generate random parameters.
-3. **Execute operations**: Run protocol operations on random inputs.
-4. **Verify invariant**: Assert the invariant still holds after operations.
-5. **Record seed**: On failure, record the random seed for precise reproduction.
-
-## Mock Design
-
-### mock_phy
-
-Simulates physical layer TX/RX for testing datalink and network layers without hardware:
-
-- `mock_phy_init()`: Initialize mock PHY, configure TX/RX buffers.
-- `mock_phy_get_tx_buffer()`: Retrieve transmitted data for frame format verification.
-- `mock_phy_enqueue_rx()`: Inject received data, simulating remote transmission.
-- `mock_phy_reset()`: Reset state.
-
-### mock_callbacks
-
-Simulates application-layer callbacks:
-
-- `mock_rx_callback`: Records received data for delivery correctness verification.
-- `mock_error_callback`: Records errors for error handling verification.
-
-### mock_allocator
-
-Simulates a memory allocator:
-
-- `mock_allocator_init()`: Initialize with configurable failure points.
-- `mock_allocator_set_fail_after()`: Set failure after the Nth allocation to test memory exhaustion paths.
-- `mock_allocator_get_alloc_count()`: Query allocation count.
-
-## Integration Testing
-
-`test/integration/test_integration.cpp` verifies end-to-end behavior of the complete protocol stack:
-
-1. Create instance + configure routes + register callbacks.
-2. Inject received data through mock PHY.
-3. Call `xgl_run()` to drive the protocol stack.
-4. Verify the application receives correct data.
-5. Verify statistics counters are correct.
-
-## Test Build
-
-```bash
-# Build tests
-cmake --preset dev
-cmake --build build-dev --target xgl_tests
-
-# Run tests
-ctest --test-dir build-dev --output-on-failure
-
-# Run specific test
-./build-dev/test/xgl_tests --gtest_filter="TestName"
+```sh
+./build/dev-full/link/test/xgl_tests --gtest_filter='XglFrameProperties.*' --xgl_property_seed=5785420
+ctest --test-dir build/dev-full -L property --output-on-failure
 ```
 
-## Coverage
+Use `.exe` on Windows and the actual configuration subdirectory for multi-config builds.
 
-Enable coverage at build time:
+## Coverage and evidence
 
-```bash
-cmake --preset dev -DENABLE_COVERAGE=ON
-cmake --build build-dev
-ctest --test-dir build-dev
-gcovr build-dev --root .
+Configure a separate native GNU build with `-DXGL_ENABLE_COVERAGE=ON`. Only the production `xgl` target is instrumented; dependencies, GoogleTest and test sources are excluded from protocol metrics. Start with fresh counters or a new build after source/configuration changes, then run all tests:
+
+```sh
+python tools/quality.py test --build-dir build/coverage
+python tools/quality.py coverage --build-dir build/coverage --gcov-executable gcov
 ```
 
-## Traceability
-
-| Component | Source | Tests |
-| --- | --- | --- |
-| Property framework | `test/property/property_framework.h` | `test/property/test_*.cpp` |
-| Mock PHY | `test/mocks/mock_phy.cpp` | `test/integration/test_integration.cpp` |
-| Mock callbacks | `test/mocks/mock_callbacks.cpp` | `test/integration/test_integration.cpp` |
-| Mock allocator | `test/mocks/mock_allocator.cpp` | `test/integration/test_integration.cpp` |
+Lines, functions and branches must each reach 80%; neither averaging nor excluding difficult production files is acceptable. Unsupported coverage toolchains fail configuration explicitly. Reports are written to `out/reports`. Host, installed consumption, sanitizer, ARM ELF and hardware results remain separate.

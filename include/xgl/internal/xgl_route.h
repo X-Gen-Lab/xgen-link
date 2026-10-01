@@ -11,12 +11,17 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include "xgl/xgl_types.h"
+
+#include "xgl/xgl_build_config.h"
 #include "xgl/xgl_error.h"
-#include "xgl/internal/xgl_hashtable.h"
+#include "xgl/xgl_types.h"
+
+#if XGL_FEATURE_ROUTE_INDEX
+#include <xgen/containers/hash.h>
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Route Table Configuration                                                 */
@@ -25,17 +30,17 @@ extern "C" {
 /**
  * \brief           Default route table size (must be power of 2)
  */
-#define XGL_ROUTE_TABLE_DEFAULT_SIZE    16
+#define XGL_ROUTE_TABLE_DEFAULT_SIZE 16
 
 /**
  * \brief           Maximum route metric value
  */
-#define XGL_ROUTE_METRIC_MAX            255
+#define XGL_ROUTE_METRIC_MAX 255
 
 /**
  * \brief           Default route metric
  */
-#define XGL_ROUTE_METRIC_DEFAULT        100
+#define XGL_ROUTE_METRIC_DEFAULT 100
 
 /*---------------------------------------------------------------------------*/
 /* Route Table Structure                                                     */
@@ -45,11 +50,14 @@ extern "C" {
  * \brief           Route table structure
  */
 typedef struct {
-    xgl_hashtable_t hashtable;      /**< Hash table for O(1) lookup */
-    xgl_route_item_t* routes;       /**< Array of route items */
-    size_t route_count;             /**< Number of routes */
-    size_t route_capacity;          /**< Capacity of routes array */
-    xgl_allocator_t* allocator;     /**< Memory allocator */
+#if XGL_FEATURE_ROUTE_INDEX
+    xgct_hash_t index;       /**< Caller-sized route index */
+    xgct_hash_node_t* nodes; /**< One node per reserved route */
+#endif
+    xgl_route_item_t* routes;         /**< Array of route items */
+    size_t route_count;               /**< Number of routes */
+    size_t route_capacity;            /**< Capacity of routes array */
+    const xgm_allocator_t* allocator; /**< Memory allocator */
 } xgl_route_table_t;
 
 /*---------------------------------------------------------------------------*/
@@ -59,13 +67,14 @@ typedef struct {
 /**
  * \brief           Initialize route table
  * \param[in,out]   table: Route table structure
- * \param[in]       initial_capacity: Initial capacity for routes
- * \param[in]       allocator: Memory allocator; NULL fallback is build-policy controlled
+ * \param[in]       initial_capacity: Fixed route capacity; additions never grow
+ * it
+ * \param[in]       allocator: Explicit memory allocator
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_route_table_init(xgl_route_table_t* table,
                                  size_t initial_capacity,
-                                 xgl_allocator_t* allocator);
+                                 const xgm_allocator_t* allocator);
 
 /**
  * \brief           Destroy route table and free resources
@@ -83,12 +92,9 @@ void xgl_route_table_destroy(xgl_route_table_t* table);
  * \param[in]       metric: Route metric (lower is better)
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_route_table_add(xgl_route_table_t* table,
-                                uint16_t target_id,
-                                xgl_phy_ops_t* phy,
-                                uint16_t max_frame_size,
-                                uint32_t read_freq_hz,
-                                uint8_t metric);
+xgl_error_t xgl_route_table_add(xgl_route_table_t* table, uint16_t target_id,
+                                xgl_phy_ops_t* phy, uint16_t max_frame_size,
+                                uint32_t read_freq_hz, uint8_t metric);
 
 /**
  * \brief           Remove route from table
@@ -100,7 +106,7 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
                                    uint16_t target_id);
 
 /**
- * \brief           Lookup route in table (O(1) average)
+ * \brief           Lookup a route using the configured index strategy
  * \param[in]       table: Route table structure
  * \param[in]       target_id: Target node ID
  * \return          Route item pointer, NULL if not found
@@ -115,9 +121,8 @@ xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
  * \param[in]       metric: New metric value
  * \return          XGL_OK on success, XGL_ERR_ROUTE_NOT_FOUND if not found
  */
-xgl_error_t xgl_route_table_update_metric(xgl_route_table_t* table,
-                                          uint16_t target_id,
-                                          uint8_t metric);
+xgl_error_t xgl_route_table_update_metric(const xgl_route_table_t* table,
+                                          uint16_t target_id, uint8_t metric);
 
 /**
  * \brief           Clear all routes from table
@@ -151,8 +156,7 @@ static inline bool xgl_route_table_is_empty(const xgl_route_table_t* table) {
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_route_table_load(xgl_route_table_t* table,
-                                 const xgl_route_item_t* routes,
-                                 size_t count);
+                                 const xgl_route_item_t* routes, size_t count);
 
 #ifdef __cplusplus
 }

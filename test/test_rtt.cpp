@@ -28,7 +28,7 @@ TEST(XglRttTest, Initialization) {
  * \brief           Test initialization with null pointer
  */
 TEST(XglRttTest, InitializationNullPointer) {
-    xgl_rtt_init(nullptr);  /* Should not crash */
+    xgl_rtt_init(nullptr); /* Should not crash */
     EXPECT_TRUE(true);
 }
 
@@ -56,7 +56,7 @@ TEST(XglRttTest, FirstMeasurement) {
 
     EXPECT_TRUE(xgl_rtt_is_initialized(&est));
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 100);
-    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 50);  /* R/2 */
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 50); /* R/2 */
 
     /* RTO = SRTT + 4 * RTTVAR = 100 + 4*50 = 300 */
     EXPECT_EQ(xgl_rtt_get_rto(&est), 300);
@@ -73,21 +73,21 @@ TEST(XglRttTest, FirstMeasurementVariousValues) {
     xgl_rtt_update(&est, 50);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 50);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 25);
-    EXPECT_EQ(xgl_rtt_get_rto(&est), 150);  /* 50 + 4*25 */
+    EXPECT_EQ(xgl_rtt_get_rto(&est), 150); /* 50 + 4*25 */
 
     /* Test with 200ms */
     xgl_rtt_init(&est);
     xgl_rtt_update(&est, 200);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 200);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 100);
-    EXPECT_EQ(xgl_rtt_get_rto(&est), 600);  /* 200 + 4*100 */
+    EXPECT_EQ(xgl_rtt_get_rto(&est), 600); /* 200 + 4*100 */
 
     /* Test with 1000ms */
     xgl_rtt_init(&est);
     xgl_rtt_update(&est, 1000);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 1000);
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 500);
-    EXPECT_EQ(xgl_rtt_get_rto(&est), 3000);  /* 1000 + 4*500 */
+    EXPECT_EQ(xgl_rtt_get_rto(&est), 3000); /* 1000 + 4*500 */
 }
 
 /*---------------------------------------------------------------------------*/
@@ -96,7 +96,8 @@ TEST(XglRttTest, FirstMeasurementVariousValues) {
 
 /**
  * \brief           Test subsequent RTT measurements
- * \details         RFC 6298: SRTT += (R - SRTT)/8, RTTVAR += (|R - SRTT| - RTTVAR)/4
+ * \details         RFC 6298: SRTT += (R - SRTT)/8, RTTVAR += (|R - SRTT| -
+ * RTTVAR)/4
  */
 TEST(XglRttTest, SubsequentMeasurements) {
     xgl_rtt_estimator_t est;
@@ -110,10 +111,13 @@ TEST(XglRttTest, SubsequentMeasurements) {
     /* Second measurement: 120ms */
     /* error = 120 - 100 = 20 */
     /* SRTT = 100 + 20/8 = 100 + 2 = 102 */
-    /* RTTVAR = 50 + (20 - 50)/4 = 50 + (-30/4) = 50 - 7 = 43 (but integer division: -30/4 = -7, so 50 - 7 = 43, but actual is 42) */
+    /* RTTVAR = 50 + (20 - 50)/4 = 50 + (-30/4) = 50 - 7 = 43 (but integer
+     * division: -30/4 = -7, so 50 - 7 = 43, but actual is 42) */
     xgl_rtt_update(&est, 120);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 102);
-    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 42);  /* Integer division: 50 + (-30 >> 2) = 50 - 7 = 43, but -30 >> 2 = -8, so 50 - 8 = 42 */
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est),
+              42); /* Integer division: 50 + (-30 >> 2) = 50 - 7 = 43, but -30
+                      >> 2 = -8, so 50 - 8 = 42 */
 
     /* RTO = 102 + 4*42 = 102 + 168 = 270 */
     EXPECT_EQ(xgl_rtt_get_rto(&est), 270);
@@ -269,7 +273,7 @@ TEST(XglRttTest, NegativeRttMeasurement) {
  * \brief           Test with null pointer in update
  */
 TEST(XglRttTest, UpdateNullPointer) {
-    xgl_rtt_update(nullptr, 100);  /* Should not crash */
+    xgl_rtt_update(nullptr, 100); /* Should not crash */
     EXPECT_TRUE(true);
 }
 
@@ -317,12 +321,11 @@ TEST(XglRttTest, RealisticNetworkConditions) {
     xgl_rtt_init(&est);
 
     /* Simulate realistic RTT measurements with some jitter */
-    int32_t measurements[] = {
-        100, 105, 98, 102, 110, 95, 103, 108, 97, 101,
-        99, 104, 106, 100, 102, 98, 105, 103, 100, 99
-    };
+    int32_t measurements[] = {100, 105, 98,  102, 110, 95, 103, 108, 97,  101,
+                              99,  104, 106, 100, 102, 98, 105, 103, 100, 99};
 
-    for (size_t i = 0; i < sizeof(measurements) / sizeof(measurements[0]); i++) {
+    for (size_t i = 0; i < sizeof(measurements) / sizeof(measurements[0]);
+         i++) {
         xgl_rtt_update(&est, measurements[i]);
     }
 
@@ -346,12 +349,11 @@ TEST(XglRttTest, HighJitterNetwork) {
     xgl_rtt_init(&est);
 
     /* Simulate high jitter: RTT varies between 50ms and 200ms */
-    int32_t measurements[] = {
-        100, 150, 75, 180, 60, 170, 90, 160, 80, 140,
-        110, 130, 95, 155, 85, 145, 105, 135, 100, 125
-    };
+    int32_t measurements[] = {100, 150, 75, 180, 60, 170, 90,  160, 80,  140,
+                              110, 130, 95, 155, 85, 145, 105, 135, 100, 125};
 
-    for (size_t i = 0; i < sizeof(measurements) / sizeof(measurements[0]); i++) {
+    for (size_t i = 0; i < sizeof(measurements) / sizeof(measurements[0]);
+         i++) {
         xgl_rtt_update(&est, measurements[i]);
     }
 
@@ -421,8 +423,8 @@ TEST(XglRttTest, Rfc6298AlgorithmVerification) {
     /* First measurement: R = 100 */
     xgl_rtt_update(&est, 100);
     EXPECT_EQ(xgl_rtt_get_srtt(&est), 100);
-    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 50);  /* R/2 */
-    EXPECT_EQ(xgl_rtt_get_rto(&est), 300);    /* 100 + 4*50 */
+    EXPECT_EQ(xgl_rtt_get_rttvar(&est), 50); /* R/2 */
+    EXPECT_EQ(xgl_rtt_get_rto(&est), 300);   /* 100 + 4*50 */
 
     /* Second measurement: R = 120 */
     /* error = 120 - 100 = 20 */
@@ -442,9 +444,11 @@ TEST(XglRttTest, Rfc6298AlgorithmVerification) {
     /* RTTVAR = 42 + (12 - 42)/4 = 42 + (-30 >> 2) = 42 - 8 = 34 */
     /* RTO = 101 + 4*34 = 237, but let's check actual value */
     xgl_rtt_update(&est, 90);
-    EXPECT_EQ(xgl_rtt_get_srtt(&est), 100);  /* 102 + (-12 >> 3) = 102 - 1 = 101, but -12 >> 3 = -2, so 102 - 2 = 100 */
+    EXPECT_EQ(xgl_rtt_get_srtt(&est),
+              100); /* 102 + (-12 >> 3) = 102 - 1 = 101, but -12 >> 3 = -2, so
+                       102 - 2 = 100 */
     EXPECT_EQ(xgl_rtt_get_rttvar(&est), 34);
-    EXPECT_EQ(xgl_rtt_get_rto(&est), 236);  /* 100 + 4*34 = 236 */
+    EXPECT_EQ(xgl_rtt_get_rto(&est), 236); /* 100 + 4*34 = 236 */
 }
 
 /**
@@ -464,7 +468,6 @@ TEST(XglRttTest, ExponentialMovingAverage) {
 
     /* SRTT should converge towards 200ms but not reach it immediately */
     int32_t srtt = xgl_rtt_get_srtt(&est);
-    EXPECT_GT(srtt, 180);  /* Should be close to 200 */
-    EXPECT_LE(srtt, 200);  /* But not exceed it */
+    EXPECT_GT(srtt, 180); /* Should be close to 200 */
+    EXPECT_LE(srtt, 200); /* But not exceed it */
 }
-

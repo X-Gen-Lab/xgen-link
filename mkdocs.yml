@@ -82,6 +82,7 @@ nav:
           - Platform 抽象层: zh/protocol/platform.md
           - Codec 层: zh/protocol/codec.md
       - 使用指南:
+          - SDK 3 模块化迁移: zh/guide/modular-migration.md
           - 配置: zh/guide/configuration.md
           - Kconfig 配置: zh/guide/kconfig.md
           - Send API: zh/guide/send-api.md
@@ -131,6 +132,7 @@ nav:
           - Platform Abstraction: en/protocol/platform.md
           - Codec Layer: en/protocol/codec.md
       - Guides:
+          - SDK 3 Modular Migration: en/guide/modular-migration.md
           - Configuration: en/guide/configuration.md
           - Kconfig Configuration: en/guide/kconfig.md
           - Send API: en/guide/send-api.md

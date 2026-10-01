@@ -56,12 +56,14 @@ TEST(CompactWindowTest, FailedInitializationPreservesCallerState) {
     const xgm_allocator_t allocator = {&probe, allocate, release};
     xgl_sliding_window_t window = {};
     window.window_size = 9U;
+    window.ack_head = 4U;
     window.send_base_packet_number = 123U;
     window.next_packet_number = 127U;
     const auto before = window;
     EXPECT_EQ(xgl_window_init_with_allocator(&window, 9U, &allocator),
               XGL_ERR_NO_MEMORY);
     EXPECT_EQ(window.window_size, before.window_size);
+    EXPECT_EQ(window.ack_head, before.ack_head);
     EXPECT_EQ(window.send_base_packet_number, before.send_base_packet_number);
     EXPECT_EQ(window.next_packet_number, before.next_packet_number);
     EXPECT_EQ(window.ack_received, before.ack_received);
@@ -114,4 +116,54 @@ TEST(CompactWindowTest, ResetClearsRotatedAcknowledgments) {
     EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 8U);
     EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 0U);
     xgl_window_destroy(&window);
+}
+
+TEST(CompactWindowTest, AcknowledgesNewTailAfterPartialAdvanceAtMaximumWidths) {
+    for (uint8_t width : std::array<uint8_t, 3>{9U, 127U, 128U}) {
+        SCOPED_TRACE(static_cast<unsigned>(width));
+        AllocationProbe probe;
+        const xgm_allocator_t allocator = {&probe, allocate, release};
+        xgl_sliding_window_t window = {};
+        ASSERT_EQ(xgl_window_init_with_allocator(&window, width, &allocator),
+                  XGL_OK);
+        for (uint32_t packet = 0U; packet < width; ++packet) {
+            ASSERT_TRUE(xgl_window_can_send_packet_number(&window));
+            xgl_window_advance_next_packet_number(&window);
+        }
+        ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 0U), XGL_OK);
+        ASSERT_EQ(xgl_window_advance_base_packet_number(&window), 1U);
+        ASSERT_EQ(window.ack_head, 1U);
+
+        /* The newly available tail reuses the physical slot before the head. */
+        ASSERT_TRUE(xgl_window_can_send_packet_number(&window));
+        xgl_window_advance_next_packet_number(&window);
+        ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, width), XGL_OK);
+        EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 0U);
+        for (uint32_t packet = 1U; packet < width; ++packet) {
+            ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, packet),
+                      XGL_OK);
+        }
+        EXPECT_EQ(xgl_window_advance_base_packet_number(&window), width);
+        EXPECT_EQ(window.send_base_packet_number,
+                  static_cast<uint32_t>(width) + 1U);
+        EXPECT_EQ(xgl_window_get_usage(&window), 0U);
+        EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 0U);
+
+        /* Refill a complete rotated window and prove no stale ACK survives. */
+        const uint32_t base = window.send_base_packet_number;
+        for (uint32_t offset = 0U; offset < width; ++offset) {
+            xgl_window_advance_next_packet_number(&window);
+        }
+        EXPECT_FALSE(xgl_window_can_send_packet_number(&window));
+        EXPECT_EQ(xgl_window_advance_base_packet_number(&window), 0U);
+        for (uint32_t offset = 0U; offset < width; ++offset) {
+            ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, base + offset),
+                      XGL_OK);
+        }
+        EXPECT_EQ(xgl_window_advance_base_packet_number(&window), width);
+        EXPECT_EQ(window.send_base_packet_number, base + width);
+        EXPECT_EQ(xgl_window_get_usage(&window), 0U);
+        xgl_window_destroy(&window);
+        EXPECT_EQ(probe.released, 1U);
+    }
 }

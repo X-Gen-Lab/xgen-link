@@ -4,10 +4,12 @@
  * \author          X-Gen Lab
  */
 
-#include "xgl_network_internal.h"
-#include <xgl/xgl_error.h>
 #include <xgl/internal/xgl_wire.h>
+#include <xgl/xgl_error.h>
+
 #include <string.h>
+
+#include "xgl_network_internal.h"
 
 /*---------------------------------------------------------------------------*/
 /* Public API Implementation                                                 */
@@ -25,6 +27,11 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     if (config->route_table == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
+#if !XGL_FEATURE_AUTH
+    if (config->auth_required) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#endif
 
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_network_ctx_t));
@@ -35,10 +42,14 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     ctx->error_callback = config->error_callback;
     ctx->callback_user_data = config->callback_user_data;
     ctx->stats = config->stats;
+#if XGL_FEATURE_AUTH
     ctx->auth_required = config->auth_required;
-    ctx->auth_key_id = config->auth_key_id;
+    ctx->security = config->security;
     ctx->auth_provider = config->auth_provider;
+#endif
+#if XGL_FEATURE_FORWARDING
     ctx->allocator = config->allocator;
+#endif
 
     return XGL_OK;
 }
@@ -48,8 +59,7 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
  * \details         Checks if source and target IDs are valid
  */
 bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
-                                  uint16_t target_id,
-                                  uint16_t source_id) {
+                                  uint16_t target_id, uint16_t source_id) {
     if (ctx == NULL) {
         return false;
     }
@@ -78,10 +88,8 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
  * \brief           Invoke error callback
  * \details         Reports error through registered callback
  */
-void xgl_network_report_error(xgl_network_ctx_t* ctx,
-                              xgl_handle_t handle,
-                              xgl_error_t error,
-                              const char* message) {
+void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                              xgl_error_t error, const char* message) {
     if (ctx == NULL) {
         return;
     }
@@ -101,86 +109,38 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx,
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Network layer send implementation (called by upper layers)
- * \details         This function is called by transport layer to send packets
+ * \brief           Submit a typed transport packet to the network
  */
-static xgl_error_t network_send_impl(void* ctx,
-                                    xgl_handle_t handle,
-                                    void* data) {
-    xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
-    xgl_packet_t* packet = (xgl_packet_t*)data;
-
-    if (net_ctx == NULL || packet == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    /* Forward to network send function */
-    return xgl_network_send_with_handle(net_ctx, handle, packet, false);
+static xgl_error_t network_send_impl(void* ctx, xgl_handle_t handle,
+                                     xgl_packet_t* packet) {
+    return xgl_network_send_with_handle(ctx, handle, packet);
 }
 
 /**
- * \brief           Network layer receive implementation (called by lower layers)
- * \details         This function is called by datalink layer to deliver frames
+ * \brief           Receive a borrowed frame from the datalink
  */
-static xgl_error_t network_receive_impl(void* ctx,
-                                       xgl_handle_t handle,
-                                       // cppcheck-suppress constParameterCallback
-                                       void* data) {
-    xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
-
-    if (net_ctx == NULL || data == NULL) {
+static xgl_error_t network_receive_impl(void* ctx, xgl_handle_t handle,
+                                        const xgl_frame_rx_message_t* message) {
+    if (ctx == NULL || message == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-
-    /* Extract frame buffer and length from data */
-    const xgl_frame_rx_message_t* frame_data = (const xgl_frame_rx_message_t*)data;
-
-    /* Forward to network receive function */
-    return xgl_network_receive(net_ctx, handle, frame_data->frame_buf, frame_data->frame_len);
+    if (message->view != NULL) {
+        return xgl_network_receive_view(ctx, handle, message->view);
+    }
+    return xgl_network_receive(ctx, handle, message->frame_buf,
+                               message->frame_len);
 }
 
 /**
- * \brief           Network layer error reporting implementation
- * \details         This function is called to report errors to upper layers
+ * \brief           Bind the packet and frame boundaries of a network context
  */
-static xgl_error_t network_report_error_impl(void* ctx,
-                                            xgl_handle_t handle,
-                                            void* data) {
-    xgl_network_ctx_t* net_ctx = (xgl_network_ctx_t*)ctx;
-    xgl_layer_error_info_t* error_info = (xgl_layer_error_info_t*)data;
-
-    if (net_ctx == NULL || error_info == NULL) {
+xgl_error_t xgl_network_get_interfaces(xgl_network_ctx_t* ctx,
+                                       xgl_packet_interface_t* packets,
+                                       xgl_frame_interface_t* frames) {
+    if (ctx == NULL || packets == NULL || frames == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-
-    /* Forward error to callback if available */
-    if (net_ctx->error_callback != NULL) {
-        net_ctx->error_callback(handle, error_info->error,
-                               error_info->message,
-                               net_ctx->callback_user_data);
-    }
-
-    return XGL_OK;
-}
-
-/**
- * \brief           Get network layer interface
- * \details         Returns the layer interface for this network instance
- * \param[in]       ctx: Network layer context
- * \param[out]      iface: Layer interface structure to initialize
- * \return          XGL_OK on success, error code otherwise
- */
-xgl_error_t xgl_network_get_interface(xgl_network_ctx_t* ctx,
-                                     xgl_layer_interface_t* iface) {
-    if (ctx == NULL || iface == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    xgl_layer_interface_init(iface,
-                            ctx,
-                            network_send_impl,
-                            network_receive_impl,
-                            network_report_error_impl);
-
+    xgl_packet_interface_init(packets, ctx, network_send_impl, NULL);
+    xgl_frame_interface_init(frames, ctx, NULL, network_receive_impl);
     return XGL_OK;
 }

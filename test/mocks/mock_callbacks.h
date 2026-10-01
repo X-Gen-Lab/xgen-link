@@ -8,9 +8,9 @@
 #define MOCK_CALLBACKS_H
 
 #include <gmock/gmock.h>
-#include <xgl/xgl.h>
-#include <vector>
 #include <string>
+#include <vector>
+#include <xgl/xgl.h>
 
 /**
  * \brief           Received data record
@@ -33,8 +33,9 @@ struct ErrorRecord {
  * \brief           Mock callback class for testing
  */
 class MockCallbacks {
-public:
-    MockCallbacks() {}
+  public:
+    MockCallbacks() {
+    }
 
     /**
      * \brief           Mock receive callback
@@ -45,8 +46,8 @@ public:
      * \param[in]       len: Data length
      */
     MOCK_METHOD(void, rx_callback_impl,
-                (xgl_handle_t handle, uint16_t source_id,
-                 uint8_t data_type, const uint8_t* data, size_t len));
+                (xgl_handle_t handle, uint16_t source_id, uint8_t data_type,
+                 const uint8_t* data, size_t len));
 
     /**
      * \brief           Mock error callback
@@ -72,12 +73,16 @@ public:
     /**
      * \brief           Get received data records
      */
-    const std::vector<RxRecord>& get_rx_records() const { return rx_records_; }
+    const std::vector<RxRecord>& get_rx_records() const {
+        return rx_records_;
+    }
 
     /**
      * \brief           Get error records
      */
-    const std::vector<ErrorRecord>& get_error_records() const { return error_records_; }
+    const std::vector<ErrorRecord>& get_error_records() const {
+        return error_records_;
+    }
 
     /**
      * \brief           Clear all records
@@ -87,11 +92,10 @@ public:
         error_records_.clear();
     }
 
-private:
+  private:
     static void rx_callback_wrapper(xgl_handle_t handle, uint16_t source_id,
-                                    uint8_t data_type,
-                                    const uint8_t* data, size_t len,
-                                    void* user_data);
+                                    uint8_t data_type, const uint8_t* data,
+                                    size_t len, void* user_data);
 
     static void error_callback_wrapper(xgl_handle_t handle, xgl_error_t error,
                                        const char* message, void* user_data);

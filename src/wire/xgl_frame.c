@@ -5,19 +5,19 @@
  */
 
 #include <xgl/internal/xgl_frame.h>
-#include <xgl/internal/xgl_crc.h>
-#include <xgl/internal/xgl_serialize.h>
-#include <xgl/xgl_types.h>
-#include <xgl/xgl_error.h>
 #include <xgl/internal/xgl_wire.h>
+#include <xgl/xgl_error.h>
+#include <xgl/xgl_types.h>
+
 #include <string.h>
+#include <xgen/bytes/bytes.h>
+#include <xgen/crc/crc.h>
 
 /*---------------------------------------------------------------------------*/
 /* Protocol Version                                                          */
 /*---------------------------------------------------------------------------*/
 
-static xgl_error_t encode_frame_wire_header(uint8_t* buffer,
-                                            size_t buffer_size,
+static xgl_error_t encode_frame_wire_header(uint8_t* buffer, size_t buffer_size,
                                             const xgl_frame_t* frame,
                                             size_t extension_len,
                                             uint8_t extra_flags,
@@ -68,7 +68,8 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
 
     uint8_t traffic_class_bits = 0;
     if (params->reliability_class != XGL_RELIABILITY_NONE) {
-        xgl_frame_set_reliability_class(&traffic_class_bits, params->reliability_class);
+        xgl_frame_set_reliability_class(&traffic_class_bits,
+                                        params->reliability_class);
     } else {
         xgl_frame_set_reliability(&traffic_class_bits, params->reliable);
     }
@@ -76,7 +77,8 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     xgl_frame_set_priority(&traffic_class_bits, params->priority);
 
     uint8_t flags = params->flags;
-    uint8_t reliable = (uint8_t)(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK);
+    uint8_t reliable =
+        (uint8_t)(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK);
     if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
         flags |= XGL_WIRE_FLAG_ACK_ELICITING;
     }
@@ -103,15 +105,18 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->header.packet_type = packet_type;
     frame->header.flags = flags;
     frame->header.ttl = params->ttl;
-    frame->header.traffic_class = (params->traffic_class != 0U) ?
-                                  params->traffic_class :
-                                  traffic_class_bits;
+    frame->header.traffic_class = (params->traffic_class != 0U)
+                                      ? params->traffic_class
+                                      : traffic_class_bits;
     frame->header.source_id = params->source_id;
     frame->header.target_id = params->target_id;
-    frame->header.connection_id = (params->connection_id != 0U) ?
-                                  params->connection_id :
-                                  (uint32_t)params->session_id;
-    frame->header.packet_number = params->packet_number;
+    frame->header.connection_id = params->connection_id;
+    frame->header.packet_number =
+        packet_type == XGL_PACKET_TYPE_DATA &&
+                (reliable == XGL_RELIABILITY_ACK_ELICITING ||
+                 (flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U)
+            ? params->packet_number
+            : 0U;
     frame->header.payload_len = (uint16_t)params->payload_len;
     frame->header.header_crc16 = 0;
 
@@ -134,8 +139,7 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
 /**
  * \brief           Serialize frame to buffer
  */
-xgl_error_t xgl_frame_serialize(uint8_t* buffer,
-                                size_t buffer_size,
+xgl_error_t xgl_frame_serialize(uint8_t* buffer, size_t buffer_size,
                                 const xgl_frame_t* frame,
                                 size_t* bytes_written) {
     if (buffer == NULL || frame == NULL || bytes_written == NULL) {
@@ -156,20 +160,15 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
     size_t offset = 0;
 
     size_t header_len = 0;
-    xgl_error_t err = encode_frame_wire_header(buffer,
-                                               buffer_size,
-                                               frame,
-                                               frame->extensions_len,
-                                               0U,
-                                               &header_len);
+    xgl_error_t err = encode_frame_wire_header(
+        buffer, buffer_size, frame, frame->extensions_len, 0U, &header_len);
     if (err != XGL_OK) {
         return err;
     }
     offset += header_len;
 
     if (frame->extensions != NULL && frame->extensions_len > 0U) {
-        memcpy(&buffer[XGL_WIRE_BASE_HEADER_SIZE],
-               frame->extensions,
+        memcpy(&buffer[XGL_WIRE_BASE_HEADER_SIZE], frame->extensions,
                frame->extensions_len);
     }
 
@@ -180,8 +179,8 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
     }
 
     /* Calculate and write CRC16 (entire frame except CRC16 itself) */
-    uint16_t crc16 = xgl_crc16_modbus(buffer, offset);
-    xgl_serialize_u16_le(&buffer[offset], crc16);
+    uint16_t crc16 = xgcrc_crc16_modbus(buffer, offset);
+    xgb_serialize_u16_le(&buffer[offset], crc16);
     offset += XGL_CRC16_SIZE;
 
     *bytes_written = offset;

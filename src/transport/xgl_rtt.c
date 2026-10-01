@@ -13,6 +13,7 @@
  */
 
 #include <xgl/internal/xgl_rtt.h>
+
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -90,7 +91,7 @@ void xgl_rtt_update(xgl_rtt_estimator_t* est, int32_t measured_rtt) {
     if (!est->initialized) {
         /* First measurement (RFC 6298 Section 2.2) */
         est->srtt = measured_rtt;
-        est->rttvar = measured_rtt >> 1;  /* RTTVAR = R/2 */
+        est->rttvar = measured_rtt >> 1; /* RTTVAR = R/2 */
         est->initialized = true;
     } else {
         /* Subsequent measurements (RFC 6298 Section 2.3) */

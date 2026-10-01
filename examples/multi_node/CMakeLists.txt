@@ -1,11 +1,6 @@
-# Multi-Node Network Example
-# Three-node network demonstrating routing
-# Author: X-Gen Lab
-
-add_executable(multi_node
-    main.c
-)
-
-target_link_libraries(multi_node
-    PRIVATE xgl
-)
+add_executable(multi_node main.c)
+target_link_libraries(multi_node PRIVATE xgl)
+if(XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE)
+    add_test(NAME xgl_multi_node_example COMMAND multi_node)
+    set_tests_properties(xgl_multi_node_example PROPERTIES LABELS integration TIMEOUT 10)
+endif()

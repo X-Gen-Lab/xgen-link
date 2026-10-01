@@ -48,6 +48,8 @@ site/
 *.log
 
 # Test coverage
+.coverage
+.coverage.*
 coverage/
 coverage_html/
 coverage_report/
@@ -118,4 +120,3 @@ Release/
 .config
 .config.old
 defconfig
-

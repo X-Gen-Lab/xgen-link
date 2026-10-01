@@ -1,23 +1,23 @@
-# Config Presets
+# Configuration presets
 
-| Preset | Target | Auth | Notes |
+A profile is a compile-time capability ceiling. A preset supplies explicit runtime limits within it. Unsupported capabilities are rejected.
+
+## Profiles
+
+| Profile | Authentication | Fragments / forwarding / out-of-order | xgen-memory libc default |
 | --- | --- | --- | --- |
-| Tiny | Small MCU | Off by default | Minimum footprint |
-| Small | Small app | Off by default | Larger buffers |
-| Medium | Typical MCU | Off by default | Balanced resources |
-| Large | Host / large MCU | Off by default | Larger windows and buffers |
-| Production | Release profile | On by default | Requires auth provider |
+| boot | No | No | Off |
+| embedded | Yes, 4 session slots | Yes | Off |
+| full | Yes, 16 session slots | Yes | On |
 
-Production releases should start from the Production preset and tighten resources for the target board.
+## Runtime limits
 
-## Exact Defaults
-
-| Preset | ACK Timeout | Retry | Window | Max Frame | TX Pool | RX Buffer |
+| Preset | MTU | Window | Peers | Retained TX | Retained RX | Message bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Tiny | 1000 ms | 3 | 2 | 128 | 1024 | 160 |
-| Small | 1000 ms | 5 | 4 | 256 | 2048 | 288 |
-| Medium | 1000 ms | 5 | 8 | 512 | 4096 | 544 |
-| Large | 1000 ms | 7 | 16 | 1024 | 8192 | 1056 |
-| Production | 1000 ms | 7 | 16 | 1024 | 8192 | 1056 |
+| boot | 128 | 1 | 1 | 1 | 0 | Disabled |
+| tiny | 128 | 2 | 1 | 2 | 2 | Disabled |
+| small | 256 | 4 | 2 | 4 | 4 | 1024 |
+| medium | 512 | 8 | 8 | 16 | 16 | 4096 |
+| large / production | 1024 | 16 | 16 | 64 | 64 | 16384 |
 
-All presets disable compression/encryption by default. Production defaults to `auth_required=true` and `auth_key_id=1`.
+Production additionally requires an authentication provider and explicit trusted sessions before traffic. The shared message budgets and reassembly slots also apply; inspect `xgl_feature_config_t` and query `xgl_memory_requirements()` for the actual selected configuration. A preset name is not a measured MCU RAM/Flash guarantee.

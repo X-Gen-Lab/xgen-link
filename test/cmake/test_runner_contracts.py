@@ -6,7 +6,9 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 
 class RunnerContracts(unittest.TestCase):
@@ -40,6 +42,9 @@ class RunnerContracts(unittest.TestCase):
             self.assertTrue({"unit", "integration"}.intersection(labels), case["name"])
             labels_seen.update(labels)
         self.assertTrue({"unit", "integration", "property"}.issubset(labels_seen))
+        baseline = Path(__file__).with_name("baseline_tests.txt").read_text().splitlines()
+        self.assertEqual(len(baseline), 510)
+        self.assertFalse(set(baseline) - {case["name"] for case in cases})
 
     def test_compilation_uses_standard_cpp17(self):
         entries = json.loads((OPTIONS.build_dir / "compile_commands.json").read_text())
@@ -48,14 +53,36 @@ class RunnerContracts(unittest.TestCase):
         self.assertTrue(commands)
         for command in commands:
             self.assertRegex(command, r"(?:-std=c\+\+17|/std:c\+\+17)")
+            self.assertRegex(command, r"(?:-pedantic-errors|/permissive-)")
 
     def test_explicit_seed_is_recorded_and_replayable(self):
-        first = self.run_binary("--xgl_property_seed=713")
-        second = self.run_binary("--xgl_property_seed=713")
-        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
-        self.assertIn("XGL_PROPERTY_SEED=713", first.stdout)
-        self.assertIn("XGL_PROPERTY_SEED=713", second.stdout)
+        with tempfile.TemporaryDirectory(prefix="xgl-seed-replay-") as directory:
+            snapshots = []
+            for index in range(2):
+                report = Path(directory) / f"replay-{index}.xml"
+                result = self.run_binary("--xgl_property_seed=713",
+                                         f"--gtest_output=xml:{report}")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("XGL_PROPERTY_SEED=713", result.stdout)
+                cases = ET.parse(report).findall(".//testcase")
+                self.assertEqual(len(cases), 6)
+                snapshot = {}
+                for case in cases:
+                    properties = {p.get("name"): p.get("value")
+                                  for p in case.findall("properties/property")}
+                    self.assertEqual(properties["xgl_property_seed"], "713")
+                    snapshot[case.get("name")] = properties["xgl_property_stream"]
+                snapshots.append(snapshot)
+            self.assertEqual(snapshots[0], snapshots[1])
+
+    def test_duplicate_and_invalid_environment_seed_are_rejected(self):
+        duplicate = self.run_binary("--xgl_property_seed=1", "--xgl_property_seed=2")
+        environment = self.run_binary(seed="invalid")
+        missing = self.run_binary("--xgl_property_seed")
+        for result in (duplicate, environment, missing):
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Invalid property seed", result.stderr)
+            self.assertNotIn("[ RUN", result.stdout)
 
     def test_environment_seed_and_cli_precedence(self):
         environment = self.run_binary(seed="17")

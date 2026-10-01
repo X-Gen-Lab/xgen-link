@@ -1,195 +1,77 @@
 /**
  * \file            xgl_runtime.c
- * \brief           Protocol runtime scheduling implementation
+ * \brief           Instance scheduling with module-owned deadlines and state
  * \author          X-Gen Lab
  */
-
 #include <xgl/xgl.h>
 #include <xgl/xgl_config.h>
-#include <xgl/internal/xgl_datalink.h>
-#include <xgl/internal/xgl_time.h>
+
 #include "xgl_instance_internal.h"
 
-static uint32_t deadline_delta_ms(uint32_t now_ms,
-                                  uint32_t start_ms,
-                                  uint32_t timeout_ms) {
-    uint32_t elapsed_ms = now_ms - start_ms;
-    if (elapsed_ms >= timeout_ms) {
-        return 0U;
+/**
+ * \brief           Query the next relative link or transport deadline
+ */
+bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
+                      uint32_t* delay_ms) {
+    if (handle == NULL || !handle->initialized || delay_ms == NULL) {
+        return false;
     }
-
-    return timeout_ms - elapsed_ms;
+    uint32_t next = 0U;
+    bool found = xgl_transport_next_timeout(&handle->layers.transport_ctx,
+                                            now_ms, &next);
+    for (size_t i = 0; i < handle->link_count; ++i) {
+        const xgl_instance_link_t* link = &handle->links[i];
+        const uint32_t elapsed = now_ms - link->last_poll_ms;
+        uint32_t remaining =
+            (!link->polled || elapsed >= link->poll_interval_ms)
+                ? 0U
+                : link->poll_interval_ms - elapsed;
+        if (!found || remaining < next) {
+            next = remaining;
+            found = true;
+        }
+    }
+    if (found) {
+        *delay_ms = next;
+    }
+    return found;
 }
 
-static void deadline_take_min(uint32_t* deadline_ms, uint32_t candidate_ms) {
-    if (deadline_ms == NULL) {
-        return;
+/**
+ * \brief           Poll each due PHY once, then advance transport maintenance
+ */
+xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
+                     const xgl_work_budget_t* budget) {
+    if (handle == NULL || budget == NULL) {
+        return XGL_ERR_NULL_POINTER;
     }
-
-    if (candidate_ms < *deadline_ms) {
-        *deadline_ms = candidate_ms;
+    if (!handle->initialized) {
+        return XGL_ERR_NOT_INITIALIZED;
     }
-}
-
-static void collect_route_deadlines(const struct xgl_instance* handle,
-                                    uint32_t now_ms,
-                                    uint32_t* deadline_ms) {
-    if (handle == NULL || deadline_ms == NULL) {
-        return;
+    if (budget->receive_timeout_ms >= UINT32_C(0x80000000)) {
+        return XGL_ERR_INVALID_PARAM;
     }
-
-    for (size_t i = 0; i < handle->config.route_table_len; i++) {
-        const xgl_route_item_t* route = &handle->config.route_table[i];
-        if (route->phy == NULL || route->phy->rx == NULL) {
+    xgl_error_t error;
+    handle->layers.transport_ctx.current_time_ms = now_ms;
+    xgl_error_t first_error = XGL_OK;
+    for (size_t i = 0; i < handle->link_count && budget->rx_bytes != 0U; ++i) {
+        xgl_instance_link_t* link = &handle->links[i];
+        if (link->polled &&
+            now_ms - link->last_poll_ms < link->poll_interval_ms) {
             continue;
         }
-
-        if (route->read_freq_hz == 0U ||
-            handle->route_last_read_ms == NULL ||
-            i >= handle->route_last_read_count ||
-            handle->route_last_read_ms[i] == 0U) {
-            deadline_take_min(deadline_ms, 0U);
-            continue;
-        }
-
-        uint32_t interval_ms = 1000U / route->read_freq_hz;
-        if (interval_ms == 0U) {
-            interval_ms = 1U;
-        }
-        deadline_take_min(deadline_ms,
-                          deadline_delta_ms(now_ms,
-                                            handle->route_last_read_ms[i],
-                                            interval_ms));
-    }
-}
-
-static void collect_reliable_deadlines(const xgl_transport_ctx_t* transport,
-                                       uint32_t now_ms,
-                                       uint32_t* deadline_ms) {
-    if (transport == NULL || deadline_ms == NULL) {
-        return;
-    }
-
-    for (const xgl_transport_peer_state_t* peer = transport->peers;
-         peer != NULL;
-         peer = peer->next) {
-        if (peer->earliest_deadline_ms == 0U) {
-            continue;
-        }
-
-        /* earliest_deadline_ms is an absolute deadline; compute remaining time */
-        int32_t remaining = (int32_t)(peer->earliest_deadline_ms - now_ms);
-        if (remaining <= 0) {
-            deadline_take_min(deadline_ms, 0U);
-        } else {
-            deadline_take_min(deadline_ms, (uint32_t)remaining);
+        link->polled = true;
+        link->last_poll_ms = now_ms;
+        error = xgl_datalink_poll_parser(
+            &handle->layers.datalink_ctx, &link->parser, link->phy, now_ms,
+            budget->receive_timeout_ms, budget->rx_bytes);
+        if (first_error == XGL_OK && error != XGL_OK) {
+            first_error = error;
         }
     }
-}
-
-static void collect_reassembly_deadlines(const xgl_fragment_manager_t* manager,
-                                         uint32_t now_ms,
-                                         uint32_t* deadline_ms) {
-    if (manager == NULL || deadline_ms == NULL) {
-        return;
+    error = xgl_transport_run(&handle->layers.transport_ctx, handle, now_ms);
+    if (first_error == XGL_OK) {
+        first_error = error;
     }
-
-    xgl_list_node_t* node;
-    XGL_LIST_FOR_EACH(&manager->reassembly_list, node) {
-        const xgl_reassembly_buffer_t* buffer =
-            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
-        if (buffer->first_fragment_time == 0U || buffer->timeout_ms == 0U) {
-            continue;
-        }
-
-        deadline_take_min(deadline_ms,
-                          deadline_delta_ms(now_ms,
-                                            buffer->first_fragment_time,
-                                            buffer->timeout_ms));
-    }
-}
-
-uint32_t xgl_next_deadline_ms(xgl_handle_t handle) {
-    if (handle == NULL || !handle->initialized) {
-        return XGL_NO_DEADLINE_MS;
-    }
-
-    uint32_t now_ms = xgl_time_ms();
-    uint32_t deadline_ms = XGL_NO_DEADLINE_MS;
-
-#ifdef XGL_THREAD_SAFE
-    if (handle->config.features.thread_safe) {
-        xgl_instance_lock(handle);
-    }
-#endif
-
-    collect_route_deadlines(handle, now_ms, &deadline_ms);
-    collect_reliable_deadlines(&handle->layers.transport_ctx,
-                               now_ms,
-                               &deadline_ms);
-    collect_reassembly_deadlines(handle->layers.transport_ctx.fragment_mgr,
-                                 now_ms,
-                                 &deadline_ms);
-
-#ifdef XGL_THREAD_SAFE
-    xgl_instance_unlock(handle);
-#endif
-
-    return deadline_ms;
-}
-
-void xgl_run(xgl_handle_t handle, uint32_t freq_hz) {
-    size_t i;
-    uint32_t current_time_ms;
-
-    if (handle == NULL || !handle->initialized) {
-        return;
-    }
-
-    current_time_ms = xgl_time_ms();
-
-#ifdef XGL_THREAD_SAFE
-    if (handle->config.features.thread_safe) {
-        xgl_instance_lock(handle);
-    }
-#endif
-
-    for (i = 0; i < handle->config.route_table_len; i++) {
-        xgl_route_item_t* route = &handle->config.route_table[i];
-        if (route->phy != NULL && route->phy->rx != NULL) {
-            uint32_t route_freq_hz = route->read_freq_hz;
-            bool should_read = true;
-
-            if (route_freq_hz > 0U && freq_hz > 0U && route_freq_hz < freq_hz &&
-                handle->route_last_read_ms != NULL && i < handle->route_last_read_count) {
-                uint32_t interval_ms = 1000U / route_freq_hz;
-                if (interval_ms == 0U) {
-                    interval_ms = 1U;
-                }
-                if (handle->route_last_read_ms[i] != 0U &&
-                    current_time_ms - handle->route_last_read_ms[i] < interval_ms) {
-                    should_read = false;
-                }
-            }
-
-            if (!should_read) {
-                continue;
-            }
-
-            if (handle->route_last_read_ms != NULL && i < handle->route_last_read_count) {
-                handle->route_last_read_ms[i] = current_time_ms;
-            }
-
-            xgl_datalink_receive(&handle->layers.datalink_ctx,
-                                 route->phy,
-                                 current_time_ms,
-                                 XGL_DATALINK_RX_MAX_BYTES_PER_CALL);
-        }
-    }
-
-    xgl_transport_run(&handle->layers.transport_ctx, handle, current_time_ms);
-
-#ifdef XGL_THREAD_SAFE
-    xgl_instance_unlock(handle);
-#endif
+    return first_error;
 }

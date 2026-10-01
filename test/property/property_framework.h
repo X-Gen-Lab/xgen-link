@@ -7,12 +7,14 @@
 #ifndef PROPERTY_FRAMEWORK_H
 #define PROPERTY_FRAMEWORK_H
 
+#include <algorithm>
 #include <gtest/gtest.h>
-#include <xgl/xgl.h>
-#include <xgl/internal/xgl_wire.h>
 #include <random>
 #include <vector>
-#include <algorithm>
+#include <xgl/internal/xgl_wire.h>
+#include <xgl/xgl.h>
+
+#include "property_seed.h"
 
 /**
  * \brief           Property test configuration
@@ -23,8 +25,10 @@
  * \brief           Random generator utilities for property-based testing
  */
 class PropertyTestGenerator {
-public:
-    PropertyTestGenerator() : rng_(std::random_device{}()) {}
+  public:
+    explicit PropertyTestGenerator(uint32_t seed = property_test_seed())
+        : rng_(seed) {
+    }
 
     /**
      * \brief           Generate random uint8_t
@@ -65,7 +69,8 @@ public:
      * \brief           Generate random uint32_t in range
      */
     uint32_t random_uint32(uint32_t min, uint32_t max) {
-        if (max <= min) return min;
+        if (max <= min)
+            return min;
         return min + (rng_() % (max - min + 1));
     }
 
@@ -85,9 +90,7 @@ public:
      */
     std::vector<uint8_t> random_bytes(size_t min_len, size_t max_len) {
         size_t len = static_cast<size_t>(random_uint32(
-            static_cast<uint32_t>(min_len),
-            static_cast<uint32_t>(max_len)
-        ));
+            static_cast<uint32_t>(min_len), static_cast<uint32_t>(max_len)));
         return random_bytes(len);
     }
 
@@ -127,16 +130,18 @@ public:
      * \brief           Corrupt random byte in data
      */
     void corrupt_random_byte(std::vector<uint8_t>& data) {
-        if (data.empty()) return;
+        if (data.empty())
+            return;
         size_t index = rng_() % data.size();
-        data[index] ^= 0xFF;  /* Flip all bits */
+        data[index] ^= 0xFF; /* Flip all bits */
     }
 
     /**
      * \brief           Corrupt random bit in data
      */
     void corrupt_random_bit(std::vector<uint8_t>& data) {
-        if (data.empty()) return;
+        if (data.empty())
+            return;
         size_t byte_index = rng_() % data.size();
         uint8_t bit_index = rng_() % 8;
         data[byte_index] ^= (1 << bit_index);
@@ -175,35 +180,34 @@ public:
      * \brief           Generate random packet data
      */
     std::vector<uint8_t> random_packet_data(size_t max_size = 1024) {
-        size_t len = static_cast<size_t>(random_uint32(1, static_cast<uint32_t>(max_size)));
+        size_t len = static_cast<size_t>(
+            random_uint32(1, static_cast<uint32_t>(max_size)));
         return random_bytes(len);
     }
 
     /**
      * \brief           Shuffle vector elements
      */
-    template<typename T>
-    void shuffle(std::vector<T>& vec) {
+    template <typename T> void shuffle(std::vector<T>& vec) {
         std::shuffle(vec.begin(), vec.end(), rng_);
     }
 
-private:
+  private:
     std::mt19937 rng_;
 };
 
 /**
  * \brief           Property test helper macros
  */
-#define PROPERTY_TEST(test_suite, test_name) \
-    TEST(test_suite, test_name)
+#define PROPERTY_TEST(test_suite, test_name) TEST(test_suite, test_name)
 
-#define FOR_ALL_ITERATIONS(iterations) \
+#define FOR_ALL_ITERATIONS(iterations)                                         \
     for (int _iteration = 0; _iteration < (iterations); ++_iteration)
 
-#define PROPERTY_ASSERT(condition) \
+#define PROPERTY_ASSERT(condition)                                             \
     ASSERT_TRUE(condition) << "Property violated at iteration " << _iteration
 
-#define PROPERTY_EXPECT(condition) \
+#define PROPERTY_EXPECT(condition)                                             \
     EXPECT_TRUE(condition) << "Property violated at iteration " << _iteration
 
 #endif /* PROPERTY_FRAMEWORK_H */

@@ -1,24 +1,16 @@
 # Examples
 
-Examples live under `examples/`.
+## Programs
 
-| Example | Purpose |
+| Target | Demonstration |
 | --- | --- |
-| `echo_server` | Basic send/receive and echo behavior between two 16-bit nodes |
-| `multi_node` | Three-node routing and forwarding |
-| `file_transfer` | Reliable transfer and fragmentation |
-| `platforms` | Bare-metal, FreeRTOS, and Windows mock ports |
+| `echo_server` | Queue in RX callback, respond from the next application step |
+| `file_transfer` | Reliable application chunks and payload verification |
+| `multi_node` | Routing through an intermediate node; requires forwarding |
+| `boot_update` | Bounded blocks, slow Flash BUSY and lost-ACK recovery |
 
-Build:
+All examples use public APIs, explicit time and fixed application storage. The common synchronous host PHY copies frames into bounded byte queues.
 
-```sh
-cmake --preset gcc-test
-cmake --build build/gcc-test
-```
+## Run
 
-Example callbacks must use `uint16_t source_id`, matching the public `xgl_rx_callback_t` signature.
-
-`echo_server` is not a single-node self-loop. It creates node `1` and node `2`
-as separate protocol instances connected by two simulated PHY channels, keeping
-the example aligned with the production rule that ordinary unicast frames do not
-use the same source and target node ID.
+Enable `XGL_BUILD_EXAMPLES=ON`, build and run CTest. Boot excludes the forwarding example. Executable paths and limits are described in `examples/*/README.md`.

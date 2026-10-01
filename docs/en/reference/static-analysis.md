@@ -1,39 +1,30 @@
-# Static Analysis
+# Static analysis
 
-Compiler baseline:
+## Run
 
-- `-Wall`
-- `-Wextra`
-- `-Werror`
-- `-Wpedantic`
-- conversion/sign/cast warnings
-
-cppcheck baseline:
+Prepare the five foundation packages and GoogleTest/GoogleMock as described in [Build and test](../getting-started/build-and-test.md), then explicitly install the xgen-quality commit pinned by `tools/quality.json`. The shared package owns tool versions; missing or mismatched tools fail.
 
 ```sh
-cmake --build build/gcc-test --target xgl_static_analysis
+cmake --preset gcc-test \
+  -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
+cmake --build --preset gcc-test
+python tools/quality.py cppcheck --build-dir build/gcc-test
+python tools/quality.py tidy --build-dir build/gcc-test
 ```
 
-Release environments must install cppcheck. Unavailable static analysis is not a release pass.
+`xgl_static_analysis` invokes the same shared `cppcheck` entry; run it with `cmake --build build/gcc-test --target xgl_static_analysis`. It uses the Python interpreter discovered at configure time, so configure within the environment containing the quality package or explicitly set `Python3_EXECUTABLE`. Run Clang-Tidy through the `tidy` command above.
 
-## Expected Failure Handling
+Source development uses the same entries with its configured dev directory, for example `--build-dir build/dev-debug`. Analysis helpers default to disabled under a parent project; explicitly enable `XGL_BUILD_STATIC_ANALYSIS_TARGET` when needed. Production builds do not install quality tools.
 
-| Failure | Action |
-| --- | --- |
-| Compiler warning promoted by `-Werror` | Fix code or make the conversion/cast explicit |
-| cppcheck finding in production code | Fix code, add a targeted suppression only when the finding is demonstrably false positive |
-| cppcheck unavailable | Treat as environment failure for release validation |
-| Generated/build output warning | Prefer excluding generated output from analysis instead of suppressing source files |
+## Inputs and diagnostics
 
-Suppressions must be narrow: prefer line-level or symbol-level suppressions with
-a short reason near the code. Do not add broad file suppressions for protocol
-paths that touch wire format, allocator lifetimes, authentication, or fragment
-reassembly.
+The shared runner selects production sources declared in `tools/quality.json` from the real `compile_commands.json`, preserving compiler, macros, includes, and profile. Cppcheck uses the shared warning, performance, and portability policy. Clang-Tidy reads the root `.clang-tidy`, currently enabling `clang-analyzer-*`, `bugprone-*`, and `performance-*`. Do not replace the compilation database with an independently maintained include list.
 
-Audit focus:
+The quality package controls fixed tools and optional local-path variables `XGEN_CPPCHECK` and `XGEN_CLANG_TIDY`. Selecting an executable still requires its version to match. Missing databases, empty production inputs, tool failures, and blocking diagnostics return nonzero. Results and selected sources are retained in `out/reports/`; local, CMake, and CI entries share these decisions.
 
-- v2 wire header offset encoding
-- allocator failure paths
-- fragment reassembly lifetime
-- callback reentrancy
-- ISR-to-protocol-task boundary
+Public API comments are checked separately with `python tools/quality.py docs`. The root `Doxyfile` makes missing documentation, parameters, and documentation errors fail; the site inherits that configuration to generate HTML. Formatting uses `python tools/quality.py format`, with its result reported separately from analysis.
+
+## Limits
+
+Analysis covers the compiled configuration. Record Full, Embedded, Boot, and compiler results separately; excluded features do not inherit a pass. Static analysis complements runtime, capacity, and wire tests. It does not establish constant-time cryptography, interrupt safety, DMA lifetime correctness, or worst-case call-stack bounds.

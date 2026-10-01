@@ -4,16 +4,18 @@
  */
 
 #include <xgl/internal/xgl_wire.h>
-#include <xgl/internal/xgl_crc.h>
-#include <xgl/internal/xgl_serialize.h>
+#include <xgl/xgl_config.h>
+
 #include <string.h>
+#include <xgen/bytes/bytes.h>
+#include <xgen/crc/crc.h>
 
 static uint16_t wire_header_crc16(const uint8_t* buffer) {
     uint8_t crc_input[XGL_WIRE_BASE_HEADER_SIZE];
     memcpy(crc_input, buffer, XGL_WIRE_BASE_HEADER_SIZE);
     crc_input[22] = 0;
     crc_input[23] = 0;
-    return xgl_crc16_modbus(crc_input, XGL_WIRE_BASE_HEADER_SIZE);
+    return xgcrc_crc16_modbus(crc_input, XGL_WIRE_BASE_HEADER_SIZE);
 }
 
 static bool wire_packet_type_valid(uint8_t packet_type) {
@@ -21,41 +23,7 @@ static bool wire_packet_type_valid(uint8_t packet_type) {
            packet_type <= XGL_PACKET_TYPE_CLOSE;
 }
 
-static bool wire_auth_aad_has_frame_header(const uint8_t* aad,
-                                           size_t aad_len) {
-    return aad_len >= XGL_WIRE_BASE_HEADER_SIZE &&
-           aad[0] == XGL_WIRE_MAGIC_0 &&
-           aad[1] == XGL_WIRE_MAGIC_1;
-}
-
-static xgl_error_t wire_auth_canonical_aad(const uint8_t* aad,
-                                           size_t aad_len,
-                                           uint8_t* canonical,
-                                           size_t canonical_size,
-                                           const uint8_t** prepared_aad) {
-    if (aad == NULL || canonical == NULL || prepared_aad == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    *prepared_aad = aad;
-    if (!wire_auth_aad_has_frame_header(aad, aad_len)) {
-        return XGL_OK;
-    }
-
-    if (aad_len > canonical_size) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    memcpy(canonical, aad, aad_len);
-    canonical[6] = 0U;
-    canonical[22] = 0U;
-    canonical[23] = 0U;
-    *prepared_aad = canonical;
-    return XGL_OK;
-}
-
-xgl_error_t xgl_wire_encode_header(uint8_t* buffer,
-                                   size_t buffer_size,
+xgl_error_t xgl_wire_encode_header(uint8_t* buffer, size_t buffer_size,
                                    const xgl_wire_header_t* header) {
     if (buffer == NULL || header == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -68,8 +36,9 @@ xgl_error_t xgl_wire_encode_header(uint8_t* buffer,
     if (header->version != XGL_WIRE_VERSION ||
         header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
         !wire_packet_type_valid(header->packet_type) ||
-        header->source_id == 0U ||
-        header->target_id == 0U) {
+        (header->flags & XGL_WIRE_FLAG_ENCRYPTED) != 0U ||
+        (header->traffic_class & XGL_TRAFFIC_ENCRYPTION_MASK) != 0U ||
+        header->source_id == 0U || header->target_id == 0U) {
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -82,19 +51,18 @@ xgl_error_t xgl_wire_encode_header(uint8_t* buffer,
     buffer[5] = header->flags;
     buffer[6] = header->ttl;
     buffer[7] = header->traffic_class;
-    xgl_serialize_u16_le(&buffer[8], header->source_id);
-    xgl_serialize_u16_le(&buffer[10], header->target_id);
-    xgl_serialize_u32_le(&buffer[12], header->connection_id);
-    xgl_serialize_u32_le(&buffer[16], header->packet_number);
-    xgl_serialize_u16_le(&buffer[20], header->payload_len);
-    xgl_serialize_u16_le(&buffer[22], wire_header_crc16(buffer));
+    xgb_serialize_u16_le(&buffer[8], header->source_id);
+    xgb_serialize_u16_le(&buffer[10], header->target_id);
+    xgb_serialize_u32_le(&buffer[12], header->connection_id);
+    xgb_serialize_u32_le(&buffer[16], header->packet_number);
+    xgb_serialize_u16_le(&buffer[20], header->payload_len);
+    xgb_serialize_u16_le(&buffer[22], wire_header_crc16(buffer));
 
     return XGL_OK;
 }
 
 xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
-                                   const uint8_t* buffer,
-                                   size_t buffer_size) {
+                                   const uint8_t* buffer, size_t buffer_size) {
     if (header == NULL || buffer == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -108,7 +76,7 @@ xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
     }
 
     uint16_t expected_crc = wire_header_crc16(buffer);
-    uint16_t actual_crc = xgl_deserialize_u16_le(&buffer[22]);
+    uint16_t actual_crc = xgb_deserialize_u16_le(&buffer[22]);
     if (expected_crc != actual_crc) {
         return XGL_ERR_CRC_FAILED;
     }
@@ -120,30 +88,28 @@ xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
     header->flags = buffer[5];
     header->ttl = buffer[6];
     header->traffic_class = buffer[7];
-    header->source_id = xgl_deserialize_u16_le(&buffer[8]);
-    header->target_id = xgl_deserialize_u16_le(&buffer[10]);
-    header->connection_id = xgl_deserialize_u32_le(&buffer[12]);
-    header->packet_number = xgl_deserialize_u32_le(&buffer[16]);
-    header->payload_len = xgl_deserialize_u16_le(&buffer[20]);
+    header->source_id = xgb_deserialize_u16_le(&buffer[8]);
+    header->target_id = xgb_deserialize_u16_le(&buffer[10]);
+    header->connection_id = xgb_deserialize_u32_le(&buffer[12]);
+    header->packet_number = xgb_deserialize_u32_le(&buffer[16]);
+    header->payload_len = xgb_deserialize_u16_le(&buffer[20]);
     header->header_crc16 = actual_crc;
 
     if (header->version != XGL_WIRE_VERSION ||
         header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
         !wire_packet_type_valid(header->packet_type) ||
-        header->source_id == 0U ||
-        header->target_id == 0U) {
+        (header->flags & XGL_WIRE_FLAG_ENCRYPTED) != 0U ||
+        (header->traffic_class & XGL_TRAFFIC_ENCRYPTION_MASK) != 0U ||
+        header->source_id == 0U || header->target_id == 0U) {
         return XGL_ERR_INVALID_FRAME;
     }
 
     return XGL_OK;
 }
 
-xgl_error_t xgl_wire_encode_ext(uint8_t* buffer,
-                                size_t buffer_size,
-                                uint8_t type,
-                                const uint8_t* value,
-                                size_t value_len,
-                                size_t* bytes_written) {
+xgl_error_t xgl_wire_encode_ext(uint8_t* buffer, size_t buffer_size,
+                                uint8_t type, const uint8_t* value,
+                                size_t value_len, size_t* bytes_written) {
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -171,9 +137,107 @@ xgl_error_t xgl_wire_encode_ext(uint8_t* buffer,
     return XGL_OK;
 }
 
+/**
+ * \brief           Validate frame boundaries and CRCs before exposing byte
+ *                  spans
+ * \param[out]      view: Borrowed view, cleared if decoding fails
+ * \param[in]       buffer: Complete frame bytes
+ * \param[in]       frame_len: Available bytes including the final CRC
+ * \param[out]      status: Optional detailed validation result
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_wire_decode_frame(xgl_wire_frame_view_t* view,
+                                  const uint8_t* buffer, size_t frame_len,
+                                  xgl_wire_decode_status_t* status) {
+    if (status != NULL) {
+        *status = XGL_WIRE_DECODE_INVALID;
+    }
+    if (view == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    memset(view, 0, sizeof(*view));
+    if (buffer == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (frame_len < XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    xgl_wire_header_t header;
+    xgl_error_t err = xgl_wire_decode_header(&header, buffer, frame_len);
+    if (err != XGL_OK) {
+        if (status != NULL && err == XGL_ERR_CRC_FAILED) {
+            *status = XGL_WIRE_DECODE_HEADER_CRC;
+        }
+        return err;
+    }
+
+    /* Establish the actual extension boundary before reading any TLV byte. */
+    size_t body_end = frame_len - XGL_CRC16_SIZE;
+    if (header.header_len > body_end) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    size_t extensions_len =
+        (size_t)header.header_len - XGL_WIRE_BASE_HEADER_SIZE;
+    xgl_wire_ext_metadata_t extensions;
+    err = xgl_wire_decode_ext_metadata(buffer + XGL_WIRE_BASE_HEADER_SIZE,
+                                       extensions_len, &extensions);
+    if (err != XGL_OK) {
+        return err;
+    }
+    size_t body_len = body_end - header.header_len;
+    if (header.payload_len > body_len ||
+        body_len - header.payload_len != extensions.auth_tag_len) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    bool authenticated = (header.flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U;
+    if (authenticated != extensions.has_security_ext) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    if (xgcrc_crc16_modbus(buffer, body_end) !=
+        xgb_deserialize_u16_le(buffer + body_end)) {
+        if (status != NULL) {
+            *status = XGL_WIRE_DECODE_FRAME_CRC;
+        }
+        return XGL_ERR_CRC_FAILED;
+    }
+
+    view->header = header;
+    view->data_type = extensions.data_type;
+    view->session_epoch = extensions.session_epoch;
+    view->extensions =
+        extensions_len > 0U ? buffer + XGL_WIRE_BASE_HEADER_SIZE : NULL;
+    view->extensions_len = extensions_len;
+    view->payload = buffer + header.header_len;
+    view->payload_len = header.payload_len;
+    view->frame_buf = buffer;
+    view->frame_len = frame_len;
+    view->auth_key_id = extensions.auth_key_id;
+    view->nonce_id = extensions.nonce_id;
+    view->incarnation_id = extensions.incarnation_id;
+    view->auth_tag_len = extensions.auth_tag_len;
+    view->has_security_ext = extensions.has_security_ext;
+    view->authenticated = authenticated;
+    uint8_t reliability =
+        (uint8_t)(header.traffic_class & XGL_RELIABILITY_CLASS_MASK);
+    if (reliability == XGL_RELIABILITY_ACK_ELICITING ||
+        (header.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
+        view->reliable = XGL_RELIABILITY_ACK_ELICITING;
+    } else if (reliability == XGL_RELIABILITY_ACK_ONLY ||
+               header.packet_type == XGL_PACKET_TYPE_ACK) {
+        view->reliable = XGL_RELIABILITY_ACK_ONLY;
+    }
+    view->fragment = (header.flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U;
+    view->priority =
+        (uint8_t)((header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK) >>
+                  XGL_TRAFFIC_PRIORITY_SHIFT);
+    if (status != NULL) {
+        *status = XGL_WIRE_DECODE_OK;
+    }
+    return XGL_OK;
+}
+
 xgl_error_t xgl_wire_ext_cursor_init(xgl_wire_ext_cursor_t* cursor,
-                                     const uint8_t* buffer,
-                                     size_t len) {
+                                     const uint8_t* buffer, size_t len) {
     if (cursor == NULL || (buffer == NULL && len > 0U)) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -215,110 +279,4 @@ xgl_error_t xgl_wire_ext_cursor_next(xgl_wire_ext_cursor_t* cursor,
     cursor->offset += ext_len;
 
     return XGL_OK;
-}
-
-xgl_error_t xgl_wire_append_auth_trailer(uint8_t* buffer,
-                                         size_t buffer_size,
-                                         size_t aad_len,
-                                         size_t payload_len,
-                                         uint32_t key_id,
-                                         const xgl_auth_provider_t* provider,
-                                         size_t* frame_len) {
-    if (buffer == NULL || provider == NULL || provider->sign == NULL ||
-        frame_len == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    if (provider->tag_len == 0U || provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    size_t tag_offset = aad_len + payload_len;
-    if (tag_offset > buffer_size) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-    if (buffer_size - tag_offset < provider->tag_len) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    uint8_t canonical_aad[UINT8_MAX] = {0};
-    const uint8_t* signing_aad = NULL;
-    xgl_error_t err = wire_auth_canonical_aad(buffer,
-                                              aad_len,
-                                              canonical_aad,
-                                              sizeof(canonical_aad),
-                                              &signing_aad);
-    if (err != XGL_OK) {
-        return err;
-    }
-
-    size_t tag_len = 0U;
-    err = provider->sign(key_id,
-                         signing_aad,
-                         aad_len,
-                         &buffer[aad_len],
-                         payload_len,
-                         &buffer[tag_offset],
-                         buffer_size - tag_offset,
-                         &tag_len,
-                         provider->user_data);
-    if (err != XGL_OK) {
-        return err;
-    }
-
-    if (tag_len != provider->tag_len) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    if (tag_len == 0U || tag_offset + tag_len > buffer_size) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    *frame_len = tag_offset + tag_len;
-    return XGL_OK;
-}
-
-xgl_error_t xgl_wire_verify_auth_trailer(const uint8_t* buffer,
-                                         size_t frame_len,
-                                         size_t aad_len,
-                                         size_t payload_len,
-                                         uint32_t key_id,
-                                         const xgl_auth_provider_t* provider,
-                                         bool* valid) {
-    if (buffer == NULL || provider == NULL || provider->verify == NULL ||
-        valid == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    if (provider->tag_len == 0U || provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    *valid = false;
-    size_t tag_offset = aad_len + payload_len;
-    if (tag_offset >= frame_len) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-    if (frame_len - tag_offset != provider->tag_len) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    uint8_t canonical_aad[UINT8_MAX] = {0};
-    const uint8_t* verifying_aad = NULL;
-    xgl_error_t err = wire_auth_canonical_aad(buffer,
-                                              aad_len,
-                                              canonical_aad,
-                                              sizeof(canonical_aad),
-                                              &verifying_aad);
-    if (err != XGL_OK) {
-        return err;
-    }
-
-    return provider->verify(key_id,
-                            verifying_aad,
-                            aad_len,
-                            &buffer[aad_len],
-                            payload_len,
-                            &buffer[tag_offset],
-                            frame_len - tag_offset,
-                            valid,
-                            provider->user_data);
 }

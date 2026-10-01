@@ -1,145 +1,119 @@
 /**
  * \file            test_footprint.cpp
- * \brief           Footprint and allocation accounting tests
+ * \brief           Workspace ownership and runtime allocation accounting
+ * \author          X-Gen Lab
  */
 
-#include <gtest/gtest.h>
+#include "test_host_allocator.h"
+
 #include <xgl/xgl.h>
-#include <xgl/internal/xgl_allocator.h>
+
 #include <cstdlib>
+#include <gtest/gtest.h>
+#include <xgen/memory/allocator.h>
 
 namespace {
 
+/**
+ * \brief           Per-instance backend counters without shared global state
+ */
 struct CountingAllocator {
-    size_t allocations = 0;
-    size_t frees = 0;
-    size_t bytes = 0;
+    size_t allocations = 0U;
+    size_t frees = 0U;
+    size_t bytes = 0U;
 };
 
-static CountingAllocator* g_allocator = nullptr;
-
-static void* counting_malloc(size_t size) {
+/**
+ * \brief           Record the sole allocation used to reserve a workspace
+ */
+void* counting_alloc(void* ctx, size_t size) {
+    auto* counter = static_cast<CountingAllocator*>(ctx);
     void* ptr = std::malloc(size);
-    if (g_allocator != nullptr && ptr != nullptr) {
-        g_allocator->allocations++;
-        g_allocator->bytes += size;
+    if (ptr != nullptr) {
+        ++counter->allocations;
+        counter->bytes += size;
     }
     return ptr;
 }
 
-static void counting_free(void* ptr) {
-    if (g_allocator != nullptr && ptr != nullptr) {
-        g_allocator->frees++;
+/**
+ * \brief           Record release through the same explicit backend context
+ */
+void counting_free(void* ctx, void* ptr) {
+    if (ptr != nullptr) {
+        ++static_cast<CountingAllocator*>(ctx)->frees;
     }
     std::free(ptr);
 }
 
-static xgl_error_t null_tx(const uint8_t* data, size_t len, void* user_data) {
-    (void)data;
-    (void)len;
-    (void)user_data;
+xgl_error_t null_tx(const uint8_t*, size_t, void*) {
     return XGL_OK;
 }
 
-static xgl_error_t null_rx(uint8_t* buffer, size_t* len, void* user_data) {
-    (void)buffer;
-    (void)user_data;
-    if (len == nullptr) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    *len = 0;
+xgl_error_t null_rx(uint8_t*, size_t* size, void*) {
+    *size = 0U;
     return XGL_OK;
 }
 
 }  // namespace
 
-TEST(XglFootprintTest, TinyPresetInitDestroyAllocationsAreBalanced) {
+TEST(XglFootprintTest, CreateReservesExactlyTheMeasuredWorkspaceOnce) {
     CountingAllocator counter;
-    g_allocator = &counter;
-
-    xgl_allocator_t allocator = {
-        .malloc = counting_malloc,
-        .free = counting_free,
-        .user_data = nullptr
-    };
-    xgl_phy_ops_t phy = {
-        .tx = null_tx,
-        .rx = null_rx,
-        .user_data = nullptr
-    };
-    xgl_route_item_t routes[] = {
-        { .target_id = 2, .phy = &phy, .max_frame_size = 128, .read_freq_hz = 100, .metric = 1 }
-    };
-
+    xgm_allocator_t allocator = {&counter, counting_alloc, counting_free};
+    xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;
     xgl_config_get_preset_tiny(&config);
-    config.source_id = 1;
     config.memory.allocator = &allocator;
-    config.route_table = routes;
-    config.route_table_len = 1;
+    config.route_table = &route;
+    config.route_table_len = 1U;
+    xgl_memory_requirements_t requirements{};
+    ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
 
+    xgl_test_use_host_allocator(&config);
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
+    EXPECT_EQ(counter.allocations, 1U);
+    EXPECT_EQ(counter.bytes, requirements.size);
     EXPECT_EQ(xgl_init(handle), XGL_OK);
-
-    EXPECT_GT(counter.allocations, 0U);
-    EXPECT_GT(counter.bytes, config.memory.tx_pool_size);
-
+    EXPECT_EQ(counter.allocations, 1U);
+    EXPECT_EQ(counter.frees, 0U);
     xgl_destroy(handle);
-
-    EXPECT_EQ(counter.allocations, counter.frees);
-    g_allocator = nullptr;
+    EXPECT_EQ(counter.frees, 1U);
 }
 
-TEST(XglFootprintTest, TinyPresetUnreliableSendHasNoRuntimeTxAllocation) {
-    xgl_tracking_allocator_t tracker;
-    ASSERT_EQ(xgl_tracking_allocator_init(&tracker, nullptr), 0);
-
-    xgl_phy_ops_t phy = {
-        .tx = null_tx,
-        .rx = null_rx,
-        .user_data = nullptr
-    };
-    xgl_route_item_t routes[] = {
-        { .target_id = 2, .phy = &phy, .max_frame_size = 128, .read_freq_hz = 100, .metric = 1 }
-    };
-
+TEST(XglFootprintTest, SendsReuseReservedStorageWithoutBackendAllocations) {
+    CountingAllocator counter;
+    xgm_allocator_t allocator = {&counter, counting_alloc, counting_free};
+    xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;
     xgl_config_get_preset_tiny(&config);
-    config.source_id = 1;
-    config.memory.allocator = xgl_tracking_allocator_get_interface(&tracker);
-    config.route_table = routes;
-    config.route_table_len = 1;
-
-    xgl_tracking_allocator_set_phase(&tracker, XGL_ALLOCATOR_PHASE_INIT);
+    config.memory.allocator = &allocator;
+    config.route_table = &route;
+    config.route_table_len = 1U;
+    xgl_test_use_host_allocator(&config);
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
     ASSERT_EQ(xgl_init(handle), XGL_OK);
+    ASSERT_EQ(counter.allocations, 1U);
 
-    xgl_tracking_allocator_reset_stats(&tracker);
-    xgl_tracking_allocator_set_phase(&tracker, XGL_ALLOCATOR_PHASE_RUNTIME_TX);
-
-    uint8_t payload[] = {0x01, 0x02, 0x03, 0x04};
-    xgl_tx_data_t tx_data = {
-        .target_id = 2,
-        .data_type = 1,
-        .data = payload,
-        .data_len = sizeof(payload),
-        .reliable = false,
-        .priority = 0,
-        .timeout_ms = 0
-    };
-
-    EXPECT_EQ(xgl_send(handle, &tx_data), XGL_OK);
-
-    xgl_allocator_phase_stats_t phase_stats;
-    xgl_tracking_allocator_get_phase_stats(&tracker, &phase_stats);
-    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_RUNTIME_TX].alloc_count, 0U);
-    EXPECT_EQ(phase_stats.phase[XGL_ALLOCATOR_PHASE_RUNTIME_TX].total_allocated, 0U);
-
+    const uint8_t payload[] = {1U, 2U, 3U, 4U};
+    xgl_tx_data_t tx{};
+    tx.target_id = 2U;
+    tx.data_type = 1U;
+    tx.data = payload;
+    tx.data_len = sizeof(payload);
+    for (uint32_t tick = 0U; tick < 1000U; ++tick) {
+        ASSERT_EQ(xgl_send_at(handle, &tx, tick), XGL_OK);
+    }
+    tx.reliable = true;
+    for (size_t slot = 0U; slot < config.protocol.window_size; ++slot) {
+        ASSERT_EQ(xgl_send_at(handle, &tx, 1000U), XGL_OK);
+    }
+    EXPECT_EQ(xgl_send_at(handle, &tx, 1000U), XGL_ERR_WINDOW_FULL);
+    EXPECT_EQ(counter.allocations, 1U);
+    EXPECT_EQ(counter.frees, 0U);
     xgl_destroy(handle);
-
-    xgl_allocator_stats_t stats;
-    xgl_tracking_allocator_get_stats(&tracker, &stats);
-    EXPECT_EQ(stats.current_allocated, 0U);
+    EXPECT_EQ(counter.frees, 1U);
 }

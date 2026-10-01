@@ -1,63 +1,24 @@
-# Quick Start
+# Quick start
 
-## Install Documentation Dependencies
+## Storage and lifetime
 
-```sh
-python -m pip install -r docs/requirements.txt
-```
+Start with `xgl_config_get_preset_boot()` for one peer, one reliable slot and 128-byte MTU. Set local node, routes, PHY and application callbacks. Keep the configuration and referenced objects alive until destruction.
 
-Documentation builds also require Doxygen. Release validation environments require `cppcheck`.
+Call `xgl_memory_requirements()`, check the exact size and alignment, and supply that capacity to `xgl_init_static()`. Different profiles and limits require different sizes. Alternatively, `xgl_create()` reserves the same layout through the selected backend and requires `xgl_init()`.
 
-## Build and Test
-
-```sh
-cmake --preset gcc-test
-cmake --build build/gcc-test --target xgl_tests
-ctest --preset gcc-test --output-on-failure
-```
-
-## Minimal Program
+## Main loop
 
 ```c
-#include <xgl/xgl.h>
-
-static xgl_error_t phy_tx(const uint8_t* data, size_t len, void* user_data) {
-    (void)data;
-    (void)len;
-    (void)user_data;
-    return XGL_OK;
-}
-
-static xgl_error_t phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
-    (void)buffer;
-    (void)user_data;
-    *len = 0;
-    return XGL_OK;
-}
-
-int main(void) {
-    xgl_phy_ops_t phy = { .tx = phy_tx, .rx = phy_rx, .user_data = 0 };
-    xgl_route_item_t route = { .target_id = 2, .phy = &phy, .max_frame_size = 256, .read_freq_hz = 100 };
-
-    xgl_config_t config;
-    xgl_config_get_default(&config);
-    config.source_id = 1;
-    config.route_table = &route;
-    config.route_table_len = 1;
-
-    xgl_handle_t handle = xgl_create(&config);
-    if (handle == 0) {
-        return 1;
-    }
-    if (xgl_init(handle) != XGL_OK) {
-        xgl_destroy(handle);
-        return 1;
-    }
-
-    xgl_run(handle, 100);
-    xgl_destroy(handle);
-    return 0;
+const xgl_work_budget_t budget = {128U, 1000U};
+(void)xgl_step(handle, now_ms, &budget);
+uint32_t delay_ms;
+if (xgl_next_timeout(handle, now_ms, &delay_ms)) {
+    /* Application chooses the next wakeup. */
 }
 ```
 
-When production authentication is enabled, configure an `auth_provider` before initialization.
+Use `xgl_send_at()` outside callbacks. The receive acceptance callback can return BUSY while Flash or application storage is occupied. PHY TX must finish reading or copying the frame before returning.
+
+## Runnable programs
+
+See [examples](examples.md) for complete lifetime-correct programs. The Boot update demonstration models host pacing, fixed blocks, slow Flash and a lost ACK. It is not a secure hardware bootloader.

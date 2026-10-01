@@ -1,149 +1,23 @@
 # Thread Safety
 
-This document describes XGL's thread safety mechanisms, lock granularity, and usage constraints in multi-threaded environments.
+One instance executes in one serialized context. The protocol has no internal locks, thread-safe container variants, global mutex service, or runtime thread-safety switch.
 
-## Enabling
+## Serialization Boundary
 
-Via Kconfig:
+Serialize every call using the same handle, including send, step, timeout queries, session changes, stats, and destroy. Prefer an owner task/event loop. If several tasks access a handle, the application must provide one consistent locking policy.
 
-```text
-XGL_THREAD_SAFE=y
-```
+Different instances may run independently when their workspaces and application contexts are independent. A shared PHY, allocator, or security provider still needs the application's own synchronization.
 
-Or compile-time definition:
+## Callback Rules
 
-```text
--DXGL_THREAD_SAFE=1
-```
+PHY, receive, authentication, and error callbacks execute synchronously inside an API call. They must not reenter, reset, close, or destroy that instance. Queue requested work and process it after the outer call returns. This rule also applies when using a recursive application lock.
 
-When enabled, all `xgl_mutex_*`, `xgl_mempool_ts_*`, and `xgl_list_ts_*` functions switch from no-op to real implementations.
+Receive buffers are borrowed only during the callback. Copy accepted data to application-owned storage before returning if it must survive. PHY TX must finish consuming or copying frame bytes before return.
 
-## Thread Safety Layers
+## Interrupt Boundary
 
-```text
-┌─────────────────────────────────────────────┐
-│ Application-level Thread Safety              │
-│  xgl_run() called from a single thread       │
-│  xgl_send() must be called from xgl_run()'s  │
-│  thread or is internally locked              │
-├─────────────────────────────────────────────┤
-│ Internal Protocol Stack Thread Safety        │
-│  When XGL_THREAD_SAFE enabled:               │
-│  xgl_mempool_ts_t: lock per alloc/free       │
-│  xgl_list_ts_t: lock per insert/remove       │
-│  xgl_mutex_t: real platform mutex            │
-├─────────────────────────────────────────────┤
-│ Platform Mutex Implementation                │
-│  POSIX: pthread_mutex_t                      │
-│  Windows: CRITICAL_SECTION                   │
-│  FreeRTOS: SemaphoreHandle_t                 │
-│  Bare-Metal/No-op: no operation              │
-└─────────────────────────────────────────────┘
-```
+ISRs should capture bytes into application storage and signal an owner task. Do not call the parser, send, or `xgl_step()` concurrently with task execution. The application is responsible for ring-buffer atomicity and ISR/task visibility.
 
-## Thread-Safe API
+## Shutdown
 
-### Thread-Safe Mempool
-
-All operations acquire the internal mutex before delegating to the underlying mempool.
-
-### Thread-Safe List
-
-All operations acquire the internal mutex before delegating to the underlying list.
-
-### Mutex
-
-```c
-xgl_mutex_t mutex;
-xgl_mutex_init(&mutex);
-
-xgl_mutex_lock(&mutex);      // blocking acquire
-xgl_mutex_trylock(&mutex);   // non-blocking try
-xgl_mutex_unlock(&mutex);    // release
-
-// RAII-style (GCC/Clang)
-XGL_MUTEX_SCOPED_LOCK(&mutex);
-
-xgl_mutex_destroy(&mutex);
-```
-
-## Lock Granularity
-
-| Component | Granularity | Notes |
-| --- | --- | --- |
-| `xgl_mempool_ts_t` | Per-pool | Lock for every alloc/free on the whole pool |
-| `xgl_list_ts_t` | Per-list | Lock for every operation on the whole list |
-
-!!! warning "Coarse-grained locks"
-    Current implementation uses coarse-grained locks (per-pool/per-list), not per-element or lock-free algorithms. This is appropriate for MCU scenarios with typically ≤ 4 concurrent threads.
-
-## ISR Constraints
-
-!!! danger "Never execute the following from ISR context"
-    - `xgl_run()` — contains parser, auth verification, and other expensive operations
-    - `xgl_send()` — may trigger memory allocation and queue operations
-    - Any `xgl_mutex_lock()` — blocking lock acquisition in ISR causes deadlock
-    - Auth provider callbacks — may involve cryptographic computation
-
-**ISR-safe operations:**
-
-- Receiving bytes into a ring buffer via `xgl_phy_ops_t.rx()`
-- Setting flags to notify the main loop
-
-## Usage Patterns
-
-### Single-Thread (Default)
-
-```text
-// XGL_THREAD_SAFE=n
-// All mutexes are no-op, zero overhead
-void main_loop(void) {
-    xgl_run(instance, get_time_ms());
-}
-```
-
-### Dual-Thread
-
-```text
-// XGL_THREAD_SAFE=y
-// Thread A: protocol stack main loop
-void protocol_thread(void) {
-    while (1) xgl_run(instance, get_time_ms());
-}
-
-// Thread B: application logic (sends via xgl_send)
-void application_thread(void) {
-    while (1) xgl_send(instance, &tx_data);
-}
-```
-
-### Multi-Instance Isolation
-
-Multiple `xgl_instance_t` instances are fully independent with their own layer contexts and resources. Different threads can safely operate on different instances without additional synchronization.
-
-## Error Callback Thread Safety
-
-- `xgl_error_callback_t` is called within the `xgl_run()` context.
-- In `XGL_THREAD_SAFE` mode, it may be called from any `xgl_run()` thread.
-- The callback must not perform long blocking operations.
-- The callback must not call `xgl_send()` (potential deadlock).
-
-## Performance Impact
-
-| Operation | No-op (NOOP) | POSIX | FreeRTOS |
-| --- | --- | --- | --- |
-| mempool alloc | ~5ns | ~50ns | ~200ns |
-| list insert | ~3ns | ~40ns | ~150ns |
-| mutex lock/unlock | ~0ns | ~25ns | ~100ns |
-
-Lock overhead is acceptable at MCU clock speeds (48-160MHz), but high-frequency `xgl_send()` calls should evaluate lock contention.
-
-## Evidence
-
-| Rule | Source | Test |
-| --- | --- | --- |
-| Thread-safe mempool | `src/memory/xgl_mempool_ts.c` | `test/test_mempool.cpp` |
-| Thread-safe list | `src/core/xgl_list_ts.c` | `test/test_list.cpp` |
-| Mutex implementation | `src/platform/xgl_mutex.c` | `test/test_mutex.cpp` |
-| Mutex noop | `src/platform/xgl_mutex_noop.c` | `test/test_mutex.cpp` |
-| Windows mutex | `src/platform/xgl_mutex_windows.c` | `test/test_mutex.cpp` |
+Stop new submissions, exclude concurrent API calls, and finish the current callback before calling `xgl_destroy()`. Only then release configuration, provider/PHY descriptors, contexts, and caller workspace.

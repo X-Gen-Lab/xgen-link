@@ -1,59 +1,31 @@
 # 验证矩阵
 
-验证矩阵把协议能力、风险和测试目标关联起来。发布前应确保每一行都有自动化测试或明确的人工验证记录。
+## 协议覆盖
 
-## 核心协议矩阵
+| 范围 | 依据 |
+| --- | --- |
+| wire v3、TLV、CRC、未对齐字节跨度 | `test/test_wire.cpp`、`test/test_parser.cpp`、frame 性质测试 |
+| 固定路由及认证帧转发 | `test/test_route.cpp`、`test/test_network.cpp` |
+| 精确 scope、原子 ACK、RX 保留、重传、RESET 与关闭 | `test/test_transport.cpp`、transport 性质测试 |
+| 分片预算、重叠、超时、消息大于窗口 | `test/test_fragment.cpp`、memory 性质测试 |
+| 显式可信会话、nonce/AAD、防重放、关闭槽 | `test/test_security.cpp` |
+| 静态认证丢 ACK 恢复、应用只交付一次 | `test/test_send.cpp` |
+| 静态工作区、背压、回绕、存储复用 | `tools/static_workspace_smoke.c` |
+| 一次后端预留、运行期不调用后端分配 | `test/test_footprint.cpp`、memory 性质测试 |
+| 公开安装包 C 消费者、ABI/profile 拒绝 | SDK 消费者 CTest 及 instance 测试 |
 
-| 能力 | 风险 | 必须验证 | 推荐测试位置 |
-| --- | --- | --- | --- |
-| v2 base header | offset 错误、大小端错误、CRC 覆盖错误 | 24-byte offset、little-endian、CRC 字段置零计算 | `test/test_wire.cpp`, `test/test_frame.cpp` |
-| TLV cursor | 越界、零长度误判、未知扩展处理错误 | 多扩展、空扩展、非法 length、header_len 越界 | `test/test_wire.cpp`, `test/test_parser.cpp` |
-| parser resync | 噪声导致卡死或错帧 | 噪声、重叠 magic、分片输入、连续多帧 | `test/test_parser.cpp` |
-| auth trailer | 未认证帧穿透、tag 长度错配 | auth_required 缺 provider、伪造 header/payload/tag、zero-copy auth | `test/test_security.cpp`, `test/test_datalink.cpp`, `test/test_send.cpp` |
-| replay window | 重放攻击、跨连接污染、ACK 丢失恢复 | source/connection/session/packet 隔离，非可靠重复包拒绝，可靠重复包补 ACK | `test/test_security.cpp`, `test/test_datalink.cpp` |
-| route forwarding | TTL/auth AAD 冲突、MTU 超限 | TTL 递减、CRC 重算、auth tag 保留、route MTU 拒绝 | `test/test_network.cpp` |
-| reliable queue | ACK 释放错误、SACK 洞丢失 | ACK range 批量释放、SACK 快速重传、retry limit | `test/test_transport.cpp`, `test/test_reliable.cpp` |
-| peer state | 多连接互相污染 | peer key 按 node/connection/session 隔离 | `test/test_transport.cpp` |
-| ordered delivery | 乱序重复交付 | out-of-order 缓存、连续推进、重复包过滤 | `test/test_transport.cpp` |
-| fragmentation | 内存耗尽、跨 session 混包 | FRAGMENT_EXT 重组、预算、timeout、reset scope | `test/test_fragment.cpp` |
-| low-power deadline | 睡眠过久导致超时 | route/reliable/reassembly 最近 deadline | `test/test_instance.cpp` |
-| noheap profile | 隐式 malloc、碎片化 | noheap smoke、allocator 失败路径 | `tools/noheap_smoke.c`, memory tests |
-| examples build | README 与可编译示例漂移 | echo server、file transfer、multi-node target 能构建 | `examples/CMakeLists.txt`, `xgl_release_validation` |
-| low-power runtime guide | 文档与 runtime deadline API 漂移 | `xgl_next_deadline_ms()` 与 route polling deadline 行为 | `test/test_instance.cpp`, `test/test_time_provider.cpp` |
-| porting guide | 平台假设破坏新板级移植 | PHY callbacks、time provider、mutex/noop mutex 行为 | `test/test_platform.cpp`, `test/test_time.cpp`, `test/test_mutex.cpp` |
-| resource model | preset 预算与 config macro 漂移 | preset tx/rx/window/frame 值和 no-heap 行为 | `test/test_config.cpp`, `test/test_types.cpp`, `test/test_footprint.cpp` |
-| documentation build | 断链或 Doxygen public API 过期 | strict MkDocs 加 Doxygen API 生成 | `docs/CMakeLists.txt`, `.github/workflows/pages.yml` |
+## 构建覆盖
 
-## Fuzz / Stress 建议
+本地 Full 矩阵包括协议回归及四个主机示例。Boot 和 Embedded 分别以关闭 libc 的 C11 构建，执行静态工作区及安装包消费者测试。独立基础包拥有各自的行为、最小消费、安装和质量矩阵；协议负责五包集成。来源 core 的测试只记录为迁移基线，不代替新提供者验收。
 
-| 场景 | 输入模型 | 通过标准 |
-| --- | --- | --- |
-| parser random bytes | 随机 byte stream，插入合法/半合法 frame | 不崩溃，不越界，能恢复到下一合法 magic |
-| TLV malformed | 随机 ext_type/ext_len/header_len | 非法 TLV 丢弃，合法 TLV 正确解析 |
-| auth tamper | 修改 header、extension、payload、tag 任意字节 | 帧声明认证时必须拒绝篡改；auth_required 下还会拒绝未认证帧 |
-| route storm | 多节点 route 切换、TTL 边界、MTU 边界 | 不转发 TTL 过期帧，不发送超 MTU 帧 |
-| lossy transport | loss/reorder/duplicate/delay 注入 | 可靠包最终有序交付或按 retry limit 失败 |
-| fragment attack | 大 message、重叠 range、缺片、超时 | 预算不被突破，超时释放资源 |
+此前五包迁移的中间检查点 `6927196` 通过 4/4 CompactWindow；有效 RED 见 `b169a10`。该阶段最终 Full 在 GCC/MSVC 各通过 8/8 CTest、510/510 GoogleTest，Embedded 4/4 CTest（510 项 GoogleTest）、当时默认五子模块 Boot 2/2 CTest 通过。memory 与 containers 各自通过 GCC/MSVC 及共享质量，core 活跃实现和旧 gitlink 已退出。这些历史结果的固定提交、覆盖率、安装入口负例和完整资源口径见仓库 `REFACTORING_STATUS.md`。
 
-## Release Gate
+本轮移除 link 的基础组件子模块和生产源码路径，正式消费限定为预提供 targets 或安装包，源码开发改用独立 dev 装配。生产契约 10/10、dev Full 8/8 CTest、Embedded 4/4、Boot 2/2 均通过；Full/Embedded 各执行 510 个 GoogleTest。显式 dev 源码的 ARM 重跑结果与前轮相同。这些是本轮本地证据；MSVC 和 Linux sanitizer 本轮未重跑，远端与硬件未执行，详细路径见实施记录。
 
-推荐顺序：
+通用组件测试随归属迁移，已删除的平台接口测试不再适用；协议用例数减少不代表历史测试集合原样保留。
 
-```sh
-cmake --preset gcc-test
-cmake --build build/gcc-test --target xgl_tests
-ctest --preset gcc-test --output-on-failure
-cmake --build build/gcc-test --target xgl_release_validation
-cmake --preset ci
-cmake --build build/ci --target xgl_docs
-```
+## 资源与产品边界
 
-发布环境必须安装 `cppcheck`。静态分析 unavailable 不是通过条件。
+Cortex-M0 探针记录真实链接的 ELF、map、目标 ABI 工作区公式及栈使用文件，可按 `tools/boot_footprint/README.md` 复现。原生运行另行比较布局公式并执行真实初始化。
 
-## 文档一致性检查
-
-- 文档中的 node id 必须是 `uint16_t`。
-- 文档中的 packet number 必须是 `uint32_t`。
-- 文档中的 wire header 必须是 v2 24-byte header。
-- 未实现能力必须写 reserved，并说明 production path 会拒绝或不启用。
-- 公共 API 文档只描述稳定 SDK 入口，不把内部状态结构承诺为 ABI。
+未验收真实板卡、Flash 断电、ISR 嵌套、完整调用链栈上界、DMA lease、生产密码 provider 或跨重启新鲜性。Boot 升级使用主机 Flash 模型，CRC16 只用于意外损坏校验。Linux sanitizer CI 已配置，不能从 Windows 结果推断它已执行。

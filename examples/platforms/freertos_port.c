@@ -1,61 +1,62 @@
 /**
  * \file            freertos_port.c
- * \brief           FreeRTOS xgen-link porting skeleton
+ * \brief           Single-task FreeRTOS integration with caller-owned driver
+ * copies
+ * \author          X-Gen Lab
  */
-
-#include "xgl/xgl.h"
-
+#include <xgl/xgl.h>
 #ifdef XGL_PORT_FREERTOS_EXAMPLE
 #include "FreeRTOS.h"
 #include "task.h"
-#include "queue.h"
 
-typedef struct {
-    QueueHandle_t tx_queue;
-    QueueHandle_t rx_queue;
-} xgl_freertos_phy_t;
+/* Supply a wrap-safe millisecond clock in the board adapter. */
+extern uint32_t board_millis(void);
+extern xgl_error_t board_tx_copy(const uint8_t* data, size_t length);
+extern size_t board_rx_copy_available(uint8_t* data, size_t capacity);
 
-static xgl_error_t freertos_tx(const uint8_t* data, size_t len, void* user_data) {
-    xgl_freertos_phy_t* phy = (xgl_freertos_phy_t*)user_data;
-    if (phy == NULL || data == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    return xQueueSend(phy->tx_queue, &data, 0) == pdPASS ? XGL_OK : XGL_ERR_QUEUE_FULL;
+/**
+ * \brief           Copy TX bytes into bounded driver-owned DMA storage
+ * \param[in]       data: Borrowed frame bytes
+ * \param[in]       length: Complete frame length
+ * \param[in]       context: Driver context, unused by the skeleton
+ * \return          Board driver acceptance status
+ */
+static xgl_error_t freertos_tx(const uint8_t* data, size_t length,
+                               void* context) {
+    (void)context;
+    return board_tx_copy(data, length);
 }
 
-static xgl_error_t freertos_rx(uint8_t* buffer, size_t* len, void* user_data) {
-    xgl_freertos_phy_t* phy = (xgl_freertos_phy_t*)user_data;
-    if (phy == NULL || buffer == NULL || len == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    size_t rx_len = 0;
-    if (xQueueReceive(phy->rx_queue, &rx_len, 0) != pdPASS) {
-        *len = 0;
-        return XGL_OK;
-    }
-
-    if (rx_len > *len) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    *len = rx_len;
+/**
+ * \brief           Drain available RX bytes without blocking the protocol task
+ * \param[out]      data: Caller RX buffer
+ * \param[in,out]   length: Capacity on entry, produced bytes on return
+ * \param[in]       context: Driver context, unused by the skeleton
+ * \return          XGL_OK
+ */
+static xgl_error_t freertos_rx(uint8_t* data, size_t* length, void* context) {
+    (void)context;
+    *length = board_rx_copy_available(data, *length);
     return XGL_OK;
 }
 
-static void xgl_task(void* arg) {
-    xgl_handle_t handle = (xgl_handle_t)arg;
+xgl_phy_ops_t xgl_freertos_phy = {freertos_tx, freertos_rx, NULL};
+
+/**
+ * \brief           Run all protocol operations for one instance in one task
+ * \param[in]       context: Handle initialized from storage owned by the
+ * application
+ * \note            Other tasks and ISRs queue commands; they do not call this
+ * handle.
+ */
+void xgl_freertos_task(void* context) {
+    xgl_handle_t handle = context;
+    const xgl_work_budget_t budget = {128U, 1000U};
     TickType_t last_wake = xTaskGetTickCount();
-
     for (;;) {
-        xgl_run(handle, 100);
+        (void)xgl_step(handle, board_millis(), &budget);
         configASSERT(uxTaskGetStackHighWaterMark(NULL) > 64U);
-        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10));
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(1));
     }
-}
-
-void xgl_freertos_start(xgl_handle_t handle) {
-    (void)xTaskCreate(xgl_task, "xgl", 512, handle, tskIDLE_PRIORITY + 1, NULL);
 }
 #endif

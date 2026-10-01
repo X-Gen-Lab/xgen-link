@@ -5,6 +5,7 @@
  */
 
 #include <xgl/xgl.h>
+
 #include "xgl_instance_internal.h"
 
 /*---------------------------------------------------------------------------*/
@@ -47,7 +48,8 @@ static xgl_error_t validate_tx_data(const xgl_tx_data_t* tx_data) {
  * \brief           Send data (standard mode with copy)
  * \details         Copies data internally and sends through transport layer
  */
-xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data) {
+xgl_error_t xgl_send_at(xgl_handle_t handle, const xgl_tx_data_t* tx_data,
+                        uint32_t now_ms) {
     xgl_error_t err;
 
     /* Validate handle */
@@ -66,21 +68,9 @@ xgl_error_t xgl_send(xgl_handle_t handle, const xgl_tx_data_t* tx_data) {
         return err;
     }
 
-#ifdef XGL_THREAD_SAFE
-    /* Lock mutex if thread safety is enabled */
-    err = xgl_instance_lock(handle);
-    if (err != XGL_OK) {
-        return err;
-    }
-#endif
-
     /* Send through transport layer */
+    handle->layers.transport_ctx.current_time_ms = now_ms;
     err = xgl_transport_send(&handle->layers.transport_ctx, handle, tx_data);
-
-#ifdef XGL_THREAD_SAFE
-    /* Unlock mutex if thread safety is enabled */
-    xgl_instance_unlock(handle);
-#endif
 
     return err;
 }

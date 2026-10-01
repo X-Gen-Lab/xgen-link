@@ -1,0 +1,17 @@
+# Executed by CTest after GoogleTest discovery has registered individual cases.
+foreach(test_name IN LISTS xgl_discovered_tests)
+    set(labels xgl unit)
+    if(test_name MATCHES "^(XglIntegrationTest|XglPhyStreamTest)\\.")
+        set(labels xgl integration)
+    elseif(test_name MATCHES "Properties\\.")
+        list(APPEND labels property)
+    endif()
+    set_tests_properties("${test_name}" PROPERTIES LABELS "${labels}")
+endforeach()
+
+file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/baseline_tests.txt" baseline_tests)
+foreach(test_name IN LISTS baseline_tests)
+    if(NOT test_name IN_LIST xgl_discovered_tests)
+        message(FATAL_ERROR "Missing historical GoogleTest case: ${test_name}")
+    endif()
+endforeach()

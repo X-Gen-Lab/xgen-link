@@ -1,11 +1,6 @@
-# File Transfer Example
-# Demonstrates reliable file transfer with fragmentation
-# Author: X-Gen Lab
-
-add_executable(file_transfer
-    main.c
-)
-
-target_link_libraries(file_transfer
-    PRIVATE xgl
-)
+add_executable(file_transfer main.c)
+target_link_libraries(file_transfer PRIVATE xgl xgcrc::crc16)
+if(XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE)
+    add_test(NAME xgl_file_transfer_example COMMAND file_transfer)
+    set_tests_properties(xgl_file_transfer_example PROPERTIES LABELS integration TIMEOUT 10)
+endif()

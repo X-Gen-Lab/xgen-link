@@ -2,20 +2,25 @@ name: Prepare development components
 description: Check out five explicitly named repositories at the development test commits
 inputs:
   status-repository:
+    default: X-Gen-Lab/xgen-status
     description: Published owner/repository for xgen-status
-    required: true
+    required: false
   bytes-repository:
+    default: X-Gen-Lab/xgen-bytes
     description: Published owner/repository for xgen-bytes
-    required: true
+    required: false
   crc-repository:
+    default: X-Gen-Lab/xgen-crc
     description: Published owner/repository for xgen-crc
-    required: true
+    required: false
   memory-repository:
+    default: X-Gen-Lab/xgen-memory
     description: Published owner/repository for xgen-memory
-    required: true
+    required: false
   containers-repository:
+    default: X-Gen-Lab/xgen-containers
     description: Published owner/repository for xgen-containers
-    required: true
+    required: false
 runs:
   using: composite
   steps:
@@ -23,11 +28,11 @@ runs:
       id: plan
       shell: bash
       env:
-        XGEN_STATUS_REPOSITORY: ${{ inputs.status-repository }}
-        XGEN_BYTES_REPOSITORY: ${{ inputs.bytes-repository }}
-        XGEN_CRC_REPOSITORY: ${{ inputs.crc-repository }}
-        XGEN_MEMORY_REPOSITORY: ${{ inputs.memory-repository }}
-        XGEN_CONTAINERS_REPOSITORY: ${{ inputs.containers-repository }}
+        XGEN_STATUS_REPOSITORY: ${{ inputs.status-repository || 'X-Gen-Lab/xgen-status' }}
+        XGEN_BYTES_REPOSITORY: ${{ inputs.bytes-repository || 'X-Gen-Lab/xgen-bytes' }}
+        XGEN_CRC_REPOSITORY: ${{ inputs.crc-repository || 'X-Gen-Lab/xgen-crc' }}
+        XGEN_MEMORY_REPOSITORY: ${{ inputs.memory-repository || 'X-Gen-Lab/xgen-memory' }}
+        XGEN_CONTAINERS_REPOSITORY: ${{ inputs.containers-repository || 'X-Gen-Lab/xgen-containers' }}
       run: |
         python dev/prepare_dependencies.py --manifest dev/dependencies.json \
           --workspace "$GITHUB_WORKSPACE" --github-output "$GITHUB_OUTPUT" --github-env "$GITHUB_ENV"
@@ -64,9 +69,9 @@ runs:
     - name: Verify detached source identities before configuration
       shell: bash
       env:
-        XGEN_STATUS_REPOSITORY: ${{ inputs.status-repository }}
-        XGEN_BYTES_REPOSITORY: ${{ inputs.bytes-repository }}
-        XGEN_CRC_REPOSITORY: ${{ inputs.crc-repository }}
-        XGEN_MEMORY_REPOSITORY: ${{ inputs.memory-repository }}
-        XGEN_CONTAINERS_REPOSITORY: ${{ inputs.containers-repository }}
+        XGEN_STATUS_REPOSITORY: ${{ inputs.status-repository || 'X-Gen-Lab/xgen-status' }}
+        XGEN_BYTES_REPOSITORY: ${{ inputs.bytes-repository || 'X-Gen-Lab/xgen-bytes' }}
+        XGEN_CRC_REPOSITORY: ${{ inputs.crc-repository || 'X-Gen-Lab/xgen-crc' }}
+        XGEN_MEMORY_REPOSITORY: ${{ inputs.memory-repository || 'X-Gen-Lab/xgen-memory' }}
+        XGEN_CONTAINERS_REPOSITORY: ${{ inputs.containers-repository || 'X-Gen-Lab/xgen-containers' }}
       run: python dev/prepare_dependencies.py --manifest dev/dependencies.json --workspace "$GITHUB_WORKSPACE" --verify

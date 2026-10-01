@@ -1,122 +1,23 @@
 # Public API
 
-Normal SDK users depend only on installed public headers:
+Use `<xgl/xgl.h>`. Installed headers include the generated profile and ABI constants; `internal/` headers are not installed.
 
-- `xgl.h`
-- `xgl_config.h`
-- `xgl_types.h`
-- `xgl_error.h`
+## Lifecycle and ownership
 
-Internal protocol headers live under `include/xgl/internal`, for example `xgl/internal/xgl_wire.h`, `xgl/internal/xgl_parser.h`, and `xgl/internal/xgl_reliable.h`. They are not installed as normal SDK headers and are not stable user APIs.
+`xgl_memory_requirements()` measures exact storage. `xgl_init_static()` initializes aligned caller storage. `xgl_create()` reserves the same layout through `config.memory.allocator` (`xgm_allocator_t`), then requires `xgl_init()`. Only Full may select the optional xgen-memory libc backend. `xgl_destroy()` frees a dynamically reserved workspace, or ends use of static storage.
 
-## API Groups
+The configuration and referenced PHY/provider/callback objects are borrowed until destruction. Keep their addresses stable and do not modify them while the instance exists. All operations on an instance are serialized by the caller; callbacks must not reenter it.
 
-- Lifecycle: `xgl_create`, `xgl_init`, `xgl_destroy`
-- Send: `xgl_send`, `xgl_send_zerocopy`
-- Runtime: `xgl_run`, `xgl_next_deadline_ms`
-- Stats: `xgl_stats_get`, `xgl_stats_reset`
-- Version: `xgl_version_string`, `xgl_version_int`
+## Send and scheduling
 
-## Minimal Lifecycle
+`xgl_send_at(handle, &tx, now_ms)` accepts a borrowed payload during the call and retains reliable data in bounded protocol storage. `xgl_send_zerocopy_at()` uses caller frame storage for unreliable single-frame sends; it does not permit an asynchronous PHY to retain that address.
 
-```c
-#include "xgl/xgl.h"
+`xgl_step(handle, now_ms, &budget)` polls due links and runs transport maintenance. `budget.rx_bytes` is the limit per link, not a frequency. `xgl_next_timeout(handle, now_ms, &delay)` returns whether a relative deadline exists. All calls share one monotonic modulo-2^32 millisecond clock; elapsed intervals must stay below 2^31.
 
-static xgl_error_t phy_tx(const uint8_t* data, size_t len, void* user_data);
-static xgl_error_t phy_rx(uint8_t* buffer, size_t* len, void* user_data);
+## Sessions and diagnostics
 
-static void on_rx(xgl_handle_t handle, uint16_t source_id, uint8_t data_type,
-                  const uint8_t* data, size_t len, void* user_data);
+`xgl_install_security_session()` copies explicitly trusted directional parameters. `xgl_close_security_session()` closes the association and releases the matching transport peer while retaining the security tombstone. `xgl_close_peer()` cancels an unauthenticated scope; drain old traffic and use a new epoch before reconnecting.
 
-xgl_phy_ops_t phy = {
-    .tx = phy_tx,
-    .rx = phy_rx,
-    .user_data = NULL,
-};
+`xgl_stats_get()` / `xgl_stats_reset()` require exclusive instance access. `xgl_error_string()` translates the protocol error domain. `xgl_version_string()` and `xgl_version_int()` report the linked SDK version.
 
-xgl_route_item_t routes[] = {
-    { .target_id = 2, .phy = &phy, .max_frame_size = 256, .read_freq_hz = 100, .metric = 1 },
-};
-
-xgl_config_t config;
-xgl_config_get_default(&config);
-config.source_id = 1;
-config.route_table = routes;
-config.route_table_len = 1;
-config.rx_callback = on_rx;
-
-xgl_handle_t handle = xgl_create(&config);
-if (handle != NULL && xgl_init(handle) == XGL_OK) {
-    xgl_run(handle, 100);
-}
-xgl_destroy(handle);
-```
-
-## Send
-
-```c
-const uint8_t payload[] = "hello";
-xgl_tx_data_t tx = {
-    .target_id = 2,
-    .data_type = 1,
-    .data = payload,
-    .data_len = sizeof(payload) - 1,
-    .reliable = true,
-    .priority = 0,
-    .timeout_ms = 0,
-    .connection_id = 0,
-    .session_epoch = 0,
-};
-
-xgl_error_t err = xgl_send(handle, &tx);
-```
-
-Use `xgl_send_zerocopy()` only for single-frame unreliable sends where the
-caller buffer reserves the documented header/TLV space.
-
-## Stats
-
-```c
-xgl_statistics_t stats;
-if (xgl_stats_get(handle, &stats) == XGL_OK) {
-    printf("transport tx=%llu rx=%llu retries=%llu\n",
-           (unsigned long long)stats.transport.tx_packets,
-           (unsigned long long)stats.transport.rx_packets,
-           (unsigned long long)stats.tx_retries);
-}
-```
-
-## Authentication Provider
-
-```c
-static xgl_error_t sign(uint32_t key_id, const uint8_t* aad, size_t aad_len,
-                        const uint8_t* payload, size_t payload_len,
-                        uint8_t* tag, size_t tag_capacity, size_t* tag_len,
-                        void* user_data);
-
-static xgl_error_t verify(uint32_t key_id, const uint8_t* aad, size_t aad_len,
-                          const uint8_t* payload, size_t payload_len,
-                          const uint8_t* tag, size_t tag_len, bool* valid,
-                          void* user_data);
-
-xgl_auth_provider_t provider = {
-    .sign = sign,
-    .verify = verify,
-    .tag_len = 16,
-    .user_data = NULL,
-};
-
-config.auth_required = true;
-config.auth_key_id = 1;
-config.auth_provider = &provider;
-config.memory.allocator = &allocator;
-```
-
-When `auth_required=true`, `config.memory.allocator` must provide both
-`malloc` and `free`.
-
-## Doxygen
-
-The CMake documentation build generates the public C API reference:
-
-<a href="../../../api/doxygen/html/index.html">Open generated Doxygen API</a>
+See [migration](../guide/modular-migration.md) and [security](../protocol/security.md).

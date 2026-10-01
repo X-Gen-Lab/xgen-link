@@ -8,11 +8,9 @@
 
 #include "xgl_reliable_internal.h"
 
-xgl_error_t xgl_reliable_set_packet_extensions(xgl_reliable_queue_t *queue,
-                                               xgl_reliable_packet_t *packet,
-                                               const uint8_t *extensions,
-                                               size_t extensions_len)
-{
+xgl_error_t xgl_reliable_set_packet_extensions(
+    const xgl_reliable_queue_t* queue, xgl_reliable_packet_t* packet,
+    const uint8_t* extensions, size_t extensions_len) {
     if (queue == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -22,7 +20,7 @@ xgl_error_t xgl_reliable_set_packet_extensions(xgl_reliable_queue_t *queue,
     }
 
     if (packet->extensions != NULL) {
-        reliable_free(queue->allocator, packet->extensions);
+        xgm_free(queue->extensions_allocator, packet->extensions);
         packet->extensions = NULL;
         packet->extensions_len = 0U;
     }
@@ -32,7 +30,7 @@ xgl_error_t xgl_reliable_set_packet_extensions(xgl_reliable_queue_t *queue,
     }
 
     packet->extensions =
-        (uint8_t *) reliable_malloc(queue->allocator, extensions_len);
+        (uint8_t*)xgm_alloc(queue->extensions_allocator, extensions_len);
     if (packet->extensions == NULL) {
         return XGL_ERR_NO_MEMORY;
     }

@@ -13,17 +13,20 @@
 /**
  * \brief           Initialize fragmentation manager
  */
-xgl_error_t xgl_fragment_init(xgl_fragment_manager_t *manager,
+xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
                               size_t max_reassembly_buffers,
                               uint32_t reassembly_timeout_ms,
-                              xgl_allocator_t *allocator)
-{
-    if (manager == NULL) {
+                              const xgm_allocator_t* allocator) {
+    if (manager == NULL || !xgm_allocator_is_valid(allocator)) {
         return XGL_ERR_NULL_POINTER;
     }
 
+    if (max_reassembly_buffers == 0U || reassembly_timeout_ms > INT32_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
     /* Initialize reassembly list */
-    xgl_list_init(&manager->reassembly_list);
+    xgct_list_init(&manager->reassembly_list);
 
     manager->next_message_id = 0;
 
@@ -31,6 +34,7 @@ xgl_error_t xgl_fragment_init(xgl_fragment_manager_t *manager,
     manager->max_reassembly_buffers = max_reassembly_buffers;
     manager->reassembly_timeout_ms = reassembly_timeout_ms;
     manager->allocator = allocator;
+    manager->data_allocator = allocator;
     manager->max_message_size = 0;
     manager->max_reassembly_bytes = 0;
     manager->current_reassembly_bytes = 0;
@@ -38,10 +42,9 @@ xgl_error_t xgl_fragment_init(xgl_fragment_manager_t *manager,
     return XGL_OK;
 }
 
-xgl_error_t xgl_fragment_set_limits(xgl_fragment_manager_t *manager,
+xgl_error_t xgl_fragment_set_limits(xgl_fragment_manager_t* manager,
                                     size_t max_message_size,
-                                    size_t max_reassembly_bytes)
-{
+                                    size_t max_reassembly_bytes) {
     if (manager == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -59,8 +62,7 @@ xgl_error_t xgl_fragment_set_limits(xgl_fragment_manager_t *manager,
 /**
  * \brief           Destroy fragmentation manager
  */
-void xgl_fragment_destroy(xgl_fragment_manager_t *manager)
-{
+void xgl_fragment_destroy(xgl_fragment_manager_t* manager) {
     if (manager == NULL) {
         return;
     }

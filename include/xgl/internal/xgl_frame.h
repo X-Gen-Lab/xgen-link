@@ -11,12 +11,17 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include "xgl/xgl_types.h"
-#include "xgl/xgl_error.h"
+
 #include "xgl/internal/xgl_wire.h"
+#include "xgl/xgl_config.h"
+#include "xgl/xgl_error.h"
+#include "xgl/xgl_types.h"
+#if XGL_FEATURE_AUTH
+#include "xgl/internal/xgl_security.h"
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Frame Structure                                                           */
@@ -28,12 +33,12 @@ extern "C" {
  * \note            The fixed header already contains the production magic bytes
  */
 typedef struct {
-    xgl_wire_header_t header;       /**< Production logical wire header */
-    const uint8_t* extensions;      /**< Production TLV extension bytes */
-    size_t extensions_len;          /**< Extension length in bytes */
-    const uint8_t* payload;         /**< Pointer to payload data */
-    size_t payload_len;             /**< Payload length in bytes */
-    uint16_t crc16;                 /**< Frame CRC16 */
+    xgl_wire_header_t header;  /**< Production logical wire header */
+    const uint8_t* extensions; /**< Production TLV extension bytes */
+    size_t extensions_len;     /**< Extension length in bytes */
+    const uint8_t* payload;    /**< Pointer to payload data */
+    size_t payload_len;        /**< Payload length in bytes */
+    uint16_t crc16;            /**< Frame CRC16 */
 } xgl_frame_t;
 
 /*---------------------------------------------------------------------------*/
@@ -45,25 +50,27 @@ typedef struct {
  * \details         Encapsulates all parameters needed to build a frame
  */
 typedef struct {
-    uint16_t source_id;         /**< Source node ID */
-    uint16_t target_id;         /**< Target node ID */
-    uint8_t data_type;          /**< Application/control data type; encoded by upper layers */
-    uint8_t packet_type;        /**< Production packet type, 0 uses DATA */
-    uint8_t flags;              /**< Production wire flags merged with derived flags */
-    uint8_t traffic_class;      /**< Production traffic class, 0 uses priority */
-    uint32_t connection_id;     /**< Production connection context ID */
-    uint32_t packet_number;     /**< Production monotonic packet number */
-    uint32_t session_epoch;     /**< Production session epoch for SESSION_EXT users */
-    const uint8_t* extensions;   /**< Production TLV extension bytes */
-    size_t extensions_len;       /**< Extension length in bytes */
-    const uint8_t* payload;     /**< Payload data */
-    size_t payload_len;         /**< Payload length */
-    bool reliable;              /**< Reliable transmission flag */
-    uint8_t reliability_class;  /**< Raw reliability class, 0 uses reliable flag */
-    bool fragment;              /**< Fragment flag */
-    uint8_t priority;           /**< Priority level (0-7) */
-    uint16_t session_id;        /**< Short transport session ID fallback for connection_id */
-    uint8_t ttl;                /**< Hop limit */
+    uint16_t source_id;  /**< Source node ID */
+    uint16_t target_id;  /**< Target node ID */
+    uint8_t data_type;   /**< Application/control data type; encoded by upper
+                            layers */
+    uint8_t packet_type; /**< Production packet type, 0 uses DATA */
+    uint8_t flags;       /**< Production wire flags merged with derived flags */
+    uint8_t traffic_class;  /**< Production traffic class, 0 uses priority */
+    uint32_t connection_id; /**< Production connection context ID */
+    uint32_t packet_number; /**< Production monotonic packet number */
+    uint32_t
+        session_epoch; /**< Production session epoch for SESSION_EXT users */
+    const uint8_t* extensions; /**< Production TLV extension bytes */
+    size_t extensions_len;     /**< Extension length in bytes */
+    const uint8_t* payload;    /**< Payload data */
+    size_t payload_len;        /**< Payload length */
+    bool reliable;             /**< Reliable transmission flag */
+    uint8_t
+        reliability_class; /**< Raw reliability class, 0 uses reliable flag */
+    bool fragment;         /**< Fragment flag */
+    uint8_t priority;      /**< Priority level (0-7) */
+    uint8_t ttl;           /**< Hop limit */
 } xgl_frame_params_t;
 
 /**
@@ -83,8 +90,7 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
  * \param[out]      bytes_written: Number of bytes written
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_frame_serialize(uint8_t* buffer,
-                                size_t buffer_size,
+xgl_error_t xgl_frame_serialize(uint8_t* buffer, size_t buffer_size,
                                 const xgl_frame_t* frame,
                                 size_t* bytes_written);
 
@@ -93,17 +99,17 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer,
  * \param[out]      buffer: Output buffer
  * \param[in]       buffer_size: Buffer size in bytes
  * \param[in]       frame: Frame structure to serialize
- * \param[in]       key_id: Authentication key identifier
- * \param[in]       provider: Authentication provider callbacks
+ * \param[in,out]   security: Trusted state allocating a fresh security sequence
  * \param[out]      bytes_written: Number of bytes written
  * \return          XGL_OK on success, error code otherwise
  */
+#if XGL_FEATURE_AUTH
 xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
                                               size_t buffer_size,
                                               const xgl_frame_t* frame,
-                                              uint32_t key_id,
-                                              const xgl_auth_provider_t* provider,
+                                              xgl_security_ctx_t* security,
                                               size_t* bytes_written);
+#endif
 
 /**
  * \brief           Build frame in zero-copy mode
@@ -121,20 +127,16 @@ xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
  * \param[out]      frame_len: Total frame length
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer,
-                                     size_t buffer_size,
-                                     size_t data_offset,
-                                     size_t data_len,
-                                     uint16_t source_id,
-                                     uint16_t target_id,
-                                     uint8_t data_type,
-                                     uint32_t packet_number,
-                                     bool reliable,
-                                     uint8_t priority,
+xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer, size_t buffer_size,
+                                     size_t data_offset, size_t data_len,
+                                     uint16_t source_id, uint16_t target_id,
+                                     uint8_t data_type, uint32_t packet_number,
+                                     bool reliable, uint8_t priority,
                                      size_t* frame_len);
 
 #define XGL_SECURITY_EXT_VALUE_SIZE 13U
-#define XGL_SECURITY_EXT_SIZE       (XGL_WIRE_EXT_HEADER_SIZE + XGL_SECURITY_EXT_VALUE_SIZE)
+#define XGL_SECURITY_EXT_SIZE                                                  \
+    (XGL_WIRE_EXT_HEADER_SIZE + XGL_SECURITY_EXT_VALUE_SIZE)
 
 /**
  * \brief           Calculate frame size
@@ -152,11 +154,8 @@ static inline size_t xgl_frame_auth_overhead(size_t auth_tag_len) {
 static inline size_t xgl_frame_serialized_size(size_t payload_len,
                                                size_t extensions_len,
                                                size_t auth_tag_len) {
-    return XGL_WIRE_BASE_HEADER_SIZE +
-           extensions_len +
-           xgl_frame_auth_overhead(auth_tag_len) +
-           payload_len +
-           XGL_CRC16_SIZE;
+    return XGL_WIRE_BASE_HEADER_SIZE + extensions_len +
+           xgl_frame_auth_overhead(auth_tag_len) + payload_len + XGL_CRC16_SIZE;
 }
 
 static inline bool xgl_frame_payload_budget(size_t max_frame_size,
@@ -167,10 +166,8 @@ static inline bool xgl_frame_payload_budget(size_t max_frame_size,
         return false;
     }
 
-    size_t overhead = XGL_WIRE_BASE_HEADER_SIZE +
-                      extensions_len +
-                      xgl_frame_auth_overhead(auth_tag_len) +
-                      XGL_CRC16_SIZE;
+    size_t overhead = XGL_WIRE_BASE_HEADER_SIZE + extensions_len +
+                      xgl_frame_auth_overhead(auth_tag_len) + XGL_CRC16_SIZE;
     if (max_frame_size < overhead) {
         *payload_budget = 0U;
         return false;
@@ -189,8 +186,10 @@ static inline bool xgl_frame_payload_budget(size_t max_frame_size,
  * \param[in,out]   traffic_class: Traffic-class byte
  * \param[in]       reliable: Reliable transmission flag
  */
-static inline void xgl_frame_set_reliability(uint8_t* traffic_class, bool reliable) {
-    uint8_t reliable_bits = reliable ? XGL_RELIABILITY_ACK_ELICITING : XGL_RELIABILITY_NONE;
+static inline void xgl_frame_set_reliability(uint8_t* traffic_class,
+                                             bool reliable) {
+    uint8_t reliable_bits =
+        reliable ? XGL_RELIABILITY_ACK_ELICITING : XGL_RELIABILITY_NONE;
     *traffic_class = (uint8_t)(((uint32_t)*traffic_class &
                                 ~((uint32_t)XGL_RELIABILITY_CLASS_MASK)) |
                                (uint32_t)reliable_bits);
@@ -214,7 +213,8 @@ static inline void xgl_frame_set_reliability_class(uint8_t* traffic_class,
  * \param[in,out]   traffic_class: Traffic-class byte
  * \param[in]       fragment: Fragment flag
  */
-static inline void xgl_frame_set_fragmented(uint8_t* traffic_class, bool fragment) {
+static inline void xgl_frame_set_fragmented(uint8_t* traffic_class,
+                                            bool fragment) {
     if (fragment) {
         *traffic_class = (uint8_t)((uint32_t)*traffic_class |
                                    (uint32_t)XGL_TRAFFIC_FRAGMENTED_MASK);
@@ -229,10 +229,12 @@ static inline void xgl_frame_set_fragmented(uint8_t* traffic_class, bool fragmen
  * \param[in,out]   traffic_class: Traffic-class byte
  * \param[in]       priority: Priority level (0-7)
  */
-static inline void xgl_frame_set_priority(uint8_t* traffic_class, uint8_t priority) {
-    *traffic_class = (uint8_t)(((uint32_t)*traffic_class &
-                                ~((uint32_t)XGL_TRAFFIC_PRIORITY_MASK)) |
-                               ((uint32_t)priority & (uint32_t)XGL_TRAFFIC_PRIORITY_MASK));
+static inline void xgl_frame_set_priority(uint8_t* traffic_class,
+                                          uint8_t priority) {
+    *traffic_class =
+        (uint8_t)(((uint32_t)*traffic_class &
+                   ~((uint32_t)XGL_TRAFFIC_PRIORITY_MASK)) |
+                  ((uint32_t)priority & (uint32_t)XGL_TRAFFIC_PRIORITY_MASK));
 }
 
 /**

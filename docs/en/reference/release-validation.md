@@ -1,64 +1,50 @@
-# Release Validation
+# Release validation
 
-Validate release candidates from a clean build directory.
+## Prepare inputs
 
-```sh
-cmake --preset gcc-test
-cmake --build build/gcc-test --target xgl_release_validation
-ctest --preset gcc-test --output-on-failure
-```
+Install the five foundation packages as described in [Build and test](../getting-started/build-and-test.md). Prepare GoogleTest/GoogleMock 1.16.0, the xgen-quality commit pinned by `tools/quality.json`, and documentation dependencies from `docs/requirements.txt`. Provide the Cppcheck, Clang-Tidy, and Doxygen versions required by the quality package; fix missing or mismatched tools during preparation.
 
-## Gates
+The root-project commands below consume installed packages. The `ci` preset selects native GNU, Debug, Full, and production `xgl` coverage. Use a separate build directory so counters do not belong to different sources or configurations.
 
-- Unit, property, and integration tests pass.
-- SDK consumer smoke passes.
-- noheap smoke passes.
-- footprint report is generated.
-- cppcheck is installed and passes.
-- docs build passes when `XGL_BUILD_DOCS=ON`.
-- worktree contains only explicitly accepted user changes.
-
-## Documentation Gate
+## Local gates
 
 ```sh
-mkdocs build --strict
-cmake --build build/ci --target xgl_docs
+python tools/quality.py text
+python tools/quality.py format
+python -m pre_commit run --all-files
+cmake --preset ci \
+  -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
+cmake --build --preset ci --parallel 2
+python tools/quality.py test --build-dir build/ci
+python tools/quality.py tidy --build-dir build/ci
+python tools/quality.py docs
+python tools/quality.py coverage --build-dir build/ci --gcov-executable gcov
+cmake --build build/ci --target xgl_release_validation --parallel 2
+pwsh -File tools/docs_qa.ps1
 ```
 
-`xgl_docs` validates both the MkDocs bilingual site and the Doxygen public API reference. Broken links, missing pages, and Doxygen configuration errors block release.
+The shared test entry compares CTest discovery with actual JUnit results. Line, function, and branch coverage must each reach 80%. Reports are retained in `out/reports/`. New or fixed behavior also requires TDD RED/GREEN evidence; historical coverage additions and documentation changes use appropriate verification.
 
-## Recommended Order
+`xgl_release_validation` builds and runs protocol tests, examples, the SDK consumer, static workspace and applicable noheap smoke checks. It depends on the shared Cppcheck target, footprint report, and documentation site. The independent runner commands above additionally enforce text, Clang-Tidy, strict API documentation, and coverage gates. `tools/docs_qa.ps1` checks bilingual structure and obsolete API references.
 
-1. Configure from a clean build directory.
-2. Build `xgl_tests`.
-3. Run CTest.
-4. Build `xgl_release_validation`.
-5. Build `xgl_docs`.
-6. Check `git status --short`.
+For source development, provide five paths as described in the repository's `dev/README.md`, configure with `cmake -S dev --preset ci`, and replace the build directory with `build/dev-ci`. Production subdirectories do not add these helpers by default; products explicitly enable the required checks. The dev manifest fixes protocol-repository test inputs only.
 
-## Wire Format Compatibility Commitments
+## Configuration matrix
 
-| Commitment | Description |
-| --- | --- |
-| Base header layout | 24-byte fixed layout unchanged, compatible across all versions |
-| Byte order | Always little-endian, never changes |
-| Magic value | `A5 5A` unchanged |
-| Version field | Currently fixed `2`, incremented on major version upgrades |
-| TLV extensions | Backward compatible: new extensions do not affect old receivers (unknown TLVs are ignored) |
-| Flags reserved bits | Unused bits (`0xC0`) reserved, not used for new features |
-| Packet Type reserved values | 4–7 reserved; old versions should ignore them if used in the future |
+```sh
+cmake --preset boot -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
+cmake --build --preset boot
+python tools/quality.py test --build-dir build/boot --config MinSizeRel
+cmake --preset embedded -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
+cmake --build --preset embedded
+python tools/quality.py test --build-dir build/embedded --config MinSizeRel
+```
 
-## API Stability Commitments
+Boot and Embedded build separately without protocol libc fallback. Boot validates its selected minimal protocol capabilities. Full Embedded protocol regression needs a separate host configuration explicitly enabling GoogleTest. Scripts in `test/cmake` validate source reuse, installation consumption, incompatible dependencies, C++17, discovery, and replay contracts separately.
 
-| Layer | Stability | Description |
-| --- | --- | --- |
-| `xgl.h` public API | Stable | Semantically compatible; no removal or renaming of existing functions |
-| `xgl_types.h` types | Stable | No removal of existing fields; new fields may be appended |
-| `xgl_config.h` configuration | Stable | No removal of existing config items; new items may be appended |
-| `xgl_error.h` error codes | Stable | No renumbering of existing error codes |
-| `include/xgl/internal/` | Internal | Not a stable ABI; may be freely modified |
+Preserve environment-specific reports for native Host, ASan/UBSan, bounded profiles, package consumption, and coverage. [GitHub CI](github-ci.md) describes jobs and fixed preparation. Release evidence identifies source/dependency commits, tools, configurations, and results. A remote pass requires an actual run for the target commit.
 
-## Version Upgrade Strategy
+## Product acceptance
 
-- **Minor version**: New features, new extensions, new Kconfig options; no breaking changes to existing API or wire format.
-- **Major version**: May modify wire format base header, remove deprecated APIs; migration path must be documented.
+Run the Cortex-M0 final-ELF footprint probe separately, then integrate the board. Account for full-image Flash, static RAM, stack, PHY buffers, and the real Boot partition. Verify Flash erase/program timing and power-loss recovery. Authentication requires a production provider and persistent freshness or fresh trusted keys. Report host simulation, SDK consumption, and ELF linkage within their respective scope; see [validation matrix](validation-matrix.md) for board acceptance.

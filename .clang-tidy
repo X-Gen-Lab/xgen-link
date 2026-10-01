@@ -1,0 +1,8 @@
+---
+# X-Gen quality 0.1.0: focused C/C++ analysis.
+# Annex K is optional and unavailable on supported freestanding C11 targets.
+# Keep buffer bounds analysis; only omit suggestions to replace libc with *_s.
+Checks: '-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,bugprone-*,performance-*'
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*[/\\]include[/\\]xgl[/\\].*'
+FormatStyle: file

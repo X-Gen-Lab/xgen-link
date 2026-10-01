@@ -1,65 +1,28 @@
-# TLV 扩展
+# 扩展
 
-扩展头紧跟 24-byte 基础头。
+每个 TLV 的布局为 `type:u8 | value_length:u8 | value`。TLV 受 `header_len` 限定，不从载荷内容推断边界。未知类型会跳过。重复的 DATA_TYPE、SESSION、SECURITY 单例扩展会被拒绝；transport 要求每个 ACK 恰好包含一个 ACK_RANGE 或 SACK。
 
-| 字段 | Size | 说明 |
-| --- | ---: | --- |
-| `ext_type` | 1 | 扩展类型 |
-| `ext_len` | 1 | value 长度 |
-| `value` | `ext_len` | 扩展负载 |
+## 已定义的值
 
-## 扩展类型
-
-| 扩展 | 内容 | 用途 |
+| 类型 | 值长度 | 含义 |
 | --- | --- | --- |
-| SESSION_EXT | `session_epoch`, `incarnation_id` | 会话隔离和重启识别 |
-| ACK_RANGE_EXT | `largest_ack`, `ack_delay_us`, ranges | 批量确认 |
-| SACK_EXT | `base_packet`, bitmap | 保留未确认洞 |
-| FRAGMENT_EXT | `message_id`, `fragment_offset`, `message_len` | 分片重组 |
-| SECURITY_EXT | `key_id`, nonce/material metadata | 认证 trailer 元数据 |
-| ROUTE_EXT | previous hop、next hop、route epoch、metric | 路由信息 |
-| TIMESTAMP_EXT | Reserved — 不在当前生产 wire 上出现 | 预留的 timestamp 元数据 |
-| DATA_TYPE_EXT | `data_type` | DATA 包上的应用 payload 分类；CONTROL 包上的 transport control 子类型 |
+| SESSION = 1 | 12 | `epoch:u32`、`incarnation_id:u64` |
+| ACK_RANGE = 2 | `9 + 4*n` | `largest_ack:u32`、`ack_delay_us:u32`、`count:u8`，后接 `gap:u16,length:u16` |
+| SACK = 3 | `5 + n` | `base:u32`、`bitmap_length:u8`、位图 |
+| FRAGMENT = 4 | 12 | `message_id:u32`、`offset:u32`、`total_length:u32` |
+| SECURITY = 5 | 13 | `key_id:u32`、`security_seq:u64`、`tag_length:u8` |
+| DATA_TYPE = 8 | 1 | 应用类型或 CONTROL 操作 |
 
-## Value 格式
+值中的整数使用小端序。ROUTE、TIMESTAMP 编号保留。SESSION 增加 14 字节，FRAGMENT 增加 14 字节，SECURITY 增加 15 字节。未携带 SESSION 表示 epoch 为零。`incarnation_id` 是传输的元数据，其存在不会安装信任，也不会替代 peer key。
 
-| 扩展 | Value 长度 | 字段 |
-| --- | ---: | --- |
-| SESSION_EXT | 12 | `session_epoch u32`, `incarnation_id u64` |
-| ACK_RANGE_EXT | `9 + 4*n` | `largest_ack u32`, `ack_delay_us u32`, `range_count u8`, repeated `gap u16 + length u16` |
-| SACK_EXT | `5 + bitmap_len` | `base_packet u32`, `bitmap_len u8`, bitmap bytes |
-| FRAGMENT_EXT | 12 | `message_id u32`, `fragment_offset u32`, `message_len u32` |
-| SECURITY_EXT | 13 | `key_id u32`, `nonce_id u64`, `tag_len u8` |
-| ROUTE_EXT | 10 | `previous_hop u16`, `next_hop u16`, `route_epoch u32`, `metric u16` |
-| TIMESTAMP_EXT | Reserved | Reserved；当前生产路径不存在，value format 待定义 |
-| DATA_TYPE_EXT | 1 | `data_type u8` |
+## ACK 语义
 
-ACK range 的 `gap` 和 `length` 表示从 `largest_ack` 反向描述的确认区间。SACK bitmap 的 bit 表示 `base_packet + bit_index` 的接收状态。
-ACK_RANGE_EXT 和 SACK_EXT 位于 header TLV 区，不放在 payload 中。
-全零 SACK bitmap 是合法编码，表示请求快速重传 `base_packet`。
-应用 `data_type` 不因 transport control 值而保留。接收端只有在 `packet_type=CONTROL` 时才把 DATA_TYPE_EXT 解释为控制子类型。
+第一个 ACK 区间的 gap 必须为零，从 `largest_ack` 开始；length 为正的包数。后续区间跳过 gap 与区间边界，再描述较低包号。非法区间、下溢、未来包号使整个 ACK 被拒绝，在此之前不修改队列、窗口或 RTT。
 
-## 归属与追溯
+SACK 第 `i` 位描述 `base + i`；低于 base 的包累计确认。置位表示接收方持有所对应的字节，缺失位可触发重传。当前发送端最多生成八个字节的位图。Boot 即使裁剪了乱序缓存，仍可处理 transport 支持的 ACK 形式。
 
-| 扩展 | Type | Producer | Consumer | 失败规则 | 证据 |
-| --- | ---: | --- | --- | --- | --- |
-| SESSION_EXT | 1 | session-aware send path | datalink replay、network metadata、transport peer scope、fragment reassembly | 长度非法则 decode 失败 | `src/wire/xgl_wire_ext.c`, `test/test_wire.cpp`, `test/test_transport.cpp` |
-| ACK_RANGE_EXT | 2 | `transport_send_ack()` | reliable queue ACK removal | 长度或 range count 非法则 decode 失败 | `src/wire/xgl_wire_ack_ext.c`, `src/transport/xgl_transport_ack.c`, `test/test_reliable.cpp` |
-| SACK_EXT | 3 | `transport_send_sack()` | SACK processing 与 fast retransmit | bitmap 长度非法则 decode 失败 | `src/wire/xgl_wire_ack_ext.c`, `src/transport/xgl_transport_sack.c`, `test/test_transport.cpp` |
-| FRAGMENT_EXT | 4 | fragment send path | fragment manager 与 delivery path | 缺失或非法 value 不得重组 | `src/transport/xgl_transport_send_fragment.c`, `src/transport/xgl_transport_delivery.c`, `test/test_fragment.cpp` |
-| SECURITY_EXT | 5 | authenticated frame build | parser auth length、datalink verification | AUTHENTICATED 没有合法 SECURITY_EXT 时 fail closed | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_parser_extensions.c`, `test/test_datalink.cpp` |
-| ROUTE_EXT | 6 | route-aware internals/future route controls | network metadata/routing | 长度非法则 decode 失败 | `src/wire/xgl_wire_ext.c`, `test/test_wire.cpp`, `test/test_network.cpp` |
-| TIMESTAMP_EXT | 7 | Reserved | 不在生产 wire 上出现 | 当前值格式未定义，生产路径不编码此扩展 | `include/xgl/internal/xgl_wire.h` |
-| DATA_TYPE_EXT | 8 | send、zero-copy、control packets | network metadata 与 transport control | value 为 1 byte；只有 `packet_type=CONTROL` 时才解释为控制子类型 | `src/network/xgl_network_send.c`, `src/network/xgl_network_metadata.c`, `src/transport/xgl_transport_control.c` |
+## 组合
 
-## 失败规则
+Network 组合或校验 DATA_TYPE 与非零 SESSION epoch 扩展。重传保留分片元数据，但重新构造帧。认证层每次尝试都从已安装的方向关联填充 SECURITY；保留 DATA 包不等于保留已经签名的帧。
 
-- `ext_len` 不足以解码对应扩展时丢弃。
-- 扩展总长度不能超过 `header_len - 24`。
-- 未知扩展只有在不影响当前包语义时才可忽略；安全和分片相关未知扩展应 fail closed。
-
-## 实现约束
-
-- 扩展顺序不应成为语义依赖，接收端按 type 查找需要的扩展。
-- 同一语义扩展重复出现时，接收端应选择 fail closed，避免歧义。
-- 发送端只有在存在扩展时设置 HAS_EXTENSIONS。
+验证依据：`test/test_wire.cpp`。

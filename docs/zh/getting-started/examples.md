@@ -1,21 +1,16 @@
 # 示例
 
-示例位于 `examples/`。
+## 程序
 
-| 示例 | 目的 |
+| Target | 演示 |
 | --- | --- |
-| `echo_server` | 演示两个 16-bit 节点之间的基础收发和回显 |
-| `multi_node` | 演示三节点路由和转发 |
-| `file_transfer` | 演示可靠传输和分片 |
-| `platforms` | 演示 bare-metal、FreeRTOS 和 Windows mock port |
+| `echo_server` | 接收回调排队，下次应用步进发送响应 |
+| `file_transfer` | 可靠应用块及 payload 校验 |
+| `multi_node` | 经中间节点路由，需要转发能力 |
+| `boot_update` | 有界块、慢 Flash BUSY 及丢 ACK 恢复 |
 
-构建：
+全部示例使用公开 API、显式时间和固定应用存储。公共同步主机 PHY 把帧复制到有界字节队列。
 
-```sh
-cmake --preset gcc-test
-cmake --build build/gcc-test
-```
+## 运行
 
-示例 callback 必须使用 `uint16_t source_id`，与公共 `xgl_rx_callback_t` 保持一致。
-
-`echo_server` 不是单节点 self-loop。它创建 node `1` 和 node `2` 两个协议实例，用两条模拟 PHY 通道连接，避免把生产网络层中拒绝普通 `source_id == target_id` 的规则隐藏掉。
+开启 `XGL_BUILD_EXAMPLES=ON`，构建后运行 CTest。Boot 不构建转发示例。可执行文件路径及边界见 `examples/*/README.md`。

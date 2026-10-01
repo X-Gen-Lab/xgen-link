@@ -1,24 +1,15 @@
-PROJECT_NAME           = "XGL"
+# Share the public-header validation policy with the quality runner.
+@INCLUDE               = "@PROJECT_SOURCE_DIR@/Doxyfile"
 PROJECT_NUMBER         = "@PROJECT_VERSION@"
 OUTPUT_DIRECTORY       = "@XGL_DOXYGEN_OUTPUT_DIR@"
-GENERATE_HTML          = YES
-GENERATE_LATEX         = NO
-GENERATE_XML           = NO
-FULL_PATH_NAMES        = NO
-QUIET                  = YES
-WARNINGS               = YES
-WARN_IF_UNDOCUMENTED   = NO
-WARN_IF_DOC_ERROR      = YES
+WARN_LOGFILE           = "@XGL_DOXYGEN_OUTPUT_DIR@/warnings.log"
 INPUT                  = "@PROJECT_SOURCE_DIR@/include/xgl/xgl.h" \
                          "@PROJECT_SOURCE_DIR@/include/xgl/xgl_config.h" \
                          "@PROJECT_SOURCE_DIR@/include/xgl/xgl_types.h" \
                          "@PROJECT_SOURCE_DIR@/include/xgl/xgl_error.h"
-RECURSIVE              = NO
-FILE_PATTERNS          = *.h
-EXTRACT_ALL            = NO
-EXTRACT_STATIC         = NO
-JAVADOC_AUTOBRIEF      = NO
-OPTIMIZE_OUTPUT_FOR_C  = YES
+GENERATE_HTML          = YES
+GENERATE_XML           = NO
+FULL_PATH_NAMES        = NO
 DISABLE_INDEX          = NO
 GENERATE_TREEVIEW      = YES
 HTML_OUTPUT            = html

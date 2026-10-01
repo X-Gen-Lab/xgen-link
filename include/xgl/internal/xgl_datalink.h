@@ -11,18 +11,19 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include "xgl/xgl_types.h"
-#include "xgl/xgl_error.h"
+
 #include "xgl/internal/xgl_frame.h"
 #include "xgl/internal/xgl_parser.h"
-#include "xgl/internal/xgl_layer_interface.h"
+#include "xgl/internal/xgl_protocol_io.h"
+#include "xgl/xgl_config.h"
+#include "xgl/xgl_error.h"
+#include "xgl/xgl_types.h"
+#if XGL_FEATURE_AUTH
 #include "xgl/internal/xgl_security.h"
-
-#define XGL_DATALINK_REPLAY_WINDOW_COUNT 16U
-#define XGL_DATALINK_REPLAY_WINDOW_SIZE  64U
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Forward Declarations                                                      */
@@ -46,18 +47,17 @@ typedef struct xgl_datalink_ctx_s {
     uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer */
     uint64_t* rx_crc16_errors;      /**< Frame CRC16 error counter pointer */
     xgl_error_callback_t error_callback; /**< Error callback */
-    void* callback_user_data;       /**< User data for callbacks */
-    xgl_handle_t owner_handle;      /**< Owning protocol instance handle */
-    xgl_allocator_t* allocator;     /**< Allocator for large temporary TX buffers */
-    uint16_t source_id;             /**< Local source ID */
-    bool auth_required;             /**< Require authenticated production frames */
-    uint32_t auth_key_id;           /**< Active authentication key id */
-    xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
-    xgl_replay_window_t replay_windows[XGL_DATALINK_REPLAY_WINDOW_COUNT]; /**< Anti-replay windows */
-    bool replay_window_used[XGL_DATALINK_REPLAY_WINDOW_COUNT]; /**< Replay window occupancy */
+    void* callback_user_data;            /**< User data for callbacks */
+    xgl_handle_t owner_handle;           /**< Owning protocol instance handle */
+    const xgm_allocator_t* allocator; /**< Allocator for temporary TX buffers */
+    uint16_t source_id;               /**< Local source ID */
+#if XGL_FEATURE_AUTH
+    xgl_security_ctx_t
+        security; /**< Explicit trusted endpoint security state */
+#endif
 
     /* Layer interface for decoupled communication */
-    xgl_layer_interface_t* upper_layer; /**< Upper layer interface (network) */
+    xgl_frame_interface_t* upper_layer; /**< Upper layer interface (network) */
 } xgl_datalink_ctx_t;
 
 /**
@@ -68,15 +68,20 @@ typedef struct {
     size_t rx_cache_size;           /**< RX cache size */
     uint16_t source_id;             /**< Local source ID */
     xgl_layer_stats_t* stats;       /**< Layer statistics pointer */
-    uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer (can be NULL) */
-    uint64_t* rx_crc16_errors;      /**< Frame CRC16 error counter pointer (can be NULL) */
-    xgl_layer_interface_t* upper_layer; /**< Upper layer interface (can be NULL) */
+    uint64_t* rx_header_crc_errors; /**< Header CRC error counter pointer (can
+                                       be NULL) */
+    uint64_t*
+        rx_crc16_errors; /**< Frame CRC16 error counter pointer (can be NULL) */
+    xgl_frame_interface_t*
+        upper_layer; /**< Upper layer interface (can be NULL) */
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
-    void* callback_user_data;       /**< User data for callbacks (can be NULL) */
-    xgl_handle_t owner_handle;      /**< Owning protocol instance handle (can be NULL) */
-    xgl_allocator_t* allocator;     /**< Allocator for large temporary TX buffers; NULL fallback is build-policy controlled */
-    bool auth_required;             /**< Require authenticated production frames */
-    uint32_t auth_key_id;           /**< Active authentication key id */
+    void* callback_user_data; /**< User data for callbacks (can be NULL) */
+    xgl_handle_t
+        owner_handle; /**< Owning protocol instance handle (can be NULL) */
+    const xgm_allocator_t*
+        allocator;      /**< Allocator for temporary TX buffers; NULL
+                                   fallback is build-policy controlled */
+    bool auth_required; /**< Require authenticated production frames */
     xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
 } xgl_datalink_config_t;
 
@@ -85,7 +90,8 @@ typedef struct {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Initialize data link layer context with configuration structure
+ * \brief           Initialize data link layer context with configuration
+ * structure
  * \param[out]      ctx: Data link layer context
  * \param[in]       config: Configuration structure
  * \return          XGL_OK on success, error code otherwise
@@ -100,8 +106,7 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
  * \param[in]       frame: Frame structure to send
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
-                              xgl_phy_ops_t* phy,
+xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
                               const xgl_frame_t* frame);
 
 /**
@@ -112,8 +117,7 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx,
  * \param[in]       frame_len: Frame length
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx,
-                                  xgl_phy_ops_t* phy,
+xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
                                   const uint8_t* frame_buffer,
                                   size_t frame_len);
 
@@ -125,10 +129,24 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx,
  * \param[in]       timeout_ms: Parser timeout in milliseconds
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_datalink_receive(xgl_datalink_ctx_t* ctx,
-                                 xgl_phy_ops_t* phy,
-                                 uint32_t current_time_ms,
-                                 uint32_t timeout_ms);
+xgl_error_t xgl_datalink_receive(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
+                                 uint32_t current_time_ms, uint32_t timeout_ms);
+
+/**
+ * \brief           Poll one PHY using its own parser and shared link policy
+ * \param[in,out]   ctx: Shared security, statistics and delivery context
+ * \param[in,out]   parser: Parser owned by the selected PHY
+ * \param[in]       phy: Physical layer operations
+ * \param[in]       current_time_ms: Current time in milliseconds
+ * \param[in]       timeout_ms: Parser timeout in milliseconds
+ * \param[in]       byte_budget: Maximum bytes to read in this call
+ * \return          XGL_OK on success, error code otherwise
+ * \note            A single read is capped at XGL_DATALINK_RX_CHUNK_SIZE.
+ */
+xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
+                                     xgl_parser_t* parser, xgl_phy_ops_t* phy,
+                                     uint32_t current_time_ms,
+                                     uint32_t timeout_ms, size_t byte_budget);
 
 /**
  * \brief           Process received frame
@@ -149,7 +167,7 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_datalink_get_interface(xgl_datalink_ctx_t* ctx,
-                                      xgl_layer_interface_t* iface);
+                                       xgl_frame_interface_t* iface);
 
 #ifdef __cplusplus
 }

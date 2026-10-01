@@ -1,29 +1,31 @@
-# Zero-Copy
+# 零拷贝
 
-`xgl_send_zerocopy()` 面向单帧、unreliable、调用者拥有 buffer 的发送路径。
+`xgl_send_zerocopy_at()` 在调用者提供的可写存储中构造单帧非可靠消息，不引入异步缓冲所有权。
 
 ## 支持范围
 
-- true zero-copy：单帧 unreliable。
-- reliable zero-copy：返回 `XGL_ERR_INVALID_PARAM`；需要 ACK/retry 语义时使用 `xgl_send()`。
+当前 API 只支持单帧非可靠发送。`reliable=true` 返回 `XGL_ERR_INVALID_PARAM`；可靠或分片消息使用 `xgl_send_at()`。
 
-## Buffer 要求
+零拷贝描述符没有 connection/epoch 字段，使用默认 scope。认证发送要求已经为该 scope 安装可信会话。需要显式选择 connection/epoch 时使用普通发送 API。
 
-- buffer 必须可写。
-- payload 前必须预留 header 和必要扩展空间。
-- auth_required 时还要预留 SECURITY_EXT 和 auth trailer。
-- route MTU 必须容纳最终 frame。
+## 缓冲布局
 
-## 偏移规则
+Payload 前预留精确的头部偏移，后面预留 trailer：
 
-未认证单帧发送在 `data_type == 0` 时从 `XGL_FRAME_HEADER_SIZE` 开始放 payload；当 `data_type != 0` 时必须额外预留 DATA_TYPE_EXT，因此 offset 为 `XGL_FRAME_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE`。认证路径还需要 SECURITY_EXT，offset 必须再加 15 bytes。不要手写 magic 或 CRC，调用 API 让协议栈填充。
+| 部分 | 字节数 |
+| --- | ---: |
+| 基础头 | `XGL_FRAME_HEADER_SIZE`（24） |
+| 非零 data type | `XGL_DATA_TYPE_EXT_SIZE`（3） |
+| 启用认证时的 security extension | 15 |
+| 启用认证时的 tag | Provider tag 长度 |
+| 末尾 CRC | `XGL_CRC16_SIZE`（2） |
+
+`data_offset` 必须等于基础头加启用的扩展。`buffer_size` 须在不溢出的前提下覆盖 offset、payload、tag 和 CRC，完整序列化帧还必须满足路由 MTU。协议负责写入头部和 CRC，不必自行构造。
 
 ## 所有权
 
-PHY TX 调用返回前 caller buffer 必须保持有效。zero-copy 路径会绕过 transport 和 network 的常规发送处理，在 raw datalink 发送成功后显式补齐两层 TX 统计。
+`xgl_send_zerocopy_at()` 返回后，调用者可以复用存储。即使使用 DMA，PHY TX 返回前也必须完成读取或复制。此接口减少组帧复制，驱动仍可能需要复制到自有 DMA 缓冲。
 
-## 常见误用
+## 失败处理
 
-- 未预留 header 空间。
-- 在 `auth_required=true` 时使用不带 tag length 的 provider。
-- 把 reliable 数据传给 `xgl_send_zerocopy()`，而不是使用 `xgl_send()`。
+检查返回值。不能传入只读存储、遗漏头部空间或保留回调指针。本地成功不能证明远端交付。调用和恢复须遵循与普通发送相同的串行化规则。

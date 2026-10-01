@@ -1,108 +1,25 @@
 # Reliability
 
-Reliability is managed by connection-scoped peer state, not by 8-bit seq/ack fields.
+One peer owns one TX window, one reliable queue, one RTT estimator and one RX ordering state. The sole key is `(remote_id, connection_id, session_epoch)`. There is no instance-global fallback window or separate PHY retransmission engine.
 
-## Peer Key
+## Transmit Lifecycle
 
-```text
-remote_peer_id + connection_id + session_epoch
-```
+Reliable DATA is copied before submission. Failed admission does not consume its packet number. A successful first lower-layer send marks the retained packet sent, including at timestamp zero, then advances the DATA number. ACK completion frees the queue record and advances only the owning window.
 
-`remote_peer_id` is direction-dependent: the TX path uses `target_id`, while
-the RX/ACK paths use the incoming packet's `source_id`. This matches
-`transport_get_or_create_peer_scope()` and `transport_find_peer_scope()`.
+Timeout and SACK retries use the same transport routine and pass through network and datalink again. DATA number and payload remain stable; authentication obtains a fresh sequence. Temporary BUSY or NO_MEMORY retains accepted bytes and schedules a positive delay of the configured default timeout clamped to 1–100 ms. Successful retries update timestamp, retry count and exponential backoff, capped at 30000 ms. A hard lower-layer failure or exhausted retry count fails the entire peer and reports once.
 
-This key isolates:
+## Receive and Acknowledgement
 
-- reliable queue
-- sliding window
-- RTT estimator
-- RX next packet number
-- out-of-order buffer
-- replay and reassembly cleanup scope
+In-order DATA is acknowledged only after application acceptance or retained transport ownership. An application BUSY response leaves an unretained in-order packet unacknowledged. Out-of-order packets are SACKed only after a successful copy; once retained, they survive temporary application backpressure. Duplicates are not delivered again. RTT samples exclude retransmitted packets.
 
-## ACK and SACK
+ACKs match the exact scope, validate the complete TLV stream and acknowledgement claims before mutation, and cannot complete unsent or future packets. Repeated valid ACKs are idempotent. Header packet number is never an ACK target.
 
-- ACK_RANGE_EXT can release multiple sent packets at once.
-- SACK_EXT describes holes, keeps missing packets pending, and enables fast retransmit.
-- ACK_RANGE_EXT and SACK_EXT live in the header TLV area and do not consume payload.
-- ACK-only packets do not rely on a single-byte ACK field in the base header.
-- ACK and SACK replies preserve `connection_id`, `session_epoch`, and transport `session_id` from the received reliable packet so lost-ACK recovery targets the same peer scope.
+## Failure and Recovery
 
-### ACK_RANGE_EXT Fields
+HELLO ensures a peer without resetting existing state. RESET only targets an existing exact scope; its first effect is terminal cancellation, with repeated requests producing no extra transition or error callback. Unknown RESET does not allocate a peer.
 
-| Field | Type | Meaning | Source/tests |
-| --- | --- | --- | --- |
-| `largest_ack` | u32 | Highest packet number described by this ACK frame | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
-| `ack_delay_us` | u32 | Encoded ACK delay metadata; current tests validate round-trip encoding | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
-| `range_count` | u8 | Number of repeated ranges | `src/wire/xgl_wire_ack_ext.c`, `test/test_reliable.cpp` |
-| `gap` | u16 | Distance from the previous acknowledged range when walking backward | `src/transport/xgl_reliable_ack.c`, `test/test_reliable.cpp` |
-| `length` | u16 | Number of packets covered by the range | `src/transport/xgl_reliable_ack.c`, `test/test_reliable.cpp` |
+Failed reliable scopes cannot accept new reliable work. `xgl_close_peer` releases an unauthenticated scope and reports CANCELLED once if accepted work remains. With authentication, close the security session, which also retires transport ownership while retaining the nonce-domain tombstone. Establish a new epoch before reconnecting. Without authentication, the caller must drain old link traffic; epoch selection alone is not a security mechanism.
 
-### SACK_EXT Fields
+Once a scope has used TX or RX reliable numbering, idle time never reclaims its history. Only unused, empty peers may be reclaimed automatically; used scopes require explicit close.
 
-| Field | Type | Meaning | Source/tests |
-| --- | --- | --- | --- |
-| `base_packet` | u32 | First packet number represented by the bitmap | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
-| `bitmap_len` | u8 | Number of bitmap bytes | `src/wire/xgl_wire_ack_ext.c`, `test/test_wire.cpp` |
-| `bitmap` | bytes | Bit `n` describes receive state for `base_packet + n` | `src/transport/xgl_transport_sack.c`, `test/test_transport.cpp` |
-
-An all-zero SACK bitmap is valid. It preserves `base_packet` as a known hole
-and allows the sender to fast-retransmit the missing packet while removing
-packets that are explicitly marked received.
-
-### Reliable Data Flow
-
-```mermaid
-flowchart LR
-  App[xgl_send reliable] --> Peer[Resolve remote peer scope]
-  Peer --> Queue[Admit payload into reliable queue]
-  Queue --> Network[Network/frame TX]
-  Network --> Await[Wait for ACK_RANGE/SACK]
-  Await --> Acked[ACK range removes covered packets]
-  Await --> Sack[SACK keeps holes and fast-retransmits missing packets]
-  Await --> Timeout[Timeout uses exponential backoff]
-  Timeout --> Retry{retry_count <= max?}
-  Retry -- yes --> Network
-  Retry -- no --> Failed[Remove and report ACK timeout]
-```
-
-## Sender State
-
-```mermaid
-stateDiagram-v2
-  [*] --> Ready
-  Ready --> Queued: reliable send
-  Queued --> Sent: network tx accepted
-  Sent --> Acked: ACK range covers packet
-  Sent --> Retransmit: timeout or SACK hole
-  Retransmit --> Sent: resend
-  Sent --> Failed: retry limit
-  Acked --> [*]
-  Failed --> [*]
-```
-
-The sender reliable queue uses packet-number index buckets to accelerate lookup. Small windows may still tolerate list traversal, but ACK/SACK paths should not degrade to full queue scans.
-
-Reliable transmission is transactional: queue admission happens before the packet is handed to the network layer. If admission fails, nothing is transmitted. If network transmission fails, the queued record is removed. Packet numbers and window state are committed only after the network layer accepts the send.
-
-## Receiver State
-
-| Condition | Behavior |
-| --- | --- |
-| `packet_number == rx_next_packet_number` | Deliver and advance contiguous window |
-| `packet_number > rx_next_packet_number` | Cache in out-of-order buffer and ACK/SACK |
-| `packet_number < rx_next_packet_number` | Treat as duplicate or old packet, do not redeliver |
-| connection/session mismatch | Reject without polluting other peer state |
-
-## Ordered Delivery
-
-The receiver buffers out-of-order packets by packet number. Only contiguous payloads starting at `rx_next_packet_number` are delivered to the application callback.
-
-## Reset / Close
-
-RESET and CLOSE clear only the matching peer, connection, and session. They do not globally reset ACK, fragment, or replay state.
-
-## Observability
-
-Reliability should surface retransmit, ACK timeout, window-full, and drop counters through statistics. Production debugging should first inspect route MTU, auth/replay rejects, and reliable queue peak usage.
+Verification: `test/test_reliable.cpp` and `test/test_transport.cpp`.

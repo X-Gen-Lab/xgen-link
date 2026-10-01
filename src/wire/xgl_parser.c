@@ -4,13 +4,15 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_parser.h>
 #include <xgl/internal/xgl_frame.h>
-#include <xgl/internal/xgl_crc.h>
-#include <xgl/internal/xgl_serialize.h>
+#include <xgl/internal/xgl_parser.h>
 #include <xgl/internal/xgl_wire.h>
-#include "xgl_parser_internal.h"
+
 #include <string.h>
+#include <xgen/bytes/bytes.h>
+#include <xgen/crc/crc.h>
+
+#include "xgl_parser_internal.h"
 
 /*---------------------------------------------------------------------------*/
 /* Parser Initialization                                                     */
@@ -19,8 +21,7 @@
 /**
  * \brief           Initialize frame parser
  */
-xgl_error_t xgl_parser_init(xgl_parser_t* parser,
-                            uint8_t* cache_buffer,
+xgl_error_t xgl_parser_init(xgl_parser_t* parser, uint8_t* cache_buffer,
                             size_t cache_size) {
     if (parser == NULL || cache_buffer == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -74,8 +75,7 @@ void xgl_parser_reset(xgl_parser_t* parser) {
  * \brief           Feed byte to parser
  * \details         Implements byte-by-byte parsing state machine
  */
-xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
-                                        uint8_t byte,
+xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
                                         uint32_t current_time_ms) {
     if (parser == NULL) {
         return XGL_PARSE_RESULT_ERROR;
@@ -110,7 +110,8 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             /* Store header byte */
             parser->cache[parser->cache_len++] = byte;
 
-            if (parser->cache_len == 2U && parser->cache[1] != XGL_WIRE_MAGIC_1) {
+            if (parser->cache_len == 2U &&
+                parser->cache[1] != XGL_WIRE_MAGIC_1) {
                 if (byte == XGL_WIRE_MAGIC_0) {
                     parser->cache[0] = byte;
                     parser->cache_len = 1U;
@@ -124,10 +125,11 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             /* Check if we have complete production base header. */
             if (parser->cache_len >= XGL_WIRE_BASE_HEADER_SIZE) {
                 xgl_wire_header_t header;
-                if (xgl_wire_decode_header(&header,
-                                           parser->cache,
-                                           XGL_WIRE_BASE_HEADER_SIZE) != XGL_OK) {
-                    /* Header validation failed, reset and search for next magic */
+                if (xgl_wire_decode_header(&header, parser->cache,
+                                           XGL_WIRE_BASE_HEADER_SIZE) !=
+                    XGL_OK) {
+                    /* Header validation failed, reset and search for next magic
+                     */
                     xgl_parser_reset(parser);
                     return XGL_PARSE_RESULT_ERROR;
                 }
@@ -146,10 +148,9 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
                 }
 
                 /* Check if payload, auth trailer, and CRC fit in cache. */
-                size_t total_frame_size = parser->expected_header_len +
-                                         parser->expected_payload_len +
-                                         parser->expected_auth_tag_len +
-                                         XGL_CRC16_SIZE;
+                size_t total_frame_size =
+                    parser->expected_header_len + parser->expected_payload_len +
+                    parser->expected_auth_tag_len + XGL_CRC16_SIZE;
                 if (total_frame_size > parser->cache_size) {
                     xgl_parser_reset(parser);
                     return XGL_PARSE_RESULT_ERROR;
@@ -173,7 +174,8 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             parser->cache[parser->cache_len++] = byte;
 
             /* Check if we have complete payload */
-            size_t body_received = parser->cache_len - parser->expected_header_len;
+            size_t body_received =
+                parser->cache_len - parser->expected_header_len;
             size_t expected_body_len = (size_t)parser->expected_payload_len +
                                        (size_t)parser->expected_auth_tag_len;
             if (body_received >= expected_body_len) {
@@ -195,10 +197,12 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
             if (parser->index >= XGL_CRC16_SIZE) {
                 /* Calculate expected CRC16 (all data except CRC16 itself) */
                 size_t crc_offset = parser->cache_len - XGL_CRC16_SIZE;
-                uint16_t calculated_crc = xgl_crc16_modbus(parser->cache, crc_offset);
+                uint16_t calculated_crc =
+                    xgcrc_crc16_modbus(parser->cache, crc_offset);
 
                 /* Extract received CRC16 */
-                uint16_t received_crc = xgl_deserialize_u16_le(&parser->cache[crc_offset]);
+                uint16_t received_crc =
+                    xgb_deserialize_u16_le(&parser->cache[crc_offset]);
 
                 /* Validate CRC16 */
                 if (calculated_crc != received_crc) {
@@ -227,8 +231,7 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser,
  * \brief           Check for parser timeout
  */
 bool xgl_parser_check_timeout(const xgl_parser_t* parser,
-                              uint32_t current_time_ms,
-                              uint32_t timeout_ms) {
+                              uint32_t current_time_ms, uint32_t timeout_ms) {
     if (parser == NULL) {
         return false;
     }
@@ -251,8 +254,7 @@ bool xgl_parser_check_timeout(const xgl_parser_t* parser,
  * \brief           Get parsed frame data
  */
 xgl_error_t xgl_parser_get_frame(const xgl_parser_t* parser,
-                                 uint8_t** frame_buffer,
-                                 size_t* frame_len) {
+                                 uint8_t** frame_buffer, size_t* frame_len) {
     if (parser == NULL || frame_buffer == NULL || frame_len == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

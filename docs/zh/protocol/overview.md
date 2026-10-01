@@ -1,37 +1,24 @@
 # 协议概览
 
-XGL v2 放弃 v1 小型 packed header 思路，使用固定基础头、TLV 扩展和认证 trailer。目标是在 MCU 资源约束下提供清晰、可验证、可路由的可靠通信。
+XGen Link 实现面向有界、同步嵌入式通信的 wire version 3。各 profile 使用相同的帧头和扩展编码。配置明确拒绝不支持的能力，不对 version 2 帧进行隐式升级或降级。
 
-```mermaid
-flowchart LR
-  App[Application API] --> Transport[Transport]
-  Transport --> Network[Network / Routing]
-  Network --> Datalink[Data Link]
-  Datalink --> Wire[Wire Parser / Frame]
-  Wire --> Phy[PHY]
-```
+## 职责
 
-## 分层职责
-
-| 层 | 职责 |
+| 组件 | 职责 |
 | --- | --- |
-| API | 生命周期、发送、统计、运行时 deadline |
-| Transport | reliable queue、ACK/SACK、RTT、fragment |
-| Network | 16-bit 节点、route lookup、TTL、forwarding |
-| Datalink/Wire | header 编解码、parser、CRC、认证 trailer |
-| Platform | allocator、time、mutex、atomic、PHY callbacks |
+| API | 实例生命周期、显式时间、配置与工作区检查 |
+| Transport | peer 所有权、可靠 DATA、ACK/SACK、重试与可选消息层 |
+| Network | 目标查找、扩展组合与可选转发 |
+| Security | 显式可信会话、独立认证序号与重放检查 |
+| Datalink / Wire | 同步帧提交、有界解析、布局与 CRC |
+| 独立基础包 | xgen-memory 分配/池；xgen-containers 容器/位图；xgen-bytes 字节序；xgen-crc 校验；xgen-status 通用状态 |
 
-## 生产原则
+## 核心契约
 
-- 所有 wire 字段显式按 little-endian 编解码。
-- 认证失败、CRC 失败、长度越界都 fail closed。
-- 可变路由字段和端到端安全边界必须清晰分离。
-- 嵌入式 profile 必须能说明内存、deadline 和 ISR 边界。
+peer 严格由 `(remote_id, connection_id, session_epoch)` 标识。connection 和 epoch 的零值是普通取值，不存在短 session 回退。只有可靠 DATA 消耗连续的 32 位 DATA 序号；ACK、CONTROL、非可靠 DATA 的该帧头字段为零。每次签名尝试使用独立的 64 位认证序号。
 
-## 如何读完整协议
+可靠发送成功表示本地已接纳并持有数据。ACK 表示 transport 或应用已接纳，不代表写 flash 或其他业务操作已经提交。失败对该 epoch 是终态。RESET 不会将其重新开放；显式 close 释放容量后，才能建立新 epoch。
 
-- 先读 [架构设计](architecture.md)，理解模块边界和 TX/RX 数据流。
-- 再读 [实现映射](implementation-map.md)，把协议规则对应到源码文件和测试。
-- 然后读 [状态机](state-machines.md)，理解 parser、datalink、network、transport 和 fragment 的运行状态。
-- 最后按主题阅读 wire、extensions、reliability、security、routing 和 fragmentation 页面。
-- 发布前用 [验证矩阵](../reference/validation-matrix.md) 和 [生产检查表](../guide/production-checklist.md) 复核。
+## 阅读顺序
+
+先阅读[架构](architecture.md)、[线格式](wire-format.md)、[扩展](extensions.md)、[可靠传输](reliability.md)和[安全](security.md)。[分片](fragmentation.md)、[内存](memory.md)、[平台](platform.md)与[实现映射](implementation-map.md)说明容量、执行及源码所有权。Boot profile 使用单 peer、单包窗口；固件传输的分块属于 Boot 应用协议。

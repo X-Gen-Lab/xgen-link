@@ -1,48 +1,20 @@
-# XGL 文档
+# xgen-link SDK 3
 
-XGL 是面向资源受限 MCU 的生产级多节点可靠协议栈。它提供 v2 wire format、多 PHY 路由、可靠传输、ACK range/SACK、认证、分片重组预算和低功耗运行时 deadline。
+具有显式资源上限的可移植 C11 协议。通用能力由独立的 xgen-status、xgen-bytes、xgen-crc、xgen-memory、xgen-containers 提供；准备方式见[构建与测试](getting-started/build-and-test.md)。
 
-## 当前能力
+## 架构
 
-- 24-byte 固定 wire header，所有字段手动按 offset 编解码。
-- 16-bit 节点地址和 32-bit packet number。
-- TLV 扩展头支持 session、ACK range、SACK、fragment、security 和 route 元数据。
-- 可靠传输以 `target_id + connection_id + session_epoch` 隔离 peer state。
-- 生产配置要求认证 provider；zero-copy 路径遵守认证要求。
-- `xgl_next_deadline_ms()` 支持 bare-metal/RTOS 低功耗调度。
+静态初始化和 allocator 初始化共用工作区布局及状态机。应用提供时间、串行访问实例并实现同步 PHY 回调。wire v3 分离可靠 DATA 编号与认证安全序号。
 
-## 能力边界
+## 阅读入口
 
-- 单帧 payload 长度仍由 `uint16_t payload_len` 限制。
-- 大消息通过 FRAGMENT_EXT 分片重组。
-- 压缩和加密是 reserved codec capability，当前生产路径拒绝直接启用。
-- broadcast/multicast 地址段保留，当前可靠路径以单播为主。
+- [构建与测试](getting-started/build-and-test.md)
+- [快速开始](getting-started/quick-start.md)
+- [迁移指南](guide/modular-migration.md)
+- [公开 API](reference/public-api.md)
+- [架构](protocol/architecture.md)
+- [验证矩阵](reference/validation-matrix.md)
 
-## 推荐阅读路径
+## 产品边界
 
-### SDK 使用者
-
-1. [快速开始](getting-started/quick-start.md)
-2. [配置](guide/configuration.md)
-3. [Send API](guide/send-api.md)
-4. [Zero-Copy](guide/zero-copy.md)
-5. [低功耗运行时](guide/low-power-runtime.md)
-
-### 协议维护者
-
-1. [架构设计](protocol/architecture.md)
-2. [实现映射](protocol/implementation-map.md)
-3. [状态机](protocol/state-machines.md)
-4. [Wire Format](protocol/wire-format.md)
-5. [TLV 扩展](protocol/extensions.md)
-6. [可靠传输](protocol/reliability.md)
-7. [安全模型](protocol/security.md)
-8. [验证矩阵](reference/validation-matrix.md)
-
-### MCU 交付负责人
-
-1. [移植](guide/porting.md)
-2. [资源模型](guide/resource-model.md)
-3. [生产检查表](guide/production-checklist.md)
-4. [发布验证](reference/release-validation.md)
-5. [静态分析](reference/static-analysis.md)
+Boot 裁剪认证、分片、转发及乱序缓存；Embedded/Full 提供这些有界能力。压缩、payload 加密和异步 DMA 所有权接口未实现。PHY TX 返回前必须消费或复制字节。板级接入与生产认证需要应用专属验证。

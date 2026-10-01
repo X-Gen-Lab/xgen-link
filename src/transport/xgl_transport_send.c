@@ -3,31 +3,35 @@
  * \brief           Transport send path implementation
  */
 
-#include "xgl_transport_send_internal.h"
-#include "xgl/internal/xgl_time.h"
-#include "xgl/internal/xgl_codec.h"
 #include "xgl/xgl_config.h"
+#include "xgl_transport_send_internal.h"
 
-static xgl_transport_peer_state_t *
-transport_select_tx_peer(xgl_transport_ctx_t *ctx, const xgl_tx_data_t *tx_data)
-{
-    bool has_tx_scope =
-        (tx_data->connection_id != 0U || tx_data->session_epoch != 0U);
-
-    if (has_tx_scope) {
-        return transport_get_or_create_peer_scope(ctx, tx_data->target_id,
-                                                  tx_data->connection_id,
-                                                  tx_data->session_epoch);
-    }
-
-    return transport_get_or_create_peer(ctx, tx_data->target_id);
+/**
+ * \brief           Select the single owner for a reliable transmit scope
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       tx_data: Borrowed application request
+ * \return          Matching peer, or NULL on resource exhaustion
+ */
+static xgl_transport_peer_state_t*
+transport_select_tx_peer(xgl_transport_ctx_t* ctx,
+                         const xgl_tx_data_t* tx_data) {
+    return transport_get_or_create_peer_scope(ctx, tx_data->target_id,
+                                              tx_data->connection_id,
+                                              tx_data->session_epoch);
 }
 
+/**
+ * \brief           Validate peer capacity and announce a reliable scope
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in]       tx_data: Borrowed application request
+ * \param[out]      peer: Exact reliable owner, or NULL for unreliable traffic
+ * \return          XGL_OK or admission error
+ */
 static xgl_error_t
-transport_prepare_reliable_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
-                                const xgl_tx_data_t *tx_data,
-                                xgl_transport_peer_state_t **peer)
-{
+transport_prepare_reliable_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                                const xgl_tx_data_t* tx_data,
+                                xgl_transport_peer_state_t** peer) {
     *peer = NULL;
 
     if (!tx_data->reliable) {
@@ -39,6 +43,18 @@ transport_prepare_reliable_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
         return XGL_ERR_NO_MEMORY;
     }
 
+    if ((*peer)->failed) {
+        return XGL_ERR_ACK_TIMEOUT;
+    }
+#if XGL_FEATURE_FRAGMENTATION
+    if ((*peer)->tx_message.data != NULL) {
+        return XGL_ERR_BUSY;
+    }
+#endif
+    if ((*peer)->tx_window.next_packet_number == UINT32_MAX) {
+        return XGL_ERR_SEQUENCE_ERROR;
+    }
+
     if (!xgl_window_can_send_packet_number(&(*peer)->tx_window)) {
         return XGL_ERR_WINDOW_FULL;
     }
@@ -48,8 +64,8 @@ transport_prepare_reliable_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
     }
 
     xgl_error_t err = transport_send_control(
-        ctx, handle, tx_data->target_id, XGL_TRANSPORT_CONTROL_HELLO, 0,
-        (*peer)->session_id, (*peer)->connection_id, (*peer)->session_epoch);
+        ctx, handle, tx_data->target_id, XGL_TRANSPORT_CONTROL_HELLO,
+        (*peer)->connection_id, (*peer)->session_epoch);
     if (err == XGL_OK) {
         (*peer)->hello_sent = true;
     }
@@ -57,16 +73,26 @@ transport_prepare_reliable_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
     return err;
 }
 
-xgl_error_t xgl_transport_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
-                               const xgl_tx_data_t *tx_data)
-{
+xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                               const xgl_tx_data_t* tx_data) {
     if (ctx == NULL || tx_data == NULL || tx_data->data == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (tx_data->data_len == 0U) {
+    if (tx_data->compression_id != 0U) {
+        return XGL_ERR_UNSUPPORTED;
+    }
+
+    if (tx_data->data_len == 0U || tx_data->timeout_ms > INT32_MAX) {
         return XGL_ERR_INVALID_PARAM;
     }
+
+#if XGL_FEATURE_FRAGMENTATION
+    if (ctx->enable_fragmentation &&
+        tx_data->data_len > ctx->max_message_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+#endif
 
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         if (ctx->error_callback != NULL) {
@@ -78,7 +104,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    xgl_transport_peer_state_t *peer = NULL;
+    xgl_transport_peer_state_t* peer = NULL;
     xgl_error_t err =
         transport_prepare_reliable_send(ctx, handle, tx_data, &peer);
     if (err != XGL_OK) {
@@ -97,45 +123,29 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
         return err;
     }
 
-    /* Apply codec compression if requested and codec is registered */
-    const uint8_t *send_data = tx_data->data;
+    const uint8_t* send_data = tx_data->data;
     size_t send_data_len = tx_data->data_len;
-    uint8_t codec_buffer[XGL_DATALINK_STACK_BUFFER_SIZE];
-
-    if (tx_data->compression_id != 0U && ctx->codec_registry != NULL) {
-        const xgl_codec_t *codec = xgl_codec_find(
-            ctx->codec_registry, XGL_CODEC_KIND_COMPRESSION,
-            tx_data->compression_id);
-        if (codec != NULL) {
-            size_t encoded_len = sizeof(codec_buffer);
-            err = codec->encode(tx_data->data, tx_data->data_len,
-                                codec_buffer, &encoded_len, codec->user_data);
-            if (err == XGL_OK && encoded_len < tx_data->data_len) {
-                send_data = codec_buffer;
-                send_data_len = encoded_len;
-            }
-            /* If encode fails or doesn't compress, fall through with original data */
-        }
-    }
 
     if (send_plan.needs_fragmentation) {
+#if XGL_FEATURE_FRAGMENTATION
         err = transport_send_fragmented(ctx, handle, peer, tx_data, &send_plan);
+#else
+        return XGL_ERR_BUFFER_TOO_SMALL;
+#endif
     } else {
-        /* Use encoded data if available */
         uint32_t packet_number = 0U;
         if (tx_data->reliable && peer != NULL) {
             packet_number = xgl_window_get_next_packet_number(&peer->tx_window);
         }
 
-        xgl_reliable_packet_t *rel_packet = NULL;
-        err = transport_queue_reliable_tx(
-            ctx, peer, tx_data, send_data, send_data_len, packet_number,
-            false, NULL, 0U, &rel_packet);
+        xgl_reliable_packet_t* rel_packet = NULL;
+        err = transport_queue_reliable_tx(ctx, peer, tx_data, send_data,
+                                          send_data_len, packet_number, false,
+                                          NULL, 0U, &rel_packet);
         if (err == XGL_OK) {
-            err = transport_send_packet_view(ctx, handle, peer, tx_data,
-                                             send_data, send_data_len,
-                                             packet_number, false,
-                                             NULL, 0U, &rel_packet);
+            err = transport_send_packet_view(
+                ctx, handle, peer, tx_data, send_data, send_data_len,
+                packet_number, false, NULL, 0U, &rel_packet);
         }
     }
 
@@ -147,7 +157,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t *ctx, xgl_handle_t handle,
     ctx->stats->tx_bytes += tx_data->data_len;
 
     if (peer != NULL) {
-        peer->last_active_ms = xgl_time_ms();
+        peer->last_active_ms = transport_now(ctx);
     }
 
     return XGL_OK;

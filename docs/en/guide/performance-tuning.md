@@ -1,76 +1,29 @@
-# Performance Tuning Guide
+# Performance Tuning
 
-This document provides performance optimization strategies, configuration tuning recommendations, and best practices for the XGL protocol stack.
+Measure the selected profile and real driver before changing capacities. Host throughput and structure sizes do not predict a small MCU's Flash, RAM, or worst-case latency.
 
-## Performance Factors
+## Window and Packet Capacity
 
-```text
-Performance = min(PHY speed, CPU capability, memory bandwidth, protocol overhead)
-```
+A larger peer window can hide ACK latency, but the global `max_tx_packets` also limits total in-flight work. Increase them together only when measured traffic needs the capacity. Reserve out-of-order RX slots for windows above one.
 
-Key factors:
+Reliable message pumping allows large fragmented messages with a small packet window. It still needs a retained maximum-message slot per peer and explicit TX-message and RX-reassembly byte admission budgets.
 
-1. **PHY speed**: Physical transmission capability is the upper bound.
-2. **CPU capability**: Encoding/decoding, CRC calculation, encryption.
-3. **Memory allocation**: Pool exhaustion leads to allocation failures.
-4. **Protocol overhead**: Header, CRC, authentication tag.
+## Frame and Memory Size
 
-## Configuration Tuning
+Larger frames reduce framing overhead but increase parser caches, scratch, reliable payload slots, and out-of-order payload slots. Query `xgl_memory_requirements()` for every candidate configuration.
 
-### Sliding Window
+Pools are partitioned by resource type and reserve maximum slot sizes. Lower byte admission budgets alone may not reduce workspace. Reduce peer counts, packet counts, frame size, message size, or reassembly slots to reduce the corresponding reservations.
 
-| Window Size | Use Case | Throughput Impact |
-| --- | --- | --- |
-| 2 | Low latency, low bandwidth | Low |
-| 4 | Balanced (default) | Medium |
-| 8 | High bandwidth, high latency | High |
-| 16 | Very high bandwidth | Highest |
+Boot removes authentication, forwarding, fragmentation, out-of-order state, and route indexing. Use the real Cortex-M0 consumer to compare Flash and RAM; do not infer final image size from a static archive.
 
-**Formula**: `max throughput ≈ (window_size × MTU) / RTT`
+## Scheduling and Copies
 
-### Timeout Settings
+Tune route polling frequency against latency and wakeups. RX work is budgeted per link, while callbacks and transport maintenance still contribute to step duration.
 
-| Parameter | Default | Recommendation |
-| --- | --- | --- |
-| `ACK_TIMEOUT_MS` | 100-1000 | Adjust based on RTT, typically 2×RTT |
-| `MAX_RETRY` | 3-5 | Increase for poor link quality |
-| `REASSEMBLY_TIMEOUT_MS` | 5000 | Fragment reassembly timeout |
+Use `xgl_send_zerocopy_at()` only for supported single-frame unreliable traffic. Reliable retransmission and fragmented-message ownership require retained copies. A synchronous PHY adapter may also need a driver-owned copy for DMA.
 
-## Code-Level Optimization
+## Measurement and Diagnosis
 
-### Reduce Copies
+Record application latency, PHY busy frequency, retransmission/error counters, and peak outstanding traffic. Keep stats sampling serialized. Use map files, final ELF symbols, compiler stack reports, and target stack high-water measurements.
 
-1. Use zero-copy send: `xgl_send_zerocopy()`.
-2. Avoid unnecessary payload copies.
-3. Use reference counting to share data.
-
-### Reduce Lock Contention
-
-1. Single-thread mode: `XGL_THREAD_SAFE=n`.
-2. Reduce `xgl_send()` call frequency; batch sends.
-3. Use separate instances to avoid sharing.
-
-### Reduce CRC Computation
-
-1. Increase MTU to reduce frame count.
-2. Enable hardware CRC (if supported).
-
-## Monitoring Recommendations
-
-1. **Real-time monitoring**: Use statistics API for key metrics.
-2. **Alert setup**: Set alerts for abnormal counters.
-3. **Performance analysis**: Regular performance benchmarking.
-
-## Best Practices
-
-1. **Pre-allocate memory**: Use no-heap profile to avoid dynamic allocation.
-2. **Reasonable configuration**: Choose appropriate presets for your scenario.
-3. **Avoid over-optimization**: Ensure correctness first, then optimize performance.
-4. **Test validation**: Any optimization must be validated through testing.
-
-## Evidence
-
-| Rule | Source | Tool |
-| --- | --- | --- |
-| Performance stats | `src/api/xgl_stats.c` | `test/test_stats.cpp` |
-| Resource presets | `Kconfig` | `tools/footprint_report.cmake` |
+A single-function `.su` maximum is not a call-chain or interrupt-stack bound. The Boot measurement includes a consumer and a generic startup, and excludes your BSP and application buffers. The smaller Boot design target remains an optimization target until the measured configuration meets it.

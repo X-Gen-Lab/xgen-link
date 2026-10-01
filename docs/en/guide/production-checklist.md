@@ -1,62 +1,45 @@
 # Production Checklist
 
-Use this page as an engineering review checklist before deploying XGL on an MCU or multi-node system. Every item should have evidence in code, configuration, tests, or runtime logs.
+Acceptance applies to a specific configuration, target ABI, driver, and provider. Preserve those inputs with the resulting artifacts.
 
-## Configuration
+## Build and Configuration
 
-- `source_id` is non-zero and not in a reserved address range.
-- Route table covers all target nodes, and `max_frame_size` matches PHY MTU.
-- `auth_required=true` with a valid `auth_provider`.
-- `auth_key_id` matches the device key-management system.
-- `enable_encryption` and `enable_compression` remain disabled until codec/security models are fully wired.
-- Production/no-heap profiles have explicit allocator behavior and do not silently fall back to malloc.
+- Let the product prepare and record revisions, dirty states, or installation provenance for status, bytes, CRC, memory, and containers. Product gitlinks pin versions when submodules are used. Link consumes provided targets or installed packages and does not use its development manifest to select product dependencies.
+- Build library and consumers with matching profile/ABI headers.
+- Validate explicit capacities and the exact workspace size/alignment.
+- Keep borrowed configuration and contexts immutable and alive until destroy.
+
+## I/O and Execution
+
+- Serialize all instance calls; callbacks never reenter or destroy the instance.
+- Verify synchronous whole-frame PHY acceptance, including DMA adapters.
+- Verify nonblocking bounded RX and per-link parser separation.
+- Use one monotonic millisecond clock for send, step, and timeout queries.
+
+## Reliability and Recovery
+
+- Exercise ACK loss, duplicates, reorder, full windows, and PHY BUSY.
+- Exercise application BUSY with already retained reliable/fragmented data.
+- Verify fragmented messages larger than the window and global resource exhaustion.
+- Retire failed scopes explicitly and reconnect under a new epoch; drain stale unauthenticated traffic.
+- Treat local acceptance separately from remote application completion.
 
 ## Security
 
-- Auth provider `tag_len` is fixed and satisfies `0 < tag_len <= XGL_AUTH_TAG_MAX_LEN`.
-- `sign` and `verify` use the same AAD boundary for header/extensions/payload.
-- End-to-end auth canonicalizes hop-mutable fields: TTL and header CRC are excluded, and frame CRC is outside the tag input.
-- Key id and nonce/material id generation and rotation are handled by the application or secure module.
-- Replay window capacity is sufficient for the maximum reorder window.
-- Multi-hop forwarding preserves the auth tag while recomputing header/frame CRC after TTL mutation.
-- Bad auth, rejected replay, wrong session, and wrong connection packets are not ACKed; reliable duplicates may be ACKed without re-delivery.
+- Use the selected profile's trusted-session API and a reviewed provider.
+- Authenticate complete provider AAD and payload with the supplied directional nonce/key identity.
+- Ensure restart freshness and no key/nonce-domain reuse.
+- Respect session capacity and retained tombstones; received frames cannot establish trust.
+- Keep reserved compression and payload-encryption features disabled.
 
-## Reliability
+## Memory and Timing
 
-- Reliable window size matches link RTT, bandwidth, and RAM budget.
-- Retry limit matches application latency tolerance.
-- ACK range/SACK passes loss/reorder/duplicate injection.
-- RESET/CLOSE clears only the target peer/connection/session.
-- Application callback does not block the protocol loop.
+- Inspect the final ELF for unexpected heap services.
+- Include workspace, application/driver buffers, provider state, BSP, and stack in RAM.
+- Measure full call chains and ISR nesting on target; single-function reports are insufficient.
+- Verify overflow rejection, capacity recovery, clock wrap, and worst-case step duration.
+- Confirm product Flash/RAM limits with its actual linker map.
 
-## Memory
+## Release Evidence
 
-- Peer state, reliable queue, RX buffer, and fragment reassembly upper bounds are calculable.
-- Fragment global budget and per-peer budget are configured.
-- Worst-case payload, fragment count, and route MTU have a capacity analysis.
-- No-heap smoke passes.
-- Footprint report fits target MCU RAM/Flash.
-
-## Real-Time and Power
-
-- ISR only enqueues PHY RX data and does not call parser/auth/transport.
-- Main loop or RTOS task calls `xgl_run()`.
-- `xgl_next_deadline_ms()` is used to compute sleep time.
-- Time provider is monotonic and handles wraparound.
-- PHY send/receive does not block for long while protocol locks are held.
-
-## Diagnostics
-
-- Stats distinguish CRC, auth, replay, route, MTU, timeout, and fragment budget failures.
-- Release builds retain required error callbacks.
-- Field logs do not print keys, raw tags, or sensitive payloads.
-- Long soak tests cover multi-node forwarding, retransmission, and fragmentation.
-
-## Release
-
-- `ctest --preset gcc-test --output-on-failure` passes.
-- `xgl_release_validation` passes.
-- `xgl_docs` passes.
-- cppcheck is installed and passes.
-- SDK consumer smoke passes.
-- Worktree has no unexplained source changes.
+Archive build arguments, compiler version, dependency revisions, map/ELF, test reports, and hardware observations. The standalone Boot consumer is link/resource evidence and does not replace a real board test or boot-update power-loss validation.

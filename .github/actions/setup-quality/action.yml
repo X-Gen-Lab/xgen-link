@@ -1,0 +1,70 @@
+name: Prepare shared quality tools
+description: Install the pinned shared policy and optional native Linux analyzers
+inputs:
+  repository:
+    description: Published quality repository
+    default: X-Gen-Lab/xgen-quality
+  native-analyzers:
+    description: Build fixed Cppcheck and Doxygen on Linux
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Read fixed quality source
+      id: quality
+      shell: bash
+      env:
+        QUALITY_REPOSITORY: ${{ inputs.repository || 'X-Gen-Lab/xgen-quality' }}
+      run: |
+        python - <<'PY'
+        import json, os, re
+        from pathlib import Path
+        repository = os.environ['QUALITY_REPOSITORY']
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+            raise SystemExit('Invalid quality repository; use owner/repository.')
+        revision = json.loads(Path('tools/quality.json').read_text('utf-8'))['quality_source']['revision']
+        if not re.fullmatch(r'[0-9a-f]{40}', revision):
+            raise SystemExit('Pin a full quality source commit in tools/quality.json.')
+        with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+            output.write(f'repository={repository}\nrevision={revision}\n')
+        PY
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: ${{ steps.quality.outputs.repository }}
+        ref: ${{ steps.quality.outputs.revision }}
+        path: out/deps/quality-source
+        persist-credentials: false
+    - name: Install fixed Python tools
+      shell: bash
+      run: python -m pip install ./out/deps/quality-source
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      if: inputs.native-analyzers == 'true'
+      with:
+        repository: danmar/cppcheck
+        ref: e73bf44c3e49686b7495fab352d03a6c6075516b
+        path: out/deps/cppcheck-src
+        persist-credentials: false
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      if: inputs.native-analyzers == 'true'
+      with:
+        repository: doxygen/doxygen
+        ref: 0128237a63c2ca9ca4c8d772d0cee9e8e5415835
+        path: out/deps/doxygen-src
+        persist-credentials: false
+    - name: Build fixed native analyzers
+      if: inputs.native-analyzers == 'true'
+      shell: bash
+      run: |
+        test "$RUNNER_OS" = Linux
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends flex bison graphviz ninja-build
+        cmake -S out/deps/cppcheck-src -B out/deps/cppcheck-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DBUILD_TESTING=OFF \
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/out/deps/cppcheck"
+        cmake --build out/deps/cppcheck-build --parallel 2
+        cmake --install out/deps/cppcheck-build
+        cmake -S out/deps/doxygen-src -B out/deps/doxygen-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        cmake --build out/deps/doxygen-build --target doxygen --parallel 2
+        echo "XGEN_CPPCHECK=$GITHUB_WORKSPACE/out/deps/cppcheck/bin/cppcheck" >> "$GITHUB_ENV"
+        echo "XGEN_DOXYGEN=$GITHUB_WORKSPACE/out/deps/doxygen-build/bin/doxygen" >> "$GITHUB_ENV"
+        echo "$GITHUB_WORKSPACE/out/deps/doxygen-build/bin" >> "$GITHUB_PATH"

@@ -6,13 +6,12 @@
 #include "xgl/internal/xgl_wire.h"
 #include "xgl_transport_internal.h"
 
-xgl_error_t transport_send_sack(const xgl_transport_ctx_t *ctx,
+xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
                                 xgl_handle_t handle,
-                                const xgl_transport_peer_state_t *peer,
+                                const xgl_transport_peer_state_t* peer,
                                 uint16_t source_id, uint32_t base_packet,
-                                uint16_t session_id, uint32_t connection_id,
-                                uint32_t session_epoch)
-{
+                                uint32_t connection_id,
+                                uint32_t session_epoch) {
     if (ctx == NULL || peer == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -20,16 +19,16 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t *ctx,
     uint8_t bitmap[8] = {0};
     size_t highest_bit = 0U;
     bool has_received = false;
-    for (const xgl_transport_rx_buffered_packet_t *node = peer->rx_buffered;
+    for (const xgl_transport_rx_buffered_packet_t* node = peer->rx_buffered;
          node != NULL; node = node->next) {
         if (node->packet.packet_number < base_packet) {
             continue;
         }
         uint32_t diff = node->packet.packet_number - base_packet;
-        if (diff >= (uint32_t) (sizeof(bitmap) * 8U)) {
+        if (diff >= (uint32_t)(sizeof(bitmap) * 8U)) {
             continue;
         }
-        bitmap[diff / 8U] |= (uint8_t) (1U << (diff % 8U));
+        bitmap[diff / 8U] |= (uint8_t)(1U << (diff % 8U));
         if (diff > highest_bit) {
             highest_bit = diff;
         }
@@ -54,14 +53,12 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t *ctx,
         return err;
     }
 
-    xgl_packet_data_t sack_packet_data = {
-        .ref_count = 1, .data_len = 0, .data = NULL, .owned_data = NULL};
+    xgl_packet_data_t sack_packet_data = {.data_len = 0, .data = NULL};
 
     xgl_packet_t sack_packet = {.source_id = ctx->local_id,
                                 .target_id = source_id,
-                                .session_id = session_id,
                                 .connection_id = connection_id,
-                                .packet_number = base_packet,
+                                .packet_number = 0U,
                                 .session_epoch = session_epoch,
                                 .packet_type = XGL_PACKET_TYPE_ACK,
                                 .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
@@ -75,7 +72,7 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t *ctx,
                                 .phy = NULL};
 
     if (ctx->lower_layer != NULL && ctx->lower_layer->send != NULL) {
-        return xgl_layer_send(ctx->lower_layer, handle, &sack_packet);
+        return xgl_packet_send(ctx->lower_layer, handle, &sack_packet);
     }
 
     return XGL_ERR_INVALID_PARAM;

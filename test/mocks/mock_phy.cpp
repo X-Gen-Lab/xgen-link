@@ -21,18 +21,15 @@ void MockPhy::queue_rx_data(const uint8_t* data, size_t len) {
     rx_queue_.insert(rx_queue_.end(), data, data + len);
 }
 
-xgl_error_t MockPhy::tx_wrapper(const uint8_t* data, size_t len, void* user_data) {
+xgl_error_t MockPhy::tx_wrapper(const uint8_t* data, size_t len,
+                                void* user_data) {
     MockPhy* instance = static_cast<MockPhy*>(user_data);
     if (instance == nullptr) {
         return XGL_ERR_NOT_INITIALIZED;
     }
 
     /* Store transmitted data */
-    instance->tx_data_.insert(
-        instance->tx_data_.end(),
-        data,
-        data + len
-    );
+    instance->tx_data_.insert(instance->tx_data_.end(), data, data + len);
     instance->tx_count_++;
 
     /* Call mock implementation */
@@ -51,10 +48,8 @@ xgl_error_t MockPhy::rx_wrapper(uint8_t* buffer, size_t* len, void* user_data) {
     if (!instance->rx_queue_.empty()) {
         size_t copy_len = std::min(*len, instance->rx_queue_.size());
         std::memcpy(buffer, instance->rx_queue_.data(), copy_len);
-        instance->rx_queue_.erase(
-            instance->rx_queue_.begin(),
-            instance->rx_queue_.begin() + copy_len
-        );
+        instance->rx_queue_.erase(instance->rx_queue_.begin(),
+                                  instance->rx_queue_.begin() + copy_len);
         *len = copy_len;
         return XGL_OK;
     }
@@ -83,7 +78,8 @@ xgl_phy_ops_t LoopbackPhyPair::get_phy_b() {
     return ops;
 }
 
-xgl_error_t LoopbackPhyPair::tx_a(const uint8_t* data, size_t len, void* user_data) {
+xgl_error_t LoopbackPhyPair::tx_a(const uint8_t* data, size_t len,
+                                  void* user_data) {
     auto* self = static_cast<LoopbackPhyPair*>(user_data);
     if (self == nullptr || data == nullptr) {
         return XGL_ERR_NULL_POINTER;
@@ -94,7 +90,8 @@ xgl_error_t LoopbackPhyPair::tx_a(const uint8_t* data, size_t len, void* user_da
     return XGL_OK;
 }
 
-xgl_error_t LoopbackPhyPair::rx_a(uint8_t* buffer, size_t* len, void* user_data) {
+xgl_error_t LoopbackPhyPair::rx_a(uint8_t* buffer, size_t* len,
+                                  void* user_data) {
     auto* self = static_cast<LoopbackPhyPair*>(user_data);
     if (self == nullptr || buffer == nullptr || len == nullptr) {
         return XGL_ERR_NULL_POINTER;
@@ -104,15 +101,21 @@ xgl_error_t LoopbackPhyPair::rx_a(uint8_t* buffer, size_t* len, void* user_data)
         *len = 0;
         return XGL_OK;
     }
-    const auto& frame = self->ba_queue_.front();
+    auto& frame = self->ba_queue_.front();
     size_t copy_len = std::min(*len, frame.size());
     std::memcpy(buffer, frame.data(), copy_len);
-    self->ba_queue_.pop_front();
+    if (copy_len == frame.size()) {
+        self->ba_queue_.pop_front();
+    } else {
+        frame.erase(frame.begin(),
+                    frame.begin() + static_cast<std::ptrdiff_t>(copy_len));
+    }
     *len = copy_len;
     return XGL_OK;
 }
 
-xgl_error_t LoopbackPhyPair::tx_b(const uint8_t* data, size_t len, void* user_data) {
+xgl_error_t LoopbackPhyPair::tx_b(const uint8_t* data, size_t len,
+                                  void* user_data) {
     auto* self = static_cast<LoopbackPhyPair*>(user_data);
     if (self == nullptr || data == nullptr) {
         return XGL_ERR_NULL_POINTER;
@@ -123,7 +126,8 @@ xgl_error_t LoopbackPhyPair::tx_b(const uint8_t* data, size_t len, void* user_da
     return XGL_OK;
 }
 
-xgl_error_t LoopbackPhyPair::rx_b(uint8_t* buffer, size_t* len, void* user_data) {
+xgl_error_t LoopbackPhyPair::rx_b(uint8_t* buffer, size_t* len,
+                                  void* user_data) {
     auto* self = static_cast<LoopbackPhyPair*>(user_data);
     if (self == nullptr || buffer == nullptr || len == nullptr) {
         return XGL_ERR_NULL_POINTER;
@@ -133,10 +137,15 @@ xgl_error_t LoopbackPhyPair::rx_b(uint8_t* buffer, size_t* len, void* user_data)
         *len = 0;
         return XGL_OK;
     }
-    const auto& frame = self->ab_queue_.front();
+    auto& frame = self->ab_queue_.front();
     size_t copy_len = std::min(*len, frame.size());
     std::memcpy(buffer, frame.data(), copy_len);
-    self->ab_queue_.pop_front();
+    if (copy_len == frame.size()) {
+        self->ab_queue_.pop_front();
+    } else {
+        frame.erase(frame.begin(),
+                    frame.begin() + static_cast<std::ptrdiff_t>(copy_len));
+    }
     *len = copy_len;
     return XGL_OK;
 }
@@ -179,10 +188,15 @@ xgl_error_t FifoPhy::rx_cb(uint8_t* buffer, size_t* len, void* user_data) {
         *len = 0;
         return XGL_OK;
     }
-    const auto& frame = self->rx_queue_.front();
+    auto& frame = self->rx_queue_.front();
     size_t copy_len = std::min(*len, frame.size());
     std::memcpy(buffer, frame.data(), copy_len);
-    self->rx_queue_.pop_front();
+    if (copy_len == frame.size()) {
+        self->rx_queue_.pop_front();
+    } else {
+        frame.erase(frame.begin(),
+                    frame.begin() + static_cast<std::ptrdiff_t>(copy_len));
+    }
     *len = copy_len;
     return XGL_OK;
 }

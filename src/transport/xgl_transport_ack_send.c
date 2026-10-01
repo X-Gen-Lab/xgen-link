@@ -14,11 +14,10 @@
  * \param[in]       source_id: Source node ID
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t transport_send_ack(const xgl_transport_ctx_t *ctx,
+xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                xgl_handle_t handle, uint32_t packet_number,
-                               uint16_t source_id, uint16_t session_id,
-                               uint32_t connection_id, uint32_t session_epoch)
-{
+                               uint16_t source_id, uint32_t connection_id,
+                               uint32_t session_epoch) {
     uint8_t ack_value[16] = {0};
     size_t ack_value_len = 0;
     const xgl_wire_ack_range_t ranges[] = {{.gap = 0, .length = 1}};
@@ -38,14 +37,12 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t *ctx,
         return err;
     }
 
-    xgl_packet_data_t ack_packet_data = {
-        .ref_count = 1, .data_len = 0, .data = NULL, .owned_data = NULL};
+    xgl_packet_data_t ack_packet_data = {.data_len = 0, .data = NULL};
 
     xgl_packet_t ack_packet = {.source_id = ctx->local_id,
                                .target_id = source_id,
-                               .session_id = session_id,
                                .connection_id = connection_id,
-                               .packet_number = packet_number,
+                               .packet_number = 0U,
                                .session_epoch = session_epoch,
                                .packet_type = XGL_PACKET_TYPE_ACK,
                                .flags = XGL_WIRE_FLAG_HAS_EXTENSIONS,
@@ -59,7 +56,7 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t *ctx,
                                .phy = NULL};
 
     if (ctx->lower_layer != NULL && ctx->lower_layer->send != NULL) {
-        return xgl_layer_send(ctx->lower_layer, handle, &ack_packet);
+        return xgl_packet_send(ctx->lower_layer, handle, &ack_packet);
     }
 
     return XGL_ERR_INVALID_PARAM;

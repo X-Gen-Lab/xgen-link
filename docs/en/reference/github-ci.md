@@ -1,77 +1,43 @@
-# GitHub CI/CD
+# GitHub CI
 
-XGL uses two GitHub automation workflows:
+## Fixed inputs and triggers
 
-- `CI`: validates code, tests, static analysis, footprint, SDK consumer smoke, no-heap smoke, and documentation.
-- `Deploy Docs`: builds the MkDocs + Doxygen documentation site from `main` and deploys it to GitHub Pages.
+`.github/workflows/ci.yml` runs for pushes to `main`, `develop`, and `feat/**`, pull requests targeting `main` or `develop`, and manual dispatch. The final `status` job requires every selected job to succeed; failures, cancellations, and unexpected skips fail the gate. Pages accepts pushes to `main` or manual dispatch only. Feature-branch CI does not automatically deploy the site.
 
-## CI Triggers
+CI reads fixed status, bytes, CRC, memory, and containers commits from `dev/dependencies.json`. `setup-components` explicitly checks out and verifies these sources, then supplies five `XGL_DEV_*_SOURCE_DIR` values to `dev`. Acquisition is separate from CMake configuration. Production consumes parent-provided targets or installed packages; each product still selects one component combination per image.
 
-`CI` runs on:
+`tools/quality.json` is the sole declaration of the shared quality source. `setup-quality` installs that commit; Linux analysis additionally builds fixed Cppcheck and Doxygen commits. `setup-gtest` prepares GoogleTest/GoogleMock 1.16.0 with the same native compiler as the host build. Configuration never downloads or selects a latest version.
 
-- Pushes to `main`.
-- Pull requests targeting `main`.
-- Manual `workflow_dispatch`.
+| Optional repository variable | Address when unset or empty |
+| --- | --- |
+| `XGEN_QUALITY_REPOSITORY` | `X-Gen-Lab/xgen-quality` |
+| `XGEN_STATUS_REPOSITORY` | `X-Gen-Lab/xgen-status` |
+| `XGEN_BYTES_REPOSITORY` | `X-Gen-Lab/xgen-bytes` |
+| `XGEN_CRC_REPOSITORY` | `X-Gen-Lab/xgen-crc` |
+| `XGEN_MEMORY_REPOSITORY` | `X-Gen-Lab/xgen-memory` |
+| `XGEN_CONTAINERS_REPOSITORY` | `X-Gen-Lab/xgen-containers` |
 
-The core command matches the local release gate:
+Variables override `owner/repository`, not the pinned commit. Private forks additionally require checkout credentials with read access.
 
-```sh
-cmake --preset ci
-cmake --build build/ci --target xgl_release_validation --parallel
-```
+## Check matrix
 
-This keeps GitHub validation aligned with local release validation.
+| Job | Environment and checks |
+| --- | --- |
+| `host` | Ubuntu 24.04, Windows 2022/MSVC, macOS 15; text, format, pre-commit, C11 protocol, strict C++17 GoogleTest, examples, SDK consumer, discovery and seed-replay contracts |
+| `analysis` | Ubuntu 24.04; native GNU instrumented build, shared test runner, Cppcheck, Clang-Tidy, strict public API Doxygen, independent 80% line/function/branch gates, release helpers and documentation site |
+| `sanitizers` | Ubuntu 24.04; ASan/UBSan, building every selected target before running the shared test entry |
+| `bounded-profiles` | Separate C11 Boot and Embedded builds without libc fallback, static lifecycle and installation consumption |
+| `dependency-contracts` | dev preparation unit tests, real parent-target reuse, installation consumption, and rejection of missing or incompatible dependencies |
+| `status` | Require success from every mandatory job |
 
-## CI Jobs
+Host uses `cmake -S dev --preset debug` and writes to `build/dev-debug`. Analysis, sanitizers, and bounded profiles use `dev-ci`, `dev-asan`, `dev-boot`, and `dev-embedded`. They do not share ABI/profile outputs or coverage counters. The source-development CTest root is `build/dev-<preset>`.
 
-| Job | Purpose | Main checks |
-| --- | --- | --- |
-| `release-validation` | Full release gate | CTest, cppcheck, SDK smoke, no-heap smoke, footprint, docs |
-| `gcc-smoke` | Fast GCC build and test | `gcc-test` preset, examples, CTest |
+GoogleTest registers individual cases with `unit`, `integration`, and `property` labels. Discovery checks that all 510 historical names remain present. The shared runner verifies selected names against actual JUnit results and rejects empty, disabled, skipped, or failing tests. See [testing](../contributing/testing.md) for commands and replay.
 
-`release-validation` uploads `build/ci/footprint/xgl-footprint.txt` as an artifact so MCU resource changes can be compared between runs.
+The ASan preset disables installed-package smoke because global sanitizer flags are not automatically exported as external consumer link requirements. Full and independent consumer contracts validate installation. Boot/Embedded CI jobs do not execute GoogleTest; Host jobs provide protocol regression coverage.
 
-## Documentation Deployment
+## Artifacts and conclusions
 
-`Deploy Docs` runs only on pushes to `main` or manual dispatch. It uses the official GitHub Pages artifact flow.
+Jobs use `always()` to preserve applicable `out/reports/`, CTest logs, compilation databases, Doxygen diagnostics, and footprint reports. Reports identify tools, source, configuration, selected tests, and actual exit status. Later failures preserve earlier evidence; missing required artifacts fail.
 
-```sh
-cmake --preset ci
-cmake --build build/ci --target xgl_docs --parallel
-```
-
-The uploaded directory is:
-
-```text
-build/ci/docs/site
-```
-
-It contains the bilingual MkDocs site and the Doxygen public API reference.
-
-## GitHub Pages Setup
-
-Enable Pages in the GitHub repository:
-
-1. Open repository `Settings`.
-2. Go to `Pages`.
-3. Set source to `GitHub Actions`.
-4. Save and rerun `Deploy Docs`.
-
-After deployment, the `github-pages` environment shows the published URL.
-
-## Troubleshooting
-
-| Failure point | Common cause | Action |
-| --- | --- | --- |
-| Configure fails | CMake preset or system dependency mismatch | Read the `cmake --preset ci` log |
-| Static analysis fails | cppcheck found warning/style/performance/portability issues | Fix the source or add a justified inline suppression |
-| Docs fail | MkDocs strict broken link or Doxygen configuration error | Run `cmake --build build/ci --target xgl_docs` locally |
-| Tests fail | Protocol behavior regression or example API drift | Inspect CTest failure output |
-| Pages fails | Pages source is not GitHub Actions, or workflow permissions are insufficient | Check repository Pages settings and workflow permissions |
-
-## Release Rules
-
-- Pull requests must pass `CI` before merge.
-- A failed `main` docs deployment blocks release.
-- Do not commit generated `site/` or Doxygen HTML output.
-- Release candidates should keep the CI run, footprint artifact, and release validation record.
+Local checks, remote runs, and product acceptance are recorded separately in the root `REFACTORING_STATUS.md`. A workflow definition does not establish that a commit passed. Products provide board execution, production cryptographic providers, power-loss recovery, and final MCU partition qualification; see [release validation](release-validation.md).

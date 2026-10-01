@@ -16,6 +16,7 @@ configure_file(
 
 add_custom_target(xgl_docs
     COMMAND ${CMAKE_COMMAND} -E rm -rf ${XGL_DOXYGEN_OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${XGL_DOXYGEN_OUTPUT_DIR}
     COMMAND ${DOXYGEN_EXECUTABLE} ${XGL_DOXYFILE}
     COMMAND ${XGL_MKDOCS_EXE}
         build
