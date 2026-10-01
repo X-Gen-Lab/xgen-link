@@ -92,6 +92,7 @@ struct xgl_instance {
 
 xgl_error_t xgl_instance_init_links(xgl_handle_t handle);
 void xgl_instance_destroy_links(xgl_handle_t handle);
+size_t xgl_instance_count_links(const xgl_config_t* config);
 
 /**
  * \brief           Prepare caller storage without initializing protocol layers

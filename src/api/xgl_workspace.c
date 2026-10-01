@@ -104,25 +104,6 @@ static bool align_size(size_t size, size_t* result) {
 }
 
 /**
- * \brief           Count distinct PHY descriptors in the configured routes
- */
-static size_t unique_links(const xgl_config_t* config) {
-    size_t count = 0U;
-    for (size_t i = 0U; i < config->route_table_len; ++i) {
-        size_t j = 0U;
-        for (; j < i; ++j) {
-            if (config->route_table[j].phy == config->route_table[i].phy) {
-                break;
-            }
-        }
-        if (j == i) {
-            ++count;
-        }
-    }
-    return count;
-}
-
-/**
  * \brief           Reserve an initialization object or array
  */
 static bool add_initial(xgl_workspace_plan_t* plan, size_t size, size_t count) {
@@ -166,7 +147,7 @@ static bool set_resource(xgl_workspace_plan_t* plan,
 static bool plan_initialization(const xgl_config_t* config,
                                 xgl_workspace_plan_t* plan) {
     const size_t routes = config->route_table_len;
-    const size_t links = unique_links(config);
+    const size_t links = xgl_instance_count_links(config);
     size_t bytes;
     if (!multiply_size(routes, sizeof(xgl_route_item_t), &bytes) ||
         !add_initial(plan, bytes, routes != 0U ? 1U : 0U)) {
@@ -184,8 +165,8 @@ static bool plan_initialization(const xgl_config_t* config,
 #endif
     if (!add_initial(plan, config->memory.rx_buffer_size,
                      links != 0U ? links : 1U) ||
-        !multiply_size(routes, sizeof(xgl_instance_link_t), &bytes) ||
-        !add_initial(plan, bytes, routes != 0U ? 1U : 0U)) {
+        !multiply_size(links, sizeof(xgl_instance_link_t), &bytes) ||
+        !add_initial(plan, bytes, links != 0U ? 1U : 0U)) {
         return false;
     }
     return xgm_size_class_measure(plan->initial, plan->initial_count,

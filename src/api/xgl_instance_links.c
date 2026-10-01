@@ -10,6 +10,25 @@
 #include "xgl_instance_internal.h"
 
 /**
+ * \brief           Count unique PHY descriptors for both planning and setup
+ */
+size_t xgl_instance_count_links(const xgl_config_t* config) {
+    size_t count = 0U;
+    for (size_t i = 0U; i < config->route_table_len; ++i) {
+        size_t j = 0U;
+        for (; j < i; ++j) {
+            if (config->route_table[j].phy == config->route_table[i].phy) {
+                break;
+            }
+        }
+        if (j == i) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+/**
  * \brief           Release link storage and secondary receive caches
  */
 void xgl_instance_destroy_links(xgl_handle_t handle) {
@@ -31,7 +50,7 @@ void xgl_instance_destroy_links(xgl_handle_t handle) {
  * \brief           Deduplicate route PHYs and create one parser per link
  */
 xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
-    const size_t count = handle->config->route_table_len;
+    const size_t count = xgl_instance_count_links(handle->config);
     if (count == 0U) {
         return XGL_OK;
     }
@@ -44,7 +63,7 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
         return XGL_ERR_NO_MEMORY;
     }
     memset(handle->links, 0, count * sizeof(*handle->links));
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < handle->config->route_table_len; ++i) {
         const xgl_route_item_t* route = &handle->config->route_table[i];
         uint32_t interval =
             route->read_freq_hz != 0U ? 1000U / route->read_freq_hz : 0U;
