@@ -129,15 +129,46 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     frame->extensions = params->extensions;
     frame->extensions_len = params->extensions_len;
 
-    /* CRC16 will be calculated during serialization */
-    frame->crc16 = 0;
-
     return XGL_OK;
 }
 
 /**
  * \brief           Validate lengths before any sum, write or allocation
  */
+xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
+                                      size_t auth_tag_len,
+                                      xgl_frame_layout_t* layout) {
+    if (layout == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    memset(layout, 0, sizeof(*layout));
+    if (payload_len > UINT16_MAX ||
+        extensions_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    if (auth_tag_len > XGL_AUTH_TAG_MAX_LEN) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    size_t extension_len = extensions_len;
+    if (auth_tag_len > 0U) {
+        if (extension_len >
+            UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE - XGL_SECURITY_EXT_SIZE) {
+            return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+        extension_len += XGL_SECURITY_EXT_SIZE;
+    }
+    const size_t header_len = XGL_WIRE_BASE_HEADER_SIZE + extension_len;
+    const size_t overhead = header_len + auth_tag_len + XGL_CRC16_SIZE;
+    if (payload_len > SIZE_MAX - overhead) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    layout->header_len = header_len;
+    layout->payload_len = payload_len;
+    layout->tag_len = auth_tag_len;
+    layout->frame_len = overhead + payload_len;
+    return XGL_OK;
+}
+
 xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
                               xgl_frame_layout_t* layout) {
     if (layout == NULL) {
@@ -147,40 +178,25 @@ xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
     if (frame == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    if (frame->payload_len > UINT16_MAX ||
-        frame->extensions_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
+    xgl_frame_layout_t measured;
+    xgl_error_t error = xgl_frame_measure_lengths(
+        frame->payload_len, frame->extensions_len, auth_tag_len, &measured);
+    if (error != XGL_OK) {
+        return error;
     }
     if ((frame->payload_len > 0U && frame->payload == NULL) ||
         (frame->extensions_len > 0U && frame->extensions == NULL)) {
         return XGL_ERR_NULL_POINTER;
     }
-    if (auth_tag_len > XGL_AUTH_TAG_MAX_LEN) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-    size_t extension_len = frame->extensions_len;
     if (auth_tag_len > 0U) {
-        if (extension_len >
-            UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE - XGL_SECURITY_EXT_SIZE) {
-            return XGL_ERR_BUFFER_TOO_SMALL;
-        }
         xgl_wire_ext_metadata_t metadata;
-        xgl_error_t error = xgl_wire_decode_ext_metadata(
-            frame->extensions, extension_len, &metadata);
+        error = xgl_wire_decode_ext_metadata(frame->extensions,
+                                             frame->extensions_len, &metadata);
         if (error != XGL_OK || metadata.has_security_ext) {
             return XGL_ERR_INVALID_FRAME;
         }
-        extension_len += XGL_SECURITY_EXT_SIZE;
     }
-    const size_t header_len = XGL_WIRE_BASE_HEADER_SIZE + extension_len;
-    const size_t overhead = header_len + auth_tag_len + XGL_CRC16_SIZE;
-    if (frame->payload_len > SIZE_MAX - overhead) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-    layout->header_len = header_len;
-    layout->payload_len = frame->payload_len;
-    layout->tag_len = auth_tag_len;
-    layout->frame_len = overhead + frame->payload_len;
+    *layout = measured;
     return XGL_OK;
 }
 

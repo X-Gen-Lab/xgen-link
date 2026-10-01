@@ -6,6 +6,8 @@
 
 A packet can appear in multiple layer counters. Do not add their byte counts to calculate application throughput. Submission success and transport TX counters do not prove remote application delivery; measure accepted payloads at the receiving callback.
 
+Network and datalink TX packet/byte counters commit only after successful lower-layer submission for copied, in-place and forwarded frames. Network bytes describe payload bytes; datalink bytes include framing. Failures do not count as transmitted packets. The retransmission counter increments at each successful retry submission, even when a later retry in the same SACK batch fails. Repeated SACKs that do not trigger another submission do not increment it.
+
 The streaming parser and raw-frame ingress share CRC classification: header and complete-frame CRC failures increment their respective counters and synchronously report `XGL_ERR_CRC_FAILED`. Classification uses the current validation result without computing CRC again for statistics.
 
 ## Access
@@ -14,7 +16,7 @@ Call `xgl_stats_get()` or `xgl_stats_reset()` while holding the application's ex
 
 ## Build profiles
 
-Full and Embedded enable `XGL_FEATURE_STATISTICS`. Boot removes the statistics object and counter updates. For a valid instance, `xgl_stats_get()` / `xgl_stats_reset()` return `XGL_ERR_UNSUPPORTED`; the getter leaves its output unchanged. Null-pointer and initialization checks still run first.
+Full, Embedded and Embedded-lite enable `XGL_FEATURE_STATISTICS`. Boot removes the statistics object and counter updates. For a valid instance, `xgl_stats_get()` / `xgl_stats_reset()` return `XGL_ERR_UNSUPPORTED`; the getter leaves its output unchanged. Null-pointer and initialization checks still run first.
 
 ## RTT and memory
 

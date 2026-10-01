@@ -12,6 +12,8 @@
 
 `xgl_send_at(handle, &tx, now_ms)` 在调用期间借用 payload，并将可靠数据保留在有界协议存储中。`xgl_send_zerocopy_at()` 使用调用者帧存储进行非可靠单帧发送，不允许异步 PHY 保留该地址。
 
+原零拷贝请求始终使用零 connection/epoch。`xgl_send_zerocopy_scoped_at()` 接受独立且兼容的显式 scope 请求；`xgl_send_zerocopy_layout()` 查询精确头部空间和总容量，不分配、不发送、不消耗认证状态。准备与生命周期规则见[发送 API](../guide/send-api.md)。
+
 `xgl_step(handle, now_ms, &budget)` 轮询到期链路并执行 transport 维护。`budget.rx_bytes` 是每条链路的字节上限，不是频率。`xgl_next_timeout(handle, now_ms, &delay)` 返回是否存在相对截止时间。所有调用使用同一按模 2^32 回绕的单调毫秒时钟；经过的时间间隔必须小于 2^31。
 
 ## 会话与诊断

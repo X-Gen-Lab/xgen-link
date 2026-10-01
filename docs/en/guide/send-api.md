@@ -19,6 +19,34 @@ xgl_error_t result = xgl_send_at(handle, &tx, now_ms);
 
 The example assumes valid application variables and an initialized handle. Payload length must be nonzero; priority is 0–7. Keep reserved `compression_id` zero.
 
+## Caller-Owned Frame Storage
+
+`xgl_send_zerocopy_at()` keeps its original request layout and always uses connection ID and epoch zero. Use `xgl_send_zerocopy_scoped_at()` with `xgl_tx_zerocopy_request_t` for an explicit scope. Both entries support only nonempty, unreliable, single-frame payloads; `reliable=true` is rejected and `timeout_ms` is ignored. They do not provide retained-buffer DMA or retransmission ownership.
+
+Call `xgl_send_zerocopy_layout()` before placing the payload. The query ignores `data.buffer`, `data.buffer_size` and `data.data_offset`; it validates the requested metadata, route, complete-frame MTU and installed authentication scope. It returns `payload_offset` and `frame_size`, including DATA_TYPE, nonzero SESSION, SECURITY, the fixed tag and final CRC. It allocates nothing, changes no counters or security sequence, and calls neither the provider nor the PHY. A successful query does not reserve resources; sending validates the current state again.
+
+```c
+xgl_tx_zerocopy_request_t request = {0};
+request.data.target_id = 2;
+request.data.data_type = 9;
+request.data.data_len = payload_len;
+request.connection_id = connection_id;
+request.session_epoch = session_epoch;
+xgl_tx_frame_layout_t layout;
+xgl_error_t result = xgl_send_zerocopy_layout(handle, &request, &layout);
+if (result == XGL_OK && layout.frame_size <= sizeof(frame_buffer)) {
+    request.data.buffer = frame_buffer;
+    request.data.buffer_size = sizeof(frame_buffer);
+    request.data.data_offset = layout.payload_offset;
+    memcpy(frame_buffer + layout.payload_offset, payload, payload_len);
+    result = xgl_send_zerocopy_scoped_at(handle, &request, now_ms);
+}
+```
+
+The example assumes a caller-owned array `frame_buffer` and `<string.h>`. If the frame does not fit that array, report capacity failure instead of submitting. Sending leaves the payload at its original address; headers and trailers are writable and may change even when authentication or PHY submission fails. All bytes remain borrowed only until return.
+
+Network TX packets and payload bytes commit only after successful lower-layer submission, consistently for copied, in-place and forwarded frames. These counters do not prove remote delivery.
+
 ## Reliable and Unreliable
 
 Reliable sends are constrained by the peer window and global TX capacity. Continue calling `xgl_step()` to receive ACKs, advance retransmissions, and report terminal failures.

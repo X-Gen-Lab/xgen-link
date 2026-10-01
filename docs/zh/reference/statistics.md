@@ -6,6 +6,8 @@
 
 同一个包可能计入多个协议层，不能把各层字节数相加作为应用吞吐量。提交成功和 transport TX 计数不证明远端应用已经交付；应在接收回调测量已接纳的 payload。
 
+普通、原地和转发路径的 network、datalink TX 包数及字节数均在下层成功提交后累计。Network 字节表示载荷，datalink 字节包含帧开销；失败不计为已发送包。每次成功重传即累计重传计数，即使同一批 SACK 的后续重传失败也保留已完成计数。没有触发再次提交的重复 SACK 不增加计数。
+
 流式 parser 和原始帧入口使用相同的 CRC 分类：帧头 CRC 与完整帧 CRC 分别累加对应错误计数，并同步报告 `XGL_ERR_CRC_FAILED`。分类使用当前验证的结果，不为统计再次计算 CRC。
 
 ## 访问
@@ -14,7 +16,7 @@
 
 ## 编译配置
 
-Full 和 Embedded 启用 `XGL_FEATURE_STATISTICS`。Boot 关闭统计对象及计数更新；有效实例上的 `xgl_stats_get()` / `xgl_stats_reset()` 返回 `XGL_ERR_UNSUPPORTED`，获取函数不改写输出。空指针和未初始化检查仍先执行。
+Full、Embedded 和 Embedded-lite 启用 `XGL_FEATURE_STATISTICS`。Boot 关闭统计对象及计数更新；有效实例上的 `xgl_stats_get()` / `xgl_stats_reset()` 返回 `XGL_ERR_UNSUPPORTED`，获取函数不改写输出。空指针和未初始化检查仍先执行。
 
 ## RTT 和内存
 

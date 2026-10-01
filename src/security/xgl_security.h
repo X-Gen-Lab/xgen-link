@@ -81,6 +81,13 @@ xgl_error_t xgl_security_init(xgl_security_ctx_t* ctx, uint16_t local_id,
                               bool auth_required,
                               const xgl_auth_provider_t* provider);
 
+/** \brief           Check an installed TX scope without consuming a sequence.
+ */
+xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,
+                                        uint16_t remote_id,
+                                        uint32_t connection_id,
+                                        uint32_t session_epoch);
+
 /**
  * \brief           Install a trusted association; closed slots stay reserved
  * \param[in,out]   ctx: Security context

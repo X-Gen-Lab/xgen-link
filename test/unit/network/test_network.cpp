@@ -286,9 +286,9 @@ TEST_F(XglNetworkTest, DefaultConnectionDoesNotUseLocalShortSession) {
 }
 
 TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
-    ASSERT_EQ(xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U,
-                                   100U, 1U),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U, 100U, 1U),
+        XGL_OK);
     xgl_error_t phy_result = XGL_ERR_TX_FAILED;
     phy_ops.user_data = &phy_result;
     phy_ops.tx = [](const uint8_t*, size_t, void* user) {
@@ -314,10 +314,9 @@ TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
         stats = {};
         phy_result = XGL_ERR_TX_FAILED;
         auto submit = [&]() {
-            return use_inplace
-                       ? xgl_network_send_zerocopy(&network_ctx, nullptr,
-                                                   &inplace)
-                       : xgl_network_send(&network_ctx, &packet);
+            return use_inplace ? xgl_network_send_zerocopy(&network_ctx,
+                                                           nullptr, &inplace)
+                               : xgl_network_send(&network_ctx, &packet);
         };
         EXPECT_EQ(submit(), XGL_ERR_TX_FAILED);
         EXPECT_EQ(stats.tx_packets, 0U);
@@ -331,25 +330,25 @@ TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
 }
 
 TEST_F(XglNetworkTest, ForwardTxCountersCommitOnlyAfterPhySuccess) {
-    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U,
-                                   100U, 1U),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        XGL_OK);
     xgl_error_t phy_result = XGL_ERR_TX_FAILED;
     phy_ops.user_data = &phy_result;
     phy_ops.tx = [](const uint8_t*, size_t, void* user) {
         return *static_cast<xgl_error_t*>(user);
     };
     const auto bytes = make_frame(REMOTE_ID, FORWARD_ID, 4U, "abc");
-    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, bytes.data(),
-                                   bytes.size()),
-              XGL_ERR_TX_FAILED);
+    EXPECT_EQ(
+        xgl_network_receive(&network_ctx, nullptr, bytes.data(), bytes.size()),
+        XGL_ERR_TX_FAILED);
     EXPECT_EQ(stats.tx_packets, 0U);
     EXPECT_EQ(stats.tx_bytes, 0U);
     EXPECT_EQ(stats.tx_errors, 1U);
     phy_result = XGL_OK;
-    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, bytes.data(),
-                                   bytes.size()),
-              XGL_OK);
+    EXPECT_EQ(
+        xgl_network_receive(&network_ctx, nullptr, bytes.data(), bytes.size()),
+        XGL_OK);
     EXPECT_EQ(stats.tx_packets, 1U);
     EXPECT_EQ(stats.tx_bytes, 3U);
 }
@@ -690,8 +689,9 @@ TEST_F(XglNetworkTest, SendPacketRouteMtuIncludesAuthenticationOverhead) {
     provider.verify = network_test_auth_verify;
     provider.tag_len = 8;
     provider.user_data = nullptr;
-    network_ctx.auth_required = true;
-    network_ctx.auth_provider = &provider;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, LOCAL_ID, true, &provider), XGL_OK);
+    network_ctx.security = &security;
     xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 60, 100, 1);
 
     const uint8_t payload[20] = {};
@@ -975,8 +975,9 @@ TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
     provider.verify = network_test_auth_verify;
     provider.tag_len = 8;
     provider.user_data = nullptr;
-    network_ctx.auth_required = true;
-    network_ctx.auth_provider = &provider;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, LOCAL_ID, true, &provider), XGL_OK);
+    network_ctx.security = &security;
 
     CaptureTx capture;
     xgl_phy_ops_t capture_phy = {};

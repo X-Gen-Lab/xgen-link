@@ -6,6 +6,16 @@ Every instance owns one bounded workspace. The protocol describes resource owner
 
 `xgl_memory_requirements()` validates the configuration and returns exact `size` and `alignment`. The layout includes the instance, pool descriptors, initialization objects, and all runtime slots.
 
+`xgl_memory_report()` explains the same plan without allocating: management, initialization, peers, windows, reliable records and payloads, frame scratch, buffered RX, and fragmentation. Category bytes include alignment and sum exactly to `report.requirements.size`. Failure leaves the report unchanged. Its inline entry checks the consumer's configuration ABI and compiled profile identity.
+
+```c
+xgl_memory_report_t report;
+if (xgl_memory_report(&config, &report) == XGL_OK) {
+    /* Reserve report.requirements.size at report.requirements.alignment. */
+    /* report.fragment_bytes is reserved storage, not the admission budget. */
+}
+```
+
 `xgl_init_static()` prepares and initializes caller-owned aligned storage without calling `memory.allocator`. `xgl_create()` uses the configured `xgm_allocator_t` once for the entire workspace, then returns an uninitialized handle; call `xgl_init()` next. Both paths use the same partition plan.
 
 After preparation, init, sends, receive processing, and cleanup use only the workspace. `xgl_destroy()` returns dynamic storage to the original backend once; static storage remains owned by the caller. Borrowed configuration and contexts must outlive destruction.

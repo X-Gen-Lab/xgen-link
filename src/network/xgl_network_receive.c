@@ -121,7 +121,7 @@ xgl_error_t xgl_network_receive_view(xgl_network_ctx_t* ctx,
                 network_count_rx_drop(ctx);
                 return err;
             }
-        } else if (ctx->auth_required || metadata->authenticated) {
+        } else if (metadata->authenticated) {
             network_count_rx_drop(ctx);
             return XGL_ERR_INVALID_FRAME;
         }

@@ -482,18 +482,36 @@ typedef struct {
 typedef struct {
     uint8_t* buffer;    /**< Buffer with pre-allocated header space */
     size_t buffer_size; /**< Total buffer size */
-    size_t data_offset; /**< Data start offset; add XGL_DATA_TYPE_EXT_SIZE when
-                           data_type is non-zero */
+    size_t data_offset; /**< Exact payload offset from xgl_send_zerocopy_layout */
     size_t data_len;    /**< Actual data length */
 
     /* Transmission parameters */
     uint16_t target_id;  /**< Target node ID */
     uint8_t data_type;   /**< Application payload class encoded as DATA_TYPE_EXT
                             when non-zero */
-    bool reliable;       /**< Enable reliable transmission */
+    bool reliable;       /**< Must be false for synchronous caller-buffer TX */
     uint8_t priority;    /**< Priority level (0-7) */
-    uint32_t timeout_ms; /**< Timeout in ms (0 = use default) */
+    uint32_t timeout_ms; /**< Ignored; no ACK/retry state is retained */
 } xgl_tx_data_zerocopy_t;
+
+/**
+ * \brief           Scoped synchronous caller-buffer transmission request
+ * \note            Keeps the legacy request layout unchanged. Reliable sends
+ *                  are unsupported; data.timeout_ms is ignored.
+ */
+typedef struct {
+    xgl_tx_data_zerocopy_t
+        data;               /**< Borrowed frame storage and send metadata */
+    uint32_t connection_id; /**< Exact connection scope, zero is the default */
+    uint32_t session_epoch; /**< Exact trusted epoch, zero omits SESSION_EXT */
+} xgl_tx_zerocopy_request_t;
+
+/** \brief           Exact storage required for one synchronous frame. */
+typedef struct {
+    size_t
+        payload_offset; /**< Header bytes including all selected extensions */
+    size_t frame_size; /**< Header, payload, authentication tag and final CRC */
+} xgl_tx_frame_layout_t;
 
 /*---------------------------------------------------------------------------*/
 /* Configuration Presets                                                     */

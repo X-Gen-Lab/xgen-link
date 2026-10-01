@@ -192,8 +192,10 @@ network_validate_auth_tx_budget(xgl_network_ctx_t* ctx,
                                 const xgl_route_item_t* route) {
     size_t auth_tag_len = 0U;
 #if XGL_FEATURE_AUTH
+    const xgl_security_ctx_t* security = ctx->security;
     xgl_error_t error =
-        xgl_security_frame_tag_len(ctx->auth_required, ctx->auth_provider,
+        xgl_security_frame_tag_len(security != NULL && security->auth_required,
+                                   security != NULL ? security->provider : NULL,
                                    frame->header.flags, &auth_tag_len);
     if (error != XGL_OK) {
         network_count_tx_error(ctx);
@@ -201,10 +203,15 @@ network_validate_auth_tx_budget(xgl_network_ctx_t* ctx,
     }
 #endif
 
-    const size_t frame_size = xgl_frame_serialized_size(
-        frame->payload_len, frame->extensions_len, auth_tag_len);
-    if (frame_size > route->max_frame_size ||
-        (ctx->max_frame_size != 0U && frame_size > ctx->max_frame_size)) {
+    xgl_frame_layout_t layout;
+    xgl_error_t measured = xgl_frame_measure_lengths(
+        frame->payload_len, frame->extensions_len, auth_tag_len, &layout);
+    if (measured != XGL_OK) {
+        network_count_tx_error(ctx);
+        return measured;
+    }
+    if (layout.frame_len > route->max_frame_size ||
+        (ctx->max_frame_size != 0U && layout.frame_len > ctx->max_frame_size)) {
         network_count_tx_error(ctx);
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
@@ -265,7 +272,6 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
     if (packet->source_id == 0U) {
         packet->source_id = ctx->local_id;
     }
-    packet->version = XGL_PROTOCOL_VERSION;
 
     uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
     xgl_frame_t frame;
@@ -340,9 +346,10 @@ validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
 /**
  * \brief           Apply shared routing and framing to caller-owned TX storage
  */
-xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
-                                      xgl_handle_t handle,
-                                      const xgl_tx_data_zerocopy_t* request) {
+static xgl_error_t
+network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                            const xgl_tx_data_zerocopy_t* request,
+                            uint32_t connection_id, uint32_t session_epoch) {
     if (ctx == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -360,10 +367,91 @@ xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
     xgl_packet_t packet = {
         .source_id = ctx->local_id,
         .target_id = request->target_id,
+        .connection_id = connection_id,
+        .session_epoch = session_epoch,
         .data_type = request->data_type,
         .packet_type = XGL_PACKET_TYPE_DATA,
         .priority = request->priority,
         .data = &data,
     };
     return network_send_packet(ctx, handle, &packet, request);
+}
+
+xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
+                                      xgl_handle_t handle,
+                                      const xgl_tx_data_zerocopy_t* request) {
+    return network_send_zerocopy_scope(ctx, handle, request, 0U, 0U);
+}
+
+xgl_error_t
+xgl_network_send_zerocopy_scoped(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                                 const xgl_tx_zerocopy_request_t* request) {
+    if (request == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    return network_send_zerocopy_scope(ctx, handle, &request->data,
+                                       request->connection_id,
+                                       request->session_epoch);
+}
+
+xgl_error_t
+xgl_network_zerocopy_layout(xgl_network_ctx_t* ctx,
+                            const xgl_tx_zerocopy_request_t* request,
+                            xgl_tx_frame_layout_t* layout) {
+    if (layout == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    memset(layout, 0, sizeof(*layout));
+    if (ctx == NULL || request == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    const xgl_tx_data_zerocopy_t* data = &request->data;
+    if (data->data_len == 0U || data->priority > 7U || data->reliable ||
+        data->target_id == 0U) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    if (data->data_len > UINT16_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    const xgl_route_item_t* route =
+        xgl_route_table_lookup(ctx->route_table, data->target_id);
+    if (route == NULL) {
+        return XGL_ERR_ROUTE_NOT_FOUND;
+    }
+    size_t tag_len = 0U;
+#if XGL_FEATURE_AUTH
+    xgl_security_ctx_t* security = ctx->security;
+    xgl_error_t error = xgl_security_frame_tag_len(
+        security != NULL && security->auth_required,
+        security != NULL ? security->provider : NULL, 0U, &tag_len);
+    if (error != XGL_OK) {
+        return error;
+    }
+    if (tag_len != 0U) {
+        error = xgl_security_check_tx_scope(security, data->target_id,
+                                            request->connection_id,
+                                            request->session_epoch);
+        if (error != XGL_OK) {
+            return error;
+        }
+    }
+#endif
+    size_t extensions_len = data->data_type != 0U ? XGL_DATA_TYPE_EXT_SIZE : 0U;
+    if (request->session_epoch != 0U) {
+        extensions_len += XGL_SESSION_EXT_SIZE;
+    }
+    xgl_frame_layout_t measured;
+    xgl_error_t error_layout = xgl_frame_measure_lengths(
+        data->data_len, extensions_len, tag_len, &measured);
+    if (error_layout != XGL_OK) {
+        return error_layout;
+    }
+    if (measured.frame_len > route->max_frame_size ||
+        (ctx->max_frame_size != 0U &&
+         measured.frame_len > ctx->max_frame_size)) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    layout->payload_offset = measured.header_len;
+    layout->frame_size = measured.frame_len;
+    return XGL_OK;
 }

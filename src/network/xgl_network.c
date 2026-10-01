@@ -28,11 +28,6 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     if (config->route_table == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
-#if !XGL_FEATURE_AUTH
-    if (config->auth_required) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#endif
 
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_network_ctx_t));
@@ -45,9 +40,7 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
     ctx->callback_user_data = config->callback_user_data;
     ctx->stats = config->stats;
 #if XGL_FEATURE_AUTH
-    ctx->auth_required = config->auth_required;
     ctx->security = config->security;
-    ctx->auth_provider = config->auth_provider;
 #endif
 #if XGL_FEATURE_FORWARDING
     ctx->allocator = config->allocator;

@@ -19,6 +19,34 @@ xgl_error_t result = xgl_send_at(handle, &tx, now_ms);
 
 示例假定应用变量有效且 handle 已初始化。Payload 长度必须非零，priority 为 0–7。保留字段 `compression_id` 保持零。
 
+## 调用者提供帧存储
+
+`xgl_send_zerocopy_at()` 保持原请求结构布局，始终使用零 connection ID 和零 epoch。显式 scope 使用 `xgl_tx_zerocopy_request_t` 与 `xgl_send_zerocopy_scoped_at()`。两个入口都只支持非空、非可靠、单帧 payload；`reliable=true` 会被拒绝，`timeout_ms` 被忽略。它们不提供保留缓冲区的异步 DMA 或重传所有权。
+
+放置 payload 前先调用 `xgl_send_zerocopy_layout()`。查询忽略 `data.buffer`、`data.buffer_size` 和 `data.data_offset`，验证发送元数据、路由、完整帧 MTU 和已安装的认证 scope。输出 `payload_offset` 与 `frame_size`，包含 DATA_TYPE、非零 SESSION、SECURITY、固定标签及末尾 CRC。查询不分配内存、不修改计数或安全序号、不调用 provider 或 PHY。查询成功不预留资源，发送时仍会验证当前状态。
+
+```c
+xgl_tx_zerocopy_request_t request = {0};
+request.data.target_id = 2;
+request.data.data_type = 9;
+request.data.data_len = payload_len;
+request.connection_id = connection_id;
+request.session_epoch = session_epoch;
+xgl_tx_frame_layout_t layout;
+xgl_error_t result = xgl_send_zerocopy_layout(handle, &request, &layout);
+if (result == XGL_OK && layout.frame_size <= sizeof(frame_buffer)) {
+    request.data.buffer = frame_buffer;
+    request.data.buffer_size = sizeof(frame_buffer);
+    request.data.data_offset = layout.payload_offset;
+    memcpy(frame_buffer + layout.payload_offset, payload, payload_len);
+    result = xgl_send_zerocopy_scoped_at(handle, &request, now_ms);
+}
+```
+
+示例假定存在调用者拥有的数组 `frame_buffer`，并包含 `<string.h>`。数组容量不足时应报告容量错误，不提交发送。发送保持 payload 原位；帧头和尾部可写，即使认证或 PHY 提交失败也可能已经改变。所有字节只借用到调用返回。
+
+Network TX 包数及 payload 字节数只在下层提交成功后计入，普通、原地与转发路径保持一致。这些计数不证明远端交付。
+
 ## 可靠和非可靠发送
 
 可靠发送同时受单 peer 窗口和全局 TX 容量约束。持续调用 `xgl_step()` 以接收 ACK、推进重传并报告最终失败。

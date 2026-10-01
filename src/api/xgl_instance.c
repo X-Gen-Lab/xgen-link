@@ -123,8 +123,6 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .error_callback = handle->config->error_callback,
         .callback_user_data = handle->config->callback_user_data,
         .stats = XGL_INSTANCE_STAT(handle, network),
-        .auth_required = handle->config->auth_required,
-        .auth_provider = handle->config->auth_provider,
         .allocator = handle->memory->scratch};
 #if XGL_FEATURE_AUTH
     network_config.security = &handle->security;

@@ -402,7 +402,7 @@ TEST_F(XglSecuritySessionTest, AuthenticatedBroadcastIsRejectedBeforeSigning) {
     ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
     size_t written = 19U;
     EXPECT_EQ(xgl_security_serialize_frame(bytes, sizeof(bytes), &frame,
-                                            &sender, &written),
+                                           &sender, &written),
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(written, 0U);
     EXPECT_EQ(spy.sign_calls, 0U);

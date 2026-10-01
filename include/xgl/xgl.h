@@ -113,6 +113,24 @@ typedef struct {
 } xgl_memory_requirements_t;
 
 /**
+ * \brief           Exact reserved bytes by ownership and resource category
+ * \note            Category bytes include alignment and sum to
+ * requirements.size. Admission budgets do not change fixed pool reservations.
+ */
+typedef struct {
+    xgl_memory_requirements_t requirements; /**< Complete storage contract */
+    size_t management_bytes;     /**< Instance and allocator descriptors */
+    size_t initialization_bytes; /**< Routes, links and per-PHY RX caches */
+    size_t peer_bytes;           /**< Reliable scope records */
+    size_t window_bytes;         /**< Send-window acknowledgement bits */
+    size_t tx_record_bytes;      /**< Outstanding reliable packet records */
+    size_t tx_payload_bytes;     /**< Reserved reliable payload copies */
+    size_t scratch_bytes;        /**< Synchronous frame scratch storage */
+    size_t rx_buffered_bytes;    /**< Out-of-order records, payload and TLVs */
+    size_t fragment_bytes;       /**< Message storage and reassembly records */
+} xgl_memory_report_t;
+
+/**
  * \brief           Query the exact static workspace layout after ABI validation
  * \details         Accounts for every enabled protocol capacity and alignment.
  *                  No heap fallback or runtime expansion is performed.
@@ -142,6 +160,33 @@ xgl_memory_requirements(const xgl_config_t* config,
     return xgl_memory_requirements_checked(config, sizeof(xgl_config_t),
                                            XGL_CONFIG_ABI_VERSION,
                                            XGL_BUILD_CONFIG_ID, requirements);
+}
+
+/**
+ * \brief           Explain reserved storage without allocating or initializing
+ * \param[in]       config: Configuration supported by the static storage plan
+ * \param[in]       config_size: Size of the caller's configuration structure
+ * \param[in]       abi_version: Caller configuration ABI version
+ * \param[in]       build_config_id: Caller compiled profile identifier
+ * \param[out]      report: Byte breakdown; unchanged on failure
+ * \return          XGL_OK or a configuration, capacity or ABI error
+ */
+xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
+                                      size_t config_size, uint32_t abi_version,
+                                      uint32_t build_config_id,
+                                      xgl_memory_report_t* report);
+
+/**
+ * \brief           Query reserved bytes using the consumer's ABI constants
+ * \param[in]       config: Configuration supported by the static storage plan
+ * \param[out]      report: Byte breakdown; unchanged on failure
+ * \return          XGL_OK or a configuration, capacity or ABI error
+ */
+static inline xgl_error_t xgl_memory_report(const xgl_config_t* config,
+                                            xgl_memory_report_t* report) {
+    return xgl_memory_report_checked(config, sizeof(xgl_config_t),
+                                     XGL_CONFIG_ABI_VERSION,
+                                     XGL_BUILD_CONFIG_ID, report);
 }
 
 /**
@@ -276,11 +321,43 @@ xgl_error_t xgl_send_at(xgl_handle_t handle, const xgl_tx_data_t* tx_data,
  * \param[in]       now_ms: Same clock used by xgl_step()
  * \return          XGL_OK on acceptance, or validation/capacity/driver error
  * \note            The PHY must stop reading before tx returns. Reliable data
- *                  sends are unsupported by this zero-copy entry point.
+ *                  sends are unsupported; timeout_ms is ignored. This legacy
+ *                  entry always uses connection ID and session epoch zero.
  */
 xgl_error_t xgl_send_zerocopy_at(xgl_handle_t handle,
                                  const xgl_tx_data_zerocopy_t* tx_data,
                                  uint32_t now_ms);
+
+/**
+ * \brief           Query exact frame storage without transmitting or allocating
+ * \param[in]       handle: Initialized instance, serialized by the caller
+ * \param[in]       request: Scope and send metadata; buffer, buffer_size and
+ *                  data_offset are ignored, data_len must be nonzero
+ * \param[out]      layout: Exact headroom and frame size, cleared on failure
+ * \return          XGL_OK or an argument, route, MTU or security-scope error
+ * \note            Does not call the provider or PHY, reserve storage or
+ * consume a security sequence. An authenticated scope must already be
+ *                  installed. The eventual send revalidates current state.
+ */
+xgl_error_t xgl_send_zerocopy_layout(xgl_handle_t handle,
+                                     const xgl_tx_zerocopy_request_t* request,
+                                     xgl_tx_frame_layout_t* layout);
+
+/**
+ * \brief           Send one caller-owned frame within an explicit peer scope
+ * \param[in]       handle: Initialized instance, serialized by the caller
+ * \param[in]       request: Writable frame storage and exact connection/epoch
+ * \param[in]       now_ms: Same monotonic clock used by xgl_step()
+ * \return          XGL_OK or a validation, capacity, security or driver error
+ * \note            Use xgl_send_zerocopy_layout() before filling the payload.
+ *                  The payload stays at its original address. All callbacks
+ *                  borrow it synchronously; no pointer may outlive this call.
+ *                  Reliable sends are unsupported; timeout_ms is ignored.
+ */
+xgl_error_t
+xgl_send_zerocopy_scoped_at(xgl_handle_t handle,
+                            const xgl_tx_zerocopy_request_t* request,
+                            uint32_t now_ms);
 
 /**
  * \brief           Poll due links and advance protocol deadlines
@@ -288,7 +365,11 @@ xgl_error_t xgl_send_zerocopy_at(xgl_handle_t handle,
  * \param[in]       now_ms: Monotonic time; elapsed intervals must stay below
  * 2^31
  * \param[in]       budget: Per-link RX byte budget and parser timeout
- * \return          First receive or transport error, or XGL_OK
+ * \return          First receive or maintenance error, or XGL_OK; remaining
+ *                  bytes and due maintenance are still processed
+ * \note            The most recent valid receive_timeout_ms applies to every
+ *                  incomplete parser; zero disables expiry. Timeout maintenance
+ *                  runs even when RX is disabled or a link is not due to poll.
  */
 xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
                      const xgl_work_budget_t* budget);

@@ -723,6 +723,7 @@ TEST(XglCoverageApi,
     EXPECT_EQ(xgl_close_security_session(handle, 2, 0, 0), XGL_OK);
     xgl_destroy(handle);
 }
+
 class ScopedZeroCopyApiTest : public ::testing::Test {
   protected:
     void SetUp() override {
@@ -763,7 +764,9 @@ class ScopedZeroCopyApiTest : public ::testing::Test {
         request.session_epoch = 9U;
     }
 
-    void TearDown() override { xgl_destroy(handle); }
+    void TearDown() override {
+        xgl_destroy(handle);
+    }
 
     void Install() {
         auto session = test_session_config(2U, 11U, 9U);
@@ -798,16 +801,17 @@ TEST_F(ScopedZeroCopyApiTest, PlansExactHeadroomWithoutConsumingSecurityState) {
     request.data.buffer_size = buffer.size();
     request.data.data_offset = layout.payload_offset;
     const uint8_t payload[] = {0x17U, 0x28U, 0x39U};
-    std::memcpy(buffer.data() + layout.payload_offset, payload, sizeof(payload));
+    std::memcpy(buffer.data() + layout.payload_offset, payload,
+                sizeof(payload));
     ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 7U), XGL_OK);
     EXPECT_EQ(sign_calls, 1U);
     EXPECT_EQ(last_sequence, 42U);
     EXPECT_EQ(signed_payload, buffer.data() + layout.payload_offset);
     EXPECT_EQ(std::memcmp(signed_payload, payload, sizeof(payload)), 0);
     xgl_wire_frame_view_t view = {};
-    ASSERT_EQ(xgl_wire_decode_frame(&view, captured.data(), captured.size(),
-                                     nullptr),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_wire_decode_frame(&view, captured.data(), captured.size(), nullptr),
+        XGL_OK);
     EXPECT_EQ(view.header.connection_id, 11U);
     EXPECT_EQ(view.session_epoch, 9U);
     EXPECT_EQ(view.data_type, 9U);
@@ -857,7 +861,8 @@ TEST_F(ScopedZeroCopyApiTest, RejectsInvalidMetadataAndStorageBeforeSigning) {
     EXPECT_EQ(phy_state.writes, 0U);
 }
 
-TEST_F(ScopedZeroCopyApiTest, LegacyEntryKeepsDefaultScopeAndOriginalRequestAbi) {
+TEST_F(ScopedZeroCopyApiTest,
+       LegacyEntryKeepsDefaultScopeAndOriginalRequestAbi) {
     auto session = test_session_config(2U);
     ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
     request.connection_id = 0U;
@@ -873,7 +878,7 @@ TEST_F(ScopedZeroCopyApiTest, LegacyEntryKeepsDefaultScopeAndOriginalRequestAbi)
     ASSERT_EQ(xgl_send_zerocopy_at(handle, &request.data, 0U), XGL_OK);
     xgl_wire_frame_view_t first = {};
     ASSERT_EQ(xgl_wire_decode_frame(&first, captured.data(), captured.size(),
-                                     nullptr),
+                                    nullptr),
               XGL_OK);
     EXPECT_EQ(first.header.connection_id, 0U);
     EXPECT_EQ(first.session_epoch, 0U);

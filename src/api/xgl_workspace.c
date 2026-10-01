@@ -274,6 +274,58 @@ xgl_memory_requirements_checked(const xgl_config_t* config, size_t config_size,
     return error;
 }
 
+/** \brief           Read a validated resource partition's reserved size. */
+static size_t resource_bytes(const xgl_workspace_plan_t* plan,
+                             xgl_workspace_resource_t resource) {
+    const xgm_size_class_spec_t* spec = &plan->runtime[resource];
+    return spec->block_size * spec->block_count;
+}
+
+/** \brief           Report the same validated layout used by initialization. */
+xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
+                                      size_t config_size, uint32_t abi_version,
+                                      uint32_t build_config_id,
+                                      xgl_memory_report_t* report) {
+    if (config_size != sizeof(xgl_config_t) ||
+        abi_version != XGL_CONFIG_ABI_VERSION ||
+        build_config_id != XGL_BUILD_CONFIG_ID) {
+        return XGL_ERR_INVALID_VERSION;
+    }
+    if (report == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    xgl_workspace_plan_t plan;
+    xgl_error_t error = make_plan(config, &plan);
+    if (error != XGL_OK) {
+        return error;
+    }
+    xgl_memory_report_t result = {
+        .requirements = plan.requirements,
+        .management_bytes = plan.prefix_size,
+        .initialization_bytes = plan.initialization_size,
+        .peer_bytes = resource_bytes(&plan, XGL_RESOURCE_PEER),
+        .window_bytes = resource_bytes(&plan, XGL_RESOURCE_WINDOW),
+        .tx_record_bytes = resource_bytes(&plan, XGL_RESOURCE_TX_PACKET),
+        .tx_payload_bytes = resource_bytes(&plan, XGL_RESOURCE_TX_PAYLOAD),
+        .scratch_bytes = resource_bytes(&plan, XGL_RESOURCE_SCRATCH),
+    };
+#if XGL_FEATURE_OUT_OF_ORDER
+    result.rx_buffered_bytes =
+        resource_bytes(&plan, XGL_RESOURCE_RX_PACKET) +
+        resource_bytes(&plan, XGL_RESOURCE_RX_PAYLOAD) +
+        resource_bytes(&plan, XGL_RESOURCE_RX_EXTENSIONS);
+#endif
+#if XGL_FEATURE_FRAGMENTATION
+    result.fragment_bytes =
+        resource_bytes(&plan, XGL_RESOURCE_TX_EXTENSIONS) +
+        resource_bytes(&plan, XGL_RESOURCE_TX_MESSAGE) +
+        resource_bytes(&plan, XGL_RESOURCE_REASSEMBLY) +
+        resource_bytes(&plan, XGL_RESOURCE_REASSEMBLY_PAYLOAD);
+#endif
+    *report = result;
+    return XGL_OK;
+}
+
 /**
  * \brief           Prepare bounded pools and an uninitialized protocol instance
  * \param[in]       config: Immutable configuration borrowed until destruction

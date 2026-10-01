@@ -35,7 +35,6 @@ typedef struct {
     size_t extensions_len;     /**< Extension length in bytes */
     const uint8_t* payload;    /**< Pointer to payload data */
     size_t payload_len;        /**< Payload length in bytes */
-    uint16_t crc16;            /**< Frame CRC16 */
 } xgl_frame_t;
 
 /*---------------------------------------------------------------------------*/
@@ -98,6 +97,18 @@ typedef struct {
     size_t tag_len;
     size_t frame_len;
 } xgl_frame_layout_t;
+
+/**
+ * \brief           Measure bounded frame lengths without reading payload bytes
+ * \param[in]       payload_len: Number of payload bytes
+ * \param[in]       extensions_len: Existing TLV bytes, excluding SECURITY
+ * \param[in]       auth_tag_len: Zero or the selected authentication tag size
+ * \param[out]      layout: Checked offsets and size, cleared on failure
+ * \return          XGL_OK or a length/capacity error
+ */
+xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
+                                      size_t auth_tag_len,
+                                      xgl_frame_layout_t* layout);
 
 /**
  * \brief           Validate borrowed spans and measure the complete frame

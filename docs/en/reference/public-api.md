@@ -12,6 +12,8 @@ The configuration and referenced PHY/provider/callback objects are borrowed unti
 
 `xgl_send_at(handle, &tx, now_ms)` accepts a borrowed payload during the call and retains reliable data in bounded protocol storage. `xgl_send_zerocopy_at()` uses caller frame storage for unreliable single-frame sends; it does not permit an asynchronous PHY to retain that address.
 
+The legacy zero-copy request always uses connection/epoch zero. `xgl_send_zerocopy_scoped_at()` accepts a separate compatible request with an explicit scope. `xgl_send_zerocopy_layout()` measures exact headroom and total storage without allocating, transmitting or consuming authentication state. See [Send API](../guide/send-api.md) for preparation and lifetime rules.
+
 `xgl_step(handle, now_ms, &budget)` polls due links and runs transport maintenance. `budget.rx_bytes` is the limit per link, not a frequency. `xgl_next_timeout(handle, now_ms, &delay)` returns whether a relative deadline exists. All calls share one monotonic modulo-2^32 millisecond clock; elapsed intervals must stay below 2^31.
 
 ## Sessions and diagnostics

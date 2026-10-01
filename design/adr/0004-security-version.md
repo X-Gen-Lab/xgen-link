@@ -16,6 +16,8 @@ Provider 接收版本化 `xgl_auth_input_t`，包含端点、connection、epoch�
 
 ## 信任与恢复边界
 
+单播约束在安装和发送端显式执行：广播远端 `0xFFFF` 不能安装安全关联，认证构帧和签名在预留序号、调用 provider 之前返回 `XGL_ERR_INVALID_PARAM`。原地 scoped 发送与普通发送使用相同的 connection/epoch 关联；布局查询只检查现有状态，不预留序号或调用 provider。
+
 应用显式安装精确 `(remote_id, connection_id, session_epoch)` 安全关联，并给出方向性 key、nonce prefix、初始发送序号与最小接收序号。收到 HELLO、SESSION 元数据或有效 CRC 都不能自动安装可信关联。认证帧的关联未知、已关闭或身份不匹配时拒绝处理。明文帧由 `auth_required` 控制；该策略为 false 时，关闭关联不会禁止明文流量。
 
 Transport RESET 不清理安全重放窗口或发送计数。安全 close 保留关闭标记，不回收安全槽，不允许重装同一 scope，也不允许复用该上下文内已预留的 `(key_id, nonce_prefix)` 域。安装时立即预留方向性域，无需先签名；库比较 key ID 而非 provider 的实际密钥，应用必须防止不同 ID 映射到同一实际密钥后复用 prefix。Embedded 提供 4 个安全槽，Full 提供 16 个，Boot 编译裁剪认证。

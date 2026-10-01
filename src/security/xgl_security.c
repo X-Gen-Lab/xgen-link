@@ -143,6 +143,28 @@ static xgl_security_session_t* security_find(xgl_security_ctx_t* ctx,
     return NULL;
 }
 
+xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,
+                                        uint16_t remote_id,
+                                        uint32_t connection_id,
+                                        uint32_t session_epoch) {
+    if (ctx == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (ctx->busy) {
+        return XGL_ERR_BUSY;
+    }
+    if (remote_id == 0U || remote_id == UINT16_MAX ||
+        remote_id == ctx->local_id) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    xgl_security_session_t* session =
+        security_find(ctx, remote_id, connection_id, session_epoch);
+    if (session == NULL || !session->active) {
+        return XGL_ERR_NOT_FOUND;
+    }
+    return session->exhausted ? XGL_ERR_SEQUENCE_ERROR : XGL_OK;
+}
+
 /**
  * \brief           Initialize an empty security context
  * \param[out]      ctx: Security context

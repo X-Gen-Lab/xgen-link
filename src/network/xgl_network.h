@@ -28,11 +28,6 @@ extern "C" {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Protocol version
- */
-#define XGL_PROTOCOL_VERSION XGL_WIRE_VERSION
-
-/**
  * \brief           Broadcast address
  */
 #define XGL_BROADCAST_ID 0xFFFFU
@@ -75,9 +70,6 @@ typedef struct xgl_network_ctx_s {
     void* callback_user_data;            /**< User data for callbacks */
     xgl_layer_stats_t* stats;            /**< Layer statistics pointer */
 #if XGL_FEATURE_AUTH
-    bool auth_required; /**< Require authenticated routed frames */
-    const xgl_auth_provider_t*
-        auth_provider;            /**< End-to-end authentication provider */
     xgl_security_ctx_t* security; /**< Borrowed instance security state */
 #endif
 #if XGL_FEATURE_FORWARDING
@@ -100,9 +92,6 @@ typedef struct {
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
     void* callback_user_data; /**< User data for callbacks (can be NULL) */
     xgl_layer_stats_t* stats; /**< Layer statistics pointer (can be NULL) */
-    bool auth_required;       /**< Require authenticated routed frames */
-    const xgl_auth_provider_t*
-        auth_provider; /**< End-to-end authentication provider */
 #if XGL_FEATURE_AUTH
     xgl_security_ctx_t* security; /**< Local receive security state */
 #endif
@@ -145,6 +134,19 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet);
 xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
                                       xgl_handle_t handle,
                                       const xgl_tx_data_zerocopy_t* request);
+
+/** \brief           Query one scoped frame without allocating or transmitting.
+ */
+xgl_error_t
+xgl_network_zerocopy_layout(xgl_network_ctx_t* ctx,
+                            const xgl_tx_zerocopy_request_t* request,
+                            xgl_tx_frame_layout_t* layout);
+
+/** \brief           Send caller storage with an explicit connection and epoch.
+ */
+xgl_error_t
+xgl_network_send_zerocopy_scoped(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                                 const xgl_tx_zerocopy_request_t* request);
 
 /**
  * \brief           Receive and process packet from data link layer
