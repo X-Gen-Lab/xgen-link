@@ -9,7 +9,16 @@ foreach(test_name IN LISTS xgl_discovered_tests)
     set_tests_properties("${test_name}" PROPERTIES LABELS "${labels}")
 endforeach()
 
-file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/baseline_tests.txt" baseline_tests)
+if(NOT DEFINED xgl_complete_regression_suite OR xgl_complete_regression_suite)
+    file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/baseline_tests.txt" baseline_tests)
+else()
+    set(baseline_tests
+        XglBoundedProfileTest.ReliableDeliveryUsesExplicitStorage
+        XglBoundedProfileTest.RejectsUnsupportedAuthentication
+        XglBoundedProfileTest.CapacityShortagePreservesCallerStorage
+        XglBoundedProfileTest.RejectsOversizedSingleFrameWithoutTransmit
+        XglBoundedProfileTest.ParserRequiresCompleteValidatedFrame)
+endif()
 foreach(test_name IN LISTS baseline_tests)
     list(FIND xgl_discovered_tests "${test_name}" baseline_index)
     if(baseline_index EQUAL -1)

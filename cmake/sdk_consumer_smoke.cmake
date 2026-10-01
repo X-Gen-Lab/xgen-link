@@ -18,6 +18,11 @@ set(consumer_configure_args
     "${CMAKE_COMMAND}" -S "${consumer_src}" -B "${consumer_build}" -G Ninja
     "-DCMAKE_PREFIX_PATH=${consumer_prefixes}"
 )
+set(configuration_args)
+if(DEFINED XGL_BUILD_CONFIG AND NOT XGL_BUILD_CONFIG STREQUAL "")
+    list(APPEND configuration_args --config "${XGL_BUILD_CONFIG}")
+    list(APPEND consumer_configure_args "-DCMAKE_BUILD_TYPE=${XGL_BUILD_CONFIG}")
+endif()
 if(DEFINED XGL_DEPENDENCY_HINTS)
     list(APPEND consumer_configure_args -C "${XGL_DEPENDENCY_HINTS}")
 endif()
@@ -44,7 +49,8 @@ file(REMOVE_RECURSE "${smoke_root}")
 file(MAKE_DIRECTORY "${consumer_src}")
 
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" --install "${install_root}" --prefix "${install_prefix}"
+    COMMAND "${CMAKE_COMMAND}" --install "${install_root}" ${configuration_args}
+        --prefix "${install_prefix}"
     RESULT_VARIABLE install_result
 )
 
@@ -94,7 +100,7 @@ if(NOT configure_result EQUAL 0)
 endif()
 
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" --build "${consumer_build}"
+    COMMAND "${CMAKE_COMMAND}" --build "${consumer_build}" ${configuration_args}
     RESULT_VARIABLE build_result
 )
 

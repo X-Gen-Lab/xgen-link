@@ -37,11 +37,8 @@ if(XGL_PROFILE STREQUAL "boot" OR NOT PROJECT_IS_TOP_LEVEL)
 else()
     set(XGL_HOST_DEFAULT ON)
 endif()
-option(XGL_BUILD_TESTS "Build Full/Embedded regression tests" OFF)
+option(XGL_BUILD_TESTS "Build regression tests matching the selected profile" OFF)
 option(XGL_BUILD_EXAMPLES "Build examples" ${XGL_HOST_DEFAULT})
-if(XGL_PROFILE STREQUAL "boot" AND XGL_BUILD_TESTS)
-    message(FATAL_ERROR "Boot excludes Full test capabilities; use XGL_BUILD_NOHEAP_SMOKE for its static lifecycle tests")
-endif()
 option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
 option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ${PROJECT_IS_TOP_LEVEL})
@@ -103,6 +100,11 @@ include(cmake/XglSources.cmake)
 
 add_library(xgl STATIC ${XGL_SOURCES})
 add_library(xgl::xgl ALIAS xgl)
+set_target_properties(xgl PROPERTIES
+    XGL_PROFILE "${XGL_PROFILE}"
+    XGL_BUILD_CONFIG_ID "${XGL_BUILD_CONFIG_ID}"
+    XGL_CAPABILITIES "${XGL_CAPABILITIES}"
+    EXPORT_PROPERTIES "XGL_PROFILE;XGL_BUILD_CONFIG_ID;XGL_CAPABILITIES")
 target_compile_features(xgl PUBLIC c_std_11)
 target_link_libraries(xgl PUBLIC xgm::allocator
     PRIVATE ${XGL_PRIVATE_DEPENDENCIES})

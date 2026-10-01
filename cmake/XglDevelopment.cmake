@@ -74,7 +74,8 @@ if(XGL_BUILD_SDK_CONSUMER_SMOKE)
         COMMAND ${CMAKE_COMMAND}
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
             -D XGL_INSTALL_BINARY_DIR=${XGL_SDK_INSTALL_BINARY_DIR}
-            -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke
+            -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke/$<CONFIG>
+            -D XGL_BUILD_CONFIG=$<CONFIG>
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
             -D XGL_DEPENDENCY_HINTS=${XGL_SDK_DEPENDENCY_HINTS}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
@@ -90,7 +91,8 @@ if(XGL_BUILD_SDK_CONSUMER_SMOKE)
         COMMAND ${CMAKE_COMMAND}
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
             -D XGL_INSTALL_BINARY_DIR=${XGL_SDK_INSTALL_BINARY_DIR}
-            -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest
+            -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest/$<CONFIG>
+            -D XGL_BUILD_CONFIG=$<CONFIG>
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
             -D XGL_DEPENDENCY_HINTS=${XGL_SDK_DEPENDENCY_HINTS}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
@@ -127,7 +129,8 @@ if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
     endif()
 
     add_custom_target(xgl_release_validation
-        COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_CURRENT_BINARY_DIR} --output-on-failure --no-tests=error
+        COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_CURRENT_BINARY_DIR}
+            -C $<CONFIG> --output-on-failure --no-tests=error
         DEPENDS ${XGL_RELEASE_VALIDATION_DEPS}
         COMMENT "Running xgl release validation checks"
         VERBATIM

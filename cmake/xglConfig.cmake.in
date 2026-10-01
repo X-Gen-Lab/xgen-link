@@ -1,5 +1,19 @@
 @PACKAGE_INIT@
 
+set(xgl_PROFILE "@XGL_PROFILE@")
+set(xgl_BUILD_CONFIG_ID @XGL_BUILD_CONFIG_ID@)
+set(xgl_CAPABILITIES "@XGL_CAPABILITIES@")
+foreach(_xgl_capability IN LISTS xgl_CAPABILITIES)
+    set(xgl_${_xgl_capability}_FOUND TRUE)
+endforeach()
+foreach(_xgl_capability IN LISTS xgl_FIND_COMPONENTS)
+    if(NOT _xgl_capability IN_LIST xgl_CAPABILITIES)
+        set(xgl_${_xgl_capability}_FOUND FALSE)
+        set(xgl_NOT_FOUND_MESSAGE "Unsupported xgl capability: ${_xgl_capability}")
+    endif()
+endforeach()
+unset(_xgl_capability)
+
 include(CMakeFindDependencyMacro)
 if(NOT TARGET xgs::status)
     find_dependency(xgen_status 0.1 CONFIG COMPONENTS status)

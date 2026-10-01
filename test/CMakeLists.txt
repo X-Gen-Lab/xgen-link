@@ -69,6 +69,26 @@ set(TEST_SOURCES
     property/test_generator.cpp
 )
 
+if(NOT XGL_FEATURE_AUTH)
+    # These profiles exercise their supported production capabilities without
+    # registering authentication cases which cannot exist in their image.
+    set(TEST_SOURCES
+        support/test_main.cpp
+        unit/api/test_bounded_profile.cpp
+        unit/wire/test_wire.cpp
+        unit/transport/test_rtt.cpp
+        unit/transport/test_window.cpp
+        unit/transport/test_window_storage.cpp
+    )
+    if(XGL_FEATURE_FRAGMENTATION)
+        list(APPEND TEST_SOURCES unit/transport/test_fragment.cpp
+            unit/transport/test_reliable.cpp)
+    endif()
+    if(XGL_PROFILE STREQUAL "boot")
+        list(APPEND TEST_SOURCES unit/network/test_boot_network.cpp)
+    endif()
+endif()
+
 #-----------------------------------------------------------------------------
 # Mock Objects
 #-----------------------------------------------------------------------------
@@ -125,7 +145,9 @@ gtest_discover_tests(xgl_tests
     PROPERTIES TIMEOUT 30
 )
 set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/classify_tests.cmake")
+    "${CMAKE_CURRENT_BINARY_DIR}/profile-tests.cmake")
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/profile-tests.cmake" CONTENT
+    "set(xgl_complete_regression_suite ${XGL_FEATURE_AUTH})\ninclude(\"${CMAKE_CURRENT_SOURCE_DIR}/cmake/classify_tests.cmake\")\n")
 
 #-----------------------------------------------------------------------------
 # Custom Test Targets

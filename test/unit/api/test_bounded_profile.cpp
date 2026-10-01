@@ -8,6 +8,7 @@
 #include <wire/xgl_frame.h>
 #include <xgl/xgl.h>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <gtest/gtest.h>
