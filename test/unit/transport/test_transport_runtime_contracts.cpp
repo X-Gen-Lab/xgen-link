@@ -25,6 +25,8 @@ class XglTransportRuntimeTest : public ::testing::Test {
     xgl_error_t failure = XGL_OK;
     std::vector<xgl_error_t> errors;
     xgl_error_t feedback_failure = XGL_OK;
+    std::vector<xgl_error_t> feedback_results;
+    size_t feedback_index = 0U;
     std::vector<xgl_error_t> acceptance_results;
     size_t acceptance_index = 0U;
     std::vector<uint8_t> delivered;
@@ -33,6 +35,9 @@ class XglTransportRuntimeTest : public ::testing::Test {
                                   xgl_packet_t* packet) {
         auto* self = static_cast<XglTransportRuntimeTest*>(user);
         if (packet->packet_type == XGL_PACKET_TYPE_ACK) {
+            if (self->feedback_index < self->feedback_results.size()) {
+                return self->feedback_results[self->feedback_index++];
+            }
             return self->feedback_failure;
         }
         if (packet->packet_type != XGL_PACKET_TYPE_DATA) {
@@ -317,6 +322,29 @@ TEST_F(XglTransportRuntimeTest,
     EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_INVALID_PARAM}));
     EXPECT_EQ(xgl_transport_run(&context, nullptr, 2U), XGL_OK);
     EXPECT_EQ(errors.size(), 1U);
+}
+
+TEST_F(XglTransportRuntimeTest,
+       BufferedHardAckFailureOutranksEarlierTemporaryAckFailure) {
+    Init();
+    ASSERT_EQ(Receive(1U), XGL_OK);
+    ASSERT_EQ(Receive(2U), XGL_OK);
+    acceptance_results = {XGL_OK, XGL_ERR_BUSY};
+    ASSERT_EQ(Receive(0U), XGL_ERR_BUSY);
+    ASSERT_NE(context.peers, nullptr);
+    ASSERT_EQ(context.peers->rx_buffered_count, 2U);
+
+    feedback_results = {XGL_ERR_BUSY, XGL_ERR_TX_FAILED};
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 1U), XGL_ERR_TX_FAILED);
+    EXPECT_EQ(feedback_index, 2U);
+    EXPECT_EQ(delivered, (std::vector<uint8_t>{0U, 1U, 2U}));
+    EXPECT_EQ(context.peers->rx_buffered_count, 0U);
+    EXPECT_EQ(context.peers->rx_next_packet_number, 3U);
+    EXPECT_FALSE(context.peers->failed);
+    EXPECT_TRUE(errors.empty());
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 2U), XGL_OK);
+    EXPECT_EQ(Receive(1U), XGL_OK);
+    EXPECT_EQ(delivered, (std::vector<uint8_t>{0U, 1U, 2U}));
 }
 #endif
 
