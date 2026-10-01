@@ -52,7 +52,7 @@ class RunnerContracts(unittest.TestCase):
                     if entry["file"].endswith(".cpp") and "xgl_tests" in entry["command"]]
         self.assertTrue(commands)
         for command in commands:
-            self.assertRegex(command, r"(?:-std=c\+\+17|/std:c\+\+17)")
+            self.assertRegex(command, r"(?:-std=c\+\+17|[/-]std:c\+\+17)")
             self.assertRegex(command, r"(?:-pedantic-errors|/permissive-)")
 
     def test_explicit_seed_is_recorded_and_replayable(self):

@@ -209,7 +209,9 @@ jobs:
           memory-repository: ${{ vars.XGEN_MEMORY_REPOSITORY }}
           containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
       - name: Check explicit development preparation
-        run: python -m unittest discover -s dev/tests -v
+        run: |
+          python -m unittest discover -s dev/tests -v
+          python test/cmake/test_discovery_policy.py
       - name: Validate real source and package consumers
         run: |
           python test/cmake/dependency_contracts.py \

@@ -49,7 +49,8 @@ class DiscoveryPolicyTests(unittest.TestCase):
     def test_missing_historical_case_is_rejected_by_name(self):
         result = self.discover(BASELINE[1:])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Missing historical GoogleTest case: " + BASELINE[0], result.stderr)
+        self.assertIn("Missing historical GoogleTest case: " + BASELINE[0],
+                      " ".join(result.stderr.split()))
 
     def test_empty_registry_is_rejected(self):
         result = self.discover([])
