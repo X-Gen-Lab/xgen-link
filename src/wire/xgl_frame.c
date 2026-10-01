@@ -135,9 +135,12 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
 /**
  * \brief           Validate lengths before any sum, write or allocation
  */
+/* Lengths follow the existing payload, extensions, authentication ordering. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
                                       size_t auth_tag_len,
                                       xgl_frame_layout_t* layout) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (layout == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

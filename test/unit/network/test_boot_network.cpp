@@ -76,14 +76,14 @@ TEST_F(XglBootNetworkTest, ComposesAckSessionAndDataTypeWithin32Bytes) {
     uint8_t value[13] = {};
     xgl_wire_ack_range_t range = {0U, 1U};
     size_t value_len = 0U;
-    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(value, sizeof(value), 8U,
-                                                  0U, &range, 1U, &value_len),
+    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(value, sizeof(value), 8U, 0U,
+                                                  &range, 1U, &value_len),
               XGL_OK);
     uint8_t extension[15] = {};
     size_t extension_len = 0U;
     ASSERT_EQ(xgl_wire_encode_ext(extension, sizeof(extension),
-                                   XGL_WIRE_EXT_ACK_RANGE, value, value_len,
-                                   &extension_len),
+                                  XGL_WIRE_EXT_ACK_RANGE, value, value_len,
+                                  &extension_len),
               XGL_OK);
     packet.packet_type = XGL_PACKET_TYPE_ACK;
     packet.reliable = XGL_RELIABILITY_ACK_ONLY;
@@ -94,9 +94,9 @@ TEST_F(XglBootNetworkTest, ComposesAckSessionAndDataTypeWithin32Bytes) {
     packet.extensions_len = extension_len;
     ASSERT_EQ(xgl_network_send(&network, &packet), XGL_OK);
     xgl_wire_frame_view_t view = {};
-    ASSERT_EQ(xgl_wire_decode_frame(&view, captured.data(), captured_length,
-                                     nullptr),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_wire_decode_frame(&view, captured.data(), captured_length, nullptr),
+        XGL_OK);
     EXPECT_EQ(view.extensions_len, 32U);
     EXPECT_EQ(view.header.packet_type, XGL_PACKET_TYPE_ACK);
     EXPECT_EQ(view.header.connection_id, 11U);
@@ -128,9 +128,9 @@ TEST_F(XglBootNetworkTest, WireStillPreservesLongUnknownExtensions) {
                                   &captured_length),
               XGL_OK);
     xgl_wire_frame_view_t view = {};
-    ASSERT_EQ(xgl_wire_decode_frame(&view, captured.data(), captured_length,
-                                     nullptr),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_wire_decode_frame(&view, captured.data(), captured_length, nullptr),
+        XGL_OK);
     ASSERT_EQ(view.extensions_len, sizeof(extension));
     EXPECT_EQ(std::memcmp(view.extensions, extension, sizeof(extension)), 0);
 }

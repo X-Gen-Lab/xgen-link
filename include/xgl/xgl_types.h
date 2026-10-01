@@ -482,7 +482,7 @@ typedef struct {
 typedef struct {
     uint8_t* buffer;    /**< Buffer with pre-allocated header space */
     size_t buffer_size; /**< Total buffer size */
-    size_t data_offset; /**< Exact payload offset from xgl_send_zerocopy_layout */
+    size_t data_offset; /**< Exact payload offset from the layout query */
     size_t data_len;    /**< Actual data length */
 
     /* Transmission parameters */

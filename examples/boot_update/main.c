@@ -217,8 +217,11 @@ int main(void) {
                 return 3;
             }
         }
-        if (sim_step(&host, now) != XGL_OK ||
-            sim_step(&device, now) != XGL_OK) {
+        xgl_error_t host_step = sim_step(&host, now);
+        xgl_error_t device_step = sim_step(&device, now);
+        /* Flash admission can remain BUSY until the next bounded step. */
+        if (host_step != XGL_OK ||
+            (device_step != XGL_OK && device_step != XGL_ERR_BUSY)) {
             return 4;
         }
     }

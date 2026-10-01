@@ -920,7 +920,8 @@ TEST_F(ScopedZeroCopyApiTest, QueriesDoNotChangeStatisticsOrClosedScopeState) {
     EXPECT_EQ(phy_state.writes, 0U);
 }
 
-TEST_F(ScopedZeroCopyApiTest, FailedPhyConsumesSequenceAndQueryDetectsExhaustion) {
+TEST_F(ScopedZeroCopyApiTest,
+       FailedPhyConsumesSequenceAndQueryDetectsExhaustion) {
     auto session = test_session_config(2U, 11U, 9U);
     session.tx_initial_seq = UINT64_MAX;
     ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
@@ -972,9 +973,9 @@ TEST_F(ScopedZeroCopyApiTest, PlainScopedFramesNeedNoSecurityAssociation) {
               XGL_ERR_NULL_POINTER);
     ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U), XGL_OK);
     xgl_wire_frame_view_t view = {};
-    ASSERT_EQ(xgl_wire_decode_frame(&view, captured.data(), captured.size(),
-                                     nullptr),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_wire_decode_frame(&view, captured.data(), captured.size(), nullptr),
+        XGL_OK);
     EXPECT_FALSE(view.authenticated);
     EXPECT_EQ(view.header.connection_id, 11U);
     EXPECT_EQ(view.session_epoch, 9U);
