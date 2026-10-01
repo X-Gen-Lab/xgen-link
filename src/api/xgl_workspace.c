@@ -8,7 +8,6 @@
 #include <wire/xgl_wire.h>
 
 #include <string.h>
-#include <xgen/containers/bitset.h>
 #include <xgen/memory/pool.h>
 #include <xgen/memory/size_class_allocator.h>
 
@@ -151,14 +150,9 @@ static bool plan_optional_resources(const xgl_config_t* config,
     const size_t rx_count = config->features.max_rx_buffered_packets;
     const size_t payload_size = config->protocol.max_frame_size -
                                 XGL_WIRE_BASE_HEADER_SIZE - XGL_CRC16_SIZE;
-    const size_t extension_limit = UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE;
-    const size_t extension_size =
-        payload_size < extension_limit ? payload_size : extension_limit;
     if (!set_resource(plan, XGL_RESOURCE_RX_PACKET,
                       sizeof(xgl_transport_rx_buffered_packet_t), rx_count) ||
-        !set_resource(plan, XGL_RESOURCE_RX_PAYLOAD, payload_size, rx_count) ||
-        !set_resource(plan, XGL_RESOURCE_RX_EXTENSIONS, extension_size,
-                      rx_count)) {
+        !set_resource(plan, XGL_RESOURCE_RX_PAYLOAD, payload_size, rx_count)) {
         return false;
     }
 #endif
@@ -207,9 +201,6 @@ static xgl_error_t make_plan(const xgl_config_t* config,
         !set_resource(plan, XGL_RESOURCE_PEER,
                       sizeof(xgl_transport_peer_state_t),
                       config->features.max_peers) ||
-        !set_resource(plan, XGL_RESOURCE_WINDOW,
-                      xgct_bitset_storage_size(config->protocol.window_size),
-                      config->features.max_peers) ||
         !set_resource(plan, XGL_RESOURCE_TX_PACKET,
                       sizeof(xgl_reliable_packet_t),
                       config->features.max_tx_packets) ||
@@ -234,14 +225,12 @@ static void bind_services(xgl_workspace_t* workspace) {
     xgl_protocol_memory_t* memory = &workspace->memory;
     xgm_allocator_t* services = workspace->runtime_services;
     memory->peer = &services[XGL_RESOURCE_PEER];
-    memory->window = &services[XGL_RESOURCE_WINDOW];
     memory->tx_packet = &services[XGL_RESOURCE_TX_PACKET];
     memory->tx_payload = &services[XGL_RESOURCE_TX_PAYLOAD];
     memory->scratch = &services[XGL_RESOURCE_SCRATCH];
 #if XGL_FEATURE_OUT_OF_ORDER
     memory->rx_packet = &services[XGL_RESOURCE_RX_PACKET];
     memory->rx_payload = &services[XGL_RESOURCE_RX_PAYLOAD];
-    memory->rx_extensions = &services[XGL_RESOURCE_RX_EXTENSIONS];
 #endif
 #if XGL_FEATURE_FRAGMENTATION
     memory->tx_extensions = &services[XGL_RESOURCE_TX_EXTENSIONS];
@@ -304,16 +293,14 @@ xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
         .management_bytes = plan.prefix_size,
         .initialization_bytes = plan.initialization_size,
         .peer_bytes = resource_bytes(&plan, XGL_RESOURCE_PEER),
-        .window_bytes = resource_bytes(&plan, XGL_RESOURCE_WINDOW),
+        .window_bytes = 0U,
         .tx_record_bytes = resource_bytes(&plan, XGL_RESOURCE_TX_PACKET),
         .tx_payload_bytes = resource_bytes(&plan, XGL_RESOURCE_TX_PAYLOAD),
         .scratch_bytes = resource_bytes(&plan, XGL_RESOURCE_SCRATCH),
     };
 #if XGL_FEATURE_OUT_OF_ORDER
-    result.rx_buffered_bytes =
-        resource_bytes(&plan, XGL_RESOURCE_RX_PACKET) +
-        resource_bytes(&plan, XGL_RESOURCE_RX_PAYLOAD) +
-        resource_bytes(&plan, XGL_RESOURCE_RX_EXTENSIONS);
+    result.rx_buffered_bytes = resource_bytes(&plan, XGL_RESOURCE_RX_PACKET) +
+                               resource_bytes(&plan, XGL_RESOURCE_RX_PAYLOAD);
 #endif
 #if XGL_FEATURE_FRAGMENTATION
     result.fragment_bytes =

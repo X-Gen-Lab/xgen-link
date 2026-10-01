@@ -454,8 +454,7 @@ TEST(XglTransportProperties, Property23_SlidingWindowMaintenance) {
         uint8_t window_size = 1 + (gen.random_uint8() % 128);
 
         xgl_sliding_window_t window;
-        xgl_error_t err = xgl_window_init_with_allocator(&window, window_size,
-                                                         xgm_allocator_libc());
+        xgl_error_t err = xgl_window_init(&window, window_size);
         ASSERT_EQ(err, XGL_OK) << "Window initialization failed";
 
         int num_operations = 10 + (gen.random_uint8() % 50);
@@ -503,8 +502,7 @@ TEST(XglTransportProperties, Property23_SlidingWindowMaintenance) {
 
 TEST(XglTransportProperties, Property23_SlidingWindowMaxSize) {
     xgl_sliding_window_t window;
-    xgl_error_t err =
-        xgl_window_init_with_allocator(&window, 128, xgm_allocator_libc());
+    xgl_error_t err = xgl_window_init(&window, 128);
     ASSERT_EQ(err, XGL_OK);
 
     for (int i = 0; i < 128; ++i) {
@@ -521,8 +519,7 @@ TEST(XglTransportProperties, Property23_SlidingWindowMaxSize) {
 TEST(XglTransportProperties, Property23_SlidingWindowDoesNotWrapAtEightBits) {
     xgl_sliding_window_t window;
     uint8_t window_size = 16;
-    xgl_error_t err = xgl_window_init_with_allocator(&window, window_size,
-                                                     xgm_allocator_libc());
+    xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
 
     window.send_base_packet_number = 250U;
@@ -545,8 +542,7 @@ TEST(XglTransportProperties, Property23_SlidingWindowDoesNotWrapAtEightBits) {
 TEST(XglTransportProperties, Property23_SlidingWindowAllAcked) {
     xgl_sliding_window_t window;
     uint8_t window_size = 8;
-    xgl_error_t err = xgl_window_init_with_allocator(&window, window_size,
-                                                     xgm_allocator_libc());
+    xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
 
     for (int i = 0; i < window_size; ++i) {
@@ -569,8 +565,7 @@ TEST(XglTransportProperties, Property23_SlidingWindowAllAcked) {
 TEST(XglTransportProperties, Property23_SlidingWindowOutOfOrderAcks) {
     xgl_sliding_window_t window;
     uint8_t window_size = 8;
-    xgl_error_t err = xgl_window_init_with_allocator(&window, window_size,
-                                                     xgm_allocator_libc());
+    xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
 
     for (int i = 0; i < window_size; ++i) {
@@ -598,8 +593,7 @@ TEST(XglTransportProperties, Property23_SlidingWindowReset) {
 
     xgl_sliding_window_t window;
     uint8_t window_size = 16;
-    xgl_error_t err = xgl_window_init_with_allocator(&window, window_size,
-                                                     xgm_allocator_libc());
+    xgl_error_t err = xgl_window_init(&window, window_size);
     ASSERT_EQ(err, XGL_OK);
 
     for (int i = 0; i < 50; ++i) {
@@ -630,8 +624,7 @@ TEST(XglTransportProperties, Property23_SlidingWindowReset) {
 
 TEST(XglTransportProperties, Property23_SlidingWindowMinSize) {
     xgl_sliding_window_t window;
-    xgl_error_t err =
-        xgl_window_init_with_allocator(&window, 1, xgm_allocator_libc());
+    xgl_error_t err = xgl_window_init(&window, 1);
     ASSERT_EQ(err, XGL_OK);
 
     EXPECT_TRUE(xgl_window_can_send_packet_number(&window));

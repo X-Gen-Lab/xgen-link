@@ -66,13 +66,15 @@ def generate_layout(args):
         "route_item", "link", "peer", "reliable_packet",
         "instance", "datalink", "transport", "rx_bytes", "frame_bytes", "peers", "routes",
         "links", "window", "tx_packets", "scratch_blocks", "ack_bytes",
-        "wire_header_bytes", "wire_crc_bytes", "rx_chunk_bytes",
+        "wire_header_bytes", "wire_crc_bytes", "rx_chunk_bytes", "window_pool_blocks",
     )
     if len(data) != len(names) * 4:
         raise ValueError("Unexpected target layout section size")
     values = dict(zip(names, struct.unpack("<" + "I" * len(names), data)))
-    if values["magic"] != 0x58474C42 or values["format_version"] != 4:
+    if values["magic"] != 0x58474C42 or values["format_version"] != 5:
         raise ValueError("Unsupported target layout format or endianness")
+    if values["window_pool_blocks"] != 0:
+        raise ValueError("The inline window must not reserve an external pool")
     if any(values[key] != 1 for key in (
             "routes", "peers", "links", "window", "tx_packets", "scratch_blocks")):
         raise ValueError("The footprint layout currently requires one route and peer")
@@ -89,13 +91,13 @@ def generate_layout(args):
                     - values["wire_crc_bytes"])
     partitions = {
         "peer": (values["peer"], values["peers"]),
-        "window": (values["ack_bytes"], values["peers"]),
+        "window": (values["ack_bytes"], values["window_pool_blocks"]),
         "tx_packet": (values["reliable_packet"], values["tx_packets"]),
         "tx_payload": (payload_size, values["tx_packets"]),
         "scratch": (values["frame_bytes"], values["scratch_blocks"]),
     }
     runtime_partitions = {
-        name: {"block_bytes": align(size), "blocks": count,
+        name: {"block_bytes": align(size) if count else 0, "blocks": count,
                "bytes": align(size) * count}
         for name, (size, count) in partitions.items()
     }
@@ -188,6 +190,8 @@ def report_elf(args):
         "reserved_stack_bytes": reserved_stack,
         "ram_with_reserved_stack_bytes": data_bytes + bss_bytes,
         "workspace_bytes": layout["workspace_bytes"],
+        "layout_format_version": layout["format_version"],
+        "window_pool_blocks": layout["window_pool_blocks"],
         "sections": sections,
         "forbidden_heap_symbols": forbidden,
         "unresolved_symbols": unresolved.splitlines() if unresolved else [],

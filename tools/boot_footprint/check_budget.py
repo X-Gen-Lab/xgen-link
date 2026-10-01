@@ -34,6 +34,12 @@ def audit(report, policy):
             raise ValueError("Invalid resource policy lto mode")
         if type(report.get("lto")) is not bool or report["lto"] != configuration["lto"]:
             violations.append("Report lto mode does not match the selected policy")
+    if "window_pool_blocks" in configuration:
+        expected = configuration["window_pool_blocks"]
+        if type(expected) is not int or expected != 0:
+            raise ValueError("Invalid resource policy window_pool_blocks")
+        if type(report.get("window_pool_blocks")) is not int or report["window_pool_blocks"] != expected:
+            violations.append("Report window_pool_blocks does not match the selected policy")
     for field in ("forbidden_heap_symbols", "unresolved_symbols"):
         symbols = report.get(field)
         if not isinstance(symbols, list) or symbols:

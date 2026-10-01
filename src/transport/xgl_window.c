@@ -9,8 +9,6 @@
 #include <string.h>
 #include <xgen/containers/bitset.h>
 
-#include "xgen/memory/allocator.h"
-
 /*---------------------------------------------------------------------------*/
 /* Public Functions                                                          */
 /*---------------------------------------------------------------------------*/
@@ -18,10 +16,8 @@
 /**
  * \brief           Initialize sliding window
  */
-xgl_error_t xgl_window_init_with_allocator(xgl_sliding_window_t* window,
-                                           uint8_t window_size,
-                                           const xgm_allocator_t* allocator) {
-    if (window == NULL || !xgm_allocator_is_valid(allocator)) {
+xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size) {
+    if (window == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
@@ -29,41 +25,25 @@ xgl_error_t xgl_window_init_with_allocator(xgl_sliding_window_t* window,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    const size_t bytes = xgct_bitset_storage_size(window_size);
-    uint8_t* storage = xgm_alloc(allocator, bytes);
-    if (storage == NULL) {
-        return XGL_ERR_NO_MEMORY;
-    }
-    xgct_bitset_t bits;
-    if (xgct_bitset_init(&bits, storage, bytes, window_size) != XGS_OK) {
-        xgm_free(allocator, storage);
-        return XGL_ERR_INVALID_PARAM;
-    }
     *window = (xgl_sliding_window_t){
         .window_size = window_size,
         .ack_head = 0U,
         .send_base_packet_number = 0U,
         .next_packet_number = 0U,
-        .ack_received = storage,
-        .allocator = allocator,
     };
 
     return XGL_OK;
 }
 
 /**
- * \brief           Destroy sliding window and free resources
+ * \brief           Clear sliding window state and inline storage
  */
 void xgl_window_destroy(xgl_sliding_window_t* window) {
     if (window == NULL) {
         return;
     }
 
-    if (window->ack_received != NULL) {
-        xgm_free(window->allocator, window->ack_received);
-        window->ack_received = NULL;
-    }
-    window->allocator = NULL;
+    memset(window, 0, sizeof(*window));
 }
 
 /**
@@ -87,7 +67,7 @@ uint8_t xgl_window_get_usage(const xgl_sliding_window_t* window) {
  * \brief           Reset sliding window to initial state
  */
 void xgl_window_reset(xgl_sliding_window_t* window) {
-    if (window == NULL || window->ack_received == NULL) {
+    if (window == NULL || window->window_size == 0U) {
         return;
     }
 
@@ -140,7 +120,7 @@ xgl_error_t xgl_window_mark_ack_packet_number(xgl_sliding_window_t* window,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (window->ack_received == NULL) {
+    if (window->window_size == 0U) {
         return XGL_ERR_NOT_INITIALIZED;
     }
 
@@ -160,7 +140,7 @@ xgl_error_t xgl_window_mark_ack_packet_number(xgl_sliding_window_t* window,
 }
 
 uint8_t xgl_window_advance_base_packet_number(xgl_sliding_window_t* window) {
-    if (window == NULL || window->ack_received == NULL) {
+    if (window == NULL || window->window_size == 0U) {
         return 0U;
     }
 

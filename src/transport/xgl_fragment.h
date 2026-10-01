@@ -68,10 +68,8 @@ typedef struct {
     size_t received_range_count; /**< Number of active received ranges */
 
     /* Data buffer */
-    uint8_t* data;        /**< Reassembly data buffer */
-    size_t data_len;      /**< Total data length */
-    size_t buffer_size;   /**< Allocated buffer size */
-    size_t reserved_size; /**< Bytes reserved against manager budget */
+    uint8_t* data;      /**< Reassembly data buffer */
+    size_t message_len; /**< Payload allocation and reserved byte budget */
 
     /* Timeout tracking */
     uint32_t first_fragment_time; /**< Timestamp of first fragment */

@@ -51,10 +51,7 @@ typedef struct xgl_transport_rx_buffered_packet_s {
     struct xgl_transport_rx_buffered_packet_s* next; /**< Linked-list node */
     xgl_packet_t packet;           /**< Cached packet metadata */
     xgl_packet_data_t packet_data; /**< Cached packet data view */
-    uint8_t* data;                 /**< Owned payload bytes */
-    size_t data_len;               /**< Payload length */
-    uint8_t* extensions;           /**< Owned TLV extension bytes */
-    size_t extensions_len;         /**< TLV extension length */
+    uint8_t* storage; /**< Owned contiguous payload and TLV bytes */
 } xgl_transport_rx_buffered_packet_t;
 #endif
 

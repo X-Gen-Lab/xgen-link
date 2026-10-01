@@ -10,7 +10,7 @@
 #include "api/xgl_workspace_internal.h"
 #include <wire/xgl_wire.h>
 
-_Static_assert(XGL_INIT_CLASSES == 3U && XGL_RESOURCE_COUNT == 5U,
+_Static_assert(XGL_INIT_CLASSES == 3U && XGL_RESOURCE_COUNT == 4U,
                "Update the footprint layout for the new initialization plan");
 _Static_assert(XGL_FEATURE_AUTH == 0 && XGL_FEATURE_FRAGMENTATION == 0 &&
                    XGL_FEATURE_FORWARDING == 0 && XGL_FEATURE_OUT_OF_ORDER == 0,
@@ -22,7 +22,7 @@ _Static_assert(XGL_ALLOW_FALLBACK_MALLOC == 0,
 
 __attribute__((used, section(".xgl_footprint_layout")))
 const uint32_t xgl_boot_target_layout[] = {UINT32_C(0x58474c42),
-                                           4U,
+                                           5U,
                                            sizeof(void*),
                                            _Alignof(xgm_max_align_t),
                                            sizeof(xgl_workspace_t),
@@ -44,4 +44,5 @@ const uint32_t xgl_boot_target_layout[] = {UINT32_C(0x58474c42),
                                            (XGL_FOOTPRINT_WINDOW + 7U) / 8U,
                                            XGL_WIRE_BASE_HEADER_SIZE,
                                            XGL_CRC16_SIZE,
-                                           XGL_DATALINK_RX_CHUNK_SIZE};
+                                           XGL_DATALINK_RX_CHUNK_SIZE,
+                                           0U}; /* No external window pool. */

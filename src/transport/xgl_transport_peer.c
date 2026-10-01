@@ -125,8 +125,7 @@ transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
     peer->last_active_ms = transport_now(ctx);
     xgl_rtt_init(&peer->rtt_est);
 
-    xgl_error_t err = xgl_window_init_with_allocator(
-        &peer->tx_window, ctx->window_size, ctx->memory.window);
+    xgl_error_t err = xgl_window_init(&peer->tx_window, ctx->window_size);
     if (err != XGL_OK) {
         xgm_free(ctx->memory.peer, peer);
         return NULL;

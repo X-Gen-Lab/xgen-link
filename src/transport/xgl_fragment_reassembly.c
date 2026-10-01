@@ -15,8 +15,8 @@ void fragment_free_reassembly_buffer(xgl_fragment_manager_t* manager,
     }
 
     /* Owning queue traversals always supply their live manager. */
-    if (buffer->reserved_size <= manager->current_reassembly_bytes) {
-        manager->current_reassembly_bytes -= buffer->reserved_size;
+    if (buffer->message_len <= manager->current_reassembly_bytes) {
+        manager->current_reassembly_bytes -= buffer->message_len;
     }
 
     if (buffer->data != NULL) {
@@ -96,18 +96,16 @@ static xgl_error_t fragment_create_reassembly_buffer(
     buffer->message_id = message_id;
     buffer->data_type = data_type;
     buffer->timeout_ms = manager->reassembly_timeout_ms;
-    buffer->buffer_size = message_len;
-    buffer->reserved_size = message_len;
-    buffer->data_len = message_len;
+    buffer->message_len = message_len;
 
     buffer->data =
-        (uint8_t*)xgm_alloc(manager->data_allocator, buffer->buffer_size);
+        (uint8_t*)xgm_alloc(manager->data_allocator, buffer->message_len);
     if (buffer->data == NULL) {
         xgm_free(manager->allocator, buffer);
         return XGL_ERR_NO_MEMORY;
     }
 
-    manager->current_reassembly_bytes += buffer->reserved_size;
+    manager->current_reassembly_bytes += buffer->message_len;
 
     xgct_list_node_init(&buffer->node);
     xgct_list_insert_tail(&manager->reassembly_list, &buffer->node);
@@ -120,7 +118,7 @@ static void fragment_complete_reassembly(xgl_fragment_manager_t* manager,
                                          xgl_reassembly_buffer_t* buffer,
                                          xgl_fragment_message_t* complete) {
     complete->data = buffer->data;
-    complete->len = buffer->data_len;
+    complete->len = buffer->message_len;
     xgct_list_remove(&manager->reassembly_list, &buffer->node);
     /* The payload and its budget move together; only the slot is released. */
     xgm_free(manager->allocator, buffer);
@@ -176,7 +174,7 @@ xgl_error_t xgl_fragment_process_ext(
     }
 
     if (buffer->data_type != data_type ||
-        buffer->buffer_size != (size_t)message_len) {
+        buffer->message_len != (size_t)message_len) {
         return XGL_ERR_INVALID_FRAME;
     }
 
@@ -203,7 +201,7 @@ xgl_error_t xgl_fragment_process_ext(
         buffer->first_fragment_time = current_time_ms;
     }
 
-    if (buffer->received_bytes == buffer->buffer_size) {
+    if (buffer->received_bytes == buffer->message_len) {
         fragment_complete_reassembly(manager, buffer, complete);
         return XGL_OK;
     }

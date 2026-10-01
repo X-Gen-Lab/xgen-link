@@ -18,14 +18,12 @@
  */
 typedef struct {
     const xgm_allocator_t* peer;
-    const xgm_allocator_t* window;
     const xgm_allocator_t* tx_packet;
     const xgm_allocator_t* tx_payload;
     const xgm_allocator_t* scratch;
 #if XGL_FEATURE_OUT_OF_ORDER
     const xgm_allocator_t* rx_packet;
     const xgm_allocator_t* rx_payload;
-    const xgm_allocator_t* rx_extensions;
 #endif
 #if XGL_FEATURE_FRAGMENTATION
     const xgm_allocator_t* tx_extensions;

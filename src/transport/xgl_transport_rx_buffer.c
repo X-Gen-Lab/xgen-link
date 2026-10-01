@@ -21,8 +21,7 @@ void transport_free_rx_buffered_packet(
         return;
     }
 
-    xgm_free(ctx->memory.rx_payload, buffered->data);
-    xgm_free(ctx->memory.rx_extensions, buffered->extensions);
+    xgm_free(ctx->memory.rx_payload, buffered->storage);
     xgm_free(ctx->memory.rx_packet, buffered);
 }
 
@@ -82,32 +81,26 @@ transport_copy_rx_buffered_packet(const xgl_transport_ctx_t* ctx,
                                   xgl_transport_rx_buffered_packet_t* buffered,
                                   const xgl_packet_t* packet,
                                   uint32_t packet_number) {
-    buffered->data =
-        (uint8_t*)xgm_alloc(ctx->memory.rx_payload, packet->data->data_len);
-    if (buffered->data == NULL) {
+    const size_t payload_len = packet->data->data_len;
+    const size_t extensions_len = packet->extensions_len;
+    buffered->storage = (uint8_t*)xgm_alloc(ctx->memory.rx_payload,
+                                            payload_len + extensions_len);
+    if (buffered->storage == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
-    memcpy(buffered->data, packet->data->data, packet->data->data_len);
-    buffered->data_len = packet->data->data_len;
-
-    if (packet->extensions != NULL && packet->extensions_len > 0U) {
-        buffered->extensions = (uint8_t*)xgm_alloc(ctx->memory.rx_extensions,
-                                                   packet->extensions_len);
-        if (buffered->extensions == NULL) {
-            return XGL_ERR_NO_MEMORY;
-        }
-        memcpy(buffered->extensions, packet->extensions,
-               packet->extensions_len);
-        buffered->extensions_len = packet->extensions_len;
+    memcpy(buffered->storage, packet->data->data, payload_len);
+    if (extensions_len != 0U) {
+        memcpy(buffered->storage + payload_len, packet->extensions,
+               extensions_len);
     }
 
     buffered->packet = *packet;
     buffered->packet.packet_number = packet_number;
-    buffered->packet_data.data_len = buffered->data_len;
-    buffered->packet_data.data = buffered->data;
+    buffered->packet_data.data_len = payload_len;
+    buffered->packet_data.data = buffered->storage;
     buffered->packet.data = &buffered->packet_data;
-    buffered->packet.extensions = buffered->extensions;
-    buffered->packet.extensions_len = buffered->extensions_len;
+    buffered->packet.extensions =
+        extensions_len != 0U ? buffered->storage + payload_len : NULL;
 
     return XGL_OK;
 }
@@ -132,8 +125,19 @@ xgl_error_t transport_cache_out_of_order_packet(
     const xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
     const xgl_packet_t* packet, uint32_t packet_number) {
     if (ctx == NULL || peer == NULL || packet == NULL || packet->data == NULL ||
-        packet->data->data == NULL || packet->data->data_len == 0U) {
+        packet->data->data == NULL || packet->data->data_len == 0U ||
+        (packet->extensions == NULL && packet->extensions_len != 0U)) {
         return XGL_ERR_INVALID_PARAM;
+    }
+
+    /* A retained payload and its extensions belong to the same bounded frame.
+     * Subtract before adding so malformed internal input cannot wrap size_t. */
+    const size_t overhead = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE;
+    if (ctx->max_frame_size < overhead ||
+        packet->data->data_len > ctx->max_frame_size - overhead ||
+        packet->extensions_len >
+            ctx->max_frame_size - overhead - packet->data->data_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
     uint32_t window = peer->tx_window.window_size;

@@ -1,17 +1,14 @@
-#include <xgen/memory/libc_allocator.h>
 /**
  * \file            test_window.cpp
  * \brief           Unit tests for production packet-number sliding window
  */
 
-#include <cstdlib>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <type_traits>
 #include <utility>
 
 #include "transport/xgl_window.h"
-#include "xgen/memory/allocator.h"
 
 template <typename T, typename = void>
 struct HasLegacySequenceWindowState : std::false_type {};
@@ -40,74 +37,36 @@ class XglWindowTest : public ::testing::Test {
     }
 };
 
-namespace {
-struct WindowAllocProbe {
-    size_t alloc_count;
-    size_t free_count;
-    void* last_ptr;
-};
-
-static WindowAllocProbe* g_window_alloc_probe = nullptr;
-
-static void* window_probe_malloc(void*, size_t size) {
-    if (g_window_alloc_probe != nullptr) {
-        g_window_alloc_probe->alloc_count++;
-    }
-    void* ptr = std::malloc(size);
-    if (g_window_alloc_probe != nullptr) {
-        g_window_alloc_probe->last_ptr = ptr;
-    }
-    return ptr;
-}
-
-static void window_probe_free(void*, void* ptr) {
-    if (g_window_alloc_probe != nullptr) {
-        g_window_alloc_probe->free_count++;
-    }
-    std::free(ptr);
-}
-}  // namespace
-
 TEST_F(XglWindowTest, InitSuccess) {
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 8, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
 
     EXPECT_EQ(window.window_size, 8);
     EXPECT_EQ(window.send_base_packet_number, 0U);
     EXPECT_EQ(window.next_packet_number, 0U);
-    EXPECT_NE(window.ack_received, nullptr);
+    for (uint8_t byte : window.ack_received) {
+        EXPECT_EQ(byte, 0U);
+    }
 }
 
 TEST_F(XglWindowTest, InitUsesProvidedAllocator) {
-    WindowAllocProbe probe = {};
-    g_window_alloc_probe = &probe;
-    xgm_allocator_t allocator = {};
-    allocator.ctx = nullptr;
-    allocator.alloc = window_probe_malloc;
-    allocator.free = window_probe_free;
-
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 8, &allocator), XGL_OK);
-    EXPECT_EQ(probe.alloc_count, 1U);
-    EXPECT_EQ(window.ack_received, probe.last_ptr);
-
+    /* Preserve the historical case name while verifying the new ownership. */
+    ASSERT_EQ(xgl_window_init(&window, 128U), XGL_OK);
+    EXPECT_EQ(sizeof(window.ack_received), 16U);
+    ASSERT_EQ(xgl_window_mark_ack_packet_number(&window, 127U), XGL_OK);
+    EXPECT_NE(window.ack_received[15], 0U);
     xgl_window_destroy(&window);
-    EXPECT_EQ(probe.free_count, 1U);
-    g_window_alloc_probe = nullptr;
+    EXPECT_EQ(window.window_size, 0U);
+    EXPECT_EQ(window.ack_received[15], 0U);
 }
 
 TEST_F(XglWindowTest, InitRejectsInvalidParams) {
-    EXPECT_EQ(xgl_window_init_with_allocator(nullptr, 8, xgm_allocator_libc()),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_window_init_with_allocator(&window, 0, xgm_allocator_libc()),
-              XGL_ERR_INVALID_PARAM);
-    EXPECT_EQ(
-        xgl_window_init_with_allocator(&window, 129, xgm_allocator_libc()),
-        XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_window_init(nullptr, 8), XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_window_init(&window, 0), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_window_init(&window, 129), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglWindowTest, CanSendUntilWindowFull) {
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 4, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
 
     for (uint32_t i = 0; i < 4; ++i) {
         EXPECT_TRUE(xgl_window_can_send_packet_number(&window));
@@ -120,8 +79,7 @@ TEST_F(XglWindowTest, CanSendUntilWindowFull) {
 }
 
 TEST_F(XglWindowTest, PacketNumbersDoNotWrapAtEightBits) {
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 4, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
 
     window.send_base_packet_number = 254U;
     window.next_packet_number = 254U;
@@ -139,8 +97,7 @@ TEST_F(XglWindowTest, PacketNumbersDoNotWrapAtEightBits) {
 }
 
 TEST_F(XglWindowTest, AckRangeAdvancesBaseUntilGap) {
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 8, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
 
     for (uint32_t i = 0; i < 5; ++i) {
         xgl_window_advance_next_packet_number(&window);
@@ -160,8 +117,7 @@ TEST_F(XglWindowTest, AckRangeAdvancesBaseUntilGap) {
 }
 
 TEST_F(XglWindowTest, MarkAckRejectsPacketsOutsideWindow) {
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 4, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
 
     EXPECT_EQ(xgl_window_mark_ack_packet_number(&window, 4U),
               XGL_ERR_SEQUENCE_ERROR);
@@ -170,8 +126,7 @@ TEST_F(XglWindowTest, MarkAckRejectsPacketsOutsideWindow) {
 }
 
 TEST_F(XglWindowTest, FullWindowCycle) {
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 4, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
 
     for (uint32_t i = 0; i < 4; ++i) {
         ASSERT_TRUE(xgl_window_can_send_packet_number(&window));
@@ -189,8 +144,7 @@ TEST_F(XglWindowTest, FullWindowCycle) {
 }
 
 TEST_F(XglWindowTest, ResetClearsPacketNumberState) {
-    ASSERT_EQ(xgl_window_init_with_allocator(&window, 8, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
 
     for (uint32_t i = 0; i < 5; ++i) {
         xgl_window_advance_next_packet_number(&window);

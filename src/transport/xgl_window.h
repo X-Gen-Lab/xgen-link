@@ -32,8 +32,7 @@ typedef struct {
     uint32_t
         send_base_packet_number; /**< Base packet number of sending window */
     uint32_t next_packet_number; /**< Next packet number to send */
-    uint8_t* ack_received;       /**< Packed ACK storage owned by allocator */
-    const xgm_allocator_t* allocator; /**< Allocator used for ACK bitmap */
+    uint8_t ack_received[16];    /**< Inline bitmap for at most 128 packets */
 } xgl_sliding_window_t;
 
 /*---------------------------------------------------------------------------*/
@@ -41,22 +40,18 @@ typedef struct {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Initialize sliding window with an explicit allocator
+ * \brief           Initialize a sliding window using its inline ACK bitmap
  * \param[in,out]   window: Uninitialized or previously destroyed window
  * \param[in]       window_size: Maximum window size, from 1 to 128
- * \param[in]       allocator: Borrowed allocator descriptor and context that
- *                  must remain valid until window destruction
  * \return          XGL_OK on success, error code otherwise
  * \note            Destroy a live window before initializing it again.
- *                  Failure leaves the supplied window unchanged. The window
- *                  and allocator descriptor must be separate stable objects.
+ *                  Failure leaves the supplied window unchanged. No allocation
+ *                  or externally owned bitmap is required.
  */
-xgl_error_t xgl_window_init_with_allocator(xgl_sliding_window_t* window,
-                                           uint8_t window_size,
-                                           const xgm_allocator_t* allocator);
+xgl_error_t xgl_window_init(xgl_sliding_window_t* window, uint8_t window_size);
 
 /**
- * \brief           Destroy sliding window and free resources
+ * \brief           Clear a sliding window and its inline ACK storage
  * \param[in,out]   window: Sliding window structure
  * \note            Call only after successful initialization or on a
  *                  zero-initialized window. Repeated destruction is safe.

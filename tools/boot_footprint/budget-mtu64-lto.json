@@ -6,7 +6,8 @@
     "frame_bytes": 64,
     "rx_bytes": 64,
     "lto": true,
-    "rx_chunk_bytes": 32
+    "rx_chunk_bytes": 32,
+    "window_pool_blocks": 0
   },
   "qualification": "Cortex-M0 MinSizeRel probe with library IPO and an opaque non-LTO consumer/layout; independent LTO regression ceiling, not an 8 KiB Flash or complete call-chain stack claim.",
   "baseline_kind": "first_explicit_lto_measurement",

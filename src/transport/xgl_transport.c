@@ -89,7 +89,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->max_rx_buffered_packets = config->max_rx_buffered_packets;
 #endif
     ctx->memory.peer = config->allocator;
-    ctx->memory.window = config->allocator;
     ctx->memory.tx_packet = config->allocator;
     ctx->memory.tx_payload = config->allocator;
     ctx->memory.scratch = config->allocator;
@@ -102,12 +101,10 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 #if XGL_FEATURE_OUT_OF_ORDER
     ctx->memory.rx_packet = config->allocator;
     ctx->memory.rx_payload = config->allocator;
-    ctx->memory.rx_extensions = config->allocator;
 #endif
     if (config->memory != NULL) {
         ctx->memory = *config->memory;
         if (!xgm_allocator_is_valid(ctx->memory.peer) ||
-            !xgm_allocator_is_valid(ctx->memory.window) ||
             !xgm_allocator_is_valid(ctx->memory.tx_packet) ||
             !xgm_allocator_is_valid(ctx->memory.tx_payload)) {
             return XGL_ERR_INVALID_PARAM;
@@ -124,8 +121,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 #if XGL_FEATURE_OUT_OF_ORDER
         if (config->max_rx_buffered_packets > 0U &&
             (!xgm_allocator_is_valid(ctx->memory.rx_packet) ||
-             !xgm_allocator_is_valid(ctx->memory.rx_payload) ||
-             !xgm_allocator_is_valid(ctx->memory.rx_extensions))) {
+             !xgm_allocator_is_valid(ctx->memory.rx_payload))) {
             return XGL_ERR_INVALID_PARAM;
         }
 #endif
