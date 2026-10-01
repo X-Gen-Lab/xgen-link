@@ -6,6 +6,7 @@
  */
 
 #include <xgl/internal/xgl_frame.h>
+#include <xgl/internal/xgl_datalink.h>
 #include <xgl/internal/xgl_network.h>
 #include <xgl/internal/xgl_route.h>
 #include <xgl/internal/xgl_wire.h>
@@ -689,6 +690,40 @@ TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
                                           frame_buf.data(), frame_buf.size());
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(phy_tx_count, initial_tx_count + 1);  // Should forward
+}
+
+TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256,
+                                  100, 1), XGL_OK);
+    uint8_t cache[256] = {};
+    xgl_layer_stats_t datalink_stats = {};
+    xgl_datalink_config_t config = {};
+    config.rx_cache = cache;
+    config.rx_cache_size = sizeof(cache);
+    config.stats = &datalink_stats;
+    xgl_datalink_ctx_t datalink = {};
+    ASSERT_EQ(xgl_datalink_init(&datalink, &config), XGL_OK);
+    xgl_frame_interface_t lower = {};
+    ASSERT_EQ(xgl_datalink_get_interface(&datalink, &lower), XGL_OK);
+    network_ctx.lower_layer = &lower;
+    const auto frame = make_frame(REMOTE_ID, FORWARD_ID);
+
+    ASSERT_EQ(xgl_network_receive(&network_ctx, nullptr, frame.data(),
+                                  frame.size()), XGL_OK);
+    EXPECT_EQ(phy_tx_count, 1);
+    EXPECT_EQ(datalink_stats.tx_packets, 1U);
+    EXPECT_EQ(datalink_stats.tx_bytes, frame.size());
+}
+
+TEST_F(XglNetworkTest, ForwardingRejectsMissingPhyTransmitOperation) {
+    phy_ops.tx = nullptr;
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256,
+                                  100, 1), XGL_OK);
+    const auto frame = make_frame(REMOTE_ID, FORWARD_ID);
+
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame.data(),
+                                  frame.size()), XGL_ERR_TX_FAILED);
+    EXPECT_EQ(phy_tx_count, 0);
 }
 
 TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
