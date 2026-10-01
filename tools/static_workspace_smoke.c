@@ -86,6 +86,26 @@ static xgl_error_t smoke_accept(xgl_handle_t handle, uint16_t source_id,
 }
 
 /**
+ * \brief           Drain queued PHY bytes across bounded, spaced polls.
+ * \note            A work budget is an upper bound, not a complete-frame read.
+ */
+static bool smoke_drain(xgl_handle_t handle, const smoke_endpoint_t* endpoint,
+                        uint32_t now_ms, const xgl_work_budget_t* budget) {
+    const size_t max_polls =
+        sizeof(endpoint->incoming) / XGL_DATALINK_RX_CHUNK_SIZE + 1U;
+    for (size_t i = 0U; i < max_polls; ++i) {
+        xgl_error_t error = xgl_step(handle, now_ms + (uint32_t)i, budget);
+        if (error != XGL_OK && error != XGL_ERR_BUSY) {
+            return false;
+        }
+        if (endpoint->incoming_len == 0U) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * \brief           Exercise both instances without calling a system allocator.
  */
 int main(void) {
@@ -170,15 +190,15 @@ int main(void) {
             xgl_send_at(ha, &tx, start) != XGL_ERR_WINDOW_FULL) {
             return 5;
         }
-        (void)xgl_step(hb, start, &budget);
-        if (a.incoming_len != 0U || b.deliveries != cycle * 2U) {
+        if (!smoke_drain(hb, &b, start, &budget) || a.incoming_len != 0U ||
+            b.deliveries != cycle * 2U) {
             return 6;
         }
         b.busy = false;
         (void)xgl_step(ha, start + 100U, &budget);
-        (void)xgl_step(hb, start + 100U, &budget);
-        (void)xgl_step(ha, start + 101U, &budget);
-        if (b.deliveries != cycle * 2U + 1U) {
+        if (!smoke_drain(hb, &b, start + 100U, &budget) ||
+            !smoke_drain(ha, &a, start + 120U, &budget) ||
+            b.deliveries != cycle * 2U + 1U) {
             return 7;
         }
         /* Drop the next DATA and verify the retained slot is reused after ACK.
@@ -188,9 +208,9 @@ int main(void) {
             return 8;
         }
         (void)xgl_step(ha, start + 300U, &budget);
-        (void)xgl_step(hb, start + 300U, &budget);
-        (void)xgl_step(ha, start + 301U, &budget);
-        if (b.deliveries != cycle * 2U + 2U) {
+        if (!smoke_drain(hb, &b, start + 300U, &budget) ||
+            !smoke_drain(ha, &a, start + 320U, &budget) ||
+            b.deliveries != cycle * 2U + 2U) {
             return 9;
         }
         /* Reuse the same peer state for reliable traffic in the other
@@ -200,9 +220,9 @@ int main(void) {
         if (xgl_send_at(hb, &reverse, start + 400U) != XGL_OK) {
             return 10;
         }
-        (void)xgl_step(ha, start + 400U, &budget);
-        (void)xgl_step(hb, start + 401U, &budget);
-        if (a.deliveries != cycle + 1U) {
+        if (!smoke_drain(ha, &a, start + 400U, &budget) ||
+            !smoke_drain(hb, &b, start + 420U, &budget) ||
+            a.deliveries != cycle + 1U) {
             return 11;
         }
         xgl_destroy(ha);
