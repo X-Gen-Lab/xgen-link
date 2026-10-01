@@ -510,6 +510,49 @@ TEST(XglFrameTest, SerializeRejectsUnrepresentablePayloadLength) {
               XGL_ERR_BUFFER_TOO_SMALL);
 }
 
+TEST(XglFrameTest, CopiedAndAuthenticatedPathsRejectInvalidSpansConsistently) {
+    size_t sign_count = 0U;
+    xgl_auth_provider_t provider = {};
+    provider.sign = frame_test_auth_sign;
+    provider.verify = frame_test_auth_verify;
+    provider.tag_len = 4U;
+    provider.user_data = &sign_count;
+    xgl_security_ctx_t security = {};
+    ASSERT_EQ(xgl_security_init(&security, 1U, true, &provider), XGL_OK);
+    const auto session = test_session_config(2U);
+    ASSERT_EQ(xgl_security_session_install(&security, &session), XGL_OK);
+    xgl_frame_params_t params = {};
+    params.source_id = 1U;
+    params.target_id = 2U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    uint8_t buffer[64] = {};
+    size_t written = 0U;
+
+    struct InvalidSpan {
+        size_t payload_length;
+        size_t extension_length;
+        xgl_error_t expected;
+    };
+    const InvalidSpan cases[] = {
+        {1U, 0U, XGL_ERR_NULL_POINTER},
+        {0U, XGL_DATA_TYPE_EXT_SIZE, XGL_ERR_NULL_POINTER},
+        {SIZE_MAX, 0U, XGL_ERR_BUFFER_TOO_SMALL},
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.payload_length);
+        frame.payload_len = item.payload_length;
+        frame.extensions_len = item.extension_length;
+        EXPECT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &written),
+                  item.expected);
+        EXPECT_EQ(xgl_security_serialize_frame(buffer, sizeof(buffer), &frame,
+                                               &security, &written),
+                  item.expected);
+        EXPECT_EQ(written, 0U);
+    }
+    EXPECT_EQ(sign_count, 0U);
+}
+
 TEST(XglFrameTest, PureEncodingPlansAuthenticatedLayoutWithoutAProvider) {
     const uint8_t payload[] = {0x11, 0x22, 0x33};
     xgl_frame_params_t params = {};
