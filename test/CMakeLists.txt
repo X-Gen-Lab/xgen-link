@@ -96,6 +96,10 @@ list(APPEND TEST_SOURCES
     unit/wire/test_wire_sack_view.cpp
     unit/wire/test_wire_rx_contracts.cpp
     unit/transport/test_transport_sack_view.cpp
+    unit/transport/test_transport_rx_contracts.cpp
+    unit/transport/test_transport_tx_contracts.cpp
+    unit/transport/test_transport_runtime_contracts.cpp
+    unit/transport/test_transport_storage.cpp
     unit/datalink/test_parser_recovery.cpp
     unit/datalink/test_parser_resync.cpp
     unit/network/test_network_contracts.cpp

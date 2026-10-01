@@ -225,3 +225,63 @@ TEST_F(XglFragmentTest, InvalidParameters) {
                                        sizeof(part), &complete, 0),
               XGL_ERR_INVALID_FRAME);
 }
+
+TEST_F(XglFragmentTest, BridgesTwoReceivedRangesWithoutLosingBytesOrBudget) {
+    const uint8_t first[] = {'a', 'b'};
+    const uint8_t middle[] = {'c', 'd'};
+    const uint8_t last[] = {'e', 'f'};
+    xgl_fragment_message_t complete = {};
+    ASSERT_EQ(xgl_fragment_set_limits(&manager, 6U, 6U), XGL_OK);
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 6, first,
+                                       sizeof(first), &complete, 0),
+              XGL_ERR_BUSY);
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 4, 6, last,
+                                       sizeof(last), &complete, 1),
+              XGL_ERR_BUSY);
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 2, 6, middle,
+                                       sizeof(middle), &complete, 2),
+              XGL_OK);
+    ASSERT_NE(complete.data, nullptr);
+    EXPECT_EQ(complete.len, 6U);
+    EXPECT_EQ(std::memcmp(complete.data, "abcdef", 6U), 0);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
+    EXPECT_EQ(manager.current_reassembly_bytes, 6U);
+    xgl_fragment_release_message(&manager, &complete);
+    EXPECT_EQ(manager.current_reassembly_bytes, 0U);
+}
+
+TEST_F(XglFragmentTest, FullRangeTableStillAcceptsBridgingFragments) {
+    const uint8_t byte = 0x5AU;
+    xgl_fragment_message_t complete = {};
+    for (uint32_t offset = 0U; offset < 32U; offset += 2U) {
+        ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, offset, 33,
+                                           &byte, 1U, &complete, offset),
+                  XGL_ERR_BUSY);
+    }
+    EXPECT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 32, 33, &byte,
+                                       1U, &complete, 33),
+              XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(manager.current_reassembly_bytes, 33U);
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 1, 33, &byte,
+                                       1U, &complete, 34),
+              XGL_ERR_BUSY);
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 32, 33, &byte,
+                                       1U, &complete, 35),
+              XGL_ERR_BUSY);
+    for (uint32_t offset = 3U; offset < 31U; offset += 2U) {
+        ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, offset, 33,
+                                           &byte, 1U, &complete, 36 + offset),
+                  XGL_ERR_BUSY);
+    }
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 31, 33, &byte,
+                                       1U, &complete, 68),
+              XGL_OK);
+    ASSERT_NE(complete.data, nullptr);
+    EXPECT_EQ(complete.len, 33U);
+    EXPECT_EQ(
+        std::memcmp(complete.data, std::vector<uint8_t>(33U, byte).data(), 33U),
+        0);
+    EXPECT_EQ(manager.current_reassembly_bytes, 33U);
+    xgl_fragment_release_message(&manager, &complete);
+    EXPECT_EQ(manager.current_reassembly_bytes, 0U);
+}

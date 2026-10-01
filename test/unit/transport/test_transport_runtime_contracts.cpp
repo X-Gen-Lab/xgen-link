@@ -1,0 +1,301 @@
+/**
+ * \file            test_transport_runtime_contracts.cpp
+ * \brief           Deferred transport work and observable maintenance failures
+ */
+
+#include <api/xgl_instance_internal.h>
+#include <transport/xgl_transport_internal.h>
+#include <wire/xgl_wire.h>
+#include <xgen/memory/libc_allocator.h>
+
+#include <array>
+#include <gtest/gtest.h>
+#include <vector>
+
+namespace {
+
+class XglTransportRuntimeTest : public ::testing::Test {
+  protected:
+    xgl_transport_ctx_t context = {};
+    xgl_layer_stats_t statistics = {};
+    xgl_packet_tx_endpoint_t lower = {};
+    uint64_t retries = 0U;
+    unsigned attempts = 0U;
+    uint16_t failing_target = 0U;
+    xgl_error_t failure = XGL_OK;
+    std::vector<xgl_error_t> errors;
+
+    static xgl_error_t SendPacket(void* user, xgl_handle_t,
+                                  xgl_packet_t* packet) {
+        auto* self = static_cast<XglTransportRuntimeTest*>(user);
+        if (packet->packet_type != XGL_PACKET_TYPE_DATA) {
+            return XGL_OK;
+        }
+        ++self->attempts;
+        return packet->target_id == self->failing_target ? self->failure
+                                                         : XGL_OK;
+    }
+
+    static void Error(xgl_handle_t, xgl_error_t error, const char*,
+                      void* user) {
+        static_cast<XglTransportRuntimeTest*>(user)->errors.push_back(error);
+    }
+
+    void Init(bool fragmentation = false) {
+        lower = {this, SendPacket};
+        xgl_transport_config_t config = {};
+        config.local_id = 1U;
+        config.max_retry_count = 2U;
+        config.default_timeout_ms = 100U;
+        config.window_size = fragmentation ? 1U : 4U;
+        config.max_frame_size = 64U;
+        config.max_peers = 2U;
+        config.max_tx_packets = 4U;
+        config.max_rx_buffered_packets = 4U;
+        config.lower_layer = &lower;
+        config.stats = &statistics;
+        config.tx_retries = &retries;
+        config.allocator = xgm_allocator_libc();
+        config.error_callback = Error;
+        config.callback_user_data = this;
+        config.enable_fragmentation = fragmentation;
+        config.max_message_size = 128U;
+        config.max_tx_message_bytes = 256U;
+        config.max_reassembly_bytes = 256U;
+        config.max_reassembly_slots = 2U;
+        ASSERT_EQ(xgl_transport_init(&context, &config), XGL_OK);
+    }
+
+    void TearDown() override {
+        xgl_transport_destroy(&context);
+    }
+
+    xgl_error_t Send(uint16_t target = 2U, size_t length = 1U) {
+        const std::array<uint8_t, 128> payload = {};
+        xgl_tx_data_t request = {};
+        request.target_id = target;
+        request.data = payload.data();
+        request.data_len = length;
+        request.reliable = true;
+        return xgl_transport_send(&context, nullptr, &request);
+    }
+
+    xgl_error_t Feedback(bool sack, uint32_t number, uint8_t bitmap = 0U) {
+        std::array<uint8_t, 32> value = {}, extensions = {};
+        size_t value_length = 0U, extensions_length = 0U;
+        const xgl_wire_ack_range_t range = {0U, 1U};
+        xgl_error_t error = sack ? xgl_wire_encode_sack_ext_value(
+                                       value.data(), value.size(), number,
+                                       &bitmap, 1U, &value_length)
+                                 : xgl_wire_encode_ack_range_ext_value(
+                                       value.data(), value.size(), number, 0U,
+                                       &range, 1U, &value_length);
+        if (error != XGL_OK) {
+            return error;
+        }
+        error = xgl_wire_encode_ext(
+            extensions.data(), extensions.size(),
+            sack ? XGL_WIRE_EXT_SACK : XGL_WIRE_EXT_ACK_RANGE, value.data(),
+            value_length, &extensions_length);
+        if (error != XGL_OK) {
+            return error;
+        }
+        xgl_packet_t packet = {};
+        packet.source_id = 2U;
+        packet.target_id = 1U;
+        packet.packet_type = XGL_PACKET_TYPE_ACK;
+        packet.reliable = XGL_RELIABILITY_ACK_ONLY;
+        packet.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
+        packet.extensions = extensions.data();
+        packet.extensions_len = extensions_length;
+        return xgl_transport_receive(&context, nullptr, &packet);
+    }
+
+    uint32_t Deadline(uint32_t now) {
+        uint32_t delay = UINT32_MAX;
+        EXPECT_TRUE(xgl_transport_next_timeout(&context, now, &delay));
+        return delay;
+    }
+};
+
+TEST_F(XglTransportRuntimeTest, SackCommitsAckAndDefersTransmissionUntilRun) {
+    Init();
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Feedback(true, 0U, 0x02U), XGL_OK);
+    EXPECT_EQ(attempts, 2U);
+    EXPECT_EQ(xgl_reliable_get_count(&context.peers->reliable_queue), 1U);
+    EXPECT_EQ(Deadline(0U), 0U);
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_OK);
+    EXPECT_EQ(attempts, 3U);
+    const auto* packet =
+        xgl_reliable_find_packet_number(&context.peers->reliable_queue, 0U, 2U);
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(packet->retry_count, 1U);
+    EXPECT_EQ(Deadline(0U), 200U);
+}
+
+TEST_F(XglTransportRuntimeTest, DuplicateSackRespectsDeferredBusyRetryDelay) {
+    Init();
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Feedback(true, 0U), XGL_OK);
+    ASSERT_EQ(Feedback(true, 0U), XGL_OK);
+    EXPECT_EQ(attempts, 1U);
+    failing_target = 2U;
+    failure = XGL_ERR_BUSY;
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_OK);
+    EXPECT_EQ(attempts, 2U);
+    EXPECT_EQ(Deadline(0U), 100U);
+    ASSERT_EQ(Feedback(true, 0U), XGL_OK);
+    EXPECT_EQ(Deadline(20U), 80U);
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 99U), XGL_OK);
+    EXPECT_EQ(attempts, 2U);
+    failure = XGL_OK;
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 100U), XGL_OK);
+    EXPECT_EQ(attempts, 3U);
+    ASSERT_EQ(Feedback(true, 0U), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 100U), XGL_OK);
+    EXPECT_EQ(attempts, 3U);
+    EXPECT_EQ(Deadline(100U), 200U);
+}
+
+TEST_F(XglTransportRuntimeTest, AckCancelsQueuedFastRetryBeforeMaintenance) {
+    Init();
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Feedback(true, 0U), XGL_OK);
+    ASSERT_EQ(Feedback(false, 0U), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_OK);
+    EXPECT_EQ(attempts, 1U);
+    EXPECT_TRUE(xgl_reliable_is_empty(&context.peers->reliable_queue));
+}
+
+TEST_F(XglTransportRuntimeTest, CloseCancelsQueuedFastRetryBeforeMaintenance) {
+    Init();
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(Feedback(true, 0U), XGL_OK);
+    ASSERT_EQ(xgl_transport_close_scope(&context, nullptr, 2U, 0U, 0U), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_OK);
+    EXPECT_EQ(attempts, 1U);
+    EXPECT_EQ(context.peers, nullptr);
+}
+
+TEST_F(XglTransportRuntimeTest, MaintenanceFailureDoesNotSkipAnotherPeer) {
+    Init();
+    ASSERT_EQ(Send(3U), XGL_OK);
+    ASSERT_EQ(Send(2U), XGL_OK);
+    failing_target = 2U;
+    failure = XGL_ERR_TX_FAILED;
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 100U), XGL_ERR_TX_FAILED);
+    EXPECT_EQ(attempts, 4U);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_EQ(errors.front(), XGL_ERR_TX_FAILED);
+    const auto* live = transport_find_peer_scope(&context, 3U, 0U, 0U);
+    ASSERT_NE(live, nullptr);
+    EXPECT_FALSE(live->failed);
+    const auto* packet =
+        xgl_reliable_find_packet_number(&live->reliable_queue, 0U, 3U);
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(packet->retry_count, 1U);
+}
+
+TEST_F(XglTransportRuntimeTest, RetryLimitIsReturnedOnceAtTerminalTransition) {
+    Init();
+    context.max_retry_count = 1U;
+    ASSERT_EQ(Send(), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 100U), XGL_OK);
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 300U), XGL_ERR_ACK_TIMEOUT);
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 301U), XGL_OK);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_EQ(errors.front(), XGL_ERR_ACK_TIMEOUT);
+}
+
+#if XGL_FEATURE_FRAGMENTATION
+TEST_F(XglTransportRuntimeTest, AckDefersMessagePumpAndPublishesImmediateWork) {
+    Init(true);
+    ASSERT_EQ(Send(2U, 96U), XGL_OK);
+    ASSERT_EQ(attempts, 1U);
+    ASSERT_EQ(Feedback(false, 0U), XGL_OK);
+    EXPECT_EQ(attempts, 1U);
+    EXPECT_EQ(Deadline(0U), 0U);
+    ASSERT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_OK);
+    EXPECT_EQ(attempts, 2U);
+}
+
+TEST_F(XglTransportRuntimeTest, DeferredMessageFailureIsReturnedByMaintenance) {
+    Init(true);
+    ASSERT_EQ(Send(2U, 96U), XGL_OK);
+    failing_target = 2U;
+    failure = XGL_ERR_TX_FAILED;
+    ASSERT_EQ(Feedback(false, 0U), XGL_OK);
+    EXPECT_TRUE(errors.empty());
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_ERR_TX_FAILED);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_EQ(context.tx_message_bytes, 0U);
+}
+#endif
+
+struct PublicRuntime {
+    xgl_error_t tx_result = XGL_OK;
+    std::vector<xgl_error_t> errors;
+
+    static xgl_error_t Tx(const uint8_t*, size_t, void* user) {
+        return static_cast<PublicRuntime*>(user)->tx_result;
+    }
+
+    static xgl_error_t Rx(uint8_t*, size_t* length, void*) {
+        *length = 0U;
+        return XGL_OK;
+    }
+
+    static void Error(xgl_handle_t, xgl_error_t error, const char*,
+                      void* user) {
+        static_cast<PublicRuntime*>(user)->errors.push_back(error);
+    }
+};
+
+TEST(XglTransportPublicRuntimeTest, StepReturnsHardRetryAndExhaustionErrors) {
+    for (bool hard_failure : {false, true}) {
+        SCOPED_TRACE(hard_failure);
+        PublicRuntime state;
+        xgl_phy_ops_t phy = {};
+        phy.tx = PublicRuntime::Tx;
+        phy.rx = PublicRuntime::Rx;
+        phy.user_data = &state;
+        xgl_route_item_t route = {};
+        route.target_id = 2U;
+        route.phy = &phy;
+        route.max_frame_size = 128U;
+        route.read_freq_hz = 1000U;
+        xgl_config_t config;
+        xgl_config_get_preset_boot(&config);
+        config.memory.allocator = xgm_allocator_libc();
+        config.route_table = &route;
+        config.route_table_len = 1U;
+        config.protocol.max_retry_count = 1U;
+        config.error_callback = PublicRuntime::Error;
+        config.callback_user_data = &state;
+        xgl_handle_t handle = xgl_create(&config);
+        ASSERT_NE(handle, nullptr);
+        ASSERT_EQ(xgl_init(handle), XGL_OK);
+        const uint8_t payload = 42U;
+        xgl_tx_data_t data = {};
+        data.target_id = 2U;
+        data.data = &payload;
+        data.data_len = 1U;
+        data.reliable = true;
+        data.timeout_ms = 100U;
+        ASSERT_EQ(xgl_send_at(handle, &data, 0U), XGL_OK);
+        const xgl_work_budget_t budget = {0U, 1000U};
+        if (hard_failure) {
+            state.tx_result = XGL_ERR_TX_FAILED;
+            EXPECT_EQ(xgl_step(handle, 100U, &budget), XGL_ERR_TX_FAILED);
+        } else {
+            ASSERT_EQ(xgl_step(handle, 100U, &budget), XGL_OK);
+            EXPECT_EQ(xgl_step(handle, 300U, &budget), XGL_ERR_ACK_TIMEOUT);
+        }
+        EXPECT_FALSE(state.errors.empty());
+        xgl_destroy(handle);
+    }
+}
+
+}  // namespace
