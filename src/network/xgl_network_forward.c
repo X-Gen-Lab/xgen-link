@@ -116,13 +116,6 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         return err;
     }
 
-#if XGL_FEATURE_STATISTICS
-    if (ctx->stats != NULL) {
-        ctx->stats->tx_packets++;
-        ctx->stats->tx_bytes += metadata->payload_len;
-    }
-#endif
-
     err = network_validate_forward_size(ctx, route, frame_len);
     if (err != XGL_OK) {
         return err;
@@ -165,6 +158,12 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
 #endif
         return XGL_ERR_TX_FAILED;
     }
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
+        ctx->stats->tx_packets++;
+        ctx->stats->tx_bytes += metadata->payload_len;
+    }
+#endif
     return XGL_OK;
 }
 

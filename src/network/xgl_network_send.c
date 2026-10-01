@@ -267,13 +267,6 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
     }
     packet->version = XGL_PROTOCOL_VERSION;
 
-#if XGL_FEATURE_STATISTICS
-    if (inplace == NULL && ctx->stats != NULL) {
-        ctx->stats->tx_packets++;
-        ctx->stats->tx_bytes += packet->data->data_len;
-    }
-#endif
-
     uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
     xgl_frame_t frame;
     xgl_error_t err = network_build_tx_frame(ctx, packet, extensions,
@@ -289,7 +282,7 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
 
     err = network_send_frame_to_lower(ctx, handle, packet, &frame, inplace);
 #if XGL_FEATURE_STATISTICS
-    if (inplace != NULL && err == XGL_OK && ctx->stats != NULL) {
+    if (err == XGL_OK && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += packet->data->data_len;
     }

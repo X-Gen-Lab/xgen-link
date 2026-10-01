@@ -46,6 +46,9 @@ xgl_error_t xgl_security_serialize_frame(uint8_t* buffer, size_t buffer_size,
     }
     const xgl_auth_provider_t* provider = security->provider;
     *bytes_written = 0U;
+    if (frame->header.target_id == UINT16_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
     if (provider->tag_len == 0U || provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
         return XGL_ERR_INVALID_PARAM;
     }

@@ -205,7 +205,8 @@ xgl_security_session_install(xgl_security_ctx_t* ctx,
         return XGL_ERR_BUSY;
     }
     if (ctx->provider == NULL || ctx->local_id == 0U ||
-        config->remote_id == 0U || config->remote_id == ctx->local_id ||
+        config->remote_id == 0U || config->remote_id == UINT16_MAX ||
+        config->remote_id == ctx->local_id ||
         (config->tx_key_id == config->rx_key_id &&
          config->tx_nonce_prefix == config->rx_nonce_prefix)) {
         return XGL_ERR_INVALID_PARAM;
@@ -341,6 +342,9 @@ xgl_error_t xgl_security_sign_frame(xgl_security_ctx_t* ctx, uint8_t* buffer,
     xgl_error_t err = xgl_wire_decode_header(&header, buffer, aad_len);
     if (err != XGL_OK) {
         return err;
+    }
+    if (header.target_id == UINT16_MAX) {
+        return XGL_ERR_INVALID_PARAM;
     }
     if (header.header_len != aad_len || header.payload_len != payload_len ||
         header.source_id != ctx->local_id ||
