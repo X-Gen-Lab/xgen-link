@@ -1,6 +1,6 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。当前执行六仓 CI 修复、协议完整提交交付及质量门禁补齐。各阶段证据分别记录；下面标为历史的结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，当前依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)。
+更新日期：2026-10-01。六仓 CI 修复、协议完整提交交付及质量门禁补齐已完成。各阶段证据分别记录；下面标为历史的结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，当前依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)。
 
 ## 当前：独立交付与质量补齐
 
@@ -19,7 +19,26 @@
 
 link 已实现严格 C++17、逐 GoogleTest 发现/标签、510 个历史名称逐一保留、可回放种子，以及共享 text/format/test/cppcheck/tidy/docs/coverage 入口。真实新增回归修复了 ACK 长度乘加溢出和初始化失败后重复归还 RX 存储。协议三项覆盖率门槛均为 80%，只统计完整生产源码集合。
 
-本轮 11/11 依赖契约已通过，证据为 `build/delivery-completion/contracts-final/run-pxmrmljl/result.json`。严格公共 API Doxygen 已通过。完整独立检出、最终工具矩阵和 link 远端运行正在验收，以下历史条目不能替代它们；最终结果将在此处更新。
+完整重构快照为 `c13d9b9`；最终生产与测试修复为 `1b0ce7eb658ec43891a78630a773c822d7f9c595`，已推送 `feat/independent-memory-containers`。基础包继续 main，link 未合并 main 或创建 tag。用户原有 IDE 删除及 `.spec-workflow` 模板未混入协议提交。
+
+| 本轮验收 | 实际结果 | 来源 |
+| --- | --- | --- |
+| 远端全新克隆 GNU Full / Embedded | 各 561/561；554 个 GoogleTest 加 7 项 smoke/示例 | 干净 `1b0ce7e`，独立克隆五依赖和 quality；`build/delivery-completion/remote-link/build/remote-validation-1b0ce7e.json` |
+| 全新克隆 Boot | 2/2；静态工作区与安装包消费者 | 同一干净提交，各配置使用独立构建目录 |
+| 安装消费 | Full / Embedded / Boot 都实际安装、find_package、编译并执行 | 各自 `xgl_sdk_consumer_smoke`；没有读取原工作区未跟踪文件 |
+| 头文件独立编译 | 21 个源码头分别首包含；MSVC 取得 RED 后通过 | `test/cmake/HeaderContracts.cmake`；生成配置头另由公开头间接包含 |
+| Windows 本地 MSVC | 561/561；runner 契约 6/6 | `build/delivery-completion/msvc-quality-test.json`，实际 Developer Shell 内执行 |
+| 开发输入 / 生产依赖 / CTest 策略 | 11/11、11/11、3/3 | 生产契约 `build/delivery-completion/contracts-final/run-pxmrmljl/result.json`；策略分别验证 CTest 3.31 和 4.2 |
+| 本地生产覆盖率 | 行 3672/4011（91.5%）、函数 249/250（99.6%）、分支 2315/2867（80.7%） | `build/coverage-agent-full/complete-summary.json`；63 个生产 C 文件与报告集合一致，后续干净 CI 另记 |
+| 本地质量 | text、format、pre-commit、Cppcheck、Clang-Tidy、严格 Doxygen / MkDocs 通过 | 固定工具与 shared runner；Linux GNU 11.4/Clang-Tidy 19.1.0，Cppcheck 2.21.0 |
+
+`1b0ce7e` 的[远端完整矩阵](https://github.com/X-Gen-Lab/xgen-link/actions/runs/36807629994)全部通过，九个 jobs 均成功。Linux、Windows/MSVC 和 macOS Host 各执行 561 项，ASan/UBSan 执行 560 项（独立安装消费者由普通构建验证），CI Boot/Embedded 分别执行 2/3 项。完整 GoogleTest Embedded 矩阵由上述全新克隆另行执行，不混淆两个配置的数量。
+
+远端生产覆盖率为行 **3671/4010（91.5%）**、函数 **249/250（99.6%）**、分支 **2314/2865（80.8%）**，三项均达到 80%。报告包含全部 63 个生产 C 文件及一个内部 inline 头；Cppcheck 和 Clang-Tidy 各分析 63 个翻译单元通过，严格 API/站点 Doxygen 告警日志均为空，发布验证与 11 项依赖契约通过。八份 artifacts 已核对 GitHub SHA256；全部质量报告来源为同一干净提交。可复核汇总、原始元数据和审计脚本保存于 `out/reports/remote-ci/36807629994/`。
+
+本轮 Cortex-M0/GCC 15.2.1 `-Os`、无 LTO 在干净 `1b0ce7e` 重新链接：Flash 16,764 B、静态 RAM 1,488 B、其中 workspace 1,424 B，额外预留栈 1,024 B，合计 RAM 2,512 B，最大已链接单函数栈 392 B，无堆服务或未解析符号。结果与原基线一致，满足通用 64 KiB/8 KiB 探针上限；不满足独立的 8 KiB Flash/1 KiB workspace 设计目标，也不表示真实板级 Boot 已完成。
+
+真实回归检查点包括：种子/发现/C++17 的 `753cc0c`；GNU 插桩 `a9ba4d8` → `bb1d7f5`；ACK 溢出 `fc04cb3` → `19707db`；失败初始化所有权 `e188f3b` → `ee195c2`；独立头首包含 `4ebb339` → `db6900f`；CTest 策略 `325d521` → `1b0ce7e`。首次远端运行也保留失败日志，后续修复不将它改写为通过。局部静态分析依据和工具配置例外见[规范采用](docs/standards.md)。
 
 ## 历史：正式模块与开发装配分离
 

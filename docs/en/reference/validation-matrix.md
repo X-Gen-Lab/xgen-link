@@ -13,6 +13,8 @@
 | Static workspace, backpressure, wraparound, storage reuse | `tools/static_workspace_smoke.c` |
 | One backend reservation and no runtime backend allocations | `test/test_footprint.cpp`, memory properties |
 | Public installed C consumer, ABI/profile rejection | SDK consumer CTest and instance tests |
+| ACK size overflow, failed-init release, PHY failure and recovery | `test/test_coverage_wire.cpp`, `test/test_coverage_api.cpp`, `test/test_coverage_delivery.cpp` |
+| Independent C++17 header compilation, discovery and seed replay | `test/cmake/HeaderContracts.cmake`, classification and runner contracts |
 
 ## Build coverage
 
@@ -20,12 +22,14 @@ The local Full matrix includes protocol regressions and four host examples. Boot
 
 During the previous five-package migration, intermediate checkpoint `6927196` passed 4/4 CompactWindow; the effective RED is `b169a10`. That stage's final Full builds passed 8/8 CTest and 510/510 GoogleTest on GCC and MSVC. Embedded passed 4/4 CTest (510 GoogleTests), and Boot using the then-default five submodules passed 2/2 CTest. Memory and containers passed their GCC/MSVC and shared quality checks. Active core implementations and the old gitlink were retired. `REFACTORING_STATUS.md` preserves those historical revisions, coverage, negative consumers, and resource figures.
 
-The current change removes link's foundation submodules and production source paths. Production consumption uses provided targets or installed packages; source development uses the separate dev harness. This round passed 10/10 production-contract checks and dev CTest matrices of Full 8/8, Embedded 4/4, and Boot 2/2; Full and Embedded each executed 510 GoogleTests. The ARM rebuild with explicit dev sources produced the same resource figures as the previous round. These are current local results; MSVC and Linux sanitizers were not rerun, and remote or hardware validation was not executed. Detailed paths are in the implementation record.
+Production consumption uses provided targets or installed packages; source development uses the separate dev harness. The complete protocol implementation is committed and pushed to the feature branch; development dependencies and shared quality tools pin published commits. Fresh remote clones run 561 checks for GNU Full and Embedded (554 GoogleTests and seven smoke/examples), and two for Boot, including real installed consumption in every profile. Root `REFACTORING_STATUS.md` records exact revision evidence and the latest remote matrix.
 
-Removed generic utility and platform tests live in the owning layer or are no longer applicable; a lower protocol test count is not presented as an identical historical suite.
+Production dependency contracts now contain 11 cases, classification has an independent CTest-policy regression, and 21 source headers compile as first includes in separate translation units. The version-controlled inventory retains every one of the original 510 protocol names. Generic component tests moved to their owning repositories in an earlier stage and are distinct from this inventory. Production lines, functions and branches each have a coverage gate; reports preserve exact counts, tools and source identities.
+
+[Remote CI](https://github.com/X-Gen-Lab/xgen-link/actions/runs/36807629994) passed on clean revision `1b0ce7e`: 561 checks each on Windows/MSVC, Linux and macOS, 560 with ASan/UBSan, and 2/3 for CI Boot/Embedded. Production coverage is 3671/4010 lines (91.5%), 249/250 functions (99.6%) and 2314/2865 branches (80.8%). Cppcheck, Clang-Tidy, strict documentation, installed consumption and release validation passed. All eight artifacts match their GitHub SHA256 digests and report the same clean source identity.
 
 ## Resource and product limits
 
 The Cortex-M0 probe records a real linked ELF, map, target-ABI workspace formula and stack-use files. Its results are reproducible from `tools/boot_footprint/README.md`. Native execution separately checks the layout formula against actual workspace initialization.
 
-No real board, Flash power interruption, ISR nesting, full call-chain stack bound, DMA lease, production cipher provider or cross-restart freshness has been qualified. Boot update uses a host Flash model and CRC16 for accidental corruption only. Linux sanitizer CI is configured; do not infer it ran from Windows results.
+No real board, Flash power interruption, ISR nesting, full call-chain stack bound, DMA lease, production cipher provider or cross-restart freshness has been qualified. Boot update uses a host Flash model and CRC16 for accidental corruption only. Actual Linux sanitizer executions are recorded separately; do not infer them from Windows results.

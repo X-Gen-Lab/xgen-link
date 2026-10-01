@@ -306,10 +306,10 @@ When contributing to xgen-link, keep in mind:
 
 When adding platform-specific code:
 
-1. Use the platform abstraction layer (xgl_platform.h)
-2. Implement platform-specific functions in src/platform/
-3. Ensure bare-metal compatibility
-4. Test on multiple platforms if possible
+1. Implement the public PHY and optional security-provider contracts in the consuming platform or product repository.
+2. Supply monotonic time through the explicit send/step/deadline APIs and serialize access to each instance.
+3. Provide bounded storage and retain borrowed configuration and callback contexts for the documented lifetime.
+4. Validate the adapter on its actual platform; keep the protocol library compatible with bare-metal consumers.
 
 ## Review Process
 

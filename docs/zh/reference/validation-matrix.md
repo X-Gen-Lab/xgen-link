@@ -13,6 +13,8 @@
 | 静态工作区、背压、回绕、存储复用 | `tools/static_workspace_smoke.c` |
 | 一次后端预留、运行期不调用后端分配 | `test/test_footprint.cpp`、memory 性质测试 |
 | 公开安装包 C 消费者、ABI/profile 拒绝 | SDK 消费者 CTest 及 instance 测试 |
+| ACK 长度溢出、初始化失败释放、PHY 错误与恢复 | `test/test_coverage_wire.cpp`、`test/test_coverage_api.cpp`、`test/test_coverage_delivery.cpp` |
+| 头文件独立 C++17 编译、逐例发现、种子回放 | `test/cmake/HeaderContracts.cmake`、分类与 runner 契约测试 |
 
 ## 构建覆盖
 
@@ -20,12 +22,14 @@
 
 此前五包迁移的中间检查点 `6927196` 通过 4/4 CompactWindow；有效 RED 见 `b169a10`。该阶段最终 Full 在 GCC/MSVC 各通过 8/8 CTest、510/510 GoogleTest，Embedded 4/4 CTest（510 项 GoogleTest）、当时默认五子模块 Boot 2/2 CTest 通过。memory 与 containers 各自通过 GCC/MSVC 及共享质量，core 活跃实现和旧 gitlink 已退出。这些历史结果的固定提交、覆盖率、安装入口负例和完整资源口径见仓库 `REFACTORING_STATUS.md`。
 
-本轮移除 link 的基础组件子模块和生产源码路径，正式消费限定为预提供 targets 或安装包，源码开发改用独立 dev 装配。生产契约 10/10、dev Full 8/8 CTest、Embedded 4/4、Boot 2/2 均通过；Full/Embedded 各执行 510 个 GoogleTest。显式 dev 源码的 ARM 重跑结果与前轮相同。这些是本轮本地证据；MSVC 和 Linux sanitizer 本轮未重跑，远端与硬件未执行，详细路径见实施记录。
+现行正式消费限定为预提供 targets 或安装包，源码开发使用独立 dev 装配。完整协议实现已提交并推送功能分支，五个开发依赖与共享质量工具固定到已发布提交。远端全新克隆的 GNU Full、Embedded 各执行 561 项（554 个 GoogleTest 加 7 项 smoke/示例），Boot 执行 2 项，各配置实际完成安装消费；最新提交的验收与远端矩阵由根目录 `REFACTORING_STATUS.md` 记录。
 
-通用组件测试随归属迁移，已删除的平台接口测试不再适用；协议用例数减少不代表历史测试集合原样保留。
+本轮生产依赖契约扩展到 11 项，逐用例分类具有独立 CTest 策略回归，21 个源码头文件分别首包含编译。所有原有 510 个协议测试名称由版本控制清单逐一保留。更早阶段的通用组件测试已随实现迁往各自仓库，不与本轮协议清单混淆。主机生产覆盖率按行、函数、分支分别阻断，具体分子、分母、工具和源码提交见对应报告。
+
+干净提交 `1b0ce7e` 的[远端 CI](https://github.com/X-Gen-Lab/xgen-link/actions/runs/36807629994)全部通过：Windows/MSVC、Linux、macOS 各 561 项，ASan/UBSan 560 项，CI Boot/Embedded 分别 2/3 项。生产覆盖率为行 3671/4010（91.5%）、函数 249/250（99.6%）、分支 2314/2865（80.8%）；Cppcheck、Clang-Tidy、严格文档、安装消费与发布验证均通过。八份 artifacts 的 GitHub SHA256 已核对，报告源码身份一致且干净。
 
 ## 资源与产品边界
 
 Cortex-M0 探针记录真实链接的 ELF、map、目标 ABI 工作区公式及栈使用文件，可按 `tools/boot_footprint/README.md` 复现。原生运行另行比较布局公式并执行真实初始化。
 
-未验收真实板卡、Flash 断电、ISR 嵌套、完整调用链栈上界、DMA lease、生产密码 provider 或跨重启新鲜性。Boot 升级使用主机 Flash 模型，CRC16 只用于意外损坏校验。Linux sanitizer CI 已配置，不能从 Windows 结果推断它已执行。
+未验收真实板卡、Flash 断电、ISR 嵌套、完整调用链栈上界、DMA lease、生产密码 provider 或跨重启新鲜性。Boot 升级使用主机 Flash 模型，CRC16 只用于意外损坏校验。Linux sanitizer 的实际运行单独归档，不能从 Windows 结果推断。

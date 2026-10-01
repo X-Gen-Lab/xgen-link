@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Reject oversized ACK range counts before length multiplication can overflow.
+- Clear borrowed RX storage before failed-initialization cleanup can return it twice.
+- Keep dependency includes outside C language linkage and compile headers independently as C++17.
+- Classify tests without relying on inherited CTest policies and accept both valid MSVC C++17 flag spellings.
 - Validate dependency identity, ABI, target kind and same-package version consistency before consumption.
 
 ### Removed
