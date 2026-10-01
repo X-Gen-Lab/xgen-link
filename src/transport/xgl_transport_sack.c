@@ -62,14 +62,21 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
 
     uint32_t now = transport_now(ctx);
+    /* Commit the complete acknowledgement before retrying any missing packet.
+     * Local send backpressure cannot invalidate already received peer data. */
     for (size_t i = 0; i <= highest_set; ++i) {
-        uint32_t packet_number = base_packet + (uint32_t)i;
-        bool received = transport_sack_bit_is_set(bitmap, i);
-        if (received) {
-            transport_acknowledge_packet(ctx, peer, packet_number, now);
+        if (transport_sack_bit_is_set(bitmap, i)) {
+            transport_acknowledge_packet(ctx, peer,
+                                         base_packet + (uint32_t)i, now);
+        }
+    }
+    (void)xgl_window_advance_base_packet_number(&peer->tx_window);
+
+    for (size_t i = 0; i <= highest_set; ++i) {
+        if (transport_sack_bit_is_set(bitmap, i)) {
             continue;
         }
-
+        uint32_t packet_number = base_packet + (uint32_t)i;
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
             &peer->reliable_queue, packet_number, source_id);
         if (missing != NULL) {
@@ -81,8 +88,6 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
             (*retransmitted)++;
         }
     }
-
-    (void)xgl_window_advance_base_packet_number(&peer->tx_window);
 
     return XGL_OK;
 }

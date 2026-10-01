@@ -104,15 +104,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    xgl_transport_peer_state_t* peer = NULL;
-    xgl_error_t err =
-        transport_prepare_reliable_send(ctx, handle, tx_data, &peer);
-    if (err != XGL_OK) {
-        return err;
-    }
-
     xgl_transport_send_plan_t send_plan;
-    err = transport_build_send_plan(ctx, tx_data, &send_plan);
+    xgl_error_t err = transport_build_send_plan(ctx, tx_data, &send_plan);
     if (err != XGL_OK) {
         transport_count_send_error(ctx);
         if (err == XGL_ERR_INVALID_PARAM && ctx->error_callback != NULL) {
@@ -120,6 +113,13 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                 "max_frame_size too small for headers",
                                 ctx->callback_user_data);
         }
+        return err;
+    }
+
+    /* Validate the complete frame budget before reserving a scope or HELLO. */
+    xgl_transport_peer_state_t* peer = NULL;
+    err = transport_prepare_reliable_send(ctx, handle, tx_data, &peer);
+    if (err != XGL_OK) {
         return err;
     }
 
