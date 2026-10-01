@@ -53,6 +53,53 @@ void expect_cleared_failure(const uint8_t* bytes, size_t size) {
 
 }  // namespace
 
+TEST(XglWireRxContractTest,
+     HeaderEncodingOverwritesEveryByteAndPreservesOutsideSentinels) {
+    std::array<uint8_t, XGL_WIRE_BASE_HEADER_SIZE + 2U> zeroed = {};
+    std::array<uint8_t, XGL_WIRE_BASE_HEADER_SIZE + 2U> filled = {};
+    filled.fill(0xFFU);
+    zeroed.front() = filled.front() = 0xC3U;
+    zeroed.back() = filled.back() = 0x3CU;
+    xgl_wire_header_t header = {};
+    header.version = XGL_WIRE_VERSION;
+    header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
+    header.packet_type = XGL_PACKET_TYPE_DATA;
+    header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
+    header.ttl = 17U;
+    header.traffic_class = 3U;
+    header.source_id = 0x1234U;
+    header.target_id = 0x5678U;
+    header.connection_id = 0x12345678U;
+    header.packet_number = 0x90ABCDEFU;
+    header.payload_len = 0x1357U;
+    ASSERT_EQ(xgl_wire_encode_header(zeroed.data() + 1U,
+                                     XGL_WIRE_BASE_HEADER_SIZE, &header),
+              XGL_OK);
+    ASSERT_EQ(xgl_wire_encode_header(filled.data() + 1U,
+                                     XGL_WIRE_BASE_HEADER_SIZE, &header),
+              XGL_OK);
+    EXPECT_EQ(zeroed, filled);
+    EXPECT_EQ(zeroed.front(), 0xC3U);
+    EXPECT_EQ(zeroed.back(), 0x3CU);
+    EXPECT_EQ(filled.front(), 0xC3U);
+    EXPECT_EQ(filled.back(), 0x3CU);
+    xgl_wire_header_t decoded = {};
+    ASSERT_EQ(xgl_wire_decode_header(&decoded, filled.data() + 1U,
+                                     XGL_WIRE_BASE_HEADER_SIZE),
+              XGL_OK);
+    EXPECT_EQ(decoded.version, header.version);
+    EXPECT_EQ(decoded.header_len, header.header_len);
+    EXPECT_EQ(decoded.packet_type, header.packet_type);
+    EXPECT_EQ(decoded.flags, header.flags);
+    EXPECT_EQ(decoded.ttl, header.ttl);
+    EXPECT_EQ(decoded.traffic_class, header.traffic_class);
+    EXPECT_EQ(decoded.source_id, header.source_id);
+    EXPECT_EQ(decoded.target_id, header.target_id);
+    EXPECT_EQ(decoded.connection_id, header.connection_id);
+    EXPECT_EQ(decoded.packet_number, header.packet_number);
+    EXPECT_EQ(decoded.payload_len, header.payload_len);
+}
+
 TEST(XglWireRxContractTest, EveryTruncationAndNullInputClearTheEntireView) {
     const auto bytes = make_frame({XGL_WIRE_EXT_DATA_TYPE, 1U, 7U});
     for (size_t size = 0U; size < bytes.size(); ++size) {
