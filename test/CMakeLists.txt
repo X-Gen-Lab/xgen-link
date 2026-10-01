@@ -89,6 +89,12 @@ if(NOT XGL_FEATURE_AUTH)
     endif()
 endif()
 
+# SACK wire views and bounded transport admission apply to every profile.
+list(APPEND TEST_SOURCES
+    unit/wire/test_wire_sack_view.cpp
+    unit/transport/test_transport_sack_view.cpp
+)
+
 #-----------------------------------------------------------------------------
 # Mock Objects
 #-----------------------------------------------------------------------------
