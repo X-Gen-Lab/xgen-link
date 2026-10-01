@@ -116,10 +116,15 @@ xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
 
     xgl_error_t first_error = XGL_OK;
     xgl_wire_frame_view_t view;
-    for (size_t i = 0U; i < len; ++i) {
-        xgl_wire_decode_status_t status;
-        xgl_parse_result_t result = xgl_parser_feed_byte_view(
-            parser, bytes[i], current_time_ms, &view, &status);
+    xgl_wire_decode_status_t status;
+    xgl_parse_result_t result = xgl_parser_advance_view(parser, &view, &status);
+    size_t consumed = 0U;
+    while (result != XGL_PARSE_RESULT_INCOMPLETE || consumed < len) {
+        if (result == XGL_PARSE_RESULT_INCOMPLETE) {
+            result = xgl_parser_feed_byte_view(parser, bytes[consumed++],
+                                               current_time_ms, &view, &status);
+            continue;
+        }
 
         if (result == XGL_PARSE_RESULT_COMPLETE) {
             xgl_error_t error = datalink_check_frame_size(ctx, view.frame_len);
@@ -129,10 +134,10 @@ xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
             if (first_error == XGL_OK) {
                 first_error = error;
             }
-            xgl_parser_reset(parser);
         } else if (result == XGL_PARSE_RESULT_ERROR) {
             datalink_report_decode_error(ctx, status);
         }
+        result = xgl_parser_advance_view(parser, &view, &status);
     }
     return first_error;
 }

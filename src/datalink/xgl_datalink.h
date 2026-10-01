@@ -158,6 +158,11 @@ xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
  *                  until return. No input or view pointer is retained. Partial
  *                  frames are copied into parser-owned storage. Delivery is
  *                  synchronous; callbacks must not reenter or mutate input.
+ *                  Cached candidates drain before another byte is accepted;
+ *                  an empty span can drain recovery after a recorded ERROR.
+ *                  An initial COMPLETE is treated as already consumed. Upper
+ *                  rejection consumes the whole wire-valid frame, never its
+ *                  payload as new framing candidates.
  *                  This private entry does not poll the PHY or expire a parser;
  *                  its caller performs timeout maintenance before consumption.
  */

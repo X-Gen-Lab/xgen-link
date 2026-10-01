@@ -103,7 +103,11 @@ parser_inspect(xgl_parser_t* parser, const uint8_t* buffer, size_t available,
             return XGL_PARSE_RESULT_ERROR;
         }
         parser->expected_auth_tag_len = metadata.auth_tag_len;
-        if (parser_frame_len(parser) > parser->cache_size) {
+        const size_t body_overhead = (size_t)parser->expected_header_len +
+                                     parser->expected_auth_tag_len +
+                                     XGL_CRC16_SIZE;
+        if (body_overhead > parser->cache_size ||
+            parser->expected_payload_len > parser->cache_size - body_overhead) {
             return XGL_PARSE_RESULT_ERROR;
         }
         parser->state = XGL_PARSE_PAYLOAD;
