@@ -225,8 +225,10 @@ int main(void) {
             return 4;
         }
     }
+#if XGL_FEATURE_STATISTICS
     xgl_statistics_t statistics = {0};
     (void)xgl_stats_get(host.handle, &statistics);
+#endif
     uint16_t expected_crc = xgcrc_crc16_modbus(image, sizeof(image));
     uint16_t actual_crc = xgcrc_crc16_modbus(flash.flash, sizeof(flash.flash));
     bool complete = host_app.confirmed == IMAGE_BYTES &&
@@ -234,13 +236,20 @@ int main(void) {
                     flash.flash_writes == IMAGE_BYTES / FLASH_BLOCK_BYTES &&
                     flash.busy_returns > 0U && device_port.dropped == 1U &&
                     host_app.errors == 0U && flash.errors == 0U &&
-                    statistics.tx_retries > 0U && expected_crc == actual_crc &&
+                    expected_crc == actual_crc &&
                     memcmp(image, flash.flash, sizeof(image)) == 0;
-    printf("Boot update simulation: %s; blocks=%u, BUSY=%u, dropped_ACK=%u, "
-           "retries=%llu, CRC16=%04X\n",
+#if XGL_FEATURE_STATISTICS
+    complete = complete && statistics.tx_retries > 0U;
+#endif
+    printf("Boot update simulation: %s; blocks=%u, BUSY=%u, dropped_ACK=%u, ",
            complete ? "PASS" : "FAIL", flash.flash_writes, flash.busy_returns,
-           device_port.dropped, (unsigned long long)statistics.tx_retries,
-           (unsigned)actual_crc);
+           device_port.dropped);
+#if XGL_FEATURE_STATISTICS
+    printf("retries=%llu, ", (unsigned long long)statistics.tx_retries);
+#else
+    printf("retries=disabled, ");
+#endif
+    printf("CRC16=%04X\n", (unsigned)actual_crc);
     xgl_destroy(host.handle);
     xgl_destroy(device.handle);
     return complete ? 0 : 5;

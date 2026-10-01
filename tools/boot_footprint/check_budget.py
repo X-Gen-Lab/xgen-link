@@ -23,6 +23,11 @@ def audit(report, policy):
     for field in ("frame_bytes", "rx_bytes"):
         if field in configuration and report.get(field) != configuration[field]:
             violations.append(f"Report {field} does not match the selected policy")
+    if "lto" in configuration:
+        if type(configuration["lto"]) is not bool:
+            raise ValueError("Invalid resource policy lto mode")
+        if type(report.get("lto")) is not bool or report["lto"] != configuration["lto"]:
+            violations.append("Report lto mode does not match the selected policy")
     for field in ("forbidden_heap_symbols", "unresolved_symbols"):
         symbols = report.get(field)
         if not isinstance(symbols, list) or symbols:

@@ -47,7 +47,7 @@ def cache_values(build):
         key = key.split(":", 1)[0]
         if key.startswith(("CMAKE_C_FLAGS", "CMAKE_EXE_LINKER_FLAGS")) or key in (
             "CMAKE_BUILD_TYPE", "CMAKE_TOOLCHAIN_FILE", "XGL_PROFILE",
-            "XGL_FOOTPRINT_FRAME_SIZE", "XGL_FOOTPRINT_RX_SIZE",
+            "XGL_FOOTPRINT_FRAME_SIZE", "XGL_FOOTPRINT_RX_SIZE", "XGL_FOOTPRINT_LTO",
             "CMAKE_INTERPROCEDURAL_OPTIMIZATION") or (
                 key.startswith(("XGL_", "xgen_")) and key.endswith("_SOURCE_DIR")):
             result[key] = value
@@ -160,12 +160,17 @@ def report_elf(args):
     reserved_stack = sections.get(".stack", 0)
     layout = json.loads(Path(args.layout).read_text(encoding="utf-8"))
     configuration = cache_values(args.build)
+    optimization = json.loads(
+        (Path(args.build) / "footprint-optimization.json").read_text(encoding="utf-8"))
     result = {
         "elf": elf,
         "configuration": (f"Cortex-M0, GCC {args.configuration}, boot, no heap, "
-                          f"one peer, window 1, MTU {layout['frame_bytes']}"),
+                          f"one peer, window 1, MTU {layout['frame_bytes']}, "
+                          f"{'LTO' if optimization['enabled'] else 'no LTO'}"),
         "frame_bytes": layout["frame_bytes"],
         "rx_bytes": layout["rx_bytes"],
+        "lto": optimization["enabled"],
+        "optimization": optimization,
         "compiler": run([args.compiler, "--version"]).splitlines()[0],
         "build_parameters": configuration,
         "link_source": source_identity(Path(__file__).resolve().parents[2]),

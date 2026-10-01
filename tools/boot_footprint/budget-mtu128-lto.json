@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "compiler_version": "15.2.1",
+  "configuration": {
+    "profile": "boot",
+    "frame_bytes": 128,
+    "rx_bytes": 128,
+    "lto": true
+  },
+  "qualification": "Cortex-M0 MinSizeRel probe with library IPO and an opaque non-LTO consumer/layout; independent LTO regression ceiling, not an 8 KiB Flash or complete call-chain stack claim.",
+  "baseline_kind": "first_explicit_lto_measurement",
+  "baseline_source": {
+    "revision": "4925b19c802ccc91077b0f2f31d13c131483c4ab",
+    "dirty": true,
+    "source_sha256": "5ab053e19035f56b36ef36b21b501b7a693aceae6245276c283b2a95cfb7284f"
+  },
+  "baseline_report": "out/wire-opt-root/lto-initial/arm-128-lto/boot-footprint.json",
+  "baseline": {
+    "flash_bytes": 12600,
+    "workspace_bytes": 1136,
+    "static_ram_bytes": 1200,
+    "reserved_stack_bytes": 1024,
+    "ram_with_reserved_stack_bytes": 2224,
+    "largest_linked_function_stack_bytes": 312
+  },
+  "limits": {
+    "flash_bytes": 12800,
+    "workspace_bytes": 1136,
+    "static_ram_bytes": 1200,
+    "reserved_stack_bytes": 1024,
+    "ram_with_reserved_stack_bytes": 2224,
+    "largest_linked_function_stack_bytes": 320
+  }
+}

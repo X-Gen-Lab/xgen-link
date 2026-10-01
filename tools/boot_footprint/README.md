@@ -18,6 +18,10 @@ cmake --build build/boot-footprint --parallel 6
 
 产物包括 `xgl_boot_probe.elf`、`xgl_boot_probe.map`、`boot-footprint.json`、`workspace-layout.json` 和各源文件的 `.su`。构建结束自动检查最终 ELF 中没有 malloc、free、calloc、realloc、sbrk 或相应 newlib 堆服务，也不允许未解析符号。
 
+`XGL_FOOTPRINT_LTO` 默认为 `OFF`，保留普通 `-Os` 基线。显式设置 `-DXGL_FOOTPRINT_LTO=ON` 时，配置先检查 C 编译器的 IPO 支持，再为协议和基础库开启 LTO，并在最终链接时应用 `-flto`。`layout_probe.c` 和消费者 `consumer.c` 保持普通对象，使布局常量可被读取，也避免编译器根据测量桩的空接收回调消除真实接收路径。没有自动启用或下载其他工具链；生产产品独立决定自身优化配置。
+
+LTO 应使用独立构建目录。`footprint-optimization.json` 和最终报告的 `optimization` 记录库、布局对象、消费者的实际 IPO 属性及编译/链接选项；最终报告同时记录布尔 `lto` 字段。普通编译参数继续记录在 `build_parameters`。LTO 可能改变内联和栈布局，须比较最终 ELF 和 `.su`，不能根据较小 Flash 推断更小调用栈。
+
 配置固定为一个 peer、一个路由、一个 link、window 1、一个可靠 TX 记录，默认 MTU 128、RX 128，关闭 AUTH、转发、分片、乱序和 libc allocator。可通过 `XGL_FOOTPRINT_FRAME_SIZE`、`XGL_FOOTPRINT_RX_SIZE` 显式选择较小帧和 RX 空间；MTU 范围为 64–2048，RX 必须不小于 MTU 且不大于 4096。布局对象、消费者和报告使用相同参数。全部容量显式给出；不可变配置为 `static const`，在消费者整个生命周期有效并可放入 Flash。
 
 `layout_probe.c` 包含私有 workspace 类型头，不再包含生产 `.c` 文件；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 3 布局常量，分别计算初始化区域以及 peer、window、TX record、TX payload、scratch 五个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。消费者入口仍调用真实 `xgl_memory_requirements` 核对该大小。交叉构建未执行目标代码，因此这项运行时比较只有在将消费者适配至目标或模拟器后才算 ARM 执行验证。
@@ -85,3 +89,16 @@ python tools/boot_footprint/check_budget.py \
 ```
 
 测量 64 时使用独立构建目录，并同时设置 `-DXGL_FOOTPRINT_FRAME_SIZE=64 -DXGL_FOOTPRINT_RX_SIZE=64`，选择对应 policy。任一限额超出、工具链/profile/容量不匹配、缺少测量、堆或未解析符号都会失败。CI 分别保存 ELF、map、`.su`、布局和预算差异 JSON；新增任务的远端结果必须按本次提交验证。
+
+LTO 测量分别使用 `budget-mtu128-lto.json`、`budget-mtu64-lto.json`。这些独立预算的 Flash 上限为 12,800 B、最大单函数静态栈上限为 320 B，RAM 限额与对应普通配置相同；普通预算限额保持不变。预算要求报告的 `lto` 模式与自身一致，不能用 LTO 报告替代普通基线。首次正式选项测量为 Flash 12,600 B、最大单函数栈 312 B，来源与实际脏状态保存在各 policy 的 `baseline_source`，不表示远端 CI 或板级验收通过。
+
+新增选项的真实配置、编译和报告契约可在准备好 ARM 工具链后运行：
+
+```sh
+python test/cmake/test_footprint_lto.py --link-source . --work-dir out/lto-contracts \
+  --status-source /path/to/xgen-status --bytes-source /path/to/xgen-bytes \
+  --crc-source /path/to/xgen-crc --memory-source /path/to/xgen-memory \
+  --containers-source /path/to/xgen-containers
+```
+
+测试分别构建默认配置和 LTO 配置，核查真实编译/链接命令、布局与消费者隔离、完整报告、禁堆约束及预算模式拒绝。命令日志保存在显式工作目录中。

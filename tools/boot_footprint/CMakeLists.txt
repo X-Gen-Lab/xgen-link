@@ -10,6 +10,23 @@ if(NOT CMAKE_CROSSCOMPILING OR NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
 endif()
 get_filename_component(XGL_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
+option(XGL_FOOTPRINT_LTO "Optimize protocol and foundation libraries across translation units" OFF)
+if(XGL_FOOTPRINT_LTO)
+    include(CheckIPOSupported)
+    function(xgl_footprint_check_ipo)
+        # CMake links a hosted test executable. Supply the same bare-metal
+        # runtime specs in this local check without altering production flags.
+        string(APPEND CMAKE_C_FLAGS " --specs=nano.specs --specs=nosys.specs")
+        check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error LANGUAGES C)
+        if(NOT ipo_supported)
+            message(FATAL_ERROR "XGL_FOOTPRINT_LTO requires working C IPO support: ${ipo_error}")
+        endif()
+    endfunction()
+    xgl_footprint_check_ipo()
+endif()
+# This diagnostic owns its optimization mode; production consumers select theirs.
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION "${XGL_FOOTPRINT_LTO}")
+
 set(XGL_FOOTPRINT_FRAME_SIZE 128 CACHE STRING "Probe frame MTU in bytes")
 set(XGL_FOOTPRINT_RX_SIZE 128 CACHE STRING "Probe per-link RX storage in bytes")
 foreach(capacity XGL_FOOTPRINT_FRAME_SIZE XGL_FOOTPRINT_RX_SIZE)
@@ -46,6 +63,7 @@ add_subdirectory("${XGL_SOURCE_ROOT}" xgen-link)
 # The diagnostic object measures private target types without compiling or
 # linking another copy of the protocol implementation.
 add_library(xgl_boot_layout OBJECT layout_probe.c)
+set_property(TARGET xgl_boot_layout PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 target_include_directories(xgl_boot_layout PRIVATE "${XGL_SOURCE_ROOT}/src")
 target_link_libraries(xgl_boot_layout PRIVATE xgl::xgl
     xgm::pool xgm::size_class xgct::list xgct::bitset
@@ -73,6 +91,7 @@ add_custom_target(xgl_boot_layout_data DEPENDS "${layout_header}" "${layout_json
 add_executable(xgl_boot_probe consumer.c startup.S "${layout_header}")
 add_dependencies(xgl_boot_probe xgl_boot_layout_data)
 set_target_properties(xgl_boot_probe PROPERTIES SUFFIX .elf)
+set_property(TARGET xgl_boot_probe PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 target_include_directories(xgl_boot_probe PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(xgl_boot_probe PRIVATE xgl::xgl)
 target_compile_options(xgl_boot_probe PRIVATE -Wall -Wextra -Werror -Wpedantic)
@@ -86,6 +105,29 @@ target_link_options(xgl_boot_probe PRIVATE
     -Wl,--gc-sections,--print-memory-usage)
 set_property(TARGET xgl_boot_probe APPEND PROPERTY LINK_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/memory.ld")
+
+# Keep target layout and the external PHY callbacks opaque to whole-program
+# analysis; only library objects and the final link participate in LTO.
+set(footprint_ipo_compile_options "[]")
+set(footprint_ipo_link_options "[]")
+if(XGL_FOOTPRINT_LTO)
+    target_link_options(xgl_boot_probe PRIVATE -flto)
+    string(JOIN "\", \"" footprint_ipo_flags ${CMAKE_C_COMPILE_OPTIONS_IPO})
+    set(footprint_ipo_compile_options "[\"${footprint_ipo_flags}\"]")
+    set(footprint_ipo_link_options "[\"-flto\"]")
+endif()
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/footprint-optimization.json"
+    CONTENT "{\n\
+  \"enabled\": $<IF:$<BOOL:${XGL_FOOTPRINT_LTO}>,true,false>,\n\
+  \"library_ipo\": $<IF:$<BOOL:$<TARGET_PROPERTY:xgl,INTERPROCEDURAL_OPTIMIZATION>>,true,false>,\n\
+  \"layout_ipo\": $<IF:$<BOOL:$<TARGET_PROPERTY:xgl_boot_layout,INTERPROCEDURAL_OPTIMIZATION>>,true,false>,\n\
+  \"consumer_ipo\": $<IF:$<BOOL:$<TARGET_PROPERTY:xgl_boot_probe,INTERPROCEDURAL_OPTIMIZATION>>,true,false>,\n\
+  \"compile_options\": ${footprint_ipo_compile_options},\n\
+  \"link_options\": ${footprint_ipo_link_options}\n\
+}\n")
+set_property(TARGET xgl_boot_probe APPEND PROPERTY LINK_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/report.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/footprint-optimization.json")
 
 add_custom_command(TARGET xgl_boot_probe POST_BUILD
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/report.py"

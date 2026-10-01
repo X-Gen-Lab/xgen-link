@@ -21,7 +21,7 @@ class FootprintBudget(unittest.TestCase):
         self.policy = {
             "schema_version": 1,
             "compiler_version": "15.2.1",
-            "configuration": {"profile": "boot", "frame_bytes": 128},
+            "configuration": {"profile": "boot", "frame_bytes": 128, "lto": False},
             "baseline": {"flash_bytes": 15692, "workspace_bytes": 1168},
             "limits": {"flash_bytes": 15692, "workspace_bytes": 1168},
         }
@@ -29,6 +29,7 @@ class FootprintBudget(unittest.TestCase):
             "compiler": "arm-none-eabi-gcc 15.2.1",
             "build_parameters": {"XGL_PROFILE": "boot"},
             "frame_bytes": 128,
+            "lto": False,
             "flash_bytes": 15500,
             "workspace_bytes": 1160,
             "forbidden_heap_symbols": [],
