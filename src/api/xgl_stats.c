@@ -36,6 +36,15 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
 
     /* Copy statistics structure */
     memcpy(stats, &inst->stats, sizeof(xgl_statistics_t));
+#if XGL_FEATURE_DIAGNOSTICS
+    const xgl_transport_ctx_t* transport = &inst->layers.transport_ctx;
+    stats->avg_rtt_ms = transport->rtt_sample_count == 0U
+                            ? 0U
+                            : (uint32_t)(transport->rtt_total_ms /
+                                         transport->rtt_sample_count);
+    stats->min_rtt_ms = transport->rtt_min_ms;
+    stats->max_rtt_ms = transport->rtt_max_ms;
+#endif
 
     return XGL_OK;
 }
@@ -58,8 +67,19 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
         return XGL_ERR_NOT_INITIALIZED;
     }
 
-    /* Reset all statistics to zero */
+    /* Reset observations without changing reserved memory or protocol state. */
+    const size_t reserved_bytes = inst->stats.memory_used;
     memset(&inst->stats, 0, sizeof(xgl_statistics_t));
+    inst->stats.min_rtt_ms = UINT32_MAX;
+    inst->stats.memory_used = reserved_bytes;
+    inst->stats.memory_peak = reserved_bytes;
+#if XGL_FEATURE_DIAGNOSTICS
+    xgl_transport_ctx_t* transport = &inst->layers.transport_ctx;
+    transport->rtt_total_ms = 0U;
+    transport->rtt_sample_count = 0U;
+    transport->rtt_min_ms = UINT32_MAX;
+    transport->rtt_max_ms = 0U;
+#endif
 
     return XGL_OK;
 }

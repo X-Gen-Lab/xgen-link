@@ -373,6 +373,8 @@ xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
     workspace->instance.storage_allocator = storage_allocator;
     workspace->instance.memory = &workspace->memory;
     workspace->instance.caller_owned = storage_allocator == NULL;
+    workspace->instance.stats.memory_used = plan.requirements.size;
+    workspace->instance.stats.memory_peak = plan.requirements.size;
     *handle = &workspace->instance;
     return XGL_OK;
 }

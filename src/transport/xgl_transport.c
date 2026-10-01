@@ -57,6 +57,9 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));
+#if XGL_FEATURE_DIAGNOSTICS
+    ctx->rtt_min_ms = UINT32_MAX;
+#endif
     ctx->local_id = config->local_id;
     ctx->max_retry_count = config->max_retry_count;
     ctx->window_size = config->window_size;

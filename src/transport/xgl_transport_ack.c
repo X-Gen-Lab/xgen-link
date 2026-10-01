@@ -83,7 +83,9 @@ void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
                                   xgl_transport_peer_state_t* peer,
                                   uint32_t packet_number, uint32_t now_ms) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
+#if !XGL_FEATURE_DIAGNOSTICS
     (void)ctx;
+#endif
     const xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(
         &peer->reliable_queue, packet_number, peer->peer_id);
     if (packet == NULL || !packet->sent) {
@@ -92,6 +94,18 @@ void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
     uint32_t elapsed = now_ms - packet->send_timestamp;
     if (packet->retry_count == 0U && elapsed > 0U && elapsed <= INT32_MAX) {
         xgl_rtt_update(&peer->rtt_est, (int32_t)elapsed);
+#if XGL_FEATURE_DIAGNOSTICS
+        if (ctx->rtt_sample_count < UINT32_MAX) {
+            ctx->rtt_total_ms += elapsed;
+            ctx->rtt_sample_count++;
+            if (elapsed < ctx->rtt_min_ms) {
+                ctx->rtt_min_ms = elapsed;
+            }
+            if (elapsed > ctx->rtt_max_ms) {
+                ctx->rtt_max_ms = elapsed;
+            }
+        }
+#endif
     }
     (void)xgl_window_mark_ack_packet_number(&peer->tx_window, packet_number);
     (void)xgl_reliable_remove_packet_number(&peer->reliable_queue,

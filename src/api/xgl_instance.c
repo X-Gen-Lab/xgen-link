@@ -37,8 +37,11 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     }
 
     /* Initialize statistics */
+    const size_t reserved_bytes = handle->stats.memory_used;
     memset(&handle->stats, 0, sizeof(xgl_statistics_t));
     handle->stats.min_rtt_ms = UINT32_MAX;
+    handle->stats.memory_used = reserved_bytes;
+    handle->stats.memory_peak = reserved_bytes;
 
     /* Initialize route table */
     err = xgl_route_table_init(&handle->route_table,

@@ -153,6 +153,13 @@ typedef struct xgl_transport_ctx_s {
     /* Statistics */
     xgl_layer_stats_t* stats; /**< Layer statistics pointer */
     uint64_t* tx_retries;     /**< Retransmission counter pointer */
+#if XGL_FEATURE_DIAGNOSTICS
+    uint64_t rtt_total_ms; /**< Sum of admitted first-transmission samples */
+    uint32_t
+        rtt_sample_count; /**< Number of samples, saturated at UINT32_MAX */
+    uint32_t rtt_min_ms;  /**< Minimum sample; UINT32_MAX when empty */
+    uint32_t rtt_max_ms;  /**< Maximum admitted sample */
+#endif
 
     /* Memory management */
     const xgm_allocator_t*
