@@ -6,6 +6,8 @@
 
 `xgl_memory_requirements()` 测量精确存储需求。`xgl_init_static()` 初始化对齐的调用者存储。`xgl_create()` 通过 `config.memory.allocator`（`xgm_allocator_t`）预留同一布局，随后需要调用 `xgl_init()`。只有 Full 可以选择可选的 xgen-memory libc 后端。`xgl_destroy()` 释放动态预留的 workspace，或结束对静态存储的使用。
 
+`xgl_memory_report()` 返回同一份需求及按资源类别划分的字节明细，不分配、不修改实例。类别包含对齐填充，合计为精确 workspace 大小。接纳字节预算可能小于池的实际预留，见[资源模型](../guide/resource-model.md)。
+
 配置及其引用的 PHY、provider、回调对象借用到销毁。实例存活期间必须保持地址稳定且不可变。同一实例的操作由调用者串行化；回调不得重入实例。
 
 ## 发送与调度

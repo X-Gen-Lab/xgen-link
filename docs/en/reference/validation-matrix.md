@@ -16,17 +16,20 @@
 | ACK size overflow, failed-init release, PHY failure and recovery | `test/unit/wire/test_coverage_wire.cpp`, `test/unit/api/test_coverage_api.cpp`, `test/integration/test_coverage_delivery.cpp` |
 | RTT observations, workspace reservations and streaming CRC classification | `test/unit/api/test_stats.cpp`, `test/unit/datalink/test_datalink.cpp` |
 | Boot error contracts with statistics and detailed diagnostics disabled | Conditional checks in `tools/static_workspace_smoke.c` |
+| Boot/Lite reliable delivery, capacity rejection, parsing, and multi-window fragmentation | Capability-selected cases in `test/unit/api/test_bounded_profile.cpp` |
+| Boot 32-byte logical-TX extension limit and independent raw-wire boundary | `test/unit/network/test_boot_network.cpp` |
+| Multi-configuration publication/installation, exported capabilities, and budget rejection | `test/cmake/test_profile_builds.py`, `test/cmake/test_footprint_budget.py` |
 | Independent C11/C++17 public/private header compilation, discovery and seed replay | `test/cmake/HeaderContracts.cmake`, classification and runner contracts |
 
 ## Build coverage
 
-The local Full matrix includes protocol regressions and four host examples. Boot and Embedded are independently built as C11 with libc disabled and tested through static-workspace and installed-package consumers. Independent foundation packages own their behavior, minimal-consumption, installation, and quality matrices; the protocol validates their joint integration. Source core tests are a migration baseline and do not qualify the new providers.
+The local Full matrix includes protocol regressions and four host examples. Boot, Embedded Lite, and Embedded build separately as C11 without protocol libc fallback and check static-workspace and installed-package consumers. Explicitly enabled GoogleTest runs capability-selected Boot/Lite tests and complete historical Embedded regression. Independent foundation packages own their behavior, minimal-consumption, installation, and quality matrices; the protocol validates their joint integration. Source core tests are a migration baseline and do not qualify the new providers.
 
 During the previous five-package migration, intermediate checkpoint `6927196` passed 4/4 CompactWindow; the effective RED is `b169a10`. That stage's final Full builds passed 8/8 CTest and 510/510 GoogleTest on GCC and MSVC. Embedded passed 4/4 CTest (510 GoogleTests), and Boot using the then-default five submodules passed 2/2 CTest. Memory and containers passed their GCC/MSVC and shared quality checks. Active core implementations and the old gitlink were retired. `REFACTORING_STATUS.md` preserves those historical revisions, coverage, negative consumers, and resource figures.
 
 Production consumption uses provided targets or installed packages; source development uses the separate dev harness. Development dependencies and shared quality tools pin published commits. In the preceding independent-delivery stage, fresh remote clones ran 561 checks for GNU Full and Embedded (554 GoogleTests and seven smoke/examples), and two for Boot, including installed consumption in every profile. Those results qualify that earlier stage, not subsequent source changes.
 
-For this protocol-structure refactor, local GNU Full/Embedded and MSVC Full each run 582 checks (575 GoogleTests and seven smoke/examples); GNU Boot runs two. Independent header checks compile four public headers, 24 private headers and the generated configuration header first in both C11 and C++17. Root `REFACTORING_STATUS.md` records the latest sanitizer, coverage, ELF, source revisions and remote execution status.
+In the preceding protocol-structure refactor, local GNU Full/Embedded and MSVC Full each ran 582 checks (575 GoogleTests and seven smoke/examples); GNU Boot ran two. Header checks then compiled four public headers, 24 private headers and the generated configuration header first in both C11 and C++17. Root `REFACTORING_STATUS.md` records the latest sanitizer, coverage, ELF, source revisions and remote execution status.
 
 Production dependency contracts now contain 11 cases, classification has an independent CTest-policy regression, and all public, private and generated configuration headers compile as first includes in separate C11 and C++17 translation units. The version-controlled inventory retains every one of the original 510 protocol names. Generic component tests moved to their owning repositories in an earlier stage and are distinct from this inventory. Production lines, functions and branches each have a coverage gate; reports preserve exact counts, tools and source identities.
 
@@ -35,5 +38,9 @@ Production dependency contracts now contain 11 cases, classification has an inde
 ## Resource and product limits
 
 The Cortex-M0 probe records a real linked ELF, map, target-ABI workspace formula and stack-use files. Its results are reproducible from `tools/boot_footprint/README.md`. Native execution separately checks the layout formula against actual workspace initialization.
+
+This round's local GCC 15.2.1 MTU/RX 128 and 64 final ELFs both use 16,060 B Flash. Workspaces are 1,136/944 B; RAM including the reserved 1,024 B stack is 2,224/2,032 B; the largest single-function stack is 272 B. Against the preceding 128 baseline, Flash increases 368 B, workspace/RAM falls 32 B, and the largest stack frame falls 120 B. The 64 configuration establishes its first baseline. Both have no heap or unresolved symbols and pass their local budget policies. The 16 KiB Flash ceiling is a regression limit; the 8 KiB Flash design goal remains unmet.
+
+The new CI matrix includes Boot/Lite capability tests, complete Embedded regression, multi-configuration installed consumers, and both ARM budget gates. Local script passes do not mean this new matrix has executed remotely; use actual results for the current commit.
 
 No real board, Flash power interruption, ISR nesting, full call-chain stack bound, DMA lease, production cipher provider or cross-restart freshness has been qualified. Boot update uses a host Flash model and CRC16 for accidental corruption only. Actual Linux sanitizer executions are recorded separately; do not infer them from Windows results.

@@ -10,7 +10,7 @@ Use real protocol transitions for ACK atomicity, retained RX ownership, backpres
 
 ## Running
 
-Use CTest for protocol tests, host examples, static lifecycle and installed C consumer checks. Configure the Boot and Embedded profiles separately. See the [validation matrix](../reference/validation-matrix.md). Randomized property tests complement fixed regressions; they are not a substitute for sanitizer, fuzz or hardware qualification.
+Use CTest for protocol tests, host examples, static lifecycle and installed C consumer checks. Configure Boot, Embedded Lite, and Embedded separately. See the [validation matrix](../reference/validation-matrix.md). Randomized property tests complement fixed regressions; they are not a substitute for sanitizer, fuzz or hardware qualification.
 
 Use root presets after installing dependencies, or use `cmake -S dev` with all five `XGL_DEV_*_SOURCE_DIR` paths for source development as described in [Build and test](../getting-started/build-and-test.md). CTest runs from the corresponding `build/dev-<profile>` root. Product subdirectory consumption does not add examples, smoke tests, or release helpers by default. Record new-entry results separately from previous stages.
 
@@ -38,7 +38,11 @@ Checks are read-only. Apply clang-format 19.1.5 with `-i` explicitly. Analysis u
 
 For behavior changes, reproduce the requirement or defect with a failing test, record RED, implement the smallest correction, verify GREEN, then refactor and rerun relevant regressions. Do not manufacture failures for existing-behavior coverage, documentation, or formatting changes.
 
-Host tests use GoogleTest/GoogleMock 1.16.0 and strict C++17. `gtest_discover_tests` registers individual cases; classification assigns `xgl` and `unit` or `integration`, with an additional `property` label for randomized properties. Examples, static lifecycle and installed consumption are integration tests. `test/cmake/baseline_tests.txt` retains all 510 original names; discovery checks every name rather than trusting only a growing count. The shared runner rejects empty, disabled, skipped, duplicate or failed cases.
+Host tests use GoogleTest/GoogleMock 1.16.0 and strict C++17. `gtest_discover_tests` registers individual cases; classification assigns `xgl` and `unit` or `integration`, with an additional `property` label for randomized properties. Examples, static lifecycle and installed consumption are integration tests. Full/Embedded discovery checks every one of the 510 historical names in `test/cmake/baseline_tests.txt`, rather than trusting only a growing count. The shared runner rejects empty, disabled, skipped, duplicate or failed cases.
+
+Boot/Lite enable capability-selected production tests with `XGL_BUILD_TESTS=ON` and check their required names. Shared cases cover reliable two-endpoint delivery with explicit storage, rejection of authentication, insufficient capacity, MTU rejection, complete frames and CRC, windows, and RTT. Lite also covers reliable storage, fragmentation, and messages spanning windows; Boot checks logical-send extension limits and raw wire boundaries. Tests for unavailable capabilities are not registered or disguised as skips. CI runs the complete Embedded regression suite.
+
+`test/cmake/test_profile_builds.py` exercises real Boot/Lite regression, package capability rejection, and Debug/Release publication and SDK consumption in one multi-configuration build. `test/cmake/test_footprint_budget.py` verifies rejection of growth, wrong configurations, missing measurements, and heap symbols. Its fixtures validate the checker only; resource conclusions require actual ARM ELF measurements.
 
 ## Property replay
 

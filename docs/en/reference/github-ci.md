@@ -26,18 +26,21 @@ Variables override `owner/repository`, not the pinned commit. Private forks addi
 | `host` | Ubuntu 24.04, Windows 2022/MSVC, macOS 15; text, format, pre-commit, C11 protocol, strict C++17 GoogleTest, examples, SDK consumer, discovery and seed-replay contracts |
 | `analysis` | Ubuntu 24.04; native GNU instrumented build, shared test runner, Cppcheck, Clang-Tidy, strict public API Doxygen, independent 80% line/function/branch gates, release helpers and documentation site |
 | `sanitizers` | Ubuntu 24.04; ASan/UBSan, building every selected target before running the shared test entry |
-| `bounded-profiles` | Separate C11 Boot and Embedded builds without libc fallback, static lifecycle and installation consumption |
-| `dependency-contracts` | dev preparation unit tests, real parent-target reuse, installation consumption, and rejection of missing or incompatible dependencies |
+| `bounded-profiles` | Boot/Lite capability GoogleTest and complete Embedded regression; separate C11 builds without protocol libc fallback, static lifecycle and installation consumption |
+| `dependency-contracts` | dev preparation, real target reuse, installation and dependency rejection; capability declarations, Debug/Release publication and budget-checker contracts |
+| `arm-footprint` | Cortex-M0 with fixed GCC 15.2.1; MTU/RX 128 and 64 final ELFs, resource limits, heap/unresolved-symbol rejection, and baseline deltas |
 | `status` | Require success from every mandatory job |
 
-Host uses `cmake -S dev --preset debug` and writes to `build/dev-debug`. Analysis, sanitizers, and bounded profiles use `dev-ci`, `dev-asan`, `dev-boot`, and `dev-embedded`. They do not share ABI/profile outputs or coverage counters. The source-development CTest root is `build/dev-<preset>`.
+Host uses `cmake -S dev --preset debug` and writes to `build/dev-debug`. Analysis, sanitizers, and bounded profiles use `dev-ci`, `dev-asan`, `dev-boot`, `dev-embedded-lite`, and `dev-embedded`. They do not share ABI/profile outputs or coverage counters. The source-development CTest root is `build/dev-<preset>`.
 
-GoogleTest registers individual cases with `unit`, `integration`, and `property` labels. Discovery checks that all 510 historical names remain present. The shared runner verifies selected names against actual JUnit results and rejects empty, disabled, skipped, or failing tests. See [testing](../contributing/testing.md) for commands and replay.
+GoogleTest registers individual cases with `unit`, `integration`, and `property` labels. Full/Embedded discovery preserves all 510 historical names; Boot/Lite check their required capability lists. The shared runner verifies selected names against actual JUnit results and rejects empty, disabled, skipped, or failing tests. See [testing](../contributing/testing.md) for commands and replay.
 
-The ASan preset disables installed-package smoke because global sanitizer flags are not automatically exported as external consumer link requirements. Full and independent consumer contracts validate installation. Boot/Embedded CI jobs do not execute GoogleTest; Host jobs provide protocol regression coverage.
+The ASan preset disables installed-package smoke because global sanitizer flags are not automatically exported as external consumer link requirements. Full and independent consumer contracts validate installation. Bounded CI configurations explicitly set `XGL_BUILD_TESTS=ON`; these host tests do not become MCU production dependencies.
+
+The ARM preparation step reads `tools/boot_footprint/toolchain-lock.json`, downloads the official Arm 15.2.rel1 Linux archive, and verifies the pinned upstream SHA-256. CMake does not download a compiler. Resource checks use `budget-mtu128.json` or `budget-mtu64.json`; compiler, profile, and MTU/RX must match. Missing required measurements or any exceeded limit fail. Each configuration retains its own deltas, and design goals remain separate from regression limits.
 
 ## Artifacts and conclusions
 
-Jobs use `always()` to preserve applicable `out/reports/`, CTest logs, compilation databases, Doxygen diagnostics, and footprint reports. Reports identify tools, source, configuration, selected tests, and actual exit status. Later failures preserve earlier evidence; missing required artifacts fail.
+Jobs use `always()` to preserve applicable `out/reports/`, CTest logs, compilation databases, Doxygen diagnostics, and footprint reports. ARM additionally retains ELF, map, `.su`, layout, and budget JSON. Reports identify tools, source, configuration, selected tests, and actual exit status. Later failures preserve earlier evidence; missing required artifacts fail.
 
 Local checks, remote runs, and product acceptance are recorded separately in the root `REFACTORING_STATUS.md`. A workflow definition does not establish that a commit passed. Products provide board execution, production cryptographic providers, power-loss recovery, and final MCU partition qualification; see [release validation](release-validation.md).

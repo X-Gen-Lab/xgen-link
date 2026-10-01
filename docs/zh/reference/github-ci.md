@@ -26,18 +26,21 @@ CI 从 `dev/dependencies.json` 读取 status、bytes、CRC、memory、containers
 | `host` | Ubuntu 24.04、Windows 2022/MSVC、macOS 15；文本、排版、pre-commit、C11 协议、严格 C++17 GoogleTest、示例、SDK 消费，以及测试发现和种子回放契约 |
 | `analysis` | Ubuntu 24.04；原生 GNU 插桩构建、共享测试入口、Cppcheck、Clang-Tidy、严格公共 API Doxygen、行/函数/分支各 80% 门槛、发布辅助与文档站点 |
 | `sanitizers` | Ubuntu 24.04；ASan/UBSan，先构建全部选中目标，再运行共享测试入口 |
-| `bounded-profiles` | 分别构建 Boot 和 Embedded 的 C11 无 libc fallback 配置，执行静态生命周期及安装消费 |
-| `dependency-contracts` | dev 准备工具单测、真实父工程 target 复用、安装消费与缺失/不兼容依赖拒绝 |
+| `bounded-profiles` | Boot/Lite 能力 GoogleTest、Embedded 完整回归；各自 C11 无协议 libc fallback、静态生命周期及安装消费 |
+| `dependency-contracts` | dev 准备、真实 target 复用、安装消费与依赖拒绝；能力声明、Debug/Release 发布及预算检查器契约 |
+| `arm-footprint` | Cortex-M0 固定 GCC 15.2.1，MTU/RX 128 与 64 两组完整 ELF、资源门槛、堆/未解析符号拒绝及基线差值 |
 | `status` | 汇总全部必要任务，任何非成功结果都失败 |
 
-Host 使用 `cmake -S dev --preset debug`，输出到 `build/dev-debug`。分析、sanitizer、受限配置分别使用 `dev-ci`、`dev-asan`、`dev-boot` 和 `dev-embedded`。这些是不同构建目录，不共享 ABI、profile 或覆盖率计数。源码开发的 CTest 根目录是 `build/dev-<preset>`。
+Host 使用 `cmake -S dev --preset debug`，输出到 `build/dev-debug`。分析、sanitizer、受限配置分别使用 `dev-ci`、`dev-asan`、`dev-boot`、`dev-embedded-lite` 和 `dev-embedded`。这些是不同构建目录，不共享 ABI、profile 或覆盖率计数。源码开发的 CTest 根目录是 `build/dev-<preset>`。
 
-GoogleTest 逐用例登记并标记 `unit`、`integration`、`property`。发现阶段逐名保留迁移前的 510 个测试；共享 runner 检查选中清单与实际 JUnit 一致，并拒绝空集合、禁用、跳过和失败。运行命令及回放方法见[测试策略](../contributing/testing.md)。
+GoogleTest 逐用例登记并标记 `unit`、`integration`、`property`。Full/Embedded 发现阶段逐名保留迁移前的 510 个测试；Boot/Lite 检查各自能力必需清单。共享 runner 检查选中清单与实际 JUnit 一致，并拒绝空集合、禁用、跳过和失败。运行命令及回放方法见[测试策略](../contributing/testing.md)。
 
-ASan 预设关闭安装包 smoke，因为全局 sanitizer 参数不会自动成为外部消费者的链接要求；安装边界由 Full 和独立消费契约覆盖。Boot/Embedded CI 任务不执行 GoogleTest，主机协议回归由 Host 任务承担。
+ASan 预设关闭安装包 smoke，因为全局 sanitizer 参数不会自动成为外部消费者的链接要求；安装边界由 Full 和独立消费契约覆盖。受限配置 CI 显式设置 `XGL_BUILD_TESTS=ON`，这些主机测试不引入 MCU 生产依赖。
+
+ARM 任务的独立准备步骤读取 `tools/boot_footprint/toolchain-lock.json`，下载 Arm 官方 15.2.rel1 Linux 归档并验证已固定的官方 SHA-256。CMake 不下载编译器。资源检查读取对应 `budget-mtu128.json` 或 `budget-mtu64.json`；编译器、profile 和 MTU/RX 必须匹配，缺少必要测量或超出任一限额都失败。两组配置分别保留差值，设计目标和回归门槛分别报告。
 
 ## 产物与执行结论
 
-任务通过 `always()` 保存适用的 `out/reports/`、CTest 日志、编译数据库、Doxygen 诊断或资源报告。报告记录工具与源码身份、配置、选中测试和实际退出结果；后续检查失败时仍保留此前证据。必要产物缺失会失败。
+任务通过 `always()` 保存适用的 `out/reports/`、CTest 日志、编译数据库、Doxygen 诊断或资源报告；ARM 另保留 ELF、map、`.su`、布局和预算 JSON。报告记录工具与源码身份、配置、选中测试和实际退出结果；后续检查失败时仍保留此前证据。必要产物缺失会失败。
 
 本地检查、远端运行和产品验收分别记录在根目录 `REFACTORING_STATUS.md`；工作流存在不代表某个提交已经通过。板级运行、真实密码 provider、断电恢复与最终 MCU 分区验收由产品补齐，见[发布验证](release-validation.md)。

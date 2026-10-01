@@ -47,6 +47,8 @@ if (result == XGL_OK && layout.frame_size <= sizeof(frame_buffer)) {
 
 Network TX 包数及 payload 字节数只在下层提交成功后计入，普通、原地与转发路径保持一致。这些计数不证明远端交付。
 
+Boot 私有的 network 逻辑发送工作区最多容纳 32 字节扩展，足够同时组合一个 ACK_RANGE、SESSION 和 DATA_TYPE。更长的逻辑发送扩展列表会在提交 PHY 前被拒绝。该 profile 限制不改变 Wire v3：完整帧编解码仍支持 255 字节帧头，其他 profile 保留完整的 231 字节逻辑扩展工作区。
+
 ## 可靠和非可靠发送
 
 可靠发送同时受单 peer 窗口和全局 TX 容量约束。持续调用 `xgl_step()` 以接收 ACK、推进重传并报告最终失败。

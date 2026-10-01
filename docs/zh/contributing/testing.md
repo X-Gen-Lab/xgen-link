@@ -10,7 +10,7 @@
 
 ## 执行
 
-通过 CTest 运行协议测试、主机示例、静态生命周期及安装后的 C 消费者。Boot 和 Embedded 分开配置，参见[验证矩阵](../reference/validation-matrix.md)。随机性质测试补充固定回归，不能代替 sanitizer、fuzz 或硬件验收。
+通过 CTest 运行协议测试、主机示例、静态生命周期及安装后的 C 消费者。Boot、Embedded Lite、Embedded 分开配置，参见[验证矩阵](../reference/validation-matrix.md)。随机性质测试补充固定回归，不能代替 sanitizer、fuzz 或硬件验收。
 
 安装依赖后可使用根工程 presets；独立源码开发使用 `cmake -S dev` 和五个 `XGL_DEV_*_SOURCE_DIR`，具体见[构建与测试](../getting-started/build-and-test.md)。dev 的 CTest 根目录为对应 `build/dev-<profile>`；正式模块作为产品子目录时默认不添加示例、smoke 或发布辅助。新入口和旧阶段结果分别记录。
 
@@ -38,7 +38,11 @@ python -m pre_commit run --all-files
 
 行为变更先增加能重现需求或缺陷的失败测试，记录 RED，再实现最小修复并验证 GREEN，最后整理实现并重跑相关回归。既有行为的覆盖补充、纯文档和排版不人为制造失败。
 
-主机测试使用 GoogleTest/GoogleMock 1.16.0 和严格 C++17。`gtest_discover_tests` 逐个登记用例；分类脚本为其添加 `xgl`、`unit` 或 `integration` 标签，性质测试另加 `property`。示例、静态生命周期和安装消费也属于 `integration`。`test/cmake/baseline_tests.txt` 保存迁移前的 510 个用例名称，发现阶段逐名检查，不能用新增数量掩盖历史用例丢失。共享测试入口拒绝空集合、禁用、跳过、重复或失败的测试。
+主机测试使用 GoogleTest/GoogleMock 1.16.0 和严格 C++17。`gtest_discover_tests` 逐个登记用例；分类脚本为其添加 `xgl`、`unit` 或 `integration` 标签，性质测试另加 `property`。示例、静态生命周期和安装消费也属于 `integration`。Full/Embedded 发现阶段逐名检查 `test/cmake/baseline_tests.txt` 中的 510 个历史名称，不能用新增数量掩盖历史用例丢失。共享测试入口拒绝空集合、禁用、跳过、重复或失败的测试。
+
+Boot/Lite 通过 `XGL_BUILD_TESTS=ON` 开启按能力选择的生产实现测试，并检查各自必需名称。公共测试覆盖显式存储的可靠双端交付、拒绝认证、容量不足、超 MTU 拒绝、完整帧和 CRC、窗口及 RTT；Lite 另覆盖可靠缓存、分片及跨窗口消息完成，Boot 另验证逻辑发送扩展上限与 raw wire 边界。未编译能力不登记测试，不将其伪装成跳过。CI 对 Embedded 执行完整回归。
+
+构建契约由 `test/cmake/test_profile_builds.py` 验证：真实 Boot/Lite 回归、安装能力拒绝、同目录 Debug/Release 发布和 SDK 消费。`test/cmake/test_footprint_budget.py` 验证预算工具拒绝增长、错误配置、缺失测量和堆符号；其夹具仅验证检查器，资源结论仍来自实际 ARM ELF。
 
 ## 性质测试回放
 

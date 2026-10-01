@@ -47,6 +47,17 @@
 
 ## 校验和编译 Profile
 
-`boot` 允许一个 peer、最多一条路由、窗口一，不包含认证、分片、转发和乱序缓存。`embedded` 与 `full` 编译这些能力；实际启用项及容量仍由运行时配置决定。
+只支持以下明确的能力组合，不提供任意 feature flag 的排列。实际启用项及容量仍由运行时配置决定，运行时配置不能恢复编译时已裁剪的能力。
+
+| Profile | 配置 ID | 认证/转发 | 分片/乱序 | 统计/诊断文字 |
+| --- | ---: | --- | --- | --- |
+| `boot` | 301 | 无 | 无 | 无 |
+| `embedded-lite` | 304 | 无 | 有 | 有 |
+| `embedded` | 302 | 有 | 有 | 有 |
+| `full` | 303 | 有 | 有 | 有 |
+
+Boot 允许一个 peer、最多一条路由、窗口一。Embedded Lite 使用 8 个可靠索引桶，不保留安全会话存储；适用于需要有界分片和乱序但无需认证及路由转发的端点。其他容量上限由生成的 `xgl_build_config.h` 给出。
+
+安装包导出 `xgl_PROFILE`、`xgl_BUILD_CONFIG_ID`、`xgl_CAPABILITIES`，目标 `xgl::xgl` 同时具有 `XGL_PROFILE`、`XGL_BUILD_CONFIG_ID`、`XGL_CAPABILITIES` 属性。消费者可用 `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)` 要求能力；不支持的必需能力在配置阶段拒绝。可请求名称为 `wire`、`reliable`、`authentication`、`forwarding`、`fragmentation`、`out_of_order`、`statistics` 和 `diagnostics`。
 
 压缩和 payload 加密仍是保留项，启用会被拒绝；两个 feature flag 保持 false，`compression_id` 保持零。通过 `xgl_memory_requirements()` 检查 workspace 算术溢出并查询依赖 ABI 的真实大小。库与消费者必须使用匹配的生成 profile 头文件。

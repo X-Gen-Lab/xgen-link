@@ -40,7 +40,7 @@ cmake --build --preset gcc-test
 ctest --preset gcc-test
 ```
 
-These commands use installed dependencies; the development harness above is the source alternative. Production libraries are C11, and only protocol tests require C++/GoogleTest. Protocol tests retain the documented legacy C++20 difference.
+These commands use installed dependencies; the development harness above is the source alternative. Production libraries are C11, and protocol GoogleTest uses strict C++17. Test dependencies are excluded from production exports.
 
 ## Bounded profiles
 
@@ -48,12 +48,17 @@ These commands use installed dependencies; the development harness above is the 
 cmake --preset boot -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
 cmake --build --preset boot
 ctest --preset boot
+cmake --preset embedded-lite -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
+cmake --build --preset embedded-lite
+ctest --preset embedded-lite
 cmake --preset embedded -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
 cmake --build --preset embedded
 ctest --preset embedded
 ```
 
-Both disable protocol libc fallback and test a static lifecycle plus an installed pure C consumer. For source development, select `XGL_PROFILE=boot` or `embedded` in a separate dev build directory and supply the five explicit paths again. Do not reuse Full caches or generated headers.
+All three disable protocol libc fallback and default to checking a static lifecycle plus an installed pure C consumer. For host behavior regression, explicitly add `-DXGL_BUILD_TESTS=ON -DGTest_DIR=/path/to/gtest/lib/cmake/GTest`. Boot/Lite select tests by compiled capability, while Embedded runs the full regression suite. Lite retains fragmentation/out-of-order buffering and removes authentication/forwarding.
+
+For source development use the corresponding dev preset, supplying all five source-path environment variables or explicit `-D` arguments, for example `cmake -S dev --preset boot -DXGL_BUILD_TESTS=ON`. Keep profiles in separate directories; do not reuse Full caches or generated headers. The development harness adds the libc allocator target needed by host tests, but the Boot protocol does not link it.
 
 ## Install
 
@@ -62,3 +67,17 @@ cmake --install build/gcc-test --prefix ./install
 ```
 
 Install the five dependencies separately into a common prefix or prefixes listed in `CMAKE_PREFIX_PATH`; installing link does not install its dependencies. Consumers use `find_package(xgl CONFIG REQUIRED)` and `xgl::xgl`. The package resolves required components and checks versions and ABI. Use the installed generated profile header; checked entry points reject ABI/profile mismatches.
+
+Consumers may request `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)` to reject insufficient package capabilities during configuration. See [configuration](../guide/configuration.md) for capability names and profile identities.
+
+## Multi-configuration generators
+
+Pass the same explicit configuration to Ninja Multi-Config or Visual Studio builds:
+
+```sh
+cmake --build build/multi --config Release --target xgl_release_validation
+ctest --test-dir build/multi -C Release --output-on-failure --no-tests=error
+cmake --install build/multi --config Release --prefix ./install-release
+```
+
+Release helpers pass the configuration through CTest, nested SDK builds and installation, and isolate consumer directories by configuration. `test/cmake/test_profile_builds.py` builds both Debug/Release consumers and checks their corresponding installed target files.

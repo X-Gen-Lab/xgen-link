@@ -25,7 +25,7 @@ if (xgl_memory_report(&config, &report) == XGL_OK) {
 | 资源 | 预留方式 |
 | --- | --- |
 | 路由和链路 | 固定路由数组；每个独立 PHY 一个 parser cache |
-| 路由索引 | embedded/full 预分配 hash 桶和节点；boot 不包含 |
+| 路由索引 | embedded-lite/embedded/full 预分配 hash 桶和节点；boot 不包含 |
 | Peer 和窗口 | 每个 peer 容量一个 peer 对象及窗口存储 |
 | 可靠 TX | 按全局 TX 容量分别预留包记录和 payload 槽 |
 | 帧 scratch | 同步且不可重入的 I/O 共用一个完整帧槽 |

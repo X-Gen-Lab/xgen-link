@@ -1,8 +1,32 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。协议结构和资源所有权优化已完成本地完整验收。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，当前依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)。
+更新日期：2026-10-01。当前阶段为有界恢复、调度与资源优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，当前依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，本轮决策见 [ADR 0006](design/adr/0006-bounded-recovery-runtime.md)。
 
-## 当前：协议结构与资源优化
+## 当前：有界恢复、调度与资源优化
+
+在 `af9799a` 基础上修复重复 SACK 快重传、首次 RX 准入后的空 peer 占用、RTT 中间值溢出、成功发送统计和认证广播拒绝。parser 的超时维护独立于轮询和 RX 字节预算，step 返回首个错误并继续处理已读数据及可靠维护；升级示例同步处理可恢复 BUSY。
+
+增加兼容的 scoped zero-copy、纯布局查询和精确工作区分类报告。security 持有唯一认证策略；移除 link、packet 和层上下文的冗余字段，合并 transport TX 私有头。Boot 逻辑发送扩展缓冲缩为 32 B，wire 解码能力不缩减。新增 Embedded Lite 304；原 profile 身份、旧公开结构 ABI 和 wire v3 保持。
+
+| 本轮本地验收 | 实际结果 |
+| --- | --- |
+| Windows GNU Full / Embedded、MSVC Full、Linux GNU Full | 各 613/613 CTest；606 个 GoogleTest 加 7 项 smoke/示例 |
+| GNU Boot / Embedded Lite、Linux Lite | 66/66（64 GoogleTest）/ 101/101（98 GoogleTest）/ 101/101；含安装消费 |
+| GNU 与 MSVC 构建契约 | Boot、Lite、Debug/Release、安装能力四类通过；MSVC Boot 最终 66/66 |
+| Linux ASan / UBSan | 612/612，含泄漏检查；安装消费另由 Full 验证 |
+| 生产覆盖率 | 行 3794/4124（92.0%）、函数 281/282（99.6%）、分支 2407/2954（81.5%） |
+| 边界与辅助契约 | 28 个头各 C11/C++17；11 项依赖、11 项开发准备、3 项发现策略、5 项资源门禁；三个主机 benchmark 执行通过 |
+| 质量与文档 | 45 个生产翻译单元的 Cppcheck/Clang-Tidy、严格 Doxygen/MkDocs、全仓 pre-commit、双语 QA 通过 |
+
+Boot/Lite 也通过固定 shared test runner 的清单与 JUnit 核验。完整证据见[本轮验证记录](design/validation/protocol-hardening.md)，Linux 汇总位于 `out/opt-linux/verification-summary.json`。
+
+同工具链 Cortex-M0、MTU/RX 128 的完整 ELF：Flash **15,692 → 16,060 B**，workspace **1,168 → 1,136 B**，静态 RAM **1,232 → 1,200 B**，含 1 KiB 预留栈的 RAM **2,256 → 2,224 B**；最大已链接单函数栈 **392 → 272 B**。Flash 增加 368 B，未将功能修复的成本掩盖为缩减。
+
+MTU/RX 64 首次测量为 Flash **16,060 B**、workspace **944 B**、静态 RAM **1,008 B**、含预留栈的 RAM **2,032 B**，最大单函数栈 **272 B**。两组无堆服务或未解析符号，通过正式回归限额；仅 64 的 workspace 达到 1 KiB 目标，两组 Flash 仍未达到 8 KiB 目标。未执行板级验收或本轮远端 CI。
+
+新增固定工具链 ARM CI、四 profile 测试与安装能力验证；ARM 安装脚本在本地 Linux 原样完成下载、校验、解包，两组实际 ELF 与预算结果和 Windows 一致。TDD 检查点、命令和实际产物见[本轮验证记录](design/validation/protocol-hardening.md)。未合并 main 或创建 tag。
+
+## 历史：协议结构与资源优化
 
 在 `b158d60` 基础上实施，生产源从 63 个归并为 45 个，transport 从 34 个归并为 17 个。私有头按所属层放到 `src`，测试按层组织，CMake 拆分源码、安装和开发辅助职责，继续只导出一个协议 target。普通、认证、原地及转发发送共享规划和 PHY 提交；接收传递已验证借用视图，不重复完整 CRC。
 

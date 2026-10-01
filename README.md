@@ -16,7 +16,7 @@ cmake --build --preset gcc-test
 ctest --preset gcc-test
 ```
 
-先显式准备 GoogleTest 1.16.0（包含 GoogleMock）；配置过程不下载依赖。无 libc 的 Boot 构建，把预设替换为 `boot`，无需 GoogleTest；需要有界分片、认证和转发时使用 `embedded`。默认 `full` 面向主机。生产库为 C11，仅主机测试需要 C++。
+先显式准备 GoogleTest 1.16.0（包含 GoogleMock）；配置过程不下载依赖。无 libc fallback 的 Boot 构建使用 `boot`；需要分片和乱序但不需要认证/转发时使用 `embedded-lite`，需要这些全部能力时使用 `embedded`。默认 `full` 面向主机。生产库为 C11，仅主机测试需要严格 C++17。受限预设默认关闭 GoogleTest；显式设置 `XGL_BUILD_TESTS=ON` 可运行对应能力的主机回归。
 
 先将 status、bytes、CRC、memory、containers 五包安装到示例 SDK 前缀。正式模块只消费父工程预提供的兼容 targets 或已安装 package，检查版本 `>=0.1.0,<0.2.0`、ABI 1、target 类型及包内版本一致性；产品负责选择同一镜像的唯一依赖版本。link 不再保留 `external` 生产子模块，也不会递归获取组件。
 
@@ -55,8 +55,8 @@ python tools/quality.py coverage --build-dir build/ci --gcov-executable gcov
 cmake --build build/ci --target xgl_release_validation --parallel 2
 ```
 
-GoogleTest 使用严格 C++17，CTest 逐用例发现、标记并保留全部历史测试。性质测试支持显式种子和失败回放。行、函数、分支覆盖率分别要求 80%；资源报告、共享 Cppcheck、SDK 消费和文档站点由发布辅助目标组织。命令、限制和产物见[测试策略](docs/zh/contributing/testing.md)、[发布验证](docs/zh/reference/release-validation.md)及[工程规范采用声明](docs/standards.md)。
+GoogleTest 使用严格 C++17，CTest 逐用例发现并标记；Full/Embedded 保留全部历史测试，Boot/Embedded Lite 验证所支持能力的必需清单。性质测试支持显式种子和失败回放。行、函数、分支覆盖率分别要求 80%；资源报告、共享 Cppcheck、SDK 消费和文档站点由发布辅助目标组织。多配置发布及安装消费显式传递 Debug/Release，安装包可以用 CMake `COMPONENTS` 声明必需协议能力。命令、限制和产物见[测试策略](docs/zh/contributing/testing.md)、[发布验证](docs/zh/reference/release-validation.md)及[工程规范采用声明](docs/standards.md)。
 
-CI 覆盖 Linux、Windows/MSVC、macOS，以及独立的 sanitizer、受限配置和依赖契约任务。功能分支可通过 `feat/**` push 触发；Pages 的自动部署仍仅由 `main` push 触发。本地和远端结论分别记录在[实施状态](REFACTORING_STATUS.md)。
+CI 配置覆盖 Linux、Windows/MSVC、macOS、sanitizer、Boot/Lite 能力回归、Embedded 完整回归、依赖与多配置契约，以及固定工具链的 Cortex-M0 MTU 128/64 ELF 资源门槛。新增任务的实际远端结果须按提交验证，不能沿用旧矩阵结论。功能分支可通过 `feat/**` push 触发；Pages 的自动部署仍仅由 `main` push 触发。本地和远端结论分别记录在[实施状态](REFACTORING_STATUS.md)。
 
 参见[验证矩阵](docs/zh/reference/validation-matrix.md)、[迁移指南](docs/zh/guide/modular-migration.md)、[Boot 升级示例](examples/boot_update/README.md)及 [Cortex-M0 占用探针](tools/boot_footprint/README.md)。主机测试及 ELF 链接不替代板级 Flash、断电、栈和密码 provider 验收。

@@ -47,6 +47,8 @@ The example assumes a caller-owned array `frame_buffer` and `<string.h>`. If the
 
 Network TX packets and payload bytes commit only after successful lower-layer submission, consistently for copied, in-place and forwarded frames. These counters do not prove remote delivery.
 
+Boot's private logical network TX workspace is 32 extension bytes, enough for one ACK_RANGE, SESSION and DATA_TYPE together. Larger logical TX extension lists fail before PHY submission. This profile limit does not change Wire v3: complete-frame encoding/decoding still supports the 255-byte header, and other profiles retain the full 231-byte logical extension workspace.
+
 ## Reliable and Unreliable
 
 Reliable sends are constrained by the peer window and global TX capacity. Continue calling `xgl_step()` to receive ACKs, advance retransmissions, and report terminal failures.

@@ -6,6 +6,8 @@
 
 后续协议目录、帧路径和状态所有权的实际归并见 [ADR 0005](design/adr/0005-protocol-structure.md)。该阶段保留 wire v3 和公开 ABI，收拢 transport、私有头和测试目录，关闭 Boot 可选统计与详细诊断，并以完整矩阵和最终 ELF 验证。
 
+进一步的可靠恢复、parser 调度、兼容原地发送与资源查询、Embedded Lite 和 Boot 能力验收见 [ADR 0006](design/adr/0006-bounded-recovery-runtime.md) 及[验证记录](design/validation/protocol-hardening.md)。历史三配置设计已扩展为四种受支持配置；旧公开结构和原有 profile 身份保留，真实 MCU 资源结论以该轮最终 ELF 为准。
+
 设计输入：协议跨平台使用；通用组件独立仓库；目标设备约 64 KiB Flash、8 KiB RAM，且需要放进更小的 Bootloader。Boot 分区大小、MCU 型号、Flash 擦写粒度和认证算法尚未确定，作为产品接入参数处理。
 
 范围：先建立可验证的协议边界、资源模型和迁移路径，再逐步提取与替换实现。本文描述目标设计，具体 API、wire 兼容范围和生产源码的实现状态以进度记录和[迁移指南](docs/zh/guide/modular-migration.md)为准。

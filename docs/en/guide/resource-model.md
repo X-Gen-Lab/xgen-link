@@ -25,7 +25,7 @@ After preparation, init, sends, receive processing, and cleanup use only the wor
 | Resource | Reservation |
 | --- | --- |
 | Routes and links | Fixed route arrays; one parser cache per distinct PHY |
-| Route index | Preallocated hash buckets/nodes in embedded/full; absent in boot |
+| Route index | Preallocated hash buckets/nodes in embedded-lite/embedded/full; absent in boot |
 | Peer and window | One peer object and window storage per peer capacity |
 | Reliable TX | Separate packet and payload slots per global TX capacity |
 | Frame scratch | One complete-frame scratch slot for synchronous, non-reentrant I/O |

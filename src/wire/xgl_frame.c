@@ -132,11 +132,11 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     return XGL_OK;
 }
 
+/* Layout lengths follow payload, existing TLV, then appended tag order. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Validate lengths before any sum, write or allocation
  */
-/* Lengths follow the existing payload, extensions, authentication ordering. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
                                       size_t auth_tag_len,
                                       xgl_frame_layout_t* layout) {

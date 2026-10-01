@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Scoped zero-copy sends and side-effect-free exact layout queries, while retaining the original zero-copy request ABI.
+- Exact workspace reports by resource category, including alignment and fixed reservations.
+- An Embedded Lite profile with fragmentation and out-of-order delivery, without authentication or forwarding; installed packages expose required capabilities.
+- Capability-selected Boot GoogleTest coverage, multi-configuration build/install contracts, and pinned Cortex-M0 resource regression gates for MTU 128 and 64.
 - Caller-owned static workspace with exact size/alignment queries and bounded resource accounting.
 - Explicit monotonic-time send/step/deadline APIs and per-link receive budgets.
 - Trusted directional authentication sessions, replay protection and nonce-domain retirement.
@@ -19,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Remove redundant private link, packet and layer-context fields; security remains the sole owner of provider and authentication policy.
+- Bound Boot logical TX metadata to 32 bytes without reducing the wire decoder's extension capacity; trim disabled statistics pointers from Boot contexts.
+- Consolidate private transport TX declarations into one header and document retry, parser deadline and resource admission contracts.
 - Consolidate transport lifecycle, TX, RX, ACK and maintenance into 17 implementation files, with private headers colocated under their owning layers.
 - Share frame planning, encoding and PHY submission across copied, authenticated, in-place and forwarded traffic; propagate validated RX views without repeating full-frame CRC.
 - Own security state once per instance and reserve exactly one parser and RX cache per unique PHY.
@@ -32,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bound successful SACK fast retransmission per pending record, preserve deferred retries after BUSY, and count successful retries before later failures.
+- Reclaim a newly created RX peer after failed first admission and widen RTT intermediates before applying timeout bounds.
+- Expire partial parsers independently of PHY polling and RX byte budgets; keep parser deadlines visible and process all already-read bytes while reporting the first receive error.
+- Reject authenticated broadcast sessions and sends before consuming nonce state; count successful network sends consistently across copied, in-place and forwarded paths.
 - Commit every valid SACK acknowledgment before attempting a fast retransmission that may return BUSY.
 - Validate sends before peer admission, retain completed reassembly byte charges until release, and return reliable admission records without a second lookup.
 - Reject incomplete CRC frames, malformed spans, overflowing lengths and invalid in-place capacity before pointer arithmetic or frame mutation.

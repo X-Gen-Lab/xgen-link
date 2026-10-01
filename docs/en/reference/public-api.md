@@ -6,6 +6,8 @@ Use `<xgl/xgl.h>`. Installed headers include the generated profile and ABI const
 
 `xgl_memory_requirements()` measures exact storage. `xgl_init_static()` initializes aligned caller storage. `xgl_create()` reserves the same layout through `config.memory.allocator` (`xgm_allocator_t`), then requires `xgl_init()`. Only Full may select the optional xgen-memory libc backend. `xgl_destroy()` frees a dynamically reserved workspace, or ends use of static storage.
 
+`xgl_memory_report()` returns the same requirements with a breakdown by resource category, without allocating or changing an instance. Category bytes include padding and sum to the exact workspace size. Admission byte limits can be smaller than reserved pool storage; see [Resource Model](../guide/resource-model.md).
+
 The configuration and referenced PHY/provider/callback objects are borrowed until destruction. Keep their addresses stable and do not modify them while the instance exists. All operations on an instance are serialized by the caller; callbacks must not reenter it.
 
 ## Send and scheduling

@@ -1,6 +1,6 @@
 # Security
 
-Authentication is an optional compiled capability in embedded and full profiles. The current Boot profile omits it. Authentication protects unicast traffic; this implementation does not provide payload encryption or a key-establishment protocol.
+Authentication is a compiled capability in embedded and full profiles. Boot and embedded-lite omit it. Authentication protects unicast traffic; this implementation does not provide payload encryption or a key-establishment protocol.
 
 ## Trusted Associations
 

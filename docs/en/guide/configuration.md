@@ -47,6 +47,17 @@ Authentication does not require a libc allocator: static workspaces support it. 
 
 ## Validation and Build Profiles
 
-`boot` permits one peer, at most one route, window one, and no authentication, fragmentation, forwarding, or out-of-order buffering. `embedded` and `full` compile these capabilities; runtime configuration still determines enabled features and capacities.
+Only these explicit capability combinations are supported, rather than arbitrary feature-flag permutations. Runtime configuration still selects enabled features and capacities, but cannot restore capabilities removed at build time.
+
+| Profile | Configuration ID | Authentication/forwarding | Fragmentation/out-of-order | Statistics/diagnostic text |
+| --- | ---: | --- | --- | --- |
+| `boot` | 301 | No | No | No |
+| `embedded-lite` | 304 | No | Yes | Yes |
+| `embedded` | 302 | Yes | Yes | Yes |
+| `full` | 303 | Yes | Yes | Yes |
+
+Boot permits one peer, at most one route, and window one. Embedded Lite uses eight reliable-index buckets and retains no security-session storage. It serves endpoints requiring bounded fragmentation and out-of-order buffering without authentication or forwarding. The generated `xgl_build_config.h` declares the other capacity limits.
+
+Installed packages export `xgl_PROFILE`, `xgl_BUILD_CONFIG_ID`, and `xgl_CAPABILITIES`; target `xgl::xgl` also carries `XGL_PROFILE`, `XGL_BUILD_CONFIG_ID`, and `XGL_CAPABILITIES` properties. Consumers can require capabilities with `find_package(xgl CONFIG REQUIRED COMPONENTS fragmentation out_of_order)`; unsupported required capabilities fail configuration. Requestable names are `wire`, `reliable`, `authentication`, `forwarding`, `fragmentation`, `out_of_order`, `statistics`, and `diagnostics`.
 
 Compression and payload encryption remain reserved and rejected; keep both feature flags false and `compression_id` zero. Use `xgl_memory_requirements()` to detect workspace arithmetic overflow and query the actual ABI-dependent size. Build and consume matching generated profile headers.

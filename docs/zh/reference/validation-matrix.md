@@ -16,17 +16,20 @@
 | ACK 长度溢出、初始化失败释放、PHY 错误与恢复 | `test/unit/wire/test_coverage_wire.cpp`、`test/unit/api/test_coverage_api.cpp`、`test/integration/test_coverage_delivery.cpp` |
 | RTT 观察、workspace 预留量、流式 CRC 分类 | `test/unit/api/test_stats.cpp`、`test/unit/datalink/test_datalink.cpp` |
 | Boot 关闭统计和详细诊断时保留错误契约 | `tools/static_workspace_smoke.c` 的条件分支 |
+| Boot/Lite 可靠交付、容量拒绝、parser 和跨窗口分片 | `test/unit/api/test_bounded_profile.cpp` 的按能力测试 |
+| Boot 逻辑 TX 32 字节扩展上限与 raw wire 独立边界 | `test/unit/network/test_boot_network.cpp` |
+| 多配置发布/安装、导出能力与预算拒绝 | `test/cmake/test_profile_builds.py`、`test/cmake/test_footprint_budget.py` |
 | 公开/私有头文件独立 C11/C++17 编译、逐例发现、种子回放 | `test/cmake/HeaderContracts.cmake`、分类与 runner 契约测试 |
 
 ## 构建覆盖
 
-本地 Full 矩阵包括协议回归及四个主机示例。Boot 和 Embedded 分别以关闭 libc 的 C11 构建，执行静态工作区及安装包消费者测试。独立基础包拥有各自的行为、最小消费、安装和质量矩阵；协议负责五包集成。来源 core 的测试只记录为迁移基线，不代替新提供者验收。
+本地 Full 矩阵包括协议回归及四个主机示例。Boot、Embedded Lite 和 Embedded 分别以关闭协议 libc fallback 的 C11 构建，执行静态工作区及安装包消费者测试；显式开启 GoogleTest 后，Boot/Lite 按能力测试，Embedded 执行完整历史回归。独立基础包拥有各自的行为、最小消费、安装和质量矩阵；协议负责五包集成。来源 core 的测试只记录为迁移基线，不代替新提供者验收。
 
 此前五包迁移的中间检查点 `6927196` 通过 4/4 CompactWindow；有效 RED 见 `b169a10`。该阶段最终 Full 在 GCC/MSVC 各通过 8/8 CTest、510/510 GoogleTest，Embedded 4/4 CTest（510 项 GoogleTest）、当时默认五子模块 Boot 2/2 CTest 通过。memory 与 containers 各自通过 GCC/MSVC 及共享质量，core 活跃实现和旧 gitlink 已退出。这些历史结果的固定提交、覆盖率、安装入口负例和完整资源口径见仓库 `REFACTORING_STATUS.md`。
 
 现行正式消费限定为预提供 targets 或安装包，源码开发使用独立 dev 装配。五个开发依赖与共享质量工具固定到已发布提交。前一独立交付阶段的远端全新克隆 GNU Full、Embedded 各执行 561 项（554 个 GoogleTest 加 7 项 smoke/示例），Boot 执行 2 项，各配置实际完成安装消费。这些结果属于前一阶段，不代替后续源码变更验证。
 
-本次协议结构重构的本地 GNU Full/Embedded 和 MSVC Full 各执行 582 项（575 个 GoogleTest 加 7 项 smoke/示例），GNU Boot 执行 2 项；独立头检查覆盖 4 个公开头、24 个私有头和生成配置头的 C11/C++17 首包含。最新 sanitizer、覆盖率、ELF、源码提交与远端执行状态由根目录 `REFACTORING_STATUS.md` 记录。
+前一轮协议结构重构的本地 GNU Full/Embedded 和 MSVC Full 各执行 582 项（575 个 GoogleTest 加 7 项 smoke/示例），GNU Boot 执行 2 项；当时独立头检查覆盖 4 个公开头、24 个私有头和生成配置头的 C11/C++17 首包含。最新 sanitizer、覆盖率、ELF、源码提交与远端执行状态由根目录 `REFACTORING_STATUS.md` 记录。
 
 本轮生产依赖契约扩展到 11 项，逐用例分类具有独立 CTest 策略回归，全部公开、私有及生成配置头分别以 C11/C++17 首包含编译。所有原有 510 个协议测试名称由版本控制清单逐一保留。更早阶段的通用组件测试已随实现迁往各自仓库，不与本轮协议清单混淆。主机生产覆盖率按行、函数、分支分别阻断，具体分子、分母、工具和源码提交见对应报告。
 
@@ -35,5 +38,9 @@
 ## 资源与产品边界
 
 Cortex-M0 探针记录真实链接的 ELF、map、目标 ABI 工作区公式及栈使用文件，可按 `tools/boot_footprint/README.md` 复现。原生运行另行比较布局公式并执行真实初始化。
+
+本轮本地固定 GCC 15.2.1 的 MTU/RX 128 和 64 完整 ELF 均为 Flash 16,060 B；workspace 分别为 1,136/944 B，含预留 1,024 B 栈的 RAM 分别为 2,224/2,032 B，最大单函数栈为 272 B。128 相比前一轮增加 368 B Flash、减少 32 B workspace/RAM 和 120 B 单函数栈；64 是首次配置基线。两者均无堆或未解析符号，本地 policy 门槛通过。16 KiB Flash 门槛为回归限额，8 KiB Flash 设计目标尚未达到。
+
+新增 CI 矩阵包含 Boot/Lite 能力测试、Embedded 完整回归、多配置安装消费及两个 ARM 资源门槛；本地脚本通过不等于该新矩阵已在远端执行，须以当前提交的实际结果为准。
 
 未验收真实板卡、Flash 断电、ISR 嵌套、完整调用链栈上界、DMA lease、生产密码 provider 或跨重启新鲜性。Boot 升级使用主机 Flash 模型，CRC16 只用于意外损坏校验。Linux sanitizer 的实际运行单独归档，不能从 Windows 结果推断。
