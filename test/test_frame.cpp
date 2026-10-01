@@ -479,6 +479,37 @@ TEST(XglFrameTest, SerializeFrameNullPointers) {
               XGL_ERR_NULL_POINTER);
 }
 
+TEST(XglFrameTest, SerializeRejectsNonemptyNullSpans) {
+    xgl_frame_params_t params = {};
+    params.source_id = 1U;
+    params.target_id = 2U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    uint8_t buffer[64] = {};
+    size_t written = 0U;
+
+    frame.payload_len = 1U;
+    EXPECT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &written),
+              XGL_ERR_NULL_POINTER);
+    frame.payload_len = 0U;
+    frame.extensions_len = XGL_DATA_TYPE_EXT_SIZE;
+    EXPECT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &written),
+              XGL_ERR_NULL_POINTER);
+}
+
+TEST(XglFrameTest, SerializeRejectsUnrepresentablePayloadLength) {
+    xgl_frame_params_t params = {};
+    params.source_id = 1U;
+    params.target_id = 2U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    uint8_t buffer[64] = {};
+    frame.payload_len = SIZE_MAX;
+    size_t written = 0U;
+    EXPECT_EQ(xgl_frame_serialize(buffer, sizeof(buffer), &frame, &written),
+              XGL_ERR_BUFFER_TOO_SMALL);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Zero-Copy Tests                                                           */
 /*---------------------------------------------------------------------------*/

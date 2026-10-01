@@ -594,6 +594,22 @@ TEST_F(XglParserTest, GetFrameBeforeComplete) {
     EXPECT_EQ(err, XGL_ERR_INVALID_FRAME);
 }
 
+TEST_F(XglParserTest, RejectsFrameUntilBothCrcBytesArrive) {
+    const auto frame = create_valid_frame({0xA1, 0xB2});
+    for (size_t missing = 1U; missing <= XGL_CRC16_SIZE; ++missing) {
+        SCOPED_TRACE(missing);
+        xgl_parser_reset(&parser);
+        for (size_t i = 0U; i < frame.size() - missing; ++i) {
+            ASSERT_EQ(xgl_parser_feed_byte(&parser, frame[i], 0U),
+                      XGL_PARSE_RESULT_INCOMPLETE);
+        }
+        uint8_t* bytes = nullptr;
+        size_t length = 0U;
+        EXPECT_EQ(xgl_parser_get_frame(&parser, &bytes, &length),
+                  XGL_ERR_INVALID_FRAME);
+    }
+}
+
 TEST_F(XglParserTest, GetFrameNullPointers) {
     xgl_error_t err = xgl_parser_get_frame(nullptr, nullptr, nullptr);
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
