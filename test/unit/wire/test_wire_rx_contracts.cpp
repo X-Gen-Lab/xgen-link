@@ -131,6 +131,7 @@ TEST(XglWireRxContractTest, StreamKeepsCrcClassificationAndRecoversAfterReset) {
         EXPECT_EQ(result, XGL_PARSE_RESULT_ERROR);
         EXPECT_EQ(status, corrupt_header ? XGL_WIRE_DECODE_HEADER_CRC
                                          : XGL_WIRE_DECODE_FRAME_CRC);
+        xgl_parser_reset(&parser);
         EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
         for (const uint8_t byte : valid) {
             result =
