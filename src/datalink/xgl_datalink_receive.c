@@ -78,6 +78,27 @@ static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
     return XGL_OK;
 }
 
+/** \brief           Reset expired parser state once without reading the PHY. */
+xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
+                                      xgl_parser_t* parser, uint32_t now_ms,
+                                      uint32_t timeout_ms) {
+    if (!xgl_parser_check_timeout(parser, now_ms, timeout_ms)) {
+        return XGL_OK;
+    }
+    xgl_parser_reset(parser);
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
+        ctx->stats->rx_errors++;
+    }
+#endif
+    if (ctx->error_callback != NULL) {
+        ctx->error_callback(ctx->owner_handle, XGL_ERR_TIMEOUT,
+                            XGL_ERROR_MESSAGE("Parser timeout"),
+                            ctx->callback_user_data);
+    }
+    return XGL_ERR_TIMEOUT;
+}
+
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
@@ -103,38 +124,27 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (xgl_parser_check_timeout(parser, current_time_ms, timeout_ms)) {
-        xgl_parser_reset(parser);
-#if XGL_FEATURE_STATISTICS
-        if (ctx->stats != NULL) {
-            ctx->stats->rx_errors++;
-        }
-#endif
-        if (ctx->error_callback != NULL) {
-            ctx->error_callback(ctx->owner_handle, XGL_ERR_TIMEOUT,
-                                XGL_ERROR_MESSAGE("Parser timeout"),
-                                ctx->callback_user_data);
-        }
-    }
+    xgl_error_t first_error = xgl_datalink_expire_parser(
+        ctx, parser, current_time_ms, timeout_ms);
 
     uint8_t rx_buffer[XGL_DATALINK_RX_CHUNK_SIZE];
     size_t rx_capacity =
         byte_budget < sizeof(rx_buffer) ? byte_budget : sizeof(rx_buffer);
     if (rx_capacity == 0U) {
-        return XGL_OK;
+        return first_error;
     }
     size_t rx_len = rx_capacity;
 
     xgl_error_t err = phy->rx(rx_buffer, &rx_len, phy->user_data);
     if (err != XGL_OK) {
-        return err;
+        return first_error == XGL_OK ? err : first_error;
     }
     if (rx_len > rx_capacity) {
-        return XGL_ERR_INVALID_PARAM;
+        return first_error == XGL_OK ? XGL_ERR_INVALID_PARAM : first_error;
     }
 
     if (rx_len == 0) {
-        return XGL_OK;
+        return first_error;
     }
 
     xgl_wire_frame_view_t view;
@@ -144,7 +154,10 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
             parser, rx_buffer[i], current_time_ms, &view, &status);
 
         if (result == XGL_PARSE_RESULT_COMPLETE) {
-            (void)datalink_deliver_view(ctx, &view);
+            err = datalink_deliver_view(ctx, &view);
+            if (first_error == XGL_OK) {
+                first_error = err;
+            }
             xgl_parser_reset(parser);
 
         } else if (result == XGL_PARSE_RESULT_ERROR) {
@@ -152,7 +165,7 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
         }
     }
 
-    return XGL_OK;
+    return first_error;
 }
 
 /**

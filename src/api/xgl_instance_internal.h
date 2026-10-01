@@ -78,6 +78,7 @@ struct xgl_instance {
 
     xgl_instance_link_t* links; /**< One RX parser per unique PHY */
     size_t link_count;
+    uint32_t parser_timeout_ms; /**< Latest step policy; zero disables expiry */
 
     /*-----------------------------------------------------------------------*/
     /* Protocol Stack Layers (Unified Management)                            */

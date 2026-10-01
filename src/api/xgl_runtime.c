@@ -30,6 +30,17 @@ bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
             next = remaining;
             found = true;
         }
+        if (handle->parser_timeout_ms != 0U &&
+            link->parser.state != XGL_PARSE_MAGIC &&
+            link->parser.state != XGL_PARSE_COMPLETE) {
+            const uint32_t parser_elapsed = now_ms - link->parser.timestamp;
+            remaining = parser_elapsed >= handle->parser_timeout_ms
+                            ? 0U
+                            : handle->parser_timeout_ms - parser_elapsed;
+            if (remaining < next) {
+                next = remaining;
+            }
+        }
     }
     if (found) {
         *delay_ms = next;
@@ -53,18 +64,23 @@ xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
     }
     xgl_error_t error;
     handle->layers.transport_ctx.current_time_ms = now_ms;
+    handle->parser_timeout_ms = budget->receive_timeout_ms;
     xgl_error_t first_error = XGL_OK;
-    for (size_t i = 0; i < handle->link_count && budget->rx_bytes != 0U; ++i) {
+    for (size_t i = 0; i < handle->link_count; ++i) {
         xgl_instance_link_t* link = &handle->links[i];
-        if (link->polled &&
-            now_ms - link->last_poll_ms < link->poll_interval_ms) {
-            continue;
+        if (budget->rx_bytes == 0U ||
+            (link->polled &&
+             now_ms - link->last_poll_ms < link->poll_interval_ms)) {
+            error = xgl_datalink_expire_parser(&handle->layers.datalink_ctx,
+                                               &link->parser, now_ms,
+                                               budget->receive_timeout_ms);
+        } else {
+            link->polled = true;
+            link->last_poll_ms = now_ms;
+            error = xgl_datalink_poll_parser(
+                &handle->layers.datalink_ctx, &link->parser, link->phy, now_ms,
+                budget->receive_timeout_ms, budget->rx_bytes);
         }
-        link->polled = true;
-        link->last_poll_ms = now_ms;
-        error = xgl_datalink_poll_parser(
-            &handle->layers.datalink_ctx, &link->parser, link->phy, now_ms,
-            budget->receive_timeout_ms, budget->rx_bytes);
         if (first_error == XGL_OK && error != XGL_OK) {
             first_error = error;
         }

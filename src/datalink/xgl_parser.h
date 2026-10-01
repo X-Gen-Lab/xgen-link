@@ -119,7 +119,7 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
  * \brief           Check for parser timeout
  * \param[in]       parser: Parser structure
  * \param[in]       current_time_ms: Current time in milliseconds
- * \param[in]       timeout_ms: Timeout value in milliseconds
+ * \param[in]       timeout_ms: Timeout in milliseconds; zero disables expiry
  * \return          true if timeout occurred, false otherwise
  */
 bool xgl_parser_check_timeout(const xgl_parser_t* parser,

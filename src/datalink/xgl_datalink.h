@@ -133,6 +133,18 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
                                   size_t frame_len);
 
 /**
+ * \brief           Expire an incomplete frame independently of PHY polling
+ * \param[in,out]   ctx: Shared diagnostics and owner context
+ * \param[in,out]   parser: Parser owned by the selected PHY
+ * \param[in]       now_ms: Explicit monotonic time in milliseconds
+ * \param[in]       timeout_ms: Partial-frame lifetime; zero disables expiry
+ * \return          XGL_ERR_TIMEOUT after resetting an expired frame, else OK
+ */
+xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
+                                      xgl_parser_t* parser, uint32_t now_ms,
+                                      uint32_t timeout_ms);
+
+/**
  * \brief           Poll one PHY using its own parser and shared link policy
  * \param[in,out]   ctx: Shared security, statistics and delivery context
  * \param[in,out]   parser: Parser owned by the selected PHY
@@ -142,6 +154,9 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
  * \param[in]       byte_budget: Maximum bytes to read in this call
  * \return          XGL_OK on success, error code otherwise
  * \note            A single read is capped at XGL_DATALINK_RX_CHUNK_SIZE.
+ *                  Return the first timeout, PHY or delivery error while
+ *                  consuming the entire received chunk. Malformed stream
+ *                  frames are discarded and reported through diagnostics.
  */
 xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
                                      xgl_parser_t* parser, xgl_phy_ops_t* phy,

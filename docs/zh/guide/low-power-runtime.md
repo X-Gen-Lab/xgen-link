@@ -4,7 +4,11 @@
 
 ## 相对超时 API
 
-`xgl_step(handle, now_ms, &budget)` 轮询到期链路并推进 transport。`budget.rx_bytes` 是每条链路的字节上限；为零时跳过 RX 轮询，但仍维护 transport。`receive_timeout_ms` 控制不完整帧的 parser 超时，不是 API 阻塞等待时间。
+`xgl_step(handle, now_ms, &budget)` 轮询到期链路并推进 transport。`budget.rx_bytes` 是每条链路的字节上限；为零时跳过 RX 轮询，但仍维护 parser 超时和 transport。`receive_timeout_ms` 控制不完整帧的 parser 超时，不是 API 阻塞等待时间。零表示关闭 parser 超时；最近一次有效 step 的超时策略应用于所有半帧，仍从原始起始时间计算，修改策略不会重新计时。
+
+Parser 截止时间独立于 PHY 轮询间隔参与 `xgl_next_timeout()`。即使 PHY 每秒才轮询一次，10 ms 的半帧仍会在 10 ms 到期。到期后只重置和报告一次，零 RX 字节预算也会维护超时。
+
+Step 返回最先出现的 parser 超时、PHY、交付或 transport 错误，同时继续消费已读出的整个字节批次并维护 transport。流中的格式错误帧被丢弃并通过诊断报告，不阻断后续帧的解析。PHY 成功读出字节不等于应用成功接纳。
 
 `xgl_next_timeout(handle, now_ms, &delay_ms)` 在存在截止事件时返回 true。延迟为零表示立即有工作；false 不修改输出，必须单独处理，不能按未初始化的值睡眠。
 

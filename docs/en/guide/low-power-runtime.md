@@ -4,7 +4,11 @@ The application drives protocol work explicitly. There is no internal clock prov
 
 ## Relative Timeout API
 
-`xgl_step(handle, now_ms, &budget)` polls each due link and advances transport work. `budget.rx_bytes` is a per-link byte limit; zero skips RX polling while still maintaining transport. `receive_timeout_ms` controls incomplete-frame parser timeout, not an API blocking wait.
+`xgl_step(handle, now_ms, &budget)` polls each due link and advances transport work. `budget.rx_bytes` is a per-link byte limit; zero skips RX polling while still maintaining parser expiry and transport. `receive_timeout_ms` controls incomplete-frame parser timeout, not an API blocking wait. Zero disables parser expiry. The latest valid step's timeout applies to all incomplete frames from their original start timestamps; changing it does not restart parsing.
+
+Parser deadlines participate in `xgl_next_timeout()` independently of the PHY polling interval. A 10 ms partial-frame timeout still expires at 10 ms when that PHY is polled only once per second. Expiry resets and reports the frame once, including steps with zero RX bytes.
+
+A step returns its first parser timeout, PHY, delivery or transport error while continuing to consume the received byte chunk and maintain transport. Malformed stream frames are discarded and reported through diagnostics; they do not stop parsing later frames. A successful PHY read alone does not imply successful application admission.
 
 `xgl_next_timeout(handle, now_ms, &delay_ms)` returns true when a deadline exists. A zero delay means work is due now. False leaves the output unchanged; handle that case separately instead of sleeping an uninitialized value.
 

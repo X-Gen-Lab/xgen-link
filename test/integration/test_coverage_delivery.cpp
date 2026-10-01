@@ -115,7 +115,7 @@ TEST_F(XglCoverageDelivery, TimedOutPartialFramesResetWithOptionalObservers) {
                   XGL_PARSE_RESULT_INCOMPLETE);
         EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 30, 10,
                                            XGL_DATALINK_RX_CHUNK_SIZE),
-                  XGL_OK);
+                  XGL_ERR_TIMEOUT);
         EXPECT_EQ(parser.cache_len, 0U);
         EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
     }
@@ -186,9 +186,12 @@ TEST_F(XglCoverageDelivery, ParserViewRetainsTheDatalinkFrameLimit) {
         XGL_OK);
 
     while (!input.empty()) {
+        const xgl_error_t expected = input.size() <= XGL_DATALINK_RX_CHUNK_SIZE
+                                         ? XGL_ERR_INVALID_FRAME
+                                         : XGL_OK;
         ASSERT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 1U, 10U,
                                            XGL_DATALINK_RX_CHUNK_SIZE),
-                  XGL_OK);
+                  expected);
     }
     EXPECT_EQ(statistics.rx_packets, 0U);
     EXPECT_EQ(statistics.rx_errors, 1U);
@@ -322,7 +325,9 @@ TEST_F(XglCoverageDelivery, NetworkRejectsMissingOrInvalidFrameViews) {
               XGL_ERR_CRC_FAILED);
     frame[frame_size - 1] ^= 1U;
     ASSERT_EQ(xgl_wire_decode_frame(&view, frame, frame_size, nullptr), XGL_OK);
-    network.auth_required = true;
+    xgl_security_ctx_t security = {};
+    security.auth_required = true;
+    network.security = &security;
     EXPECT_EQ(xgl_network_receive_view(&network, nullptr, &view),
               XGL_ERR_INVALID_FRAME);
 }
