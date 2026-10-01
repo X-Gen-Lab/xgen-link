@@ -17,6 +17,179 @@
 
 #include "api/xgl_instance_internal.h"
 
+/** \brief           Exercise deadlines and failures through the public step. */
+class XglRuntimeContractTest : public ::testing::Test {
+  protected:
+    void SetUp() override {
+        xgl_config_get_default(&config);
+        config.source_id = 1U;
+        config.protocol.max_frame_size = 128U;
+        config.memory.rx_buffer_size = 128U;
+        config.route_table = &route;
+        config.route_table_len = 1U;
+        config.callback_user_data = this;
+        config.error_callback = [](xgl_handle_t, xgl_error_t error,
+                                   const char*, void* user) {
+            auto* self = static_cast<XglRuntimeContractTest*>(user);
+            if (error == XGL_ERR_TIMEOUT) {
+                ++self->timeouts;
+            }
+        };
+        config.rx_accept_callback = [](xgl_handle_t, uint16_t, uint8_t,
+                                       const uint8_t*, size_t,
+                                       void* user) -> xgl_error_t {
+            auto* self = static_cast<XglRuntimeContractTest*>(user);
+            const size_t index = self->deliveries++;
+            return index < self->results.size() ? self->results[index] : XGL_OK;
+        };
+        phy.user_data = this;
+        phy.tx = [](const uint8_t*, size_t, void* user) -> xgl_error_t {
+            ++static_cast<XglRuntimeContractTest*>(user)->writes;
+            return XGL_OK;
+        };
+        phy.rx = [](uint8_t* data, size_t* length,
+                    void* user) -> xgl_error_t {
+            auto* self = static_cast<XglRuntimeContractTest*>(user);
+            ++self->reads;
+            size_t copied = 0U;
+            while (copied < *length && self->cursor < self->input.size()) {
+                data[copied++] = self->input[self->cursor++];
+            }
+            *length = copied;
+            return XGL_OK;
+        };
+        xgl_test_use_host_allocator(&config);
+        handle = xgl_create(&config);
+        ASSERT_NE(handle, nullptr);
+        ASSERT_EQ(xgl_init(handle), XGL_OK);
+    }
+
+    void TearDown() override {
+        xgl_destroy(handle);
+    }
+
+    void AppendFrame() {
+        const uint8_t payload = 42U;
+        xgl_frame_params_t params{};
+        params.source_id = 2U;
+        params.target_id = 1U;
+        params.payload = &payload;
+        params.payload_len = 1U;
+        xgl_frame_t frame{};
+        ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+        uint8_t bytes[128]{};
+        size_t length = 0U;
+        ASSERT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &length),
+                  XGL_OK);
+        input.insert(input.end(), bytes, bytes + length);
+    }
+
+    xgl_config_t config{};
+    xgl_phy_ops_t phy{};
+    xgl_route_item_t route{2U, &phy, 128U, 1U, 0U};
+    xgl_handle_t handle = nullptr;
+    std::vector<uint8_t> input;
+    std::vector<xgl_error_t> results;
+    size_t cursor = 0U;
+    size_t reads = 0U;
+    size_t writes = 0U;
+    size_t deliveries = 0U;
+    size_t timeouts = 0U;
+};
+
+TEST_F(XglRuntimeContractTest, ParserDeadlinePrecedesSlowPhyPolling) {
+    input = {XGL_WIRE_MAGIC_0};
+    const xgl_work_budget_t budget{128U, 10U};
+    ASSERT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+    uint32_t delay = 0U;
+    ASSERT_TRUE(xgl_next_timeout(handle, 0U, &delay));
+    EXPECT_EQ(delay, 10U);
+    EXPECT_EQ(xgl_step(handle, 9U, &budget), XGL_OK);
+    EXPECT_EQ(xgl_step(handle, 10U, &budget), XGL_ERR_TIMEOUT);
+    EXPECT_EQ(timeouts, 1U);
+    EXPECT_EQ(reads, 1U);
+    ASSERT_TRUE(xgl_next_timeout(handle, 10U, &delay));
+    EXPECT_EQ(delay, 990U);
+    EXPECT_EQ(xgl_step(handle, 11U, &budget), XGL_OK);
+    EXPECT_EQ(timeouts, 1U);
+}
+
+TEST_F(XglRuntimeContractTest, ZeroRxBudgetStillExpiresPartialFrames) {
+    input = {XGL_WIRE_MAGIC_0};
+    xgl_work_budget_t budget{128U, 10U};
+    ASSERT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+    budget.rx_bytes = 0U;
+    EXPECT_EQ(xgl_step(handle, 10U, &budget), XGL_ERR_TIMEOUT);
+    EXPECT_EQ(timeouts, 1U);
+    EXPECT_EQ(reads, 1U);
+}
+
+TEST_F(XglRuntimeContractTest, LatestTimeoutAppliesWithoutRestartingPartialFrame) {
+    input = {XGL_WIRE_MAGIC_0};
+    xgl_work_budget_t budget{128U, 100U};
+    ASSERT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+    budget.receive_timeout_ms = 20U;
+    budget.rx_bytes = 0U;
+    ASSERT_EQ(xgl_step(handle, 5U, &budget), XGL_OK);
+    uint32_t delay = 0U;
+    ASSERT_TRUE(xgl_next_timeout(handle, 5U, &delay));
+    EXPECT_EQ(delay, 15U);
+    EXPECT_EQ(xgl_step(handle, 20U, &budget), XGL_ERR_TIMEOUT);
+}
+
+TEST_F(XglRuntimeContractTest, DisabledTimeoutRetainsPartialFrameAcrossPolls) {
+    AppendFrame();
+    xgl_work_budget_t budget{1U, 0U};
+    ASSERT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+    budget.rx_bytes = 128U;
+    EXPECT_EQ(xgl_step(handle, 1000U, &budget), XGL_OK);
+    EXPECT_EQ(timeouts, 0U);
+    EXPECT_EQ(deliveries, 1U);
+}
+
+TEST_F(XglRuntimeContractTest, PartialFrameDeadlineSurvivesClockWrap) {
+    input = {XGL_WIRE_MAGIC_0};
+    xgl_work_budget_t budget{128U, 10U};
+    constexpr uint32_t started = UINT32_MAX - 4U;
+    ASSERT_EQ(xgl_step(handle, started, &budget), XGL_OK);
+    uint32_t delay = 0U;
+    ASSERT_TRUE(xgl_next_timeout(handle, 3U, &delay));
+    EXPECT_EQ(delay, 2U);
+    budget.rx_bytes = 0U;
+    EXPECT_EQ(xgl_step(handle, 5U, &budget), XGL_ERR_TIMEOUT);
+    EXPECT_EQ(timeouts, 1U);
+}
+
+TEST_F(XglRuntimeContractTest, BatchReturnsFirstDeliveryErrorAndConsumesLaterFrames) {
+    AppendFrame();
+    AppendFrame();
+    AppendFrame();
+    results = {XGL_ERR_BUSY, XGL_ERR_NO_MEMORY, XGL_OK};
+    const xgl_work_budget_t budget{128U, 100U};
+    EXPECT_EQ(xgl_step(handle, 0U, &budget), XGL_ERR_BUSY);
+    EXPECT_EQ(deliveries, 3U);
+    EXPECT_EQ(cursor, input.size());
+    EXPECT_EQ(xgl_step(handle, 1000U, &budget), XGL_OK);
+    EXPECT_EQ(deliveries, 3U);
+}
+
+TEST_F(XglRuntimeContractTest, ReceiveFailureDoesNotSkipReliableMaintenance) {
+    const uint8_t payload = 7U;
+    xgl_tx_data_t request{};
+    request.target_id = 2U;
+    request.data = &payload;
+    request.data_len = 1U;
+    request.reliable = true;
+    request.timeout_ms = 10U;
+    ASSERT_EQ(xgl_send_at(handle, &request, 0U), XGL_OK);
+    const size_t initial_writes = writes;
+    AppendFrame();
+    results = {XGL_ERR_NO_MEMORY};
+    const xgl_work_budget_t budget{128U, 100U};
+    EXPECT_EQ(xgl_step(handle, 10U, &budget), XGL_ERR_NO_MEMORY);
+    EXPECT_GT(writes, initial_writes);
+}
+
 template <typename T, typename = void>
 struct HasLegacySequenceState : std::false_type {};
 
