@@ -37,7 +37,6 @@ TEST(XglFrameProperties, CrcErrorDetection) {
             static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         uint16_t target_id =
             static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
-        uint8_t data_type = XGL_PACKET_TYPE_DATA;
         uint32_t packet_number = gen.random_uint32();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07; /* 3 bits */
@@ -51,7 +50,6 @@ TEST(XglFrameProperties, CrcErrorDetection) {
         xgl_frame_params_t params = {};
         params.source_id = source_id;
         params.target_id = target_id;
-        params.data_type = data_type;
         params.packet_number = packet_number;
         params.payload = payload.data();
         params.payload_len = payload_len;
@@ -173,7 +171,6 @@ TEST(XglFrameProperties, FrameEncapsulationRoundTrip) {
         xgl_frame_params_t params = {};
         params.source_id = source_id;
         params.target_id = target_id;
-        params.data_type = data_type;
         params.packet_number = packet_number;
         params.payload = payload.data();
         params.payload_len = payload_len;
@@ -293,7 +290,6 @@ TEST(XglFrameProperties, FieldValidation) {
         xgl_frame_params_t params = {};
         params.source_id = source_id;
         params.target_id = target_id;
-        params.data_type = data_type;
         params.payload = payload.data();
         params.payload_len = payload_len;
         params.reliable = reliable;
@@ -384,7 +380,6 @@ TEST(XglFrameProperties, FrameSizeCalculation) {
         xgl_frame_params_t params = {};
         params.source_id = 1;
         params.target_id = 2;
-        params.data_type = 0;
         params.payload = payload.data();
         params.payload_len = payload_len;
         params.reliable = false;
@@ -425,7 +420,6 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
             static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         uint16_t target_id =
             static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
-        uint8_t data_type = XGL_PACKET_TYPE_DATA;
         size_t payload_len = gen.random_uint32() % 256;
         std::vector<uint8_t> payload = gen.random_bytes(payload_len);
 
@@ -434,7 +428,6 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
         xgl_frame_params_t params = {};
         params.source_id = source_id;
         params.target_id = target_id;
-        params.data_type = data_type;
         params.payload = payload.data();
         params.payload_len = payload_len;
         params.reliable = false;

@@ -72,7 +72,6 @@ class XglParserTest : public ::testing::Test {
         xgl_frame_params_t params = {};
         params.source_id = 0x01;
         params.target_id = 0x02;
-        params.data_type = 0x03;
         params.payload = payload.data();
         params.payload_len = payload.size();
         params.reliable = true;
@@ -350,7 +349,6 @@ TEST_F(XglParserTest, ParseCompleteAuthenticatedFrameWithSecurityTrailer) {
     xgl_frame_params_t params = {};
     params.source_id = 0x1234;
     params.target_id = 0x5678;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload.data();
     params.payload_len = payload.size();
     params.reliable = true;

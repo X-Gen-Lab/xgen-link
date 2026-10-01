@@ -24,7 +24,7 @@ extern "C" {
 #define XGL_WIRE_MAGIC_0            ((uint8_t)0xA5U)
 #define XGL_WIRE_MAGIC_1            ((uint8_t)0x5AU)
 #define XGL_WIRE_VERSION            3U
-#define XGL_WIRE_BASE_HEADER_SIZE   24U
+#define XGL_WIRE_BASE_HEADER_SIZE   XGL_FRAME_HEADER_SIZE
 #define XGL_WIRE_EXT_HEADER_SIZE    2U
 #define XGL_FRAGMENT_EXT_VALUE_SIZE 12U
 #define XGL_FRAGMENT_EXT_SIZE                                                  \
@@ -32,6 +32,9 @@ extern "C" {
 #define XGL_SESSION_EXT_VALUE_SIZE 12U
 #define XGL_SESSION_EXT_SIZE                                                   \
     (XGL_WIRE_EXT_HEADER_SIZE + XGL_SESSION_EXT_VALUE_SIZE)
+#define XGL_SECURITY_EXT_VALUE_SIZE 13U
+#define XGL_SECURITY_EXT_SIZE                                                  \
+    (XGL_WIRE_EXT_HEADER_SIZE + XGL_SECURITY_EXT_VALUE_SIZE)
 
 typedef enum {
     XGL_PACKET_TYPE_INVALID = 0,
@@ -104,6 +107,18 @@ typedef struct {
     const uint8_t* ranges;
     size_t range_count;
 } xgl_wire_ack_range_view_t;
+
+/**
+ * \brief           SACK fields borrowing the encoded bitmap bytes
+ * \note            Source bytes must remain alive and unchanged while the view
+ *                  is used. Transport applies its own receive capacity and
+ *                  packet-number validation before changing peer state.
+ */
+typedef struct {
+    const uint8_t* bitmap;
+    size_t bitmap_len;
+    uint32_t base_packet;
+} xgl_wire_sack_view_t;
 
 typedef struct {
     const uint8_t* buffer;
@@ -236,6 +251,20 @@ xgl_error_t
 xgl_wire_decode_sack_ext_value(const uint8_t* buffer, size_t buffer_size,
                                uint32_t* base_packet, uint8_t* bitmap,
                                size_t bitmap_capacity, size_t* bitmap_len);
+
+/**
+ * \brief           Validate a complete SACK value without copying its bitmap
+ * \param[in]       buffer: Borrowed encoded value bytes, excluding the TLV
+ * header
+ * \param[in]       buffer_size: Exact encoded value length
+ * \param[out]      view: Validated fields and borrowed bytes, cleared on
+ * failure
+ * \return          XGL_OK, NULL_POINTER or INVALID_FRAME
+ * \note            Empty bitmaps are structurally valid; transport determines
+ *                  whether the value can acknowledge a packet.
+ */
+xgl_error_t xgl_wire_decode_sack_view(const uint8_t* buffer, size_t buffer_size,
+                                      xgl_wire_sack_view_t* view);
 
 xgl_error_t xgl_wire_encode_fragment_ext_value(
     uint8_t* buffer, size_t buffer_size, uint32_t message_id,

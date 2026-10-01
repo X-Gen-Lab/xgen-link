@@ -5,6 +5,7 @@
 
 #include <datalink/xgl_datalink.h>
 #include <internal/xgl_diagnostics.h>
+#include <wire/xgl_frame_internal.h>
 #include <xgl/xgl_config.h>
 
 #include <xgen/memory/allocator.h>
@@ -120,13 +121,16 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
     size_t bytes_written = 0U;
 #if XGL_FEATURE_AUTH
     if (auth_tag_len != 0U) {
-        err = xgl_security_serialize_frame(frame_buffer, frame_size, frame,
-                                           ctx->security, &bytes_written);
+        err = xgl_security_serialize_measured(frame_buffer, frame, &layout,
+                                              ctx->security, &bytes_written);
     } else
 #endif
     {
-        err = xgl_frame_serialize(frame_buffer, frame_size, frame,
-                                  &bytes_written);
+        err = xgl_frame_encode_measured(frame_buffer, frame, &layout);
+        if (err == XGL_OK) {
+            err = xgl_frame_finalize_crc(frame_buffer, frame_size, &layout,
+                                         &bytes_written);
+        }
     }
     if (err != XGL_OK) {
         datalink_count_tx_error(ctx);

@@ -5,6 +5,7 @@
  */
 
 #include <wire/xgl_frame.h>
+#include <wire/xgl_frame_internal.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_error.h>
 #include <xgl/xgl_types.h>
@@ -13,44 +14,32 @@
 #include <xgen/bytes/bytes.h>
 #include <xgen/crc/crc.h>
 
+#define XGL_FRAME_DEFAULT_TTL 8U
+
 /*---------------------------------------------------------------------------*/
-/* Protocol Version                                                          */
+/* Frame Header                                                              */
 /*---------------------------------------------------------------------------*/
 
-/* Parameter order follows the documented protocol fields and units. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-static xgl_error_t encode_frame_wire_header(uint8_t* buffer, size_t buffer_size,
+/** \brief           Normalize derived header fields from the checked layout. */
+static xgl_error_t encode_frame_wire_header(uint8_t* buffer,
                                             const xgl_frame_t* frame,
-                                            size_t extension_len,
-                                            uint8_t extra_flags,
-                                            size_t* header_len) {
-    /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    if (buffer == NULL || frame == NULL || header_len == NULL) {
-        return XGL_ERR_NULL_POINTER;
+                                            const xgl_frame_layout_t* layout) {
+    uint8_t flags = frame->header.flags;
+    if (layout->tag_len > 0U) {
+        flags |= XGL_WIRE_FLAG_AUTHENTICATED;
     }
-    if (extension_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    size_t produced_header_len = XGL_WIRE_BASE_HEADER_SIZE + extension_len;
-    uint8_t flags = (uint8_t)(frame->header.flags | extra_flags);
-    if (extension_len > 0U) {
+    if (layout->header_len > XGL_WIRE_BASE_HEADER_SIZE) {
         flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
     }
 
     xgl_wire_header_t wire = frame->header;
     wire.version = XGL_WIRE_VERSION;
-    wire.header_len = (uint8_t)produced_header_len;
+    wire.header_len = (uint8_t)layout->header_len;
     wire.flags = flags;
-    wire.payload_len = (uint16_t)frame->payload_len;
+    wire.payload_len = (uint16_t)layout->payload_len;
     wire.header_crc16 = 0;
 
-    xgl_error_t err = xgl_wire_encode_header(buffer, buffer_size, &wire);
-    if (err != XGL_OK) {
-        return err;
-    }
-    *header_len = produced_header_len;
-    return XGL_OK;
+    return xgl_wire_encode_header(buffer, layout->frame_len, &wire);
 }
 
 /**
@@ -181,14 +170,14 @@ xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
     if (frame == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    xgl_frame_layout_t measured;
     xgl_error_t error = xgl_frame_measure_lengths(
-        frame->payload_len, frame->extensions_len, auth_tag_len, &measured);
+        frame->payload_len, frame->extensions_len, auth_tag_len, layout);
     if (error != XGL_OK) {
         return error;
     }
     if ((frame->payload_len > 0U && frame->payload == NULL) ||
         (frame->extensions_len > 0U && frame->extensions == NULL)) {
+        memset(layout, 0, sizeof(*layout));
         return XGL_ERR_NULL_POINTER;
     }
     if (auth_tag_len > 0U) {
@@ -196,10 +185,10 @@ xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
         error = xgl_wire_decode_ext_metadata(frame->extensions,
                                              frame->extensions_len, &metadata);
         if (error != XGL_OK || metadata.has_security_ext) {
+            memset(layout, 0, sizeof(*layout));
             return XGL_ERR_INVALID_FRAME;
         }
     }
-    *layout = measured;
     return XGL_OK;
 }
 
@@ -216,12 +205,12 @@ xgl_error_t xgl_frame_encode_into(uint8_t* buffer, size_t buffer_size,
     if (buffer_size < layout->frame_len) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    size_t encoded_header_len = 0U;
-    error = encode_frame_wire_header(
-        buffer, buffer_size, frame,
-        layout->header_len - XGL_WIRE_BASE_HEADER_SIZE,
-        auth_tag_len > 0U ? XGL_WIRE_FLAG_AUTHENTICATED : 0U,
-        &encoded_header_len);
+    return xgl_frame_encode_measured(buffer, frame, layout);
+}
+
+xgl_error_t xgl_frame_encode_measured(uint8_t* buffer, const xgl_frame_t* frame,
+                                      const xgl_frame_layout_t* layout) {
+    xgl_error_t error = encode_frame_wire_header(buffer, frame, layout);
     if (error != XGL_OK) {
         return error;
     }
@@ -229,7 +218,7 @@ xgl_error_t xgl_frame_encode_into(uint8_t* buffer, size_t buffer_size,
         memmove(buffer + XGL_WIRE_BASE_HEADER_SIZE, frame->extensions,
                 frame->extensions_len);
     }
-    if (auth_tag_len > 0U) {
+    if (layout->tag_len > 0U) {
         uint8_t* extension =
             buffer + XGL_WIRE_BASE_HEADER_SIZE + frame->extensions_len;
         extension[0] = XGL_WIRE_EXT_SECURITY;
@@ -237,7 +226,7 @@ xgl_error_t xgl_frame_encode_into(uint8_t* buffer, size_t buffer_size,
         size_t written = 0U;
         error = xgl_wire_encode_security_ext_value(
             extension + XGL_WIRE_EXT_HEADER_SIZE, XGL_SECURITY_EXT_VALUE_SIZE,
-            0U, 0U, (uint8_t)auth_tag_len, &written);
+            0U, 0U, (uint8_t)layout->tag_len, &written);
         if (error != XGL_OK) {
             return error;
         }
@@ -284,4 +273,64 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer, size_t buffer_size,
         return error;
     }
     return xgl_frame_finalize_crc(buffer, buffer_size, &layout, bytes_written);
+}
+
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer, size_t buffer_size,
+                                     size_t data_offset, size_t data_len,
+                                     uint16_t source_id, uint16_t target_id,
+                                     uint8_t data_type, uint32_t packet_number,
+                                     bool reliable, uint8_t priority,
+                                     size_t* frame_len) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    if (buffer == NULL || frame_len == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (data_len > UINT16_MAX) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    size_t app_type_ext_len = (data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
+    xgl_frame_layout_t layout;
+    xgl_error_t error =
+        xgl_frame_measure_lengths(data_len, app_type_ext_len, 0U, &layout);
+    if (error != XGL_OK) {
+        return error;
+    }
+    if (data_offset != layout.header_len) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    if (buffer_size < layout.frame_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+
+    uint8_t extensions[XGL_DATA_TYPE_EXT_SIZE];
+    if (app_type_ext_len > 0U) {
+        size_t written = 0U;
+        error = xgl_wire_encode_ext(extensions, sizeof(extensions),
+                                    XGL_WIRE_EXT_DATA_TYPE, &data_type, 1U,
+                                    &written);
+        if (error != XGL_OK) {
+            return error;
+        }
+    }
+    xgl_frame_params_t params = {.source_id = source_id,
+                                 .target_id = target_id,
+                                 .packet_number = packet_number,
+                                 .extensions =
+                                     app_type_ext_len > 0U ? extensions : NULL,
+                                 .extensions_len = app_type_ext_len,
+                                 .payload = buffer + data_offset,
+                                 .payload_len = data_len,
+                                 .reliable = reliable,
+                                 .priority = priority,
+                                 .ttl = XGL_FRAME_DEFAULT_TTL};
+    xgl_frame_t frame;
+    error = xgl_frame_build(&frame, &params);
+    if (error != XGL_OK) {
+        return error;
+    }
+    return xgl_frame_serialize(buffer, buffer_size, &frame, frame_len);
 }

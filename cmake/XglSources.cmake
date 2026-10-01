@@ -17,7 +17,6 @@ set(XGL_SOURCES
     src/wire/xgl_wire_ext.c
     src/wire/xgl_wire.c
     src/wire/xgl_frame.c
-    src/wire/xgl_frame_zerocopy.c
 
     # Security
     src/security/xgl_security_frame.c

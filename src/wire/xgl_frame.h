@@ -43,20 +43,17 @@ typedef struct {
 
 /**
  * \brief           Frame building parameters
- * \details         Encapsulates all parameters needed to build a frame
+ * \details         Normalizes transport flags and borrowed byte spans.
+ * DATA_TYPE and SESSION values are encoded only in the extension span.
  */
 typedef struct {
     uint16_t source_id;  /**< Source node ID */
     uint16_t target_id;  /**< Target node ID */
-    uint8_t data_type;   /**< Application/control data type; encoded by upper
-                            layers */
     uint8_t packet_type; /**< Production packet type, 0 uses DATA */
     uint8_t flags;       /**< Production wire flags merged with derived flags */
-    uint8_t traffic_class;  /**< Production traffic class, 0 uses priority */
-    uint32_t connection_id; /**< Production connection context ID */
-    uint32_t packet_number; /**< Production monotonic packet number */
-    uint32_t
-        session_epoch; /**< Production session epoch for SESSION_EXT users */
+    uint8_t traffic_class;     /**< Production traffic class, 0 uses priority */
+    uint32_t connection_id;    /**< Production connection context ID */
+    uint32_t packet_number;    /**< Production monotonic packet number */
     const uint8_t* extensions; /**< Production TLV extension bytes */
     size_t extensions_len;     /**< Extension length in bytes */
     const uint8_t* payload;    /**< Payload data */
@@ -170,14 +167,11 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer, size_t buffer_size,
                                      bool reliable, uint8_t priority,
                                      size_t* frame_len);
 
-#define XGL_SECURITY_EXT_VALUE_SIZE 13U
-#define XGL_SECURITY_EXT_SIZE                                                  \
-    (XGL_WIRE_EXT_HEADER_SIZE + XGL_SECURITY_EXT_VALUE_SIZE)
-
 /**
  * \brief           Calculate frame size
  * \param[in]       payload_len: Payload length in bytes
- * \return          Total frame size, or zero if payload_len is not representable
+ * \return          Total frame size, or zero if payload_len is not
+ * representable
  */
 static inline size_t xgl_frame_calculate_size(size_t payload_len) {
     xgl_frame_layout_t layout;
@@ -186,7 +180,8 @@ static inline size_t xgl_frame_calculate_size(size_t payload_len) {
                : 0U;
 }
 
-/** \brief           Return the checked encoded size, or zero on invalid lengths. */
+/** \brief           Return the checked encoded size, or zero on invalid
+ * lengths. */
 static inline size_t xgl_frame_serialized_size(size_t payload_len,
                                                size_t extensions_len,
                                                size_t auth_tag_len) {
@@ -199,7 +194,8 @@ static inline size_t xgl_frame_serialized_size(size_t payload_len,
 
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-/** \brief           Compute a wire-representable payload budget, cleared on failure. */
+/** \brief           Compute a wire-representable payload budget, cleared on
+ * failure. */
 static inline bool xgl_frame_payload_budget(size_t max_frame_size,
                                             size_t extensions_len,
                                             size_t auth_tag_len,

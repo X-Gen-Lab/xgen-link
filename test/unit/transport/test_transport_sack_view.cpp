@@ -19,6 +19,7 @@ class XglTransportSackViewTest : public ::testing::Test {
     xgl_layer_stats_t statistics = {};
     uint64_t retries = 0U;
     unsigned sends = 0U;
+    unsigned sends_before_ack = 0U;
     xgl_packet_interface_t lower = {};
     bool initialized = false;
 
@@ -56,6 +57,7 @@ class XglTransportSackViewTest : public ::testing::Test {
             ASSERT_EQ(xgl_transport_send(&context, nullptr, &data), XGL_OK);
         }
         ASSERT_NE(context.peers, nullptr);
+        sends_before_ack = sends;
     }
 
     void TearDown() override {
@@ -95,7 +97,7 @@ class XglTransportSackViewTest : public ::testing::Test {
         EXPECT_EQ(context.peers->tx_window.next_packet_number, 3U);
         EXPECT_FALSE(xgl_rtt_is_initialized(&context.peers->rtt_est));
         EXPECT_FALSE(context.peers->failed);
-        EXPECT_EQ(sends, 3U);
+        EXPECT_EQ(sends, sends_before_ack);
         EXPECT_EQ(retries, 0U);
     }
 };
@@ -108,7 +110,7 @@ TEST_F(XglTransportSackViewTest, AcceptsTheExisting64ByteBitmapLimit) {
     ASSERT_EQ(Receive(bitmap.data(), bitmap.size()), XGL_OK);
     EXPECT_EQ(xgl_reliable_get_count(&context.peers->reliable_queue), 0U);
     EXPECT_EQ(context.peers->tx_window.send_base_packet_number, 3U);
-    EXPECT_EQ(sends, 3U);
+    EXPECT_EQ(sends, sends_before_ack);
     EXPECT_EQ(retries, 0U);
 }
 

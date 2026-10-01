@@ -5,6 +5,7 @@
  */
 
 #include <security/xgl_security.h>
+#include <wire/xgl_frame_internal.h>
 
 /** \brief           Resolve authentication overhead before reserving storage.
  */
@@ -54,21 +55,44 @@ xgl_error_t xgl_security_serialize_frame(uint8_t* buffer, size_t buffer_size,
     }
 
     xgl_frame_layout_t layout;
-    xgl_error_t err = xgl_frame_encode_into(buffer, buffer_size, frame,
-                                            provider->tag_len, &layout);
+    xgl_error_t err = xgl_frame_measure(frame, provider->tag_len, &layout);
+    if (err != XGL_OK) {
+        return err;
+    }
+    if (buffer_size < layout.frame_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    return xgl_security_serialize_measured(buffer, frame, &layout, security,
+                                           bytes_written);
+}
+
+xgl_error_t xgl_security_serialize_measured(uint8_t* buffer,
+                                            const xgl_frame_t* frame,
+                                            const xgl_frame_layout_t* layout,
+                                            xgl_security_ctx_t* security,
+                                            size_t* bytes_written) {
+    *bytes_written = 0U;
+    if (security->busy) {
+        return XGL_ERR_BUSY;
+    }
+    if (frame->header.target_id == UINT16_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    xgl_error_t err = xgl_frame_encode_measured(buffer, frame, layout);
     if (err != XGL_OK) {
         return err;
     }
 
     size_t frame_len_without_crc = 0;
     err = xgl_security_sign_frame(
-        security, buffer, buffer_size - XGL_CRC16_SIZE, layout.header_len,
-        layout.payload_len, &frame_len_without_crc);
+        security, buffer, layout->frame_len - XGL_CRC16_SIZE,
+        layout->header_len, layout->payload_len, &frame_len_without_crc);
     if (err != XGL_OK) {
         return err;
     }
-    if (frame_len_without_crc + XGL_CRC16_SIZE != layout.frame_len) {
+    if (frame_len_without_crc + XGL_CRC16_SIZE != layout->frame_len) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    return xgl_frame_finalize_crc(buffer, buffer_size, &layout, bytes_written);
+    return xgl_frame_finalize_crc(buffer, layout->frame_len, layout,
+                                  bytes_written);
 }

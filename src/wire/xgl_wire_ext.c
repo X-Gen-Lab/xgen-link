@@ -247,14 +247,14 @@ xgl_wire_encode_security_ext_value(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (buffer_size < 13U) {
+    if (buffer_size < XGL_SECURITY_EXT_VALUE_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
     xgb_serialize_u32_le(&buffer[0], key_id);
     xgb_serialize_u64_le(&buffer[4], nonce_id);
     buffer[12] = tag_len;
-    *bytes_written = 13U;
+    *bytes_written = XGL_SECURITY_EXT_VALUE_SIZE;
 
     return XGL_OK;
 }
@@ -269,7 +269,7 @@ xgl_error_t xgl_wire_decode_security_ext_value(const uint8_t* buffer,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (buffer_size != 13U) {
+    if (buffer_size != XGL_SECURITY_EXT_VALUE_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
 

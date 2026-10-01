@@ -195,35 +195,36 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_NULL_POINTER;
     }
 
-    uint32_t base_packet = 0U;
-    uint8_t bitmap[64] = {0};
-    size_t bitmap_len = 0U;
-    xgl_error_t err = xgl_wire_decode_sack_ext_value(
-        value, value_len, &base_packet, bitmap, sizeof(bitmap), &bitmap_len);
+    xgl_wire_sack_view_t view;
+    xgl_error_t err = xgl_wire_decode_sack_view(value, value_len, &view);
     if (err != XGL_OK) {
         return err;
     }
-    if (bitmap_len == 0U) {
+    /* Preserve the receive bound formerly imposed by the copied bitmap. */
+    if (view.bitmap_len > 64U) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    if (view.bitmap_len == 0U) {
         return XGL_ERR_INVALID_FRAME;
     }
 
     size_t highest_set = 0U;
     bool has_set = false;
-    for (size_t i = 0; i < bitmap_len * 8U; ++i) {
-        if (transport_sack_bit_is_set(bitmap, i)) {
+    for (size_t i = 0; i < view.bitmap_len * 8U; ++i) {
+        if (transport_sack_bit_is_set(view.bitmap, i)) {
             highest_set = i;
             has_set = true;
         }
     }
     /* Validate the complete claimed range before acknowledgements or retries.
      */
-    if ((uint64_t)base_packet + (has_set ? highest_set : 0U) >=
+    if ((uint64_t)view.base_packet + (has_set ? highest_set : 0U) >=
         peer->tx_window.next_packet_number) {
         return XGL_ERR_SEQUENCE_ERROR;
     }
     if (!has_set) {
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
-            &peer->reliable_queue, base_packet, source_id);
+            &peer->reliable_queue, view.base_packet, source_id);
         return transport_fast_retransmit(ctx, handle, peer, missing);
     }
 
@@ -231,18 +232,18 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     /* Commit the complete acknowledgement before retrying any missing packet.
      * Local send backpressure cannot invalidate already received peer data. */
     for (size_t i = 0; i <= highest_set; ++i) {
-        if (transport_sack_bit_is_set(bitmap, i)) {
-            transport_acknowledge_packet(ctx, peer, base_packet + (uint32_t)i,
-                                         now);
+        if (transport_sack_bit_is_set(view.bitmap, i)) {
+            transport_acknowledge_packet(ctx, peer,
+                                         view.base_packet + (uint32_t)i, now);
         }
     }
     (void)xgl_window_advance_base_packet_number(&peer->tx_window);
 
     for (size_t i = 0; i <= highest_set; ++i) {
-        if (transport_sack_bit_is_set(bitmap, i)) {
+        if (transport_sack_bit_is_set(view.bitmap, i)) {
             continue;
         }
-        uint32_t packet_number = base_packet + (uint32_t)i;
+        uint32_t packet_number = view.base_packet + (uint32_t)i;
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
             &peer->reliable_queue, packet_number, source_id);
         err = transport_fast_retransmit(ctx, handle, peer, missing);

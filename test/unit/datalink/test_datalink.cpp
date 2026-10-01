@@ -382,7 +382,6 @@ TEST_F(XglDatalinkTest, SendFrameSuccess) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = 0x01;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -432,7 +431,6 @@ TEST_F(XglDatalinkTest, SendFramePhyError) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = 0x01;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -475,7 +473,6 @@ TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = 0x01;
     params.payload = payload.data();
     params.payload_len = payload.size();
     params.reliable = false;
@@ -552,7 +549,6 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
@@ -609,7 +605,6 @@ TEST_F(XglDatalinkTest, ProcessFrameLeavesEndToEndAuthenticationToNetwork) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
@@ -661,7 +656,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDoesNotCommitEndpointReplayState) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -714,7 +708,6 @@ TEST_F(XglDatalinkTest, ProcessFrameDeliversWireValidReliableCopiesUpstream) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
@@ -763,7 +756,6 @@ TEST_F(XglDatalinkTest, ProcessFrameHasNoImplicitEndpointAuthenticationPolicy) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
@@ -888,7 +880,6 @@ TEST_F(XglDatalinkTest, StatisticsTracking) {
     xgl_frame_params_t params = {};
     params.source_id = SOURCE_ID;
     params.target_id = TARGET_ID;
-    params.data_type = 0x01;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;

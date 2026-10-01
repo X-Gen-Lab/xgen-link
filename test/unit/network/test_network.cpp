@@ -185,7 +185,6 @@ class XglNetworkTest : public ::testing::Test {
         xgl_frame_params_t params = {};
         params.source_id = source_id;
         params.target_id = target_id;
-        params.data_type = 1;
         params.payload = reinterpret_cast<const uint8_t*>(payload);
         params.payload_len = std::strlen(payload);
         params.reliable = true;
@@ -911,7 +910,6 @@ TEST_F(XglNetworkTest, ForwardingAllocatesWholeFrameFromNetworkResource) {
     xgl_frame_params_t params = {};
     params.source_id = REMOTE_ID;
     params.target_id = FORWARD_ID;
-    params.data_type = 1;
     params.payload = payload.data();
     params.payload_len = payload.size();
     params.reliable = true;
@@ -993,7 +991,6 @@ TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
     xgl_frame_params_t params = {};
     params.source_id = REMOTE_ID;
     params.target_id = FORWARD_ID;
-    params.data_type = 1;
     params.payload = reinterpret_cast<const uint8_t*>(payload);
     params.payload_len = sizeof(payload) - 1U;
     params.reliable = true;
@@ -1273,7 +1270,6 @@ TEST_F(XglNetworkTest, FrameMetadataDecodesTransportPacketSemantics) {
     params.packet_type = XGL_PACKET_TYPE_DATA;
     params.connection_id = 0x10203040U;
     params.packet_number = 99U;
-    params.session_epoch = 0x01020304U;
     params.extensions = extensions;
     params.extensions_len = extensions_len;
     params.payload = payload;

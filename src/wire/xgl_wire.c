@@ -11,11 +11,10 @@
 #include <xgen/crc/crc.h>
 
 static uint16_t wire_header_crc16(const uint8_t* buffer) {
-    uint8_t crc_input[XGL_WIRE_BASE_HEADER_SIZE];
-    memcpy(crc_input, buffer, XGL_WIRE_BASE_HEADER_SIZE);
-    crc_input[22] = 0;
-    crc_input[23] = 0;
-    return xgcrc_crc16_modbus(crc_input, XGL_WIRE_BASE_HEADER_SIZE);
+    const uint8_t zero_crc[XGL_CRC16_SIZE] = {0U, 0U};
+    uint16_t crc =
+        xgcrc_crc16_modbus(buffer, XGL_WIRE_BASE_HEADER_SIZE - XGL_CRC16_SIZE);
+    return xgcrc_crc16_modbus_update(crc, zero_crc, sizeof(zero_crc));
 }
 
 static bool wire_packet_type_valid(uint8_t packet_type) {
@@ -132,53 +131,56 @@ xgl_error_t xgl_wire_decode_frame(xgl_wire_frame_view_t* view,
     if (frame_len < XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE) {
         return XGL_ERR_INVALID_FRAME;
     }
-    xgl_wire_header_t header;
-    xgl_error_t err = xgl_wire_decode_header(&header, buffer, frame_len);
+    xgl_wire_header_t* header = &view->header;
+    xgl_error_t err = xgl_wire_decode_header(header, buffer, frame_len);
     if (err != XGL_OK) {
         if (status != NULL && err == XGL_ERR_CRC_FAILED) {
             *status = XGL_WIRE_DECODE_HEADER_CRC;
         }
-        return err;
+        goto failed;
     }
 
     /* Establish the actual extension boundary before reading any TLV byte. */
     size_t body_end = frame_len - XGL_CRC16_SIZE;
-    if (header.header_len > body_end) {
-        return XGL_ERR_INVALID_FRAME;
+    if (header->header_len > body_end) {
+        err = XGL_ERR_INVALID_FRAME;
+        goto failed;
     }
     size_t extensions_len =
-        (size_t)header.header_len - XGL_WIRE_BASE_HEADER_SIZE;
+        (size_t)header->header_len - XGL_WIRE_BASE_HEADER_SIZE;
     xgl_wire_ext_metadata_t extensions;
     err = xgl_wire_decode_ext_metadata(buffer + XGL_WIRE_BASE_HEADER_SIZE,
                                        extensions_len, &extensions);
     if (err != XGL_OK) {
-        return err;
+        goto failed;
     }
-    size_t body_len = body_end - header.header_len;
-    if (header.payload_len > body_len ||
-        body_len - header.payload_len != extensions.auth_tag_len) {
-        return XGL_ERR_INVALID_FRAME;
+    size_t body_len = body_end - header->header_len;
+    if (header->payload_len > body_len ||
+        body_len - header->payload_len != extensions.auth_tag_len) {
+        err = XGL_ERR_INVALID_FRAME;
+        goto failed;
     }
-    bool authenticated = (header.flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U;
+    bool authenticated = (header->flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U;
     if (authenticated != extensions.has_security_ext) {
-        return XGL_ERR_INVALID_FRAME;
+        err = XGL_ERR_INVALID_FRAME;
+        goto failed;
     }
     if (xgcrc_crc16_modbus(buffer, body_end) !=
         xgb_deserialize_u16_le(buffer + body_end)) {
         if (status != NULL) {
             *status = XGL_WIRE_DECODE_FRAME_CRC;
         }
-        return XGL_ERR_CRC_FAILED;
+        err = XGL_ERR_CRC_FAILED;
+        goto failed;
     }
 
-    view->header = header;
     view->data_type = extensions.data_type;
     view->session_epoch = extensions.session_epoch;
     view->extensions =
         extensions_len > 0U ? buffer + XGL_WIRE_BASE_HEADER_SIZE : NULL;
     view->extensions_len = extensions_len;
-    view->payload = buffer + header.header_len;
-    view->payload_len = header.payload_len;
+    view->payload = buffer + header->header_len;
+    view->payload_len = header->payload_len;
     view->frame_buf = buffer;
     view->frame_len = frame_len;
     view->auth_key_id = extensions.auth_key_id;
@@ -188,20 +190,24 @@ xgl_error_t xgl_wire_decode_frame(xgl_wire_frame_view_t* view,
     view->has_security_ext = extensions.has_security_ext;
     view->authenticated = authenticated;
     uint8_t reliability =
-        (uint8_t)(header.traffic_class & XGL_RELIABILITY_CLASS_MASK);
+        (uint8_t)(header->traffic_class & XGL_RELIABILITY_CLASS_MASK);
     if (reliability == XGL_RELIABILITY_ACK_ELICITING ||
-        (header.flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
+        (header->flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U) {
         view->reliable = XGL_RELIABILITY_ACK_ELICITING;
     } else if (reliability == XGL_RELIABILITY_ACK_ONLY ||
-               header.packet_type == XGL_PACKET_TYPE_ACK) {
+               header->packet_type == XGL_PACKET_TYPE_ACK) {
         view->reliable = XGL_RELIABILITY_ACK_ONLY;
     }
-    view->fragment = (header.flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U;
+    view->fragment = (header->flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U;
     view->priority =
-        (uint8_t)((header.traffic_class & XGL_TRAFFIC_PRIORITY_MASK) >>
+        (uint8_t)((header->traffic_class & XGL_TRAFFIC_PRIORITY_MASK) >>
                   XGL_TRAFFIC_PRIORITY_SHIFT);
     if (status != NULL) {
         *status = XGL_WIRE_DECODE_OK;
     }
     return XGL_OK;
+
+failed:
+    memset(view, 0, sizeof(*view));
+    return err;
 }

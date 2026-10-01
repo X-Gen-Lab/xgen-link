@@ -72,7 +72,6 @@ TEST(XglFrameTest, BuildBasicFrame) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.connection_id = 0x01020304;
     params.packet_number = 0x11223344;
     params.payload = payload;
@@ -127,7 +126,6 @@ TEST(XglFrameTest, BuildFrameNullPointer) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = 0x05;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -147,7 +145,6 @@ TEST(XglFrameTest, BuildFrameEmptyPayload) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = 0x05;
     params.payload = nullptr;
     params.payload_len = 0;
     params.reliable = false;
@@ -167,7 +164,6 @@ TEST(XglFrameTest, BuildFrameRejectsPayloadLargerThanWireLength) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = 0x05;
     params.payload = payload;
     params.payload_len = 65536;
     params.reliable = false;
@@ -190,7 +186,6 @@ TEST(XglFrameTest, SerializeFrame) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = 0x05;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
@@ -224,7 +219,6 @@ TEST(XglFrameTest, BuildFrameKeepsApplicationTypeOutOfPacketType) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = XGL_PACKET_TYPE_ACK;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
@@ -246,7 +240,6 @@ TEST(XglFrameTest, SerializeFramePreserves16BitNodeIds) {
     xgl_frame_params_t params = {};
     params.source_id = 0x1234;
     params.target_id = 0x2345;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -278,7 +271,6 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameAddsSecurityExtensionAndTrailer) {
     xgl_frame_params_t params = {};
     params.source_id = 0x1234;
     params.target_id = 0x2345;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
@@ -342,7 +334,6 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameRejectsUnspecifiedTagLength) {
     xgl_frame_params_t params = {};
     params.source_id = 1;
     params.target_id = 2;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -370,7 +361,6 @@ TEST(XglFrameTest,
     xgl_frame_params_t params = {};
     params.source_id = 1;
     params.target_id = 2;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -411,7 +401,6 @@ TEST(XglFrameTest,
     xgl_frame_params_t params = {};
     params.source_id = 1;
     params.target_id = 2;
-    params.data_type = XGL_PACKET_TYPE_DATA;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -448,7 +437,6 @@ TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = 0x05;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -699,7 +687,6 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = 0x05;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -725,7 +712,6 @@ TEST(XglFrameTest, InvalidHeaderCRC) {
     xgl_frame_params_t params = {};
     params.source_id = 0x10;
     params.target_id = 0x20;
-    params.data_type = 0x05;
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = false;
@@ -782,16 +768,15 @@ TEST(XglFrameTest, SizeHelpersRejectUnrepresentableLengths) {
     EXPECT_EQ(xgl_frame_serialized_size(1U, 232U, 0U), 0U);
     EXPECT_EQ(xgl_frame_serialized_size(1U, 217U, 1U), 0U);
     EXPECT_EQ(xgl_frame_serialized_size(1U, 0U, SIZE_MAX), 0U);
-    EXPECT_EQ(xgl_frame_serialized_size(1U, 0U, XGL_AUTH_TAG_MAX_LEN + 1U),
-              0U);
+    EXPECT_EQ(xgl_frame_serialized_size(1U, 0U, XGL_AUTH_TAG_MAX_LEN + 1U), 0U);
 }
 
 TEST(XglFrameTest, PayloadBudgetRejectsInvalidOverheadAndClearsOutput) {
     const size_t invalid_extensions[] = {232U, SIZE_MAX};
     for (size_t extension_length : invalid_extensions) {
         size_t budget = 42U;
-        EXPECT_FALSE(xgl_frame_payload_budget(128U, extension_length, 0U,
-                                              &budget));
+        EXPECT_FALSE(
+            xgl_frame_payload_budget(128U, extension_length, 0U, &budget));
         EXPECT_EQ(budget, 0U);
     }
     size_t budget = 42U;
@@ -814,4 +799,39 @@ TEST(XglFrameTest, PayloadBudgetUsesWireLimitsAndExactBoundaries) {
     EXPECT_TRUE(xgl_frame_payload_budget(SIZE_MAX, 0U, 0U, &budget));
     EXPECT_EQ(budget, UINT16_MAX);
     EXPECT_EQ(xgl_frame_serialized_size(UINT16_MAX, 231U, 0U), 65792U);
+}
+
+TEST(XglFrameTest, MeasureClearsFailedLayoutAndPreservesErrorPriority) {
+    xgl_frame_t frame = {};
+    auto expect_failure = [](const xgl_frame_t* input, size_t tag_length,
+                             xgl_error_t expected) {
+        xgl_frame_layout_t layout = {42U, 43U, 44U, 45U};
+        EXPECT_EQ(xgl_frame_measure(input, tag_length, &layout), expected);
+        EXPECT_EQ(layout.header_len, 0U);
+        EXPECT_EQ(layout.payload_len, 0U);
+        EXPECT_EQ(layout.tag_len, 0U);
+        EXPECT_EQ(layout.frame_len, 0U);
+    };
+    expect_failure(nullptr, 0U, XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_frame_measure(&frame, 0U, nullptr), XGL_ERR_NULL_POINTER);
+    frame.payload_len = SIZE_MAX;
+    expect_failure(&frame, 0U, XGL_ERR_BUFFER_TOO_SMALL);
+    frame.payload_len = 1U;
+    expect_failure(&frame, 0U, XGL_ERR_NULL_POINTER);
+    frame.payload_len = 0U;
+    frame.extensions_len = SIZE_MAX;
+    expect_failure(&frame, 0U, XGL_ERR_BUFFER_TOO_SMALL);
+    frame.extensions_len = 1U;
+    expect_failure(&frame, 0U, XGL_ERR_NULL_POINTER);
+    frame.extensions_len = 0U;
+    expect_failure(&frame, SIZE_MAX, XGL_ERR_INVALID_PARAM);
+
+    uint8_t extension[XGL_SECURITY_EXT_SIZE] = {XGL_WIRE_EXT_SECURITY,
+                                                XGL_SECURITY_EXT_VALUE_SIZE};
+    extension[XGL_SECURITY_EXT_SIZE - 1U] = 4U;
+    frame.extensions = extension;
+    frame.extensions_len = sizeof(extension);
+    expect_failure(&frame, 4U, XGL_ERR_INVALID_FRAME);
+    frame.extensions_len = 1U;
+    expect_failure(&frame, 4U, XGL_ERR_INVALID_FRAME);
 }

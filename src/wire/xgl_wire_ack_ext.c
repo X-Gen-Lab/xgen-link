@@ -163,28 +163,43 @@ xgl_wire_decode_sack_ext_value(const uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (buffer_size < 5U) {
-        return XGL_ERR_INVALID_FRAME;
+    xgl_wire_sack_view_t view;
+    xgl_error_t error = xgl_wire_decode_sack_view(buffer, buffer_size, &view);
+    if (error != XGL_OK) {
+        return error;
     }
 
-    size_t encoded_bitmap_len = buffer[4];
-    if ((5U + encoded_bitmap_len) != buffer_size) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    if (encoded_bitmap_len > 0U && bitmap == NULL) {
+    if (view.bitmap_len > 0U && bitmap == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (bitmap_capacity < encoded_bitmap_len) {
+    if (bitmap_capacity < view.bitmap_len) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    *base_packet = xgb_deserialize_u32_le(&buffer[0]);
-    *bitmap_len = encoded_bitmap_len;
-    if (encoded_bitmap_len > 0U) {
-        memcpy(bitmap, &buffer[5], encoded_bitmap_len);
+    *base_packet = view.base_packet;
+    *bitmap_len = view.bitmap_len;
+    if (view.bitmap_len > 0U) {
+        memcpy(bitmap, view.bitmap, view.bitmap_len);
     }
 
+    return XGL_OK;
+}
+
+xgl_error_t xgl_wire_decode_sack_view(const uint8_t* buffer, size_t buffer_size,
+                                      xgl_wire_sack_view_t* view) {
+    if (view == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    memset(view, 0, sizeof(*view));
+    if (buffer == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (buffer_size < 5U || 5U + (size_t)buffer[4] != buffer_size) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    view->base_packet = xgb_deserialize_u32_le(buffer);
+    view->bitmap = buffer + 5U;
+    view->bitmap_len = buffer[4];
     return XGL_OK;
 }

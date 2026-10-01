@@ -163,6 +163,24 @@ xgl_error_t xgl_security_serialize_frame(uint8_t* buffer, size_t buffer_size,
                                          xgl_security_ctx_t* security,
                                          size_t* bytes_written);
 
+/**
+ * \brief           Continue a measured synchronous authenticated send
+ * \param[out]      buffer: Non-NULL storage with at least layout->frame_len
+ * bytes
+ * \param[in]       frame: Unchanged borrowed input passed to xgl_frame_measure
+ * \param[in]       layout: Successful measurement with the provider tag length
+ * \param[in,out]   security: Non-NULL trusted association and provider
+ * \param[out]      bytes_written: Complete frame length, zero on failure
+ * \return          XGL_OK, or an encoding, provider or session error
+ * \note            Private continuation; frame, spans, provider and layout must
+ *                  remain unchanged throughout the current send call.
+ */
+xgl_error_t xgl_security_serialize_measured(uint8_t* buffer,
+                                            const xgl_frame_t* frame,
+                                            const xgl_frame_layout_t* layout,
+                                            xgl_security_ctx_t* security,
+                                            size_t* bytes_written);
+
 #endif /* XGL_FEATURE_AUTH */
 
 #ifdef __cplusplus
