@@ -103,6 +103,33 @@ TEST_F(XglReliableTest, AddPacketToQueue) {
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
 }
 
+TEST_F(XglReliableTest, AdmissionReturnsOwnedRecordWithoutLookup) {
+    uint8_t data[] = {0x11, 0x22};
+    xgl_reliable_packet_t* packet = nullptr;
+    ASSERT_EQ(xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2,
+                                              10, 5, 3, 1000, &packet),
+              XGL_OK);
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(packet->packet_number, 10U);
+    data[0] = 0x33;
+    EXPECT_EQ(packet->data[0], 0x11);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 10, 2), packet);
+}
+
+TEST_F(XglReliableTest, RejectedAdmissionClearsRecordOutput) {
+    uint8_t data[] = {0x11};
+    xgl_reliable_packet_t* packet = nullptr;
+    ASSERT_EQ(xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2,
+                                              10, 5, 3, 1000, &packet),
+              XGL_OK);
+    ASSERT_NE(packet, nullptr);
+    EXPECT_EQ(xgl_reliable_add_packet_number(&queue, nullptr, 1, 1, 2,
+                                              11, 5, 3, 1000, &packet),
+              XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(packet, nullptr);
+    EXPECT_EQ(xgl_reliable_get_count(&queue), 1U);
+}
+
 TEST_F(XglReliableTest, AddMultiplePackets) {
     uint8_t data1[] = {0x01, 0x02};
     uint8_t data2[] = {0x03, 0x04};
