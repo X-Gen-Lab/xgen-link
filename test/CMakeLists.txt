@@ -110,6 +110,10 @@ if(XGL_FEATURE_STATISTICS)
     list(APPEND TEST_SOURCES integration/test_network_tx_contracts.cpp)
 endif()
 
+if(XGL_FEATURE_FORWARDING AND XGL_FEATURE_AUTH)
+    list(APPEND TEST_SOURCES integration/test_network_multihop.cpp)
+endif()
+
 set(MOCK_SOURCES
     mocks/mock_phy.cpp
     mocks/mock_allocator.cpp

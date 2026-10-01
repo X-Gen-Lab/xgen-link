@@ -188,15 +188,14 @@ static xgl_error_t network_build_tx_frame(xgl_network_ctx_t* ctx,
 
 /**
  * \brief           Check the complete frame size against the egress route MTU
- * \param[in,out]   ctx: Network authentication policy and statistics context
+ * \param[in,out]   ctx: Network frame policy and statistics context
  * \param[in]       frame: Built frame including composed extensions
  * \param[in]       route: Selected egress route
  * \return          XGL_OK if the complete frame fits, error code otherwise
  */
-static xgl_error_t
-network_validate_auth_tx_budget(xgl_network_ctx_t* ctx,
-                                const xgl_frame_t* frame,
-                                const xgl_route_item_t* route) {
+static xgl_error_t network_validate_tx_budget(xgl_network_ctx_t* ctx,
+                                              const xgl_frame_t* frame,
+                                              const xgl_route_item_t* route) {
     size_t auth_tag_len = 0U;
 #if XGL_FEATURE_AUTH
     const xgl_security_ctx_t* security = ctx->security;
@@ -279,7 +278,7 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
         packet->source_id = ctx->local_id;
     }
 
-    uint8_t extensions[XGL_NETWORK_TX_EXT_CAPACITY] = {0};
+    uint8_t extensions[XGL_NETWORK_TX_EXT_CAPACITY];
     xgl_frame_t frame;
     xgl_error_t err = network_build_tx_frame(ctx, packet, extensions,
                                              sizeof(extensions), &frame);
@@ -287,7 +286,7 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
         return err;
     }
 
-    err = network_validate_auth_tx_budget(ctx, &frame, route);
+    err = network_validate_tx_budget(ctx, &frame, route);
     if (err != XGL_OK) {
         return err;
     }

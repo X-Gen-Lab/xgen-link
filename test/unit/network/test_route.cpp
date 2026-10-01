@@ -8,6 +8,7 @@
 #include <network/xgl_route.h>
 #include <xgl/xgl_error.h>
 
+#include <cstdlib>
 #include <cstring>
 #include <gtest/gtest.h>
 
@@ -394,9 +395,50 @@ TEST_F(XglRouteTest, LookupPerformanceWithManyRoutes) {
         xgl_route_table_add(&route_table, i, &phy_ops, 256, 100, 1);
     }
 
-    /* Lookup should still be fast (O(1) with hash table) */
+    /* Repeated indexed lookup retains the selected route. */
     for (int i = 0; i < 1000; i++) {
         xgl_route_item_t* route = xgl_route_table_lookup(&route_table, 50);
         EXPECT_NE(route, nullptr);
+    }
+}
+
+TEST_F(XglRouteTest, InitializationFailureReleasesEveryPartialReservation) {
+    struct AllocationState {
+        size_t calls = 0U;
+        size_t fail_at = 0U;
+        size_t live = 0U;
+    } state;
+
+    xgm_allocator_t allocator = {};
+    allocator.ctx = &state;
+    allocator.alloc = [](void* context, size_t size) -> void* {
+        auto& current = *static_cast<AllocationState*>(context);
+        if (++current.calls == current.fail_at) {
+            return nullptr;
+        }
+        void* memory = std::malloc(size);
+        if (memory != nullptr) {
+            ++current.live;
+        }
+        return memory;
+    };
+    allocator.free = [](void* context, void* memory) {
+        if (memory != nullptr) {
+            --static_cast<AllocationState*>(context)->live;
+            std::free(memory);
+        }
+    };
+    for (size_t failure = 1U; failure <= 3U; ++failure) {
+        SCOPED_TRACE(failure);
+        state = {};
+        state.fail_at = failure;
+        xgl_route_table_t table = {};
+        EXPECT_EQ(xgl_route_table_init(&table, 4U, &allocator),
+                  XGL_ERR_NO_MEMORY);
+        EXPECT_EQ(state.live, 0U);
+        EXPECT_EQ(table.route_count, 0U);
+        EXPECT_EQ(table.route_capacity, 0U);
+        xgl_route_table_destroy(&table);
+        EXPECT_EQ(state.live, 0U);
     }
 }

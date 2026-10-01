@@ -376,6 +376,72 @@ TEST_F(XglNetworkTest, ForwardPreservesSubmissionErrorAndInputBytes) {
     EXPECT_EQ(stats.tx_errors, 4U);
 }
 
+TEST_F(XglNetworkTest, ForwardAllocationFailureDoesNotSubmitOrChangeInput) {
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        XGL_OK);
+    xgm_allocator_t unavailable = {};
+    unavailable.alloc = [](void*, size_t) -> void* { return nullptr; };
+    unavailable.free = [](void*, void*) { FAIL() << "No allocation to free"; };
+    network_ctx.allocator = &unavailable;
+    const auto original = make_frame(REMOTE_ID, FORWARD_ID, 4U, "abc");
+    auto bytes = original;
+    EXPECT_EQ(
+        xgl_network_receive(&network_ctx, nullptr, bytes.data(), bytes.size()),
+        XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(bytes, original);
+    EXPECT_EQ(phy_tx_count, 0);
+    EXPECT_EQ(stats.rx_dropped, 1U);
+    EXPECT_EQ(stats.tx_errors, 1U);
+}
+
+TEST_F(XglNetworkTest, ForwardMissingLowerEndpointReleasesScratch) {
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        XGL_OK);
+    size_t live_allocations = 0U;
+    xgm_allocator_t allocator = {};
+    allocator.ctx = &live_allocations;
+    allocator.alloc = [](void* context, size_t size) -> void* {
+        void* memory = std::malloc(size);
+        if (memory != nullptr) {
+            ++*static_cast<size_t*>(context);
+        }
+        return memory;
+    };
+    allocator.free = [](void* context, void* memory) {
+        if (memory != nullptr) {
+            --*static_cast<size_t*>(context);
+            std::free(memory);
+        }
+    };
+    network_ctx.allocator = &allocator;
+    network_ctx.lower_layer = nullptr;
+    const auto bytes = make_frame(REMOTE_ID, FORWARD_ID);
+    EXPECT_EQ(
+        xgl_network_receive(&network_ctx, nullptr, bytes.data(), bytes.size()),
+        XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(live_allocations, 0U);
+    EXPECT_EQ(stats.tx_packets, 0U);
+    EXPECT_EQ(stats.tx_errors, 1U);
+}
+
+TEST_F(XglNetworkTest, LocalRxCountsAdmissionBeforeTransportAcceptance) {
+    xgl_packet_rx_endpoint_t upper = {};
+    upper.receive = [](void*, xgl_handle_t, const xgl_packet_t*) {
+        return XGL_ERR_BUSY;
+    };
+    network_ctx.upper_layer = &upper;
+    const auto bytes = make_frame(REMOTE_ID, LOCAL_ID, 0U, "abc");
+    EXPECT_EQ(
+        xgl_network_receive(&network_ctx, nullptr, bytes.data(), bytes.size()),
+        XGL_ERR_BUSY);
+    EXPECT_EQ(stats.rx_packets, 1U);
+    EXPECT_EQ(stats.rx_bytes, 3U);
+    EXPECT_EQ(stats.rx_dropped, 0U);
+    EXPECT_EQ(stats.tx_packets, 0U);
+}
+
 TEST_F(XglNetworkTest, EpochExtensionCountsAgainstRouteMtu) {
     const uint16_t mtu = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE + 1;
     ASSERT_EQ(
