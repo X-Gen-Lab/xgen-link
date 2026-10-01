@@ -26,10 +26,10 @@ static void reliable_index_packet(xgl_reliable_queue_t* queue,
     queue->index_buckets[bucket] = packet;
 }
 
-static void reliable_unindex_packet(xgl_reliable_queue_t* queue,
+static bool reliable_unindex_packet(xgl_reliable_queue_t* queue,
                                     xgl_reliable_packet_t* packet) {
     if (queue == NULL || packet == NULL) {
-        return;
+        return false;
     }
 
     size_t bucket =
@@ -44,11 +44,12 @@ static void reliable_unindex_packet(xgl_reliable_queue_t* queue,
                 previous->index_next = current->index_next;
             }
             current->index_next = NULL;
-            return;
+            return true;
         }
         previous = current;
         current = current->index_next;
     }
+    return false;
 }
 
 static void reliable_free_packet(const xgl_reliable_queue_t* queue,
@@ -233,14 +234,21 @@ xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
 
     xgl_reliable_packet_t* packet =
         xgl_reliable_find_packet_number(queue, packet_number, target_id);
-    if (packet != NULL) {
-        reliable_unindex_packet(queue, packet);
-        xgct_list_remove(&queue->wait_ack_list, &packet->node);
-        reliable_free_packet(queue, packet);
-        return XGL_OK;
-    }
+    return packet != NULL ? xgl_reliable_remove_owned(queue, packet)
+                          : XGL_ERR_SEQUENCE_ERROR;
+}
 
-    return XGL_ERR_SEQUENCE_ERROR; /* Packet not found */
+xgl_error_t xgl_reliable_remove_owned(xgl_reliable_queue_t* queue,
+                                      xgl_reliable_packet_t* packet) {
+    if (queue == NULL || packet == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (!reliable_unindex_packet(queue, packet)) {
+        return XGL_ERR_SEQUENCE_ERROR;
+    }
+    xgct_list_remove(&queue->wait_ack_list, &packet->node);
+    reliable_free_packet(queue, packet);
+    return XGL_OK;
 }
 
 /**

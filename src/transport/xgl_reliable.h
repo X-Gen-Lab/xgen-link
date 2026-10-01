@@ -123,6 +123,17 @@ xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
                                               uint16_t target_id);
 
 /**
+ * \brief           Remove a known live record without a second number lookup
+ * \param[in,out]   queue: Queue expected to own the record
+ * \param[in]       packet: Live record; invalid after successful removal
+ * \return          XGL_OK, XGL_ERR_NULL_POINTER or XGL_ERR_SEQUENCE_ERROR
+ * \note            A foreign live record is rejected without changing either
+ *                  queue. A dangling pointer is never a valid input.
+ */
+xgl_error_t xgl_reliable_remove_owned(xgl_reliable_queue_t* queue,
+                                      xgl_reliable_packet_t* packet);
+
+/**
  * \brief           Get number of packets in wait-ACK queue
  * \param[in]       queue: Reliable queue structure
  * \return          Number of packets waiting for ACK
