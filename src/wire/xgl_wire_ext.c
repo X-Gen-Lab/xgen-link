@@ -70,20 +70,6 @@ xgl_error_t xgl_wire_decode_ext_metadata(const uint8_t* extensions,
     return (err == XGL_ERR_NOT_FOUND) ? XGL_OK : err;
 }
 
-static void wire_serialize_u64_le(uint8_t* buffer, uint64_t value) {
-    for (size_t i = 0; i < 8U; ++i) {
-        buffer[i] = (uint8_t)((value >> (8U * i)) & 0xFFU);
-    }
-}
-
-static uint64_t wire_deserialize_u64_le(const uint8_t* buffer) {
-    uint64_t value = 0U;
-    for (size_t i = 0; i < 8U; ++i) {
-        value |= ((uint64_t)buffer[i]) << (8U * i);
-    }
-    return value;
-}
-
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_wire_encode_fragment_ext_value(
@@ -144,7 +130,7 @@ xgl_error_t xgl_wire_encode_session_ext_value(uint8_t* buffer,
     }
 
     xgb_serialize_u32_le(&buffer[0], session_epoch);
-    wire_serialize_u64_le(&buffer[4], incarnation_id);
+    xgb_serialize_u64_le(&buffer[4], incarnation_id);
     *bytes_written = XGL_SESSION_EXT_VALUE_SIZE;
 
     return XGL_OK;
@@ -163,7 +149,7 @@ xgl_error_t xgl_wire_decode_session_ext_value(const uint8_t* buffer,
     }
 
     *session_epoch = xgb_deserialize_u32_le(&buffer[0]);
-    *incarnation_id = wire_deserialize_u64_le(&buffer[4]);
+    *incarnation_id = xgb_deserialize_u64_le(&buffer[4]);
 
     return XGL_OK;
 }
@@ -188,7 +174,7 @@ xgl_wire_encode_security_ext_value(uint8_t* buffer, size_t buffer_size,
     }
 
     xgb_serialize_u32_le(&buffer[0], key_id);
-    wire_serialize_u64_le(&buffer[4], nonce_id);
+    xgb_serialize_u64_le(&buffer[4], nonce_id);
     buffer[12] = tag_len;
     *bytes_written = 13U;
 
@@ -210,7 +196,7 @@ xgl_error_t xgl_wire_decode_security_ext_value(const uint8_t* buffer,
     }
 
     *key_id = xgb_deserialize_u32_le(&buffer[0]);
-    *nonce_id = wire_deserialize_u64_le(&buffer[4]);
+    *nonce_id = xgb_deserialize_u64_le(&buffer[4]);
     *tag_len = buffer[12];
     if (*tag_len == 0U) {
         return XGL_ERR_INVALID_FRAME;

@@ -639,7 +639,7 @@ TEST_F(XglParserTest, LongUnknownExtensionRemainsCompatible) {
         const auto result =
             xgl_parser_feed_byte_view(&parser, frame[i], 0U, &view);
         EXPECT_EQ(result, i + 1U == frame.size() ? XGL_PARSE_RESULT_COMPLETE
-                                               : XGL_PARSE_RESULT_INCOMPLETE);
+                                                 : XGL_PARSE_RESULT_INCOMPLETE);
     }
     EXPECT_EQ(view.extensions_len, 231U);
     ASSERT_EQ(view.payload_len, 1U);

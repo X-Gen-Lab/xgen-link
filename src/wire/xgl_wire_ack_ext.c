@@ -58,35 +58,65 @@ xgl_error_t xgl_wire_decode_ack_range_ext_value(
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (buffer_size < 9U) {
-        return XGL_ERR_INVALID_FRAME;
+    xgl_wire_ack_range_view_t view;
+    xgl_error_t error =
+        xgl_wire_decode_ack_range_view(buffer, buffer_size, &view);
+    if (error != XGL_OK) {
+        return error;
     }
 
-    size_t encoded_count = buffer[8];
-    size_t required_size = 9U + (encoded_count * 4U);
-    if (required_size != buffer_size) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    if (encoded_count > 0U && ranges == NULL) {
+    if (view.range_count > 0U && ranges == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (range_capacity < encoded_count) {
+    if (range_capacity < view.range_count) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    *largest_ack = xgb_deserialize_u32_le(&buffer[0]);
-    *ack_delay_us = xgb_deserialize_u32_le(&buffer[4]);
-    *range_count = encoded_count;
-
-    size_t offset = 9U;
-    for (size_t i = 0; i < encoded_count; ++i) {
-        ranges[i].gap = xgb_deserialize_u16_le(&buffer[offset]);
-        ranges[i].length = xgb_deserialize_u16_le(&buffer[offset + 2U]);
-        offset += 4U;
+    *largest_ack = view.largest_ack;
+    *ack_delay_us = view.ack_delay_us;
+    *range_count = view.range_count;
+    for (size_t i = 0U; i < view.range_count; ++i) {
+        (void)xgl_wire_ack_range_at(&view, i, &ranges[i]);
     }
 
+    return XGL_OK;
+}
+
+xgl_error_t xgl_wire_decode_ack_range_view(const uint8_t* buffer,
+                                           size_t buffer_size,
+                                           xgl_wire_ack_range_view_t* view) {
+    if (view == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    memset(view, 0, sizeof(*view));
+    if (buffer == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (buffer_size < 9U || 9U + (size_t)buffer[8] * 4U != buffer_size) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    view->largest_ack = xgb_deserialize_u32_le(buffer);
+    view->ack_delay_us = xgb_deserialize_u32_le(buffer + 4U);
+    view->range_count = buffer[8];
+    view->ranges = buffer + 9U;
+    return XGL_OK;
+}
+
+xgl_error_t xgl_wire_ack_range_at(const xgl_wire_ack_range_view_t* view,
+                                  size_t index, xgl_wire_ack_range_t* range) {
+    if (view == NULL || range == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (index >= view->range_count) {
+        return XGL_ERR_NOT_FOUND;
+    }
+    if (view->ranges == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    const uint8_t* bytes = view->ranges + index * 4U;
+    range->gap = xgb_deserialize_u16_le(bytes);
+    range->length = xgb_deserialize_u16_le(bytes + 2U);
     return XGL_OK;
 }
 

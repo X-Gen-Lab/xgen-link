@@ -7,6 +7,7 @@
 #ifndef XGL_PARSER_H
 #define XGL_PARSER_H
 
+#include "xgl/internal/xgl_wire.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 #include <stdbool.h>
@@ -25,10 +26,12 @@ extern "C" {
  * \brief           Parser state enumeration
  */
 typedef enum {
-    XGL_PARSE_MAGIC,   /**< Searching for production magic */
-    XGL_PARSE_HEADER,  /**< Receiving frame header */
-    XGL_PARSE_PAYLOAD, /**< Receiving payload data */
-    XGL_PARSE_CRC,     /**< Receiving CRC16 */
+    XGL_PARSE_MAGIC,      /**< Searching for production magic */
+    XGL_PARSE_HEADER,     /**< Receiving frame header */
+    XGL_PARSE_PAYLOAD,    /**< Receiving payload data */
+    XGL_PARSE_CRC,        /**< Receiving CRC16 */
+    XGL_PARSE_EXTENSIONS, /**< Receiving the bounded header extensions */
+    XGL_PARSE_COMPLETE,   /**< Complete frame passed the wire validator */
 } xgl_parse_state_t;
 
 /**
@@ -94,6 +97,20 @@ void xgl_parser_reset(xgl_parser_t* parser);
  */
 xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
                                         uint32_t current_time_ms);
+
+/**
+ * \brief           Feed a byte and expose the complete validated frame
+ * \param[in,out]   parser: Per-link parser and caller-owned cache
+ * \param[in]       byte: Next input byte
+ * \param[in]       current_time_ms: Explicit monotonic time
+ * \param[out]      view: Optional output, valid only when COMPLETE is returned
+ * \return          Parse result; wire validation runs once upon completion
+ * \note            The view borrows the cache until reset or the next feed.
+ *                  Authentication is performed by the receiving endpoint.
+ */
+xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
+                                             uint32_t current_time_ms,
+                                             xgl_wire_frame_view_t* view);
 
 /**
  * \brief           Check for parser timeout

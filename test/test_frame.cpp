@@ -526,9 +526,9 @@ TEST(XglFrameTest, PureEncodingPlansAuthenticatedLayoutWithoutAProvider) {
     EXPECT_EQ(layout.tag_len, 4U);
     EXPECT_EQ(layout.frame_len, 48U);
     uint8_t buffer[48] = {};
-    ASSERT_EQ(xgl_frame_encode_into(buffer, sizeof(buffer), &frame, 4U,
-                                   &layout),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_frame_encode_into(buffer, sizeof(buffer), &frame, 4U, &layout),
+        XGL_OK);
     EXPECT_EQ(std::memcmp(buffer + 39U, payload, sizeof(payload)), 0);
     size_t written = 0U;
     ASSERT_EQ(xgl_frame_finalize_crc(buffer, sizeof(buffer), &layout, &written),
@@ -553,13 +553,13 @@ TEST(XglFrameTest, ZeroCopyAndCopiedFramesUseIdenticalWireRules) {
     ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
     uint8_t copied[28] = {}, inplace[28] = {};
     size_t copied_length = 0U, inplace_length = 0U;
-    ASSERT_EQ(xgl_frame_serialize(copied, sizeof(copied), &frame,
-                                  &copied_length),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_frame_serialize(copied, sizeof(copied), &frame, &copied_length),
+        XGL_OK);
     std::memcpy(inplace + 24U, payload, sizeof(payload));
     ASSERT_EQ(xgl_frame_build_zerocopy(inplace, sizeof(inplace), 24U,
-                                       sizeof(payload), 1U, 2U, 0U, 99U,
-                                       false, 0U, &inplace_length),
+                                       sizeof(payload), 1U, 2U, 0U, 99U, false,
+                                       0U, &inplace_length),
               XGL_OK);
     EXPECT_EQ(copied_length, inplace_length);
     EXPECT_EQ(std::memcmp(copied, inplace, sizeof(copied)), 0);

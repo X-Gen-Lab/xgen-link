@@ -93,6 +93,18 @@ typedef struct {
     uint16_t length;
 } xgl_wire_ack_range_t;
 
+/**
+ * \brief           ACK fields and ranges borrowing their encoded value bytes
+ * \note            The source bytes must remain alive and unchanged while the
+ *                  view is used. Sequence semantics belong to transport.
+ */
+typedef struct {
+    uint32_t largest_ack;
+    uint32_t ack_delay_us;
+    const uint8_t* ranges;
+    size_t range_count;
+} xgl_wire_ack_range_view_t;
+
 typedef struct {
     const uint8_t* buffer;
     size_t len;
@@ -204,6 +216,15 @@ xgl_error_t xgl_wire_decode_ack_range_ext_value(
     const uint8_t* buffer, size_t buffer_size, uint32_t* largest_ack,
     uint32_t* ack_delay_us, xgl_wire_ack_range_t* ranges, size_t range_capacity,
     size_t* range_count);
+
+/** \brief           Validate an ACK value and borrow its range bytes. */
+xgl_error_t xgl_wire_decode_ack_range_view(const uint8_t* buffer,
+                                           size_t buffer_size,
+                                           xgl_wire_ack_range_view_t* view);
+
+/** \brief           Read one range, or return NOT_FOUND past the last range. */
+xgl_error_t xgl_wire_ack_range_at(const xgl_wire_ack_range_view_t* view,
+                                  size_t index, xgl_wire_ack_range_t* range);
 
 xgl_error_t xgl_wire_encode_sack_ext_value(uint8_t* buffer, size_t buffer_size,
                                            uint32_t base_packet,

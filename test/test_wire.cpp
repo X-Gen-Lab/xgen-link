@@ -8,7 +8,7 @@
 
 TEST(XglWireViewTest, AckRangesBorrowWireBytesWithoutAnOutputArray) {
     const uint8_t bytes[] = {42, 0, 0, 0, 250, 0, 0, 0, 2,
-                             0, 0, 3, 0, 2, 0, 1, 0};
+                             0,  0, 3, 0, 2,   0, 1, 0};
     xgl_wire_ack_range_view_t view = {};
     ASSERT_EQ(xgl_wire_decode_ack_range_view(bytes, sizeof(bytes), &view),
               XGL_OK);

@@ -15,9 +15,6 @@
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
-#if XGL_FEATURE_AUTH
-#include "xgl/internal/xgl_security.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,22 +91,50 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer, size_t buffer_size,
                                 const xgl_frame_t* frame,
                                 size_t* bytes_written);
 
+/** \brief           Checked offsets for one encoded frame. */
+typedef struct {
+    size_t header_len;
+    size_t payload_len;
+    size_t tag_len;
+    size_t frame_len;
+} xgl_frame_layout_t;
+
 /**
- * \brief           Serialize frame with production authentication trailer
- * \param[out]      buffer: Output buffer
- * \param[in]       buffer_size: Buffer size in bytes
- * \param[in]       frame: Frame structure to serialize
- * \param[in,out]   security: Trusted state allocating a fresh security sequence
- * \param[out]      bytes_written: Number of bytes written
+ * \brief           Validate borrowed spans and measure the complete frame
+ * \param[in]       frame: Logical header and borrowed payload/extensions
+ * \param[in]       auth_tag_len: Zero, or a requested authentication trailer
+ * \param[out]      layout: Checked lengths, cleared on failure
  * \return          XGL_OK on success, error code otherwise
  */
-#if XGL_FEATURE_AUTH
-xgl_error_t xgl_frame_serialize_authenticated(uint8_t* buffer,
-                                              size_t buffer_size,
-                                              const xgl_frame_t* frame,
-                                              xgl_security_ctx_t* security,
-                                              size_t* bytes_written);
-#endif
+xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
+                              xgl_frame_layout_t* layout);
+
+/**
+ * \brief           Encode header, extensions and payload without authentication
+ * \param[out]      buffer: Complete frame storage, including tag/CRC capacity
+ * \param[in]       buffer_size: Available capacity
+ * \param[in]       frame: Logical input; in-place payload storage is supported
+ * \param[in]       auth_tag_len: Zero, or the reserved tag length
+ * \param[out]      layout: Produced layout for signing and finalization
+ * \return          XGL_OK on success, error code otherwise
+ * \note            A nonzero tag length appends a SECURITY placeholder. The
+ *                  caller must fill it and the tag before finalizing the CRC.
+ */
+xgl_error_t xgl_frame_encode_into(uint8_t* buffer, size_t buffer_size,
+                                  const xgl_frame_t* frame, size_t auth_tag_len,
+                                  xgl_frame_layout_t* layout);
+
+/**
+ * \brief           Finalize an encoded frame after its optional tag is ready
+ * \param[in,out]   buffer: Encoded header, payload and optional tag
+ * \param[in]       buffer_size: Available capacity
+ * \param[in]       layout: Layout returned by the encoder
+ * \param[out]      bytes_written: Complete frame length, zero on failure
+ * \return          XGL_OK on success, error code otherwise
+ */
+xgl_error_t xgl_frame_finalize_crc(uint8_t* buffer, size_t buffer_size,
+                                   const xgl_frame_layout_t* layout,
+                                   size_t* bytes_written);
 
 /**
  * \brief           Build frame in zero-copy mode
