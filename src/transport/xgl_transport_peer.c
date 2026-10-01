@@ -4,6 +4,7 @@
  */
 
 #include "xgl_transport_internal.h"
+#include "xgl_transport_rx_internal.h"
 #include <internal/xgl_diagnostics.h>
 #include <string.h>
 

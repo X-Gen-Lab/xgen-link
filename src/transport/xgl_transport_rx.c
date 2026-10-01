@@ -267,11 +267,15 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 
 #endif
 
-    const uint8_t* deliver_data = data;
-    size_t deliver_data_len = data_len;
-
-    err = transport_deliver_packet(ctx, handle, packet, deliver_data,
-                                   deliver_data_len);
+#if XGL_FEATURE_FRAGMENTATION
+    if (packet->fragment) {
+        err = transport_deliver_rx_fragment(ctx, handle, rx_peer, packet, data,
+                                            data_len, &fragment);
+    } else
+#endif
+    {
+        err = transport_deliver_packet(ctx, handle, packet, data, data_len);
+    }
     if (err != XGL_OK) {
         transport_release_rejected_scope(ctx, handle, packet, scope_was_absent);
         return err;

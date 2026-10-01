@@ -107,6 +107,7 @@ list(APPEND TEST_SOURCES
     unit/datalink/test_parser_resync.cpp
     unit/network/test_network_contracts.cpp
     integration/test_network_routes_contracts.cpp
+    integration/test_transport_admission.cpp
 )
 
 #-----------------------------------------------------------------------------

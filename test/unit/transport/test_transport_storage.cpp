@@ -4,7 +4,7 @@
  * \author          X-Gen Lab
  */
 
-#include <transport/xgl_transport_internal.h>
+#include <transport/xgl_transport_rx_internal.h>
 #include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 

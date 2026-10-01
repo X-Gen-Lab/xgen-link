@@ -20,6 +20,19 @@ def audit(report, policy):
     actual_profile = report.get("build_parameters", {}).get("XGL_PROFILE")
     if actual_profile != configuration["profile"]:
         violations.append("Report profile does not match the selected policy")
+    for field in ("resource_config_id", "compiled_window_capacity", "reliable_bucket_count"):
+        if field in configuration:
+            expected = configuration[field]
+            if type(expected) is not int or expected <= 0:
+                raise ValueError(f"Invalid resource policy {field}")
+            if type(report.get(field)) is not int or report[field] != expected:
+                violations.append(f"Report {field} does not match the selected policy")
+    if "adaptive_rto" in configuration:
+        if type(configuration["adaptive_rto"]) is not bool:
+            raise ValueError("Invalid resource policy adaptive_rto")
+        if type(report.get("adaptive_rto")) is not bool or (
+                report["adaptive_rto"] != configuration["adaptive_rto"]):
+            violations.append("Report adaptive_rto does not match the selected policy")
     for field in ("frame_bytes", "rx_bytes"):
         if field in configuration and report.get(field) != configuration[field]:
             violations.append(f"Report {field} does not match the selected policy")

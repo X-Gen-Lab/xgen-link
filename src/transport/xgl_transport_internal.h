@@ -74,12 +74,6 @@ static inline size_t transport_tx_packet_count(const xgl_transport_ctx_t* ctx) {
     return count;
 }
 
-#if XGL_FEATURE_OUT_OF_ORDER
-void transport_free_rx_buffered_packet(
-    const xgl_transport_ctx_t* ctx,
-    xgl_transport_rx_buffered_packet_t* buffered);
-#endif
-
 xgl_transport_peer_state_t* transport_find_peer_scope(xgl_transport_ctx_t* ctx,
                                                       uint16_t peer_id,
                                                       uint32_t connection_id,
@@ -113,34 +107,11 @@ void transport_count_send_error(xgl_transport_ctx_t* ctx);
 void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                          xgl_transport_peer_state_t* peer, xgl_error_t error);
 #if XGL_FEATURE_FRAGMENTATION
-/** \brief           Decoded metadata for one admitted fragment. */
-typedef struct {
-    uint32_t message_id;
-    uint32_t offset;
-    uint32_t message_len;
-} transport_rx_fragment_t;
-
-/**
- * \brief           Validate fragment metadata before retaining or delivering
- * \param[in]       ctx: Transport context with fragmentation enabled
- * \param[in]       packet: Borrowed packet with a valid payload span
- * \param[out]      fragment: Decoded singleton fragment extension
- * \return          XGL_OK or the metadata admission error
- */
-xgl_error_t transport_decode_rx_fragment(const xgl_transport_ctx_t* ctx,
-                                         const xgl_packet_t* packet,
-                                         transport_rx_fragment_t* fragment);
-
 void transport_clear_tx_message(xgl_transport_ctx_t* ctx,
                                 xgl_transport_peer_state_t* peer);
 xgl_error_t transport_pump_tx_message(xgl_transport_ctx_t* ctx,
                                       xgl_handle_t handle,
                                       xgl_transport_peer_state_t* peer);
-void transport_clear_pending_message(xgl_transport_ctx_t* ctx,
-                                     xgl_transport_peer_state_t* peer);
-xgl_error_t transport_drain_pending_message(xgl_transport_ctx_t* ctx,
-                                            xgl_handle_t handle,
-                                            xgl_transport_peer_state_t* peer);
 #endif
 
 xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
@@ -162,28 +133,6 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
                                 const xgl_transport_peer_state_t* peer,
                                 uint16_t source_id, uint32_t base_packet,
                                 uint32_t connection_id, uint32_t session_epoch);
-
-#if XGL_FEATURE_OUT_OF_ORDER
-xgl_error_t transport_cache_out_of_order_packet(
-    const xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
-    const xgl_packet_t* packet, uint32_t packet_number);
-void transport_clear_rx_buffered(const xgl_transport_ctx_t* ctx,
-                                 xgl_transport_peer_state_t* peer);
-xgl_transport_rx_buffered_packet_t*
-transport_take_rx_buffered(xgl_transport_peer_state_t* peer,
-                           uint32_t packet_number);
-#endif
-xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
-                                     xgl_handle_t handle,
-                                     const xgl_packet_t* packet,
-                                     const uint8_t* data, size_t data_len);
-#if XGL_FEATURE_OUT_OF_ORDER
-xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
-                                        xgl_handle_t handle,
-                                        xgl_transport_peer_state_t* peer,
-                                        bool* retained_backpressure);
-
-#endif
 
 #ifdef __cplusplus
 }

@@ -4,7 +4,7 @@
  */
 
 #include "xgen/memory/allocator.h"
-#include "xgl_transport_internal.h"
+#include "xgl_transport_rx_internal.h"
 #include <string.h>
 
 #if XGL_FEATURE_OUT_OF_ORDER
@@ -108,9 +108,7 @@ transport_copy_rx_buffered_packet(const xgl_transport_ctx_t* ctx,
 static void
 transport_insert_rx_buffered(xgl_transport_peer_state_t* peer,
                              xgl_transport_rx_buffered_packet_t* buffered,
-                             uint32_t packet_number) {
-    xgl_transport_rx_buffered_packet_t* prev = NULL;
-    (void)transport_find_rx_buffered(peer, packet_number, &prev);
+                             xgl_transport_rx_buffered_packet_t* prev) {
     if (prev == NULL) {
         buffered->next = peer->rx_buffered;
         peer->rx_buffered = buffered;
@@ -147,7 +145,8 @@ xgl_error_t transport_cache_out_of_order_packet(
     if (packet_number - peer->rx_next_packet_number >= window) {
         return XGL_ERR_WINDOW_FULL;
     }
-    if (transport_find_rx_buffered(peer, packet_number, NULL) != NULL) {
+    xgl_transport_rx_buffered_packet_t* prev = NULL;
+    if (transport_find_rx_buffered(peer, packet_number, &prev) != NULL) {
         return XGL_OK;
     }
     size_t buffered_count = 0U;
@@ -175,7 +174,7 @@ xgl_error_t transport_cache_out_of_order_packet(
         return err;
     }
 
-    transport_insert_rx_buffered(peer, buffered, packet_number);
+    transport_insert_rx_buffered(peer, buffered, prev);
 
     return XGL_OK;
 }

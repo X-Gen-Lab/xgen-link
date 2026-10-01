@@ -1,7 +1,7 @@
 # Executed by CTest after GoogleTest discovery has registered individual cases.
 foreach(test_name IN LISTS xgl_discovered_tests)
     set(labels xgl unit)
-    if(test_name MATCHES "^(XglIntegrationTest|XglPhyStreamTest|XglNetworkTxContractTest|XglNetworkRoutesContract|XglNetworkMultihopTest)\\.")
+    if(test_name MATCHES "^(XglIntegrationTest|XglPhyStreamTest|XglNetworkTxContractTest|XglNetworkRoutesContract|XglNetworkMultihopTest|XglTransportAdmissionIntegrationTest)\\.")
         set(labels xgl integration)
     elseif(test_name MATCHES "Properties\\.")
         list(APPEND labels property)

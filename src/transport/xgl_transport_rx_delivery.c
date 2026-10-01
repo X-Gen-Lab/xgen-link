@@ -171,6 +171,55 @@ xgl_error_t transport_drain_pending_message(xgl_transport_ctx_t* ctx,
     return err;
 }
 
+/**
+ * \brief           Retain admitted fragment bytes until completion or failure
+ */
+xgl_error_t
+transport_deliver_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                              xgl_transport_peer_state_t* peer,
+                              const xgl_packet_t* packet, const uint8_t* data,
+                              size_t data_len,
+                              const transport_rx_fragment_t* fragment) {
+    if (peer == NULL) {
+        peer = transport_get_or_create_rx_peer(ctx, packet);
+    }
+    if (peer == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+    if (peer->rx_pending_message.data != NULL) {
+        return XGL_ERR_BUSY;
+    }
+
+    xgl_fragment_message_t complete = {0};
+    xgl_error_t err = xgl_fragment_process_ext_scoped(
+        ctx->fragment_mgr, packet->source_id, packet->connection_id,
+        packet->session_epoch, packet->data_type, fragment->message_id,
+        fragment->offset, fragment->message_len, data, data_len,
+        packet->reliable == XGL_RELIABILITY_ACK_ELICITING, &complete,
+        transport_now(ctx));
+    if (err == XGL_ERR_BUSY) {
+        return XGL_OK;
+    }
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    err = transport_accept_payload(ctx, handle, packet->source_id,
+                                   packet->data_type, complete.data,
+                                   complete.len);
+    if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY) {
+        peer->rx_pending_message = complete;
+        peer->rx_pending_message_type = packet->data_type;
+        /* Ownership was admitted; retry the application during maintenance. */
+        return XGL_OK;
+    }
+    xgl_fragment_release_message(ctx->fragment_mgr, &complete);
+    if (err != XGL_OK) {
+        transport_fail_peer(ctx, handle, peer, err);
+    }
+    return err;
+}
+
 #endif
 
 /**
@@ -199,45 +248,13 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
     }
 
     if (packet->fragment && ctx->fragment_mgr != NULL) {
-        if (peer == NULL) {
-            peer = transport_get_or_create_rx_peer(ctx, packet);
-        }
-        if (peer == NULL) {
-            return XGL_ERR_NO_MEMORY;
-        }
         transport_rx_fragment_t fragment;
         xgl_error_t err = transport_decode_rx_fragment(ctx, packet, &fragment);
         if (err != XGL_OK) {
             return err;
         }
-        xgl_fragment_message_t complete = {0};
-        err = xgl_fragment_process_ext_scoped(
-            ctx->fragment_mgr, source_id, packet->connection_id,
-            packet->session_epoch, data_type, fragment.message_id,
-            fragment.offset, fragment.message_len, data, data_len,
-            packet->reliable == XGL_RELIABILITY_ACK_ELICITING, &complete,
-            transport_now(ctx));
-
-        if (err == XGL_OK) {
-            err = transport_accept_payload(ctx, handle, source_id, data_type,
-                                           complete.data, complete.len);
-            if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY) {
-                peer->rx_pending_message = complete;
-                peer->rx_pending_message_type = data_type;
-                return XGL_OK; /* Accepted into owned storage, retry application
-                                  in run. */
-            }
-            xgl_fragment_release_message(ctx->fragment_mgr, &complete);
-            if (err != XGL_OK) {
-                transport_fail_peer(ctx, handle, peer, err);
-                return err;
-            }
-        } else if (err == XGL_ERR_BUSY) {
-            return XGL_OK;
-        } else {
-            return err;
-        }
-        return XGL_OK;
+        return transport_deliver_rx_fragment(ctx, handle, peer, packet, data,
+                                             data_len, &fragment);
     }
 #endif
 
