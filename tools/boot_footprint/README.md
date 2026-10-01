@@ -20,7 +20,7 @@ cmake --build build/boot-footprint --parallel 6
 
 配置固定为一个 peer、一个路由、一个 link、window 1、一个可靠 TX 记录、MTU 128、RX 128，关闭 AUTH、转发、分片、乱序和 libc allocator。全部容量显式给出；不可变配置为 `static const`，在消费者整个生命周期有效并可放入 Flash。
 
-`layout_probe.c` 仅为测量私有 workspace 类型而包含生产实现源码；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 3 布局常量，分别计算初始化区域以及 peer、window、TX record、TX payload、scratch 五个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。消费者入口仍调用真实 `xgl_memory_requirements` 核对该大小。交叉构建未执行目标代码，因此这项运行时比较只有在将消费者适配至目标或模拟器后才算 ARM 执行验证。
+`layout_probe.c` 包含私有 workspace 类型头，不再包含生产 `.c` 文件；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 3 布局常量，分别计算初始化区域以及 peer、window、TX record、TX payload、scratch 五个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。消费者入口仍调用真实 `xgl_memory_requirements` 核对该大小。交叉构建未执行目标代码，因此这项运行时比较只有在将消费者适配至目标或模拟器后才算 ARM 执行验证。
 
 2026-09-30 旧 core 组合的 GCC 15.2.1 Cortex-M0 `-Os`、无 LTO 历史测量如下；2026-10-01 迁移前重跑确认同一基线。它不表示新五包组合的最终资源。
 
@@ -40,3 +40,18 @@ cmake --build build/boot-footprint --parallel 6
 本轮已通过五个显式 `XGL_DEV_*_SOURCE_DIR` 在 `build/ownership-arm` 重新构建：Flash 16,764 B、静态 RAM 1,488 B、workspace 1,424 B、预留栈 1,024 B、合计 RAM 2,512 B、最大单函数栈 392 B，均与前一阶段相同；ELF 无堆服务或未解析符号。新报告记录实际源码路径、提交与已有脏状态，不宣称为干净的发布组合，也不改写上述历史报告的来源。`dev/dependencies.json` 仅固定诊断与 CI 的测试输入，产品必须自行选择和记录其实际源码组合。
 
 报告中的 Flash 包括消费者、通用启动入口和实际链接的 C 库依赖。RAM 同时报告静态区与额外预留的 1024 字节栈；预留值不是实测栈用量。`.su` 只报告仍链接函数的单函数栈，不能替代调用链累计、ISR 嵌套或板上高水位测量。8 KiB 协议 Flash / 1 KiB workspace 是单独报告的设计目标，不满足时不会伪称达标。
+
+## 协议结构优化后的对比
+
+2026-10-01 在同一 GCC 15.2.1、Cortex-M0、`-Os`、无 LTO 和五包输入下，重新构建 `b158d60` 基线与本轮优化后的完整 ELF。接收 CRC 分类修复也计入最终值，未仅选取中间较小结果。
+
+| 项目 | 重跑基线 | 优化后 | 变化 |
+| --- | ---: | ---: | ---: |
+| Flash | 16,764 B | 15,692 B | -1,072 B |
+| workspace | 1,424 B | 1,168 B | -256 B |
+| 静态 RAM | 1,488 B | 1,232 B | -256 B |
+| 额外预留栈 | 1,024 B | 1,024 B | 0 B |
+| RAM 合计 | 2,512 B | 2,256 B | -256 B |
+| 最大已链接单函数栈 | 392 B | 392 B | 0 B |
+
+证据分别位于 `out/refactor-arm-baseline` 与 `out/refactor-arm-final`，包含完整 ELF、map、布局、`.su` 和 JSON 报告；没有堆服务或未解析符号。满足本探针的 64 KiB Flash / 8 KiB RAM 限额，仍未达到 8 KiB Flash / 1 KiB workspace 目标。测量源码、工作区状态与验证边界见[协议结构验证记录](../../design/validation/protocol-structure.md)。

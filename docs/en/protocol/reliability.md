@@ -22,4 +22,4 @@ Failed reliable scopes cannot accept new reliable work. `xgl_close_peer` release
 
 Once a scope has used TX or RX reliable numbering, idle time never reclaims its history. Only unused, empty peers may be reclaimed automatically; used scopes require explicit close.
 
-Verification: `test/test_reliable.cpp` and `test/test_transport.cpp`.
+Verification: `test/unit/transport/test_reliable.cpp` and `test/unit/transport/test_transport.cpp`.

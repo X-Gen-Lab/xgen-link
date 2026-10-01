@@ -19,12 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Consolidate transport lifecycle, TX, RX, ACK and maintenance into 17 implementation files, with private headers colocated under their owning layers.
+- Share frame planning, encoding and PHY submission across copied, authenticated, in-place and forwarded traffic; propagate validated RX views without repeating full-frame CRC.
+- Own security state once per instance and reserve exactly one parser and RX cache per unique PHY.
+- Remove optional statistics and callback diagnostic text from Boot; retain error codes and report unsupported statistics explicitly.
+- Organize tests by layer and check every public/private header independently in C11 and C++17.
+
 - Consume independent status, bytes, CRC, memory and containers packages through compatible parent targets or installed packages.
 - Use C11 production code and strict C++17 host tests; public configuration presets support both languages.
 - Allocate reliable ACK state as a compact bitset and reuse bounded workspace across static and allocator-backed initialization.
 - Instrument only protocol production objects for native GNU coverage, including Windows; reject unsupported requests explicitly.
 
 ### Fixed
+
+- Commit every valid SACK acknowledgment before attempting a fast retransmission that may return BUSY.
+- Validate sends before peer admission, retain completed reassembly byte charges until release, and return reliable admission records without a second lookup.
+- Reject incomplete CRC frames, malformed spans, overflowing lengths and invalid in-place capacity before pointer arithmetic or frame mutation.
+- Report accepted ACK RTT samples and complete workspace reservations consistently across initialization and statistics reset.
 
 - Reject oversized ACK range counts before length multiplication can overflow.
 - Clear borrowed RX storage before failed-initialization cleanup can return it twice.

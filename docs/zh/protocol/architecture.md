@@ -25,10 +25,20 @@ flowchart LR
     D --> P[同步 PHY]
 ```
 
-接收按相反方向经过这些边界：datalink 获取完整帧，network 解码并完成本地认证后，transport 才修改 peer 状态。转发帧走有界转发路径，不创建本地 transport 状态。可靠重传从持有的逻辑包重新组合帧，保留 DATA 编号并取得新的安全序号。
+接收按相反方向经过这些边界：每 PHY 的 parser 调用 wire 验证完整帧并生成借用视图，datalink 和 network 传递该视图；network 完成本地认证后，transport 才修改 peer 状态。完整帧 CRC 只计算一次。直接提交原始帧的内部入口仍先验证输入，不能冒充已验证视图。
+
+普通、认证和原地发送共用帧长度规划与编码规则，统一由 datalink 提交 PHY。转发不创建本地 transport 状态，但也经过该 PHY 出口。可靠重传从持有的逻辑包重新组合帧，保留 DATA 编号并取得新的安全序号。
 
 ## 所有权与执行
 
 一个 peer 唯一持有 `(remote_id, connection_id, session_epoch)` 对应的窗口、等待 ACK 记录、RTT 和接收顺序。借用的包/帧视图不得超出同步调用；需要保留的载荷由明确资源类别持有。安全状态独立于 peer 生命周期，不随 transport RESET 清除。
 
+实例持有唯一 security context，各层借用它；每个唯一 PHY 描述符对应一个 parser 和 RX cache，共用 PHY 的多条路由不会重复预留。完整重组消息以含长度的自有对象移交，应用 BUSY 时继续占用原字节预算，直到统一释放。
+
 同一实例由调用方串行访问。回调不得重入或销毁该实例。协议库不提供全局时钟、内部互斥包装、隐式堆回退或通用容器实现。参见[内存](memory.md)与[平台](platform.md)。
+
+## 源码与构建边界
+
+`include/xgl/` 仅保留公开 SDK。私有头与实现同放 `src/api`、`wire`、`datalink`、`network`、`transport`、`security`；跨层数据与资源契约放 `src/internal`。私有目录不安装、不导出给消费者。
+
+生产仍导出一个 `xgl::xgl` target。`cmake/XglSources.cmake` 管理显式源码和 profile 裁剪，`XglInstall.cmake` 管理 SDK 包，`XglDevelopment.cmake` 管理开发检查。测试位于 `test/unit/<layer>`、`integration`、`property` 和 `support`，不改变历史测试名称与回放种子。

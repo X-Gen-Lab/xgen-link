@@ -10,6 +10,10 @@ Queue/index/window helpers operate on the selected peer's objects. They do not c
 
 ## Ownership Across Calls
 
+The 17 implementation files follow lifetimes: the entry owns initialization and destruction; `peer` owns identity, reclamation and send eligibility; `tx` owns complete-request preflight, admission and submission, while `tx_message` advances messages across windows. `rx` decides ordering, `rx_buffer` retains out-of-order packets, and `rx_delivery` owns application delivery. `ack` interprets feedback, `ack_send` composes ACK/SACK, `runtime` processes retries and deadlines, and `control` handles control packets. `reliable`, `window`, `rtt` and three `fragment` files retain distinct algorithm boundaries.
+
+Send preflight finishes before creating a peer or emitting HELLO. Reliable admission returns its owned record without a second lookup. ACK extensions use one TLV scan. After complete validation, all acknowledgments are applied before fast retransmission, so PHY BUSY cannot prevent later valid acknowledgments in the same feedback from being committed.
+
 | Input or retained state | Contract |
 | --- | --- |
 | Send request | Borrowed for the call; accepted reliable bytes are copied |

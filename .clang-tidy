@@ -4,5 +4,5 @@
 # Keep buffer bounds analysis; only omit suggestions to replace libc with *_s.
 Checks: '-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,bugprone-*,performance-*'
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*[/\\]include[/\\]xgl[/\\].*'
+HeaderFilterRegex: '.*[/\\](include[/\\]xgl|src[/\\](api|wire|datalink|network|transport|security|internal))[/\\].*'
 FormatStyle: file

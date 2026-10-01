@@ -18,4 +18,4 @@ Boot 编译时裁剪转发。启用的转发节点验证完整帧，要求目标
 
 广播使用节点 `0xFFFF`。认证策略允许时支持明文广播。认证实现只支持单播关联。不能把广播当成组可靠投递或组认证协议。双方容量与功能兼容性由应用配置，路由发现不会协商 transport 窗口或可信 epoch。
 
-验证依据：`test/test_network.cpp`。
+验证依据：`test/unit/network/test_network.cpp`。

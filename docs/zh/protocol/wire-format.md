@@ -32,4 +32,4 @@ wire version 为 `3`。除特别说明外，整数字段使用小端序。帧布
 
 载荷预算为 `MTU - 24 - TLV 字节数 - 标签字节数 - 2`。携带单区间 ACK、SESSION、SECURITY 和 16 字节标签的 ACK 长度为 `24 + 15 + 14 + 15 + 16 + 2 = 86` 字节。128 字节控制预留可容纳该示例。当前 Boot 构建不包含认证；此处是线格式预算，不表示认证 Boot 也能放进相同 RAM 配置。
 
-验证依据：`test/test_wire.cpp`。
+验证依据：`test/unit/wire/test_wire.cpp`。

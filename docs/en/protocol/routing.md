@@ -18,4 +18,4 @@ The end-to-end authentication tag and authenticated payload remain unchanged. TT
 
 Broadcast uses node `0xFFFF`. Plain broadcast is available when the authentication policy allows it. The authentication implementation supports unicast associations only. Broadcast must not be treated as a group reliable-delivery or group-authentication protocol. Capacity and feature compatibility between peers are configured by the application; route discovery does not negotiate transport windows or trusted epochs.
 
-Verification: `test/test_network.cpp`.
+Verification: `test/unit/network/test_network.cpp`.

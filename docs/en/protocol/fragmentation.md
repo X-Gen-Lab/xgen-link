@@ -20,4 +20,4 @@ Incomplete reassembly slots, all retained reassembly bytes and pending complete 
 
 Unreliable fragmentation submits fragments synchronously without the reliable whole-message retry contract. A later submission error can leave earlier fragments already transmitted. Applications requiring recovery should use reliable messages or an application-level block protocol.
 
-Verification: `test/test_fragment.cpp` and `test/test_transport.cpp`.
+Verification: `test/unit/transport/test_fragment.cpp` and `test/unit/transport/test_transport.cpp`.

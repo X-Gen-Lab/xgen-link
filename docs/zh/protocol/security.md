@@ -20,4 +20,4 @@ AAD 是实际编码的整个帧头和 TLV，仅将 TTL 第 6 字节及帧头 CRC
 
 Network 在本地交付、修改 transport 状态之前验证安全。转发节点修改 TTL 与 CRC，保留端到端标签；AAD 规范化会排除 TTL。RESET 和 transport close 不重置重放窗口或 TX 安全计数。回调同步执行，不能重入或销毁正在执行的实例。
 
-验证依据：`test/test_security.cpp`。
+验证依据：`test/unit/security/test_security.cpp`。

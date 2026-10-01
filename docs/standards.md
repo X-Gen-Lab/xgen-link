@@ -39,6 +39,8 @@
 
 生产源码使用 C11，测试使用 GoogleTest。共享入口对真实 CMake 编译数据库中的自有生产翻译单元执行 Cppcheck 和 clang-tidy；第三方及测试源码由各自任务验证。配置保持 clang-analyzer、bugprone 和 performance 检查，并将诊断视为错误。
 
+私有头迁移后，`.clang-tidy` 的头文件过滤器同时包含公开 `include/xgl` 和自有 `src` 协议目录。该调整扩大同一套检查的可见范围；不把搬出公开 include 树当作跳过分析的理由。所有公开、私有及生成配置头均独立以 C11 和 C++17 首包含编译。
+
 ## 可移植 C 库配置
 
 `.clang-tidy` 只排除 `clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling`。该检查建议将 `memcpy`、`memmove`、`memset` 等替换为可选 Annex K 的 `*_s` 接口，受支持的裸机 C11 环境和部分主机 C 库不提供这些接口。这不是缓冲区越界验证，也不意味着标准库调用自动安全。

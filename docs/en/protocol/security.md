@@ -20,4 +20,4 @@ CRC/layout validation precedes authentication. Replay is checked against a candi
 
 Local network delivery verifies security before transport mutation. A forwarding node changes TTL and CRCs while preserving the end-to-end tag; TTL is excluded from AAD by canonicalization. RESET and transport close never reset replay or TX security counters. Callbacks are synchronous and must not reenter or destroy the active instance.
 
-Verification: `test/test_security.cpp`.
+Verification: `test/unit/security/test_security.cpp`.

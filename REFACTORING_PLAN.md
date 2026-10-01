@@ -4,6 +4,8 @@
 
 现行边界以 [ADR 0001](design/adr/0001-core-dependency.md) 和[迁移指南](docs/zh/guide/modular-migration.md)为准，实际完成项、验证结果与剩余差距见 [REFACTORING_STATUS.md](REFACTORING_STATUS.md)。以下双仓拓扑、目录和阶段叙述均属于历史设计；保留它们用于追溯，不表示仍在实施 core 聚合交付，也不表示所有原目标已完成。
 
+后续协议目录、帧路径和状态所有权的实际归并见 [ADR 0005](design/adr/0005-protocol-structure.md)。该阶段保留 wire v3 和公开 ABI，收拢 transport、私有头和测试目录，关闭 Boot 可选统计与详细诊断，并以完整矩阵和最终 ELF 验证。
+
 设计输入：协议跨平台使用；通用组件独立仓库；目标设备约 64 KiB Flash、8 KiB RAM，且需要放进更小的 Bootloader。Boot 分区大小、MCU 型号、Flash 擦写粒度和认证算法尚未确定，作为产品接入参数处理。
 
 范围：先建立可验证的协议边界、资源模型和迁移路径，再逐步提取与替换实现。本文描述目标设计，具体 API、wire 兼容范围和生产源码的实现状态以进度记录和[迁移指南](docs/zh/guide/modular-migration.md)为准。

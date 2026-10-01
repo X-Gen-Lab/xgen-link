@@ -25,4 +25,4 @@ SACK 第 `i` 位描述 `base + i`；低于 base 的包累计确认。置位表�
 
 Network 组合或校验 DATA_TYPE 与非零 SESSION epoch 扩展。重传保留分片元数据，但重新构造帧。认证层每次尝试都从已安装的方向关联填充 SECURITY；保留 DATA 包不等于保留已经签名的帧。
 
-验证依据：`test/test_wire.cpp`。
+验证依据：`test/unit/wire/test_wire.cpp`。

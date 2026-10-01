@@ -11,3 +11,5 @@
 - `UNSUPPORTED`: the selected profile or API path does not provide the capability.
 
 The receive acceptance callback returns `BUSY` before accepting data; transport does not confirm data that it cannot retain or deliver. Completion callbacks may not reenter the instance. See `test/property/test_error_properties.cpp`.
+
+The error callback always receives a non-null `message`. Boot disables `XGL_FEATURE_DIAGNOSTICS` and supplies an empty string to remove detailed diagnostic text. Error codes and callback timing remain available; applications should make decisions from the error code.

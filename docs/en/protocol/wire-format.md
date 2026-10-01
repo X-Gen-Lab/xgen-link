@@ -32,4 +32,4 @@ Reliable DATA starts at packet number zero per peer scope and increments only af
 
 Payload budget is `MTU - 24 - TLV bytes - tag bytes - 2`. A single-range ACK with SESSION, SECURITY and a 16-byte tag uses `24 + 15 + 14 + 15 + 16 + 2 = 86` bytes. A 128-byte control reservation accommodates that example. Current Boot builds omit authentication; the example is a wire budget, not a claim that authenticated Boot fits the same RAM configuration.
 
-Verification: `test/test_wire.cpp`.
+Verification: `test/unit/wire/test_wire.cpp`.

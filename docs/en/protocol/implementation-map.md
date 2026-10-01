@@ -11,9 +11,9 @@ This map identifies protocol owners. Public applications include `<xgl/xgl.h>`; 
 | Exact peer lifecycle and close | `src/transport/xgl_transport_peer.c` |
 | Atomic ACK validation and application | `src/transport/xgl_transport_ack.c` |
 | Deadline collection and periodic work | `src/transport/xgl_transport_runtime.c` |
-| Production retransmission | `src/transport/xgl_transport_retransmit.c` |
-| Owned message pump | `src/transport/xgl_transport_send_fragment.c` |
-| Receive ordering and retained delivery | `src/transport/xgl_transport_rx_order.c`, `xgl_transport_delivery.c` |
+| Production retransmission | `src/transport/xgl_transport_runtime.c` |
+| Owned message pump | `src/transport/xgl_transport_tx_message.c` |
+| Receive ordering and retained delivery | `src/transport/xgl_transport_rx.c`, `xgl_transport_rx_delivery.c` |
 | Fragment coverage and reassembly | `src/transport/xgl_fragment_*.c` |
 | Route lookup and local/forward delivery | `src/network/` |
 | Canonical frame layout and TLVs | `src/wire/` |

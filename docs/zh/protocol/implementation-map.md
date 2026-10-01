@@ -11,9 +11,9 @@
 | 精确 peer 生命周期与 close | `src/transport/xgl_transport_peer.c` |
 | ACK 原子校验与应用 | `src/transport/xgl_transport_ack.c` |
 | 期限汇总与周期处理 | `src/transport/xgl_transport_runtime.c` |
-| 生产重传路径 | `src/transport/xgl_transport_retransmit.c` |
-| 自有消息推进 | `src/transport/xgl_transport_send_fragment.c` |
-| 接收排序与保留投递 | `src/transport/xgl_transport_rx_order.c`、`xgl_transport_delivery.c` |
+| 生产重传路径 | `src/transport/xgl_transport_runtime.c` |
+| 自有消息推进 | `src/transport/xgl_transport_tx_message.c` |
+| 接收排序与保留投递 | `src/transport/xgl_transport_rx.c`、`xgl_transport_rx_delivery.c` |
 | 分片覆盖与重组 | `src/transport/xgl_fragment_*.c` |
 | 路由查找、本地投递与转发 | `src/network/` |
 | 规范帧布局与 TLV | `src/wire/` |

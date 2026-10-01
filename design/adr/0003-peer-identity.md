@@ -22,4 +22,4 @@
 
 Peer、TX 记录、OOO 包、TX 消息副本与重组字节均有显式全局容量；窗口为一时不要求乱序槽。已 ACK 字节必须由应用接纳或由 transport 持有，临时 BUSY 不允许静默丢弃。静态工作区按资源类别绑定 xgen-core 服务，分配与释放使用同一类别。
 
-`test/test_transport.cpp` 覆盖错误 scope、未来 ACK、RESET 幂等、显式取消、旧 ACK 与新 epoch 隔离、空闲期间双向编号历史以及容量拒绝。`test/property/test_transport_properties.cpp` 使用生产重传路径验证超时与失败生命周期。
+`test/unit/transport/test_transport.cpp` 覆盖错误 scope、未来 ACK、RESET 幂等、显式取消、旧 ACK 与新 epoch 隔离、空闲期间双向编号历史以及容量拒绝。`test/property/test_transport_properties.cpp` 使用生产重传路径验证超时与失败生命周期。

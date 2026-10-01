@@ -8,4 +8,4 @@ SDK 3 仅使用 wire version 3，拒绝 version 2 帧；不提供自动降级或
 
 ## 证据
 
-`test/test_wire.cpp`、`test/test_security.cpp`、`test/test_network.cpp` 和集成测试检查编码、认证输入、规范化转发 AAD 及路由交付。测试签名 provider 是确定性测试实现，不能用于生产密码。跨供应商密码互操作和板级 PHY 验证仍由应用负责。
+`test/unit/wire/test_wire.cpp`、`test/unit/security/test_security.cpp`、`test/unit/network/test_network.cpp` 和集成测试检查编码、认证输入、规范化转发 AAD 及路由交付。测试签名 provider 是确定性测试实现，不能用于生产密码。跨供应商密码互操作和板级 PHY 验证仍由应用负责。

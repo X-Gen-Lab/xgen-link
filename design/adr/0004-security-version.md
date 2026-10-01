@@ -24,4 +24,4 @@ Transport RESET 不清理安全重放窗口或发送计数。安全 close 保留
 
 ## 验证
 
-`test/test_security.cpp` 覆盖 nonce/AAD 逐字节向量、每次尝试消耗序号、provider 失败、序号耗尽、重放窗口、关闭标记与 nonce 域拒绝复用。`test/test_wire.cpp` 验证 v3 编码及旧版本拒绝；生产发送与重传路径验证 DATA 编号稳定而认证安全序号变化。
+`test/unit/security/test_security.cpp` 覆盖 nonce/AAD 逐字节向量、每次尝试消耗序号、provider 失败、序号耗尽、重放窗口、关闭标记与 nonce 域拒绝复用。`test/unit/wire/test_wire.cpp` 验证 v3 编码及旧版本拒绝；生产发送与重传路径验证 DATA 编号稳定而认证安全序号变化。

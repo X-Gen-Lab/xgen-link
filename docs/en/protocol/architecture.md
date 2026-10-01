@@ -25,10 +25,20 @@ flowchart LR
     D --> P[Synchronous PHY]
 ```
 
-Receive reverses the boundary direction: datalink obtains a complete frame, network decodes it and verifies local authentication before transport changes peer state. A forwarded frame follows the bounded forwarding path and does not create local transport state. Reliable retransmission starts from an owned logical packet and traverses frame composition again, retaining its DATA number while obtaining a fresh security sequence.
+Receive reverses the boundary direction: each PHY parser calls wire to validate a complete frame and produce a borrowed view. Datalink and network pass that view through; network verifies local authentication before transport changes peer state. The complete-frame CRC is computed once. Internal raw-frame entry points still validate their inputs before delivery.
+
+Copied, authenticated and in-place sends share frame measurement and encoding rules, with datalink as the single PHY submission owner. Forwarding creates no local transport state but uses that same PHY exit. Reliable retransmission starts from an owned logical packet and traverses frame composition again, retaining its DATA number while obtaining a fresh security sequence.
 
 ## Ownership and Execution
 
 One peer owns one exact `(remote_id, connection_id, session_epoch)` scope, including its window, wait-ACK records, RTT and receive order. Borrowed packet/frame views never outlive a synchronous call; retained payloads have a resource-class owner. Security state is separate from peer lifetime and survives transport RESET.
 
+The instance owns one security context, borrowed by the layers. Each unique PHY descriptor owns one parser and RX cache; multiple routes sharing that descriptor do not reserve duplicates. A completed reassembly transfers as an owned object carrying its length. Application BUSY retains the original byte admission charge until a common release operation returns it.
+
 Calls on one instance are serialized by the caller. Callbacks cannot reenter or destroy that instance. No global clock, internal mutex wrapper, implicit heap fallback or generic container implementation is provided by the protocol library. See [Memory](memory.md) and [Platform](platform.md).
+
+## Source and Build Boundaries
+
+`include/xgl/` contains only the public SDK. Private headers live with their implementations under `src/api`, `wire`, `datalink`, `network`, `transport` and `security`. Cross-layer data and resource contracts live under `src/internal`. Private directories are neither installed nor exported to consumers.
+
+Production still exports one `xgl::xgl` target. `cmake/XglSources.cmake` owns explicit source selection and profile trimming, `XglInstall.cmake` owns SDK packaging, and `XglDevelopment.cmake` owns development checks. Tests live under `test/unit/<layer>`, `integration`, `property` and `support`, preserving historical case names and replay seeds.

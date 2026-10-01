@@ -53,11 +53,16 @@ static xgl_error_t datalink_auth_tag_len(const xgl_datalink_ctx_t* ctx,
 #endif
 }
 
+/* Capacity is a byte count; payload_offset is an offset in the same buffer. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Serialize and synchronously transmit using a borrowed buffer
  * \param[in,out]   ctx: Datalink context owning the frame allocator
  * \param[in]       phy: Physical layer operations
  * \param[in]       frame: Frame to serialize
+ * \param[in,out]   buffer: Borrowed storage, or NULL to allocate scratch
+ * \param[in]       capacity: Total borrowed storage size in bytes
+ * \param[in]       payload_offset: Existing payload offset in borrowed storage
  * \return          XGL_OK on success, error code otherwise
  * \note            The PHY must finish reading the frame before tx returns.
  */
@@ -66,6 +71,7 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
                                           const xgl_frame_t* frame,
                                           uint8_t* buffer, size_t capacity,
                                           size_t payload_offset) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (ctx == NULL || phy == NULL || frame == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

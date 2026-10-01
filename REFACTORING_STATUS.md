@@ -1,8 +1,28 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。六仓 CI 修复、协议完整提交交付及质量门禁补齐已完成。各阶段证据分别记录；下面标为历史的结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，当前依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)。
+更新日期：2026-10-01。协议结构和资源所有权优化已完成本地完整验收。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，当前依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)。
 
-## 当前：独立交付与质量补齐
+## 当前：协议结构与资源优化
+
+在 `b158d60` 基础上实施，生产源从 63 个归并为 45 个，transport 从 34 个归并为 17 个。私有头按所属层放到 `src`，测试按层组织，CMake 拆分源码、安装和开发辅助职责，继续只导出一个协议 target。普通、认证、原地及转发发送共享规划和 PHY 提交；接收传递已验证借用视图，不重复完整 CRC。
+
+实例拥有唯一安全上下文，每唯一 PHY 只预留一个 parser/cache。已修复 SACK/BUSY 确认顺序、发送预检、重组消息预算、跨度溢出、原地容量检查及流式 CRC 分类；RTT 与 workspace 预留统计补齐。Boot 编译裁剪统计及详细错误文本，保留公开错误契约。wire v3 和公开结构 ABI 不变。
+
+| 本轮本地验收 | 结果 |
+| --- | --- |
+| Windows GNU Full / Embedded，MSVC Full，Linux GNU Full | 各 582/582 CTest；575 个 GoogleTest、7 个 smoke/示例 |
+| GNU Boot / MSVC Boot | 2/2（含安装消费）/ 严格构建与静态工作区 smoke 通过 |
+| Linux ASan / UBSan | 581/581，含泄漏检查；安装消费另由普通 Full 验证 |
+| 生产覆盖率 | 行 3665/3988（91.9%）、函数 269/270（99.6%）、分支 2308/2842（81.2%） |
+| 分析范围 | 45 个生产翻译单元；覆盖报告另包含 4 个有执行代码的私有头 |
+| 编译与依赖契约 | 29 个头分别 C11/C++17；11 项生产依赖、11 项开发准备、3 项发现策略、6 项 runner 契约通过 |
+| 质量与文档 | 固定 pre-commit、format、text、Cppcheck、Clang-Tidy、严格 Doxygen/MkDocs 与双语 QA 通过 |
+
+同工具链重跑的 Cortex-M0 完整 ELF：Flash **16,764 → 15,692 B**，workspace **1,424 → 1,168 B**，静态 RAM **1,488 → 1,232 B**，加预留 1 KiB 栈后的 RAM **2,512 → 2,256 B**；最大已链接单函数栈仍为 392 B。无堆服务或未解析符号。满足探针的 64 KiB / 8 KiB 限额，仍未达到 8 KiB Flash / 1 KiB workspace 目标，未执行板级验收。
+
+真实 RED/GREEN 检查点、工具和产物路径见[协议结构验证记录](design/validation/protocol-structure.md)。本节记录本地证据；远端结果以此次推送提交对应的 Actions 为准，不沿用下面历史 CI。现有 `.spec-workflow/` 保留在工作区，未提交；不合并 main 或创建 tag。
+
+## 历史：独立交付与质量补齐
 
 六个独立仓库已正常推送 main，远端 Windows/Linux CI 全部通过：
 

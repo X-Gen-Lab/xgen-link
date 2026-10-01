@@ -25,4 +25,4 @@ SACK bit `i` describes `base + i`. Numbers below base are cumulatively acknowled
 
 Network composes or validates DATA_TYPE and nonzero SESSION epoch extensions. Retransmission retains the fragment metadata but recomposes the frame. Authentication fills SECURITY from the installed directional association for each attempt; callers must not treat a retained DATA packet as a retained signed frame.
 
-Verification: `test/test_wire.cpp`.
+Verification: `test/unit/wire/test_wire.cpp`.

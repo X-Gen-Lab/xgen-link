@@ -22,4 +22,4 @@ HELLO 确保 peer 存在，不重置已有状态。RESET 只作用于已存在�
 
 Scope 任一方向使用过可靠编号后，空闲时间不能回收其历史。仅未使用且无保留数据的 peer 可以自动回收，已使用 scope 必须显式 close。
 
-验证依据：`test/test_reliable.cpp` 与 `test/test_transport.cpp`。
+验证依据：`test/unit/transport/test_reliable.cpp` 与 `test/unit/transport/test_transport.cpp`。

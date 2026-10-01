@@ -32,8 +32,10 @@ Application → API → Transport → Network → Datalink → synchronous PHY�
 - `xgl_send_at` / `xgl_step` / `xgl_next_timeout`：调用者提供时间。
 - 配置和引用对象借用到销毁；同一实例由应用串行访问，回调不可重入。
 - wire v3 分离可靠 DATA 编号与 64 位安全序号，不降级 v2。认证需要可信方向参数及生产密码 provider。
-- Boot 裁剪认证、转发、分片及乱序。PHY 返回前必须消费或复制字节；驱动可以使用 containers 的 DMA 缓冲接口，但这不改变协议 PHY 的同步所有权契约。
+- Boot 裁剪认证、转发、分片、乱序、统计存储与详细诊断文本。PHY 返回前必须消费或复制字节；驱动可以使用 containers 的 DMA 缓冲接口，但这不改变协议 PHY 的同步所有权契约。
 - ACK 状态使用紧凑位集合和循环偏移；128 个状态占用 16 字节位存储，完整资源仍以工作区计算与目标 ELF 为准。
+
+公开 SDK 位于 `include/xgl`；私有头和实现同放 `src/<layer>`，不安装给消费者。普通、认证、原地发送和转发共用 datalink 的同步 PHY 出口；每个唯一 PHY 只有一个 parser/RX cache。目录职责见[实现映射](docs/zh/protocol/implementation-map.md)与[结构决策](design/adr/0005-protocol-structure.md)。
 
 ## Validation / 验证
 

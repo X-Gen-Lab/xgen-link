@@ -20,4 +20,4 @@ FRAGMENT_EXT 使用三个 32 位值携带 `message_id`、`offset` 和 `total_len
 
 非可靠分片同步逐片提交，不具备可靠消息的完整副本重试契约。后续提交发生错误时，前面的片可能已经发出。需要恢复能力的应用应使用可靠消息或应用层块协议。
 
-验证依据：`test/test_fragment.cpp` 与 `test/test_transport.cpp`。
+验证依据：`test/unit/transport/test_fragment.cpp` 与 `test/unit/transport/test_transport.cpp`。

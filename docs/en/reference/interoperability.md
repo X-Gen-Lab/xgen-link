@@ -8,4 +8,4 @@ Peers must agree on MTU, extension semantics, authentication tag length, trusted
 
 ## Evidence
 
-`test/test_wire.cpp`, `test/test_security.cpp`, `test/test_network.cpp` and the integration tests check encodings, authentication input, canonical forwarded AAD and routed delivery. The test signing provider is deterministic test machinery, not a production cryptographic implementation. Cross-vendor crypto interoperability and board PHY validation remain application responsibilities.
+`test/unit/wire/test_wire.cpp`, `test/unit/security/test_security.cpp`, `test/unit/network/test_network.cpp` and the integration tests check encodings, authentication input, canonical forwarded AAD and routed delivery. The test signing provider is deterministic test machinery, not a production cryptographic implementation. Cross-vendor crypto interoperability and board PHY validation remain application responsibilities.
