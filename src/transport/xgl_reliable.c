@@ -53,8 +53,12 @@ void xgl_reliable_destroy(xgl_reliable_queue_t* queue) {
 xgl_error_t xgl_reliable_add_packet_number(
     xgl_reliable_queue_t* queue, const uint8_t* data, size_t data_len,
     uint16_t source_id, uint16_t target_id, uint32_t packet_number,
-    uint8_t data_type, uint8_t priority, int32_t timeout_ms) {
+    uint8_t data_type, uint8_t priority, int32_t timeout_ms,
+    xgl_reliable_packet_t** packet_out) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    if (packet_out != NULL) {
+        *packet_out = NULL;
+    }
     if (queue == NULL || data == NULL || data_len == 0) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -101,6 +105,9 @@ xgl_error_t xgl_reliable_add_packet_number(
     /* Add to wait-ACK list */
     xgct_list_insert_tail(&queue->wait_ack_list, &packet->node);
     reliable_index_packet(queue, packet);
+    if (packet_out != NULL) {
+        *packet_out = packet;
+    }
 
     return XGL_OK;
 }

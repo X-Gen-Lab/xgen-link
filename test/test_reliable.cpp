@@ -96,7 +96,7 @@ TEST_F(XglReliableTest, AddPacketToQueue) {
                                                      10, /* packet_number */
                                                      5,  /* data_type */
                                                      3,  /* priority */
-                                                     1000);
+                                                     1000, nullptr);
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_FALSE(xgl_reliable_is_empty(&queue));
@@ -107,7 +107,7 @@ TEST_F(XglReliableTest, AdmissionReturnsOwnedRecordWithoutLookup) {
     uint8_t data[] = {0x11, 0x22};
     xgl_reliable_packet_t* packet = nullptr;
     ASSERT_EQ(xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2,
-                                              10, 5, 3, 1000, &packet),
+                                             10, 5, 3, 1000, &packet),
               XGL_OK);
     ASSERT_NE(packet, nullptr);
     EXPECT_EQ(packet->packet_number, 10U);
@@ -120,11 +120,11 @@ TEST_F(XglReliableTest, RejectedAdmissionClearsRecordOutput) {
     uint8_t data[] = {0x11};
     xgl_reliable_packet_t* packet = nullptr;
     ASSERT_EQ(xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2,
-                                              10, 5, 3, 1000, &packet),
+                                             10, 5, 3, 1000, &packet),
               XGL_OK);
     ASSERT_NE(packet, nullptr);
-    EXPECT_EQ(xgl_reliable_add_packet_number(&queue, nullptr, 1, 1, 2,
-                                              11, 5, 3, 1000, &packet),
+    EXPECT_EQ(xgl_reliable_add_packet_number(&queue, nullptr, 1, 1, 2, 11, 5, 3,
+                                             1000, &packet),
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(packet, nullptr);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1U);
@@ -136,18 +136,18 @@ TEST_F(XglReliableTest, AddMultiplePackets) {
     uint8_t data3[] = {0x05, 0x06};
 
     xgl_reliable_add_packet_number(&queue, data1, sizeof(data1), 1, 2, 10, 5, 3,
-                                   1000);
+                                   1000, nullptr);
     xgl_reliable_add_packet_number(&queue, data2, sizeof(data2), 1, 2, 11, 5, 3,
-                                   1000);
+                                   1000, nullptr);
     xgl_reliable_add_packet_number(&queue, data3, sizeof(data3), 1, 2, 12, 5, 3,
-                                   1000);
+                                   1000, nullptr);
 
     EXPECT_EQ(xgl_reliable_get_count(&queue), 3);
 }
 
 TEST_F(XglReliableTest, AddPacketWithNullData) {
     xgl_error_t err = xgl_reliable_add_packet_number(&queue, nullptr, 10, 1, 2,
-                                                     10, 5, 3, 1000);
+                                                     10, 5, 3, 1000, nullptr);
 
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
@@ -155,8 +155,8 @@ TEST_F(XglReliableTest, AddPacketWithNullData) {
 TEST_F(XglReliableTest, AddPacketWithZeroLength) {
     uint8_t data[] = {0x01};
 
-    xgl_error_t err =
-        xgl_reliable_add_packet_number(&queue, data, 0, 1, 2, 10, 5, 3, 1000);
+    xgl_error_t err = xgl_reliable_add_packet_number(&queue, data, 0, 1, 2, 10,
+                                                     5, 3, 1000, nullptr);
 
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
@@ -164,8 +164,8 @@ TEST_F(XglReliableTest, AddPacketWithZeroLength) {
 TEST_F(XglReliableTest, AddPacketOwnsNoPhysicalInterface) {
     uint8_t data[] = {0x01, 0x02};
 
-    xgl_error_t err = xgl_reliable_add_packet_number(&queue, data, sizeof(data),
-                                                     1, 2, 10, 5, 3, 1000);
+    xgl_error_t err = xgl_reliable_add_packet_number(
+        &queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, nullptr);
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
@@ -179,7 +179,7 @@ TEST_F(XglReliableTest, RemovePacketBySeqNum) {
     uint8_t data[] = {0x01, 0x02, 0x03};
 
     xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3,
-                                   1000);
+                                   1000, nullptr);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1);
 
     xgl_error_t err = xgl_reliable_remove_packet_number(&queue, 10, 2);
@@ -191,7 +191,7 @@ TEST_F(XglReliableTest, RemoveNonExistentPacket) {
     uint8_t data[] = {0x01, 0x02};
 
     xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3,
-                                   1000);
+                                   1000, nullptr);
 
     xgl_error_t err = xgl_reliable_remove_packet_number(&queue, 99, 2);
     EXPECT_EQ(err, XGL_ERR_SEQUENCE_ERROR);
@@ -202,7 +202,7 @@ TEST_F(XglReliableTest, RemovePacketWithWrongTargetId) {
     uint8_t data[] = {0x01, 0x02};
 
     xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3,
-                                   1000);
+                                   1000, nullptr);
 
     xgl_error_t err = xgl_reliable_remove_packet_number(&queue, 10, 99);
     EXPECT_EQ(err, XGL_ERR_SEQUENCE_ERROR);
@@ -217,7 +217,7 @@ TEST_F(XglReliableTest, FindPacketBySeqNum) {
     uint8_t data[] = {0x01, 0x02, 0x03};
 
     xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3,
-                                   1000);
+                                   1000, nullptr);
 
     xgl_reliable_packet_t* packet =
         xgl_reliable_find_packet_number(&queue, 10, 2);
@@ -231,7 +231,7 @@ TEST_F(XglReliableTest, FindNonExistentPacket) {
     uint8_t data[] = {0x01, 0x02};
 
     xgl_reliable_add_packet_number(&queue, data, sizeof(data), 1, 2, 10, 5, 3,
-                                   1000);
+                                   1000, nullptr);
 
     xgl_reliable_packet_t* packet =
         xgl_reliable_find_packet_number(&queue, 99, 2);
@@ -245,11 +245,11 @@ TEST_F(XglReliableTest, FindAndRemovePacketBy32BitPacketNumber) {
 
     ASSERT_EQ(xgl_reliable_add_packet_number(&queue, data, sizeof(data), 0x1234,
                                              0x2345, first_packet_number, 5, 3,
-                                             1000),
+                                             1000, nullptr),
               XGL_OK);
     ASSERT_EQ(xgl_reliable_add_packet_number(&queue, data, sizeof(data), 0x1234,
                                              0x2345, second_packet_number, 5, 3,
-                                             1000),
+                                             1000, nullptr),
               XGL_OK);
 
     xgl_reliable_packet_t* first =
@@ -341,9 +341,9 @@ TEST_F(XglReliableTest, ClearQueueWithPackets) {
     uint8_t data2[] = {0x03, 0x04};
 
     xgl_reliable_add_packet_number(&queue, data1, sizeof(data1), 1, 2, 10, 5, 3,
-                                   1000);
+                                   1000, nullptr);
     xgl_reliable_add_packet_number(&queue, data2, sizeof(data2), 1, 2, 11, 5, 3,
-                                   1000);
+                                   1000, nullptr);
 
     EXPECT_EQ(xgl_reliable_get_count(&queue), 2);
 
@@ -362,7 +362,7 @@ TEST_F(XglReliableTest, AddPacketWithMaxPriority) {
 
     xgl_error_t err = xgl_reliable_add_packet_number(
         &queue, data, sizeof(data), 1, 2, 10, 5, 7, /* Max priority */
-        1000);
+        1000, nullptr);
 
     EXPECT_EQ(err, XGL_OK);
 
@@ -378,8 +378,8 @@ TEST_F(XglReliableTest, AddPacketWithLargeData) {
         data[i] = (uint8_t)(i & 0xFF);
     }
 
-    xgl_error_t err = xgl_reliable_add_packet_number(&queue, data, sizeof(data),
-                                                     1, 2, 10, 5, 3, 1000);
+    xgl_error_t err = xgl_reliable_add_packet_number(
+        &queue, data, sizeof(data), 1, 2, 10, 5, 3, 1000, nullptr);
 
     EXPECT_EQ(err, XGL_OK);
 

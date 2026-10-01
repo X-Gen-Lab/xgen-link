@@ -38,15 +38,10 @@ xgl_error_t transport_queue_reliable_tx(
     xgl_error_t err = xgl_reliable_add_packet_number(
         &peer->reliable_queue, data, data_len, ctx->local_id,
         tx_data->target_id, packet_number, tx_data->data_type,
-        tx_data->priority, transport_send_timeout_ms(ctx, peer, tx_data));
+        tx_data->priority, transport_send_timeout_ms(ctx, peer, tx_data),
+        rel_packet);
     if (err != XGL_OK) {
         return err;
-    }
-
-    *rel_packet = xgl_reliable_find_packet_number(
-        &peer->reliable_queue, packet_number, tx_data->target_id);
-    if (*rel_packet == NULL) {
-        return XGL_OK;
     }
 
     (*rel_packet)->connection_id = tx_data->connection_id;

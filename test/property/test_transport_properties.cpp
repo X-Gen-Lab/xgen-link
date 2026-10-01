@@ -693,7 +693,7 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuing) {
         /* Add packet to queue */
         err = xgl_reliable_add_packet_number(
             &queue, data.data(), data_len, source_id, target_id, packet_number,
-            data_type, priority, timeout_ms);
+            data_type, priority, timeout_ms, nullptr);
 
         EXPECT_EQ(err, XGL_OK) << "Adding packet to queue should succeed";
 
@@ -750,7 +750,7 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuingMultiple) {
                 static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U),
                 static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U),
                 static_cast<uint32_t>(i), gen.random_uint8(),
-                gen.random_uint8() % 8, 1000);
+                gen.random_uint8() % 8, 1000, nullptr);
 
             EXPECT_EQ(err, XGL_OK)
                 << "Adding packet " << i << " should succeed";
@@ -921,9 +921,9 @@ TEST(XglTransportProperties, Property16_ACKProcessing) {
             gen.random_bytes(10 + (gen.random_uint8() % 50));
 
         /* Add packet to queue */
-        err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
-                                             source_id, target_id,
-                                             packet_number, 0, 0, 1000);
+        err = xgl_reliable_add_packet_number(
+            &queue, data.data(), data.size(), source_id, target_id,
+            packet_number, 0, 0, 1000, nullptr);
         ASSERT_EQ(err, XGL_OK) << "Failed to add packet to queue";
 
         /* Verify packet is in queue */
@@ -980,9 +980,9 @@ TEST(XglTransportProperties, Property16_ACKProcessingMultiplePackets) {
 
         for (int i = 0; i < num_packets; ++i) {
             std::vector<uint8_t> data = gen.random_bytes(20);
-            err = xgl_reliable_add_packet_number(&queue, data.data(),
-                                                 data.size(), 1, target_id,
-                                                 (uint8_t)i, 0, 0, 1000);
+            err = xgl_reliable_add_packet_number(
+                &queue, data.data(), data.size(), 1, target_id, (uint8_t)i, 0,
+                0, 1000, nullptr);
             ASSERT_EQ(err, XGL_OK);
         }
 
@@ -1034,7 +1034,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
 
         err = xgl_reliable_add_packet_number(&queue, data.data(), data.size(),
                                              1, target_id, packet_number, 0, 0,
-                                             1000);
+                                             1000, nullptr);
         ASSERT_EQ(err, XGL_OK);
 
         /* Try to ACK with different Packet number */

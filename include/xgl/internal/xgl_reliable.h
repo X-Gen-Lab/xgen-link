@@ -102,10 +102,16 @@ xgl_error_t xgl_reliable_init(xgl_reliable_queue_t* queue,
  */
 void xgl_reliable_destroy(xgl_reliable_queue_t* queue);
 
+/**
+ * \brief           Copy a payload into one indexed reliable record
+ * \param[out]      packet_out: Optional admitted record; NULL on failure
+ * \note            The returned record stays owned by queue until removal.
+ */
 xgl_error_t xgl_reliable_add_packet_number(
     xgl_reliable_queue_t* queue, const uint8_t* data, size_t data_len,
     uint16_t source_id, uint16_t target_id, uint32_t packet_number,
-    uint8_t data_type, uint8_t priority, int32_t timeout_ms);
+    uint8_t data_type, uint8_t priority, int32_t timeout_ms,
+    xgl_reliable_packet_t** packet_out);
 
 xgl_error_t xgl_reliable_set_packet_extensions(
     const xgl_reliable_queue_t* queue, xgl_reliable_packet_t* packet,
