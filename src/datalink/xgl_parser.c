@@ -50,11 +50,7 @@ static size_t parser_find_magic(const xgl_parser_t* parser, size_t offset) {
 }
 
 static xgl_parse_result_t parser_reject(xgl_parser_t* parser) {
-    if (parser_find_magic(parser, 1U) < parser->cache_len) {
-        parser->state = XGL_PARSE_RECOVER;
-    } else {
-        xgl_parser_reset(parser);
-    }
+    parser->state = XGL_PARSE_RECOVER;
     return XGL_PARSE_RESULT_ERROR;
 }
 
@@ -63,8 +59,7 @@ static size_t parser_frame_len(const xgl_parser_t* parser) {
            parser->expected_auth_tag_len + XGL_CRC16_SIZE;
 }
 
-/** \brief           Validate received boundaries without moving buffered bytes.
- */
+/** \brief           Inspect boundaries without moving buffered bytes. */
 static xgl_parse_result_t
 parser_inspect(xgl_parser_t* parser, const uint8_t* buffer, size_t available,
                xgl_wire_frame_view_t* view, xgl_wire_decode_status_t* status) {
@@ -78,13 +73,13 @@ parser_inspect(xgl_parser_t* parser, const uint8_t* buffer, size_t available,
             if (status != NULL && error == XGL_ERR_CRC_FAILED) {
                 *status = XGL_WIRE_DECODE_HEADER_CRC;
             }
-            return XGL_PARSE_RESULT_ERROR;
+            return parser_reject(parser);
         }
         const size_t minimum_frame_len =
             (size_t)view->header.header_len + XGL_CRC16_SIZE;
         if (minimum_frame_len > parser->cache_size ||
             view->header.payload_len > parser->cache_size - minimum_frame_len) {
-            return XGL_PARSE_RESULT_ERROR;
+            return parser_reject(parser);
         }
         parser->expected_header_len = view->header.header_len;
         parser->expected_payload_len = view->header.payload_len;
@@ -100,33 +95,28 @@ parser_inspect(xgl_parser_t* parser, const uint8_t* buffer, size_t available,
                                          (size_t)parser->expected_header_len -
                                              XGL_WIRE_BASE_HEADER_SIZE,
                                          &metadata) != XGL_OK) {
-            return XGL_PARSE_RESULT_ERROR;
+            return parser_reject(parser);
+        }
+        /* The fixed-header check already proved this base fits the cache. */
+        const size_t base_size = (size_t)parser->expected_header_len +
+                                 parser->expected_payload_len + XGL_CRC16_SIZE;
+        if (metadata.auth_tag_len > parser->cache_size - base_size) {
+            return parser_reject(parser);
         }
         parser->expected_auth_tag_len = metadata.auth_tag_len;
-        const size_t body_overhead = (size_t)parser->expected_header_len +
-                                     parser->expected_auth_tag_len +
-                                     XGL_CRC16_SIZE;
-        if (body_overhead > parser->cache_size ||
-            parser->expected_payload_len > parser->cache_size - body_overhead) {
-            return XGL_PARSE_RESULT_ERROR;
-        }
         parser->state = XGL_PARSE_PAYLOAD;
     }
-    if (parser->state == XGL_PARSE_PAYLOAD) {
-        if (available < parser_frame_len(parser) - XGL_CRC16_SIZE) {
-            return XGL_PARSE_RESULT_INCOMPLETE;
-        }
-        parser->state = XGL_PARSE_CRC;
+    if (parser->state != XGL_PARSE_PAYLOAD && parser->state != XGL_PARSE_CRC) {
+        return parser_reject(parser);
     }
-    if (parser->state != XGL_PARSE_CRC) {
-        return XGL_PARSE_RESULT_ERROR;
-    }
-    if (available < parser_frame_len(parser)) {
+    const size_t total = parser_frame_len(parser);
+    if (available < total) {
+        parser->state = available < total - XGL_CRC16_SIZE ? XGL_PARSE_PAYLOAD
+                                                           : XGL_PARSE_CRC;
         return XGL_PARSE_RESULT_INCOMPLETE;
     }
-    if (xgl_wire_decode_frame(view, buffer, parser_frame_len(parser), status) !=
-        XGL_OK) {
-        return XGL_PARSE_RESULT_ERROR;
+    if (xgl_wire_decode_frame(view, buffer, total, status) != XGL_OK) {
+        return parser_reject(parser);
     }
     parser->state = XGL_PARSE_COMPLETE;
     return XGL_PARSE_RESULT_COMPLETE;
@@ -169,18 +159,14 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
         }
         return XGL_PARSE_RESULT_INCOMPLETE;
     }
-    xgl_parse_result_t result =
-        parser_inspect(parser, parser->cache, parser->cache_len, view, status);
-    return result == XGL_PARSE_RESULT_ERROR ? parser_reject(parser) : result;
+    return parser_inspect(parser, parser->cache, parser->cache_len, view,
+                          status);
 }
 
-/** \brief           Compact once after choosing a frame or partial candidate.
- */
+/** \brief           Retain a selected suffix with an offset of at least one. */
 static void parser_retain_suffix(xgl_parser_t* parser, size_t offset) {
     parser->cache_len -= offset;
-    if (offset != 0U) {
-        memmove(parser->cache, parser->cache + offset, parser->cache_len);
-    }
+    memmove(parser->cache, parser->cache + offset, parser->cache_len);
 }
 
 xgl_parse_result_t xgl_parser_advance_view(xgl_parser_t* parser,
@@ -207,7 +193,7 @@ xgl_parse_result_t xgl_parser_advance_view(xgl_parser_t* parser,
         parser->state = XGL_PARSE_HEADER;
         xgl_parse_result_t result =
             parser_inspect(parser, parser->cache + offset,
-                           parser->cache_len - offset, view, NULL);
+                           parser->cache_len - offset, view, status);
         if (result == XGL_PARSE_RESULT_COMPLETE) {
             parser_retain_suffix(parser, offset);
             view->frame_buf = parser->cache;
@@ -215,9 +201,6 @@ xgl_parse_result_t xgl_parser_advance_view(xgl_parser_t* parser,
             view->extensions = view->extensions_len > 0U
                                    ? parser->cache + XGL_WIRE_BASE_HEADER_SIZE
                                    : NULL;
-            if (status != NULL) {
-                *status = XGL_WIRE_DECODE_OK;
-            }
             return XGL_PARSE_RESULT_COMPLETE;
         }
         if (result == XGL_PARSE_RESULT_INCOMPLETE &&
@@ -225,12 +208,15 @@ xgl_parse_result_t xgl_parser_advance_view(xgl_parser_t* parser,
             partial = offset;
         }
     }
+    if (status != NULL) {
+        *status = XGL_WIRE_DECODE_INVALID;
+    }
     if (partial < parser->cache_len) {
         parser_retain_suffix(parser, partial);
         parser->state = XGL_PARSE_HEADER;
         /* Restore the earliest partial candidate after checking later ones. */
         return parser_inspect(parser, parser->cache, parser->cache_len, view,
-                              NULL);
+                              status);
     }
     xgl_parser_reset(parser);
     return XGL_PARSE_RESULT_INCOMPLETE;

@@ -22,6 +22,15 @@ static bool wire_packet_type_valid(uint8_t packet_type) {
            packet_type <= XGL_PACKET_TYPE_CLOSE;
 }
 
+static bool wire_header_valid(const xgl_wire_header_t* header) {
+    return !(header->version != XGL_WIRE_VERSION ||
+             header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
+             !wire_packet_type_valid(header->packet_type) ||
+             (header->flags & XGL_WIRE_FLAG_ENCRYPTED) != 0U ||
+             (header->traffic_class & XGL_TRAFFIC_ENCRYPTION_MASK) != 0U ||
+             header->source_id == 0U || header->target_id == 0U);
+}
+
 xgl_error_t xgl_wire_encode_header(uint8_t* buffer, size_t buffer_size,
                                    const xgl_wire_header_t* header) {
     if (buffer == NULL || header == NULL) {
@@ -32,16 +41,11 @@ xgl_error_t xgl_wire_encode_header(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    if (header->version != XGL_WIRE_VERSION ||
-        header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
-        !wire_packet_type_valid(header->packet_type) ||
-        (header->flags & XGL_WIRE_FLAG_ENCRYPTED) != 0U ||
-        (header->traffic_class & XGL_TRAFFIC_ENCRYPTION_MASK) != 0U ||
-        header->source_id == 0U || header->target_id == 0U) {
+    if (!wire_header_valid(header)) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    memset(buffer, 0, XGL_WIRE_BASE_HEADER_SIZE);
+    /* Every byte is assigned; header CRC uses its own zeroed CRC suffix. */
     buffer[0] = XGL_WIRE_MAGIC_0;
     buffer[1] = XGL_WIRE_MAGIC_1;
     buffer[2] = header->version;
@@ -94,12 +98,7 @@ xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
     header->payload_len = xgb_deserialize_u16_le(&buffer[20]);
     header->header_crc16 = actual_crc;
 
-    if (header->version != XGL_WIRE_VERSION ||
-        header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
-        !wire_packet_type_valid(header->packet_type) ||
-        (header->flags & XGL_WIRE_FLAG_ENCRYPTED) != 0U ||
-        (header->traffic_class & XGL_TRAFFIC_ENCRYPTION_MASK) != 0U ||
-        header->source_id == 0U || header->target_id == 0U) {
+    if (!wire_header_valid(header)) {
         return XGL_ERR_INVALID_FRAME;
     }
 

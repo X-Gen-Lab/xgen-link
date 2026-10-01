@@ -392,6 +392,10 @@ TEST_F(XglParserTest, InvalidExtensionLengthResetsParser) {
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
             EXPECT_EQ(i, XGL_WIRE_BASE_HEADER_SIZE + invalid_ext.size() - 1U);
+            EXPECT_EQ(parser.state, XGL_PARSE_RECOVER);
+            xgl_wire_frame_view_t view = {};
+            ASSERT_EQ(xgl_parser_advance_view(&parser, &view, nullptr),
+                      XGL_PARSE_RESULT_INCOMPLETE);
             EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
             break;
         }
@@ -440,8 +444,11 @@ TEST_F(XglParserTest, InvalidHeaderCRC16) {
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
             EXPECT_EQ(i, XGL_FRAME_HEADER_SIZE - 1U);
-            EXPECT_EQ(parser.state,
-                      XGL_PARSE_MAGIC); /* Reset to magic search */
+            EXPECT_EQ(parser.state, XGL_PARSE_RECOVER);
+            xgl_wire_frame_view_t view = {};
+            ASSERT_EQ(xgl_parser_advance_view(&parser, &view, nullptr),
+                      XGL_PARSE_RESULT_INCOMPLETE);
+            EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
             break;
         }
     }
@@ -464,7 +471,11 @@ TEST_F(XglParserTest, InvalidCRC16) {
 
     /* Should detect CRC16 error */
     EXPECT_EQ(result, XGL_PARSE_RESULT_ERROR);
-    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC); /* Reset to magic search */
+    EXPECT_EQ(parser.state, XGL_PARSE_RECOVER);
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_parser_advance_view(&parser, &view, nullptr),
+              XGL_PARSE_RESULT_INCOMPLETE);
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
 }
 
 TEST_F(XglParserTest, FrameTooLarge) {
@@ -485,11 +496,14 @@ TEST_F(XglParserTest, FrameTooLarge) {
     for (size_t i = 0; i < frame.size() && i < XGL_FRAME_HEADER_SIZE; ++i) {
         result = xgl_parser_feed_byte(&small_parser, frame[i], 0);
 
-        /* Parser detects frame too large when header is complete (after byte
-         * 11) */
+        /* Reject the oversized frame once the complete base header arrives. */
         if (result == XGL_PARSE_RESULT_ERROR) {
             error_detected = true;
             EXPECT_EQ(i, XGL_FRAME_HEADER_SIZE - 1U);
+            EXPECT_EQ(small_parser.state, XGL_PARSE_RECOVER);
+            xgl_wire_frame_view_t view = {};
+            ASSERT_EQ(xgl_parser_advance_view(&small_parser, &view, nullptr),
+                      XGL_PARSE_RESULT_INCOMPLETE);
             EXPECT_EQ(small_parser.state, XGL_PARSE_MAGIC);
             break;
         }

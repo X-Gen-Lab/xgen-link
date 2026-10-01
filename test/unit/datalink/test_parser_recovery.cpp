@@ -121,6 +121,9 @@ TEST_F(XglParserRecoveryTest,
                                               : XGL_PARSE_RESULT_INCOMPLETE);
         }
         EXPECT_EQ(status, XGL_WIRE_DECODE_INVALID);
+        EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_RECOVER);
+        ASSERT_EQ(xgl_parser_advance_view(&parser, &view, &status),
+                  XGL_PARSE_RESULT_INCOMPLETE);
         EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_MAGIC);
         EXPECT_EQ(xgl_parser_get_cached_len(&parser), 0U);
 
@@ -174,6 +177,9 @@ TEST_F(XglParserRecoveryTest, AuthenticationTrailerIsBoundedAfterExtensions) {
                                              : XGL_PARSE_RESULT_INCOMPLETE);
     }
     EXPECT_EQ(status, XGL_WIRE_DECODE_INVALID);
+    EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_RECOVER);
+    ASSERT_EQ(xgl_parser_advance_view(&parser, &view, &status),
+              XGL_PARSE_RESULT_INCOMPLETE);
     EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_MAGIC);
 }
 
@@ -204,6 +210,9 @@ TEST_F(XglParserRecoveryTest, LegacyByteFeedKeepsValidationAndFrameAccess) {
                   i + 1U == corrupt.size() ? XGL_PARSE_RESULT_ERROR
                                            : XGL_PARSE_RESULT_INCOMPLETE);
     }
+    EXPECT_EQ(xgl_parser_get_state(&parser), XGL_PARSE_RECOVER);
+    ASSERT_EQ(xgl_parser_advance_view(&parser, &view, &status),
+              XGL_PARSE_RESULT_INCOMPLETE);
     for (size_t i = 0U; i < valid.size(); ++i) {
         ASSERT_EQ(xgl_parser_feed_byte(&parser, valid[i], 1U),
                   i + 1U == valid.size() ? XGL_PARSE_RESULT_COMPLETE
