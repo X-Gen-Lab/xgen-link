@@ -129,6 +129,16 @@ int main(void) {
                 XGL_OK) {
             return 4;
         }
+#if !XGL_FEATURE_DIAGNOSTICS
+        /* A minimal image must not retain optional statistics storage. */
+        xgl_statistics_t statistics;
+        memset(&statistics, 0xA5, sizeof(statistics));
+        if (xgl_stats_get(ha, &statistics) != XGL_ERR_UNSUPPORTED ||
+            xgl_stats_reset(ha) != XGL_ERR_UNSUPPORTED ||
+            ((const unsigned char*)&statistics)[0] != 0xA5U) {
+            return 12;
+        }
+#endif
         b.busy = true;
         if (xgl_send_at(ha, &tx, start) != XGL_OK ||
             xgl_send_at(ha, &tx, start) != XGL_ERR_WINDOW_FULL) {
