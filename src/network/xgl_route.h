@@ -33,12 +33,12 @@ extern "C" {
 #define XGL_ROUTE_TABLE_DEFAULT_SIZE 16
 
 /**
- * \brief           Maximum route metric value
+ * \brief           Maximum reserved route metadata value
  */
 #define XGL_ROUTE_METRIC_MAX 255
 
 /**
- * \brief           Default route metric
+ * \brief           Default reserved route metadata value
  */
 #define XGL_ROUTE_METRIC_DEFAULT 100
 
@@ -88,9 +88,11 @@ void xgl_route_table_destroy(xgl_route_table_t* table);
  * \param[in]       target_id: Target node ID
  * \param[in]       phy: Physical layer operations
  * \param[in]       max_frame_size: Maximum frame size for this route
- * \param[in]       read_freq_hz: Read frequency in Hz
- * \param[in]       metric: Route metric (lower is better)
+ * \param[in]       read_freq_hz: Retained metadata; does not reschedule PHY RX
+ * \param[in]       metric: Reserved metadata; does not affect route selection
  * \return          XGL_OK on success, error code otherwise
+ * \note            An existing destination is updated even at full capacity.
+ *                  Runtime changes do not register or replace receive links.
  */
 xgl_error_t xgl_route_table_add(xgl_route_table_t* table, uint16_t target_id,
                                 xgl_phy_ops_t* phy, uint16_t max_frame_size,
@@ -107,15 +109,19 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
 
 /**
  * \brief           Lookup a route using the configured index strategy
- * \param[in]       table: Route table structure
+ * \param[in]       table: Route table metadata; owned entries remain mutable
  * \param[in]       target_id: Target node ID
- * \return          Route item pointer, NULL if not found
+ * \return          Borrowed mutable route, or NULL if not found
+ * \note            Adding a route does not move storage. Removing, clearing,
+ *                  loading or destroying the table invalidates prior views.
+ *                  Updating a destination replaces its contents in place.
+ *                  The caller serializes reads and updates.
  */
 xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
                                          uint16_t target_id);
 
 /**
- * \brief           Update route metric
+ * \brief           Update retained metric metadata without changing selection
  * \param[in,out]   table: Route table structure
  * \param[in]       target_id: Target node ID
  * \param[in]       metric: New metric value
@@ -149,11 +155,14 @@ static inline bool xgl_route_table_is_empty(const xgl_route_table_t* table) {
 }
 
 /**
- * \brief           Load routes from configuration
+ * \brief           Replace routes after validating the complete configuration
  * \param[in,out]   table: Route table structure
  * \param[in]       routes: Array of route items
  * \param[in]       count: Number of routes
  * \return          XGL_OK on success, error code otherwise
+ * \note            Zero destinations, duplicate destinations and NULL PHYs
+ *                  are rejected before existing routes are changed. Broadcast
+ *                  is permitted; instance configuration rejects local targets.
  */
 xgl_error_t xgl_route_table_load(xgl_route_table_t* table,
                                  const xgl_route_item_t* routes, size_t count);

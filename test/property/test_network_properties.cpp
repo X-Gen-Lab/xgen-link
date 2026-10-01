@@ -229,9 +229,16 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
         config.allocator = xgm_allocator_libc();
         ASSERT_EQ(xgl_network_init(&ctx, &config), XGL_OK);
 
-        /* Report error for missing route */
-        xgl_network_report_error(&ctx, nullptr, XGL_ERR_ROUTE_NOT_FOUND,
-                                 "Route not found");
+        /* Exercise the real missing-route path and its callback. */
+        const uint8_t payload = 0x42U;
+        xgl_packet_data_t data = {};
+        data.data = &payload;
+        data.data_len = sizeof(payload);
+        xgl_packet_t packet = {};
+        packet.target_id = missing_target_id;
+        packet.data = &data;
+        EXPECT_EQ(xgl_network_send(&ctx, &packet), XGL_ERR_ROUTE_NOT_FOUND);
+        EXPECT_EQ(stats.tx_errors, 1U);
 
         /* Verify error callback was invoked */
         EXPECT_TRUE(error_callback_invoked)

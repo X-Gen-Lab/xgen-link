@@ -198,8 +198,13 @@ xgl_error_t xgl_route_table_load(xgl_route_table_t* table,
         return XGL_ERR_QUEUE_FULL;
     }
     for (size_t i = 0U; i < count; ++i) {
-        if (routes[i].phy == NULL) {
+        if (routes[i].phy == NULL || routes[i].target_id == 0U) {
             return XGL_ERR_INVALID_PARAM;
+        }
+        for (size_t j = 0U; j < i; ++j) {
+            if (routes[j].target_id == routes[i].target_id) {
+                return XGL_ERR_INVALID_PARAM;
+            }
         }
     }
     xgl_route_table_clear(table);

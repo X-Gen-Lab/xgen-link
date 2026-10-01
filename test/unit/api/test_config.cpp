@@ -299,7 +299,7 @@ TEST_F(XglConfigTest, ValidateRouteTableWithNullPhy) {
     xgl_config_get_default(&config);
 
     xgl_route_item_t routes[1];
-    routes[0].target_id = 1;
+    routes[0].target_id = 2;
     routes[0].phy = NULL; /* NULL PHY */
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
@@ -320,7 +320,7 @@ TEST_F(XglConfigTest, ValidateRouteTableWithNullPhyOps) {
     phy.user_data = NULL;
 
     xgl_route_item_t routes[1];
-    routes[0].target_id = 1;
+    routes[0].target_id = 2;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
@@ -347,7 +347,7 @@ TEST_F(XglConfigTest, ValidateRouteTableWithInvalidFrameSize) {
     phy.user_data = NULL;
 
     xgl_route_item_t routes[1];
-    routes[0].target_id = 1;
+    routes[0].target_id = 2;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 32; /* Too small */
     routes[0].read_freq_hz = 100;
@@ -374,7 +374,7 @@ TEST_F(XglConfigTest, ValidateRouteTableWithZeroFrequency) {
     phy.user_data = NULL;
 
     xgl_route_item_t routes[1];
-    routes[0].target_id = 1;
+    routes[0].target_id = 2;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 0; /* Zero frequency */
@@ -401,7 +401,7 @@ TEST_F(XglConfigTest, ValidateValidRouteTable) {
     phy.user_data = NULL;
 
     xgl_route_item_t routes[1];
-    routes[0].target_id = 1;
+    routes[0].target_id = 2;
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;

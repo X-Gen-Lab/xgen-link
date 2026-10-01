@@ -72,8 +72,6 @@ static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
 #endif
     if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
         xgl_frame_rx_message_t message = {
-            .frame_buf = view->frame_buf,
-            .frame_len = view->frame_len,
             .view = view,
         };
         return ctx->upper_layer->receive(ctx->upper_layer->ctx,

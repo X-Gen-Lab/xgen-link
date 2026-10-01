@@ -41,8 +41,7 @@ class XglDatalinkSpanTest : public ::testing::Test {
                 return XGL_ERR_INVALID_FRAME;
             }
             EXPECT_EQ(view->frame_buf, self.cache.data());
-            EXPECT_EQ(message->frame_buf, view->frame_buf);
-            EXPECT_EQ(message->frame_len, view->frame_len);
+            EXPECT_LE(view->frame_len, self.cache.size());
             const size_t index = self.delivered.size();
             self.delivered.emplace_back(view->payload,
                                         view->payload + view->payload_len);

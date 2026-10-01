@@ -11,16 +11,6 @@
 #include "xgl_network_internal.h"
 
 #if XGL_FEATURE_FORWARDING
-static void network_count_rx_drop(xgl_network_ctx_t* ctx) {
-#if XGL_FEATURE_STATISTICS
-    if (ctx->stats != NULL) {
-        ctx->stats->rx_dropped++;
-    }
-#else
-    (void)ctx;
-#endif
-}
-
 static xgl_error_t network_lookup_forward_route(xgl_network_ctx_t* ctx,
                                                 xgl_handle_t handle,
                                                 uint16_t target_id,
@@ -36,7 +26,7 @@ static xgl_error_t network_lookup_forward_route(xgl_network_ctx_t* ctx,
                             ctx->callback_user_data);
     }
 
-    network_count_rx_drop(ctx);
+    xgl_network_count_rx_drop(ctx);
     return XGL_ERR_ROUTE_NOT_FOUND;
 }
 
@@ -47,7 +37,7 @@ static xgl_error_t network_validate_forward_ttl(xgl_network_ctx_t* ctx,
         return XGL_OK;
     }
 
-    network_count_rx_drop(ctx);
+    xgl_network_count_rx_drop(ctx);
     if (ctx->error_callback != NULL) {
         ctx->error_callback(handle, XGL_ERR_TTL_EXPIRED,
                             XGL_ERROR_MESSAGE("Packet TTL expired"),
@@ -61,7 +51,7 @@ static xgl_error_t network_validate_forward_size(xgl_network_ctx_t* ctx,
                                                  size_t frame_len) {
     if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE ||
         frame_len > route->max_frame_size) {
-        network_count_rx_drop(ctx);
+        xgl_network_count_rx_drop(ctx);
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
@@ -77,7 +67,7 @@ static xgl_error_t network_rewrite_forward_frame(
     wire_header.ttl = (uint8_t)(wire_header.ttl - 1U);
     if (xgl_wire_encode_header(forward_buf, frame_len, &wire_header) !=
         XGL_OK) {
-        network_count_rx_drop(ctx);
+        xgl_network_count_rx_drop(ctx);
         return XGL_ERR_INVALID_FRAME;
     }
 
@@ -95,15 +85,14 @@ static xgl_error_t network_rewrite_forward_frame(
  * \brief           Forward a frame using an allocator-owned temporary buffer
  * \param[in,out]   ctx: Network layer context
  * \param[in]       handle: Protocol instance handle
- * \param[in]       frame_buf: Validated complete frame bytes
- * \param[in]       frame_len: Number of complete frame bytes
  * \param[in]       metadata: Validated incoming frame view
  * \return          XGL_OK on success, error code otherwise
  * \note            The selected PHY must finish reading before tx returns.
  */
 xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                                const uint8_t* frame_buf, size_t frame_len,
                                 const xgl_wire_frame_view_t* metadata) {
+    const uint8_t* frame_buf = metadata->frame_buf;
+    const size_t frame_len = metadata->frame_len;
     xgl_route_item_t* route = NULL;
     xgl_error_t err = network_lookup_forward_route(
         ctx, handle, metadata->header.target_id, &route);
@@ -123,7 +112,7 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
 
     uint8_t* forward_buf = (uint8_t*)xgm_alloc(ctx->allocator, frame_len);
     if (forward_buf == NULL) {
-        network_count_rx_drop(ctx);
+        xgl_network_count_rx_drop(ctx);
 #if XGL_FEATURE_STATISTICS
         if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;

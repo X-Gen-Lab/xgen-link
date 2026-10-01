@@ -40,16 +40,6 @@ extern "C" {
 #endif
 
 /*---------------------------------------------------------------------------*/
-/* Forward Declarations                                                      */
-/*---------------------------------------------------------------------------*/
-
-/* Forward declare transport context */
-struct xgl_transport_ctx_s;
-
-/* Forward declare datalink context */
-struct xgl_datalink_ctx_s;
-
-/*---------------------------------------------------------------------------*/
 /* Network Layer Context                                                     */
 /*---------------------------------------------------------------------------*/
 
@@ -158,8 +148,9 @@ xgl_network_send_zerocopy_scoped(xgl_network_ctx_t* ctx, xgl_handle_t handle,
  * \param[in]       frame_buf: Frame buffer
  * \param[in]       frame_len: Frame length
  * \return          XGL_OK on success, error code otherwise
- * \note            This function validates address and forwards to transport
- * layer or application
+ * \note            This separate raw entry checks the instance frame limit and
+ *                  decodes bytes before local delivery or forwarding. Normal
+ *                  datalink endpoints supply a validated view directly.
  */
 xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                                 const uint8_t* frame_buf, size_t frame_len);
@@ -200,20 +191,11 @@ static inline bool xgl_network_is_local(const xgl_network_ctx_t* ctx,
 }
 
 /**
- * \brief           Invoke error callback
- * \param[in]       ctx: Network layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       error: Error code
- * \param[in]       message: Error message
- */
-void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                              xgl_error_t error, const char* message);
-
-/**
  * \brief           Get network layer interface
  * \details         Returns the layer interface for this network instance
  * \param[in]       ctx: Network layer context
- * \param[out]      iface: Layer interface structure to initialize
+ * \param[out]      packets: Synchronous logical packet transmitter
+ * \param[out]      frames: Receiver requiring a validated borrowed frame view
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_network_get_endpoints(xgl_network_ctx_t* ctx,

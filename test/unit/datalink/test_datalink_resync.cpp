@@ -26,8 +26,9 @@ class XglDatalinkResyncTest : public ::testing::Test {
                 return XGL_ERR_INVALID_FRAME;
             }
             const auto& view = *message->view;
-            EXPECT_EQ(message->frame_buf, view.frame_buf);
-            EXPECT_EQ(message->frame_len, view.frame_len);
+            EXPECT_NE(view.frame_buf, nullptr);
+            EXPECT_GE(view.frame_len,
+                      XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE);
             const size_t index = self.delivered.size();
             self.delivered.emplace_back(view.payload,
                                         view.payload + view.payload_len);

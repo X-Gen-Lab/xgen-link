@@ -10,18 +10,48 @@
 #include "xgl_instance_internal.h"
 
 /**
+ * \brief           Identify a PHY's first occurrence in immutable configuration
+ */
+static bool link_config_first_phy(const xgl_config_t* config, size_t index) {
+    for (size_t i = 0U; i < index; ++i) {
+        if (config->route_table[i].phy == config->route_table[index].phy) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * \brief           Merge initialization hints into one PHY polling interval
+ */
+static uint32_t link_config_interval(const xgl_config_t* config,
+                                     size_t first_route) {
+    uint32_t interval = UINT32_MAX;
+    const xgl_phy_ops_t* phy = config->route_table[first_route].phy;
+    for (size_t i = first_route; i < config->route_table_len; ++i) {
+        const xgl_route_item_t* route = &config->route_table[i];
+        if (route->phy != phy) {
+            continue;
+        }
+        uint32_t candidate =
+            route->read_freq_hz != 0U ? 1000U / route->read_freq_hz : 0U;
+        if (route->read_freq_hz != 0U && candidate == 0U) {
+            candidate = 1U;
+        }
+        if (candidate < interval) {
+            interval = candidate;
+        }
+    }
+    return interval;
+}
+
+/**
  * \brief           Count unique PHY descriptors for both planning and setup
  */
 size_t xgl_instance_count_links(const xgl_config_t* config) {
     size_t count = 0U;
     for (size_t i = 0U; i < config->route_table_len; ++i) {
-        size_t j = 0U;
-        for (; j < i; ++j) {
-            if (config->route_table[j].phy == config->route_table[i].phy) {
-                break;
-            }
-        }
-        if (j == i) {
+        if (link_config_first_phy(config, i)) {
             ++count;
         }
     }
@@ -61,26 +91,12 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
     }
     memset(handle->links, 0, count * sizeof(*handle->links));
     for (size_t i = 0; i < handle->config->route_table_len; ++i) {
-        const xgl_route_item_t* route = &handle->config->route_table[i];
-        uint32_t interval =
-            route->read_freq_hz != 0U ? 1000U / route->read_freq_hz : 0U;
-        if (route->read_freq_hz != 0U && interval == 0U) {
-            interval = 1U;
-        }
-        size_t index = 0U;
-        while (index < handle->link_count &&
-               handle->links[index].phy != route->phy) {
-            ++index;
-        }
-        if (index < handle->link_count) {
-            if (interval < handle->links[index].poll_interval_ms) {
-                handle->links[index].poll_interval_ms = interval;
-            }
+        if (!link_config_first_phy(handle->config, i)) {
             continue;
         }
         xgl_instance_link_t* link = &handle->links[handle->link_count++];
-        link->phy = route->phy;
-        link->poll_interval_ms = interval;
+        link->phy = handle->config->route_table[i].phy;
+        link->poll_interval_ms = link_config_interval(handle->config, i);
         link->parser.cache =
             xgm_alloc(handle->allocator, handle->config->memory.rx_buffer_size);
         if (link->parser.cache == NULL) {

@@ -51,8 +51,6 @@ TEST_F(XglNetworkContracts, RejectsReservedAndSelfAddresses) {
 
 TEST_F(XglNetworkContracts, EndpointRequiresValidatedView) {
     xgl_frame_rx_message_t message = {};
-    message.frame_buf = bytes;
-    message.frame_len = length;
     EXPECT_EQ(frames.receive(frames.ctx, nullptr, &message),
               XGL_ERR_NULL_POINTER);
     message.view = &view;

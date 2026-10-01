@@ -4,7 +4,6 @@
  * \author          X-Gen Lab
  */
 
-#include <internal/xgl_diagnostics.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_error.h>
 
@@ -76,30 +75,6 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
     }
 
     return true;
-}
-
-/**
- * \brief           Invoke error callback
- * \details         Reports error through registered callback
- */
-void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                              xgl_error_t error, const char* message) {
-    (void)message;
-    if (ctx == NULL) {
-        return;
-    }
-
-    if (ctx->error_callback != NULL) {
-        ctx->error_callback(handle, error, XGL_ERROR_MESSAGE(message),
-                            ctx->callback_user_data);
-    }
-
-    /* Update error statistics */
-#if XGL_FEATURE_STATISTICS
-    if (ctx->stats != NULL) {
-        ctx->stats->tx_errors++;
-    }
-#endif
 }
 
 /*---------------------------------------------------------------------------*/

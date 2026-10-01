@@ -153,13 +153,18 @@ typedef struct {
 
 /**
  * \brief           Route table entry
+ * \details         Static configuration has one entry per nonzero remote
+ *                  destination; broadcast is allowed. Entries sharing a PHY
+ *                  contribute initialization hints to one receive link, whose
+ *                  polling uses their fastest frequency. Runtime route changes
+ *                  do not register or reschedule receive links.
  */
 typedef struct {
     uint16_t target_id;      /**< Target node ID */
     xgl_phy_ops_t* phy;      /**< Physical layer operations */
     uint16_t max_frame_size; /**< Maximum frame size for this route */
-    uint32_t read_freq_hz;   /**< Read frequency in Hz */
-    uint8_t metric;          /**< Route metric (for dynamic routing) */
+    uint32_t read_freq_hz;   /**< Positive initialization polling hint in Hz */
+    uint8_t metric;          /**< Reserved metadata, not used for selection */
 } xgl_route_item_t;
 
 /*---------------------------------------------------------------------------*/

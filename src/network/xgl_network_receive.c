@@ -8,16 +8,6 @@
 #include "xgl/xgl_config.h"
 #include "xgl_network_internal.h"
 
-static void network_count_rx_drop(xgl_network_ctx_t* ctx) {
-#if XGL_FEATURE_STATISTICS
-    if (ctx->stats != NULL) {
-        ctx->stats->rx_dropped++;
-    }
-#else
-    (void)ctx;
-#endif
-}
-
 /**
  * \brief           Deliver connection identity and borrowed payload upstream
  * \param[in,out]   ctx: Network layer context
@@ -109,7 +99,7 @@ xgl_error_t xgl_network_receive_view(xgl_network_ctx_t* ctx,
     }
     if (!xgl_network_validate_address(ctx, metadata->header.target_id,
                                       metadata->header.source_id)) {
-        network_count_rx_drop(ctx);
+        xgl_network_count_rx_drop(ctx);
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -119,16 +109,16 @@ xgl_error_t xgl_network_receive_view(xgl_network_ctx_t* ctx,
             xgl_error_t err =
                 xgl_security_verify_frame(ctx->security, metadata);
             if (err != XGL_OK) {
-                network_count_rx_drop(ctx);
+                xgl_network_count_rx_drop(ctx);
                 return err;
             }
         } else if (metadata->authenticated) {
-            network_count_rx_drop(ctx);
+            xgl_network_count_rx_drop(ctx);
             return XGL_ERR_INVALID_FRAME;
         }
 #else
         if (metadata->authenticated) {
-            network_count_rx_drop(ctx);
+            xgl_network_count_rx_drop(ctx);
             return XGL_ERR_UNSUPPORTED;
         }
 #endif
@@ -136,10 +126,9 @@ xgl_error_t xgl_network_receive_view(xgl_network_ctx_t* ctx,
     }
 
 #if XGL_FEATURE_FORWARDING
-    return xgl_network_forward(ctx, handle, metadata->frame_buf,
-                               metadata->frame_len, metadata);
+    return xgl_network_forward(ctx, handle, metadata);
 #else
-    network_count_rx_drop(ctx);
+    xgl_network_count_rx_drop(ctx);
     return XGL_ERR_ROUTE_NOT_FOUND;
 #endif
 }

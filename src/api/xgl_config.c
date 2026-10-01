@@ -269,6 +269,18 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     for (size_t i = 0; i < config->route_table_len; i++) {
         const xgl_route_item_t* route = &config->route_table[i];
 
+        if (route->target_id == 0U || route->target_id == config->source_id) {
+            return XGL_ERR_INVALID_PARAM;
+        }
+#if XGL_FEATURE_OUT_OF_ORDER
+        /* Restricted profiles already rejected more than one route above. */
+        for (size_t j = 0U; j < i; ++j) {
+            if (config->route_table[j].target_id == route->target_id) {
+                return XGL_ERR_INVALID_PARAM;
+            }
+        }
+#endif
+
         /* Check PHY operations */
         if (route->phy == NULL) {
             return XGL_ERR_INVALID_PARAM;

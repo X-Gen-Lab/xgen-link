@@ -352,10 +352,14 @@ validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
 /**
  * \brief           Apply shared routing and framing to caller-owned TX storage
  */
-static xgl_error_t
-network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                            const xgl_tx_data_zerocopy_t* request,
-                            uint32_t connection_id, uint32_t session_epoch) {
+xgl_error_t
+xgl_network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                                const xgl_tx_data_zerocopy_t* request,
+                                uint32_t connection_id, uint32_t session_epoch,
+                                bool* attempted) {
+    if (attempted != NULL) {
+        *attempted = false;
+    }
     if (ctx == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -365,6 +369,9 @@ network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     }
     if (request->reliable) {
         return XGL_ERR_INVALID_PARAM;
+    }
+    if (attempted != NULL) {
+        *attempted = true;
     }
     xgl_packet_data_t data = {
         .data = request->buffer + request->data_offset,
@@ -386,7 +393,7 @@ network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
 xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
                                       xgl_handle_t handle,
                                       const xgl_tx_data_zerocopy_t* request) {
-    return network_send_zerocopy_scope(ctx, handle, request, 0U, 0U);
+    return xgl_network_send_zerocopy_scope(ctx, handle, request, 0U, 0U, NULL);
 }
 
 xgl_error_t
@@ -395,9 +402,9 @@ xgl_network_send_zerocopy_scoped(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     if (request == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    return network_send_zerocopy_scope(ctx, handle, &request->data,
-                                       request->connection_id,
-                                       request->session_epoch);
+    return xgl_network_send_zerocopy_scope(ctx, handle, &request->data,
+                                           request->connection_id,
+                                           request->session_epoch, NULL);
 }
 
 xgl_error_t

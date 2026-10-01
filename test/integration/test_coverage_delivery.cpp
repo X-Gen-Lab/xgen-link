@@ -297,10 +297,6 @@ TEST_F(XglCoverageDelivery, NetworkInterfaceValidatesBorrowedMessages) {
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(frames.receive(frames.ctx, nullptr, &message),
               XGL_ERR_NULL_POINTER);
-    message.frame_buf = frame;
-    message.frame_len = frame_size;
-    EXPECT_EQ(frames.receive(frames.ctx, nullptr, &message),
-              XGL_ERR_NULL_POINTER);
     xgl_wire_frame_view_t view = {};
     ASSERT_EQ(xgl_wire_decode_frame(&view, frame, frame_size, nullptr), XGL_OK);
     message.view = &view;

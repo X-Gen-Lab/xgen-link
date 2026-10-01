@@ -35,11 +35,10 @@ typedef struct {
 } xgl_frame_tx_message_t;
 
 /**
- * \brief           A validated frame borrowed until receive returns
+ * \brief           A required validated view borrowed until receive returns
+ * \note            Raw bytes must be decoded before entering this boundary.
  */
 typedef struct {
-    const uint8_t* frame_buf;
-    size_t frame_len;
     const xgl_wire_frame_view_t* view;
 } xgl_frame_rx_message_t;
 

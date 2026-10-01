@@ -824,7 +824,7 @@ TEST_F(XglNetworkTest, ForwardingRejectsMissingPhyTransmitOperation) {
 
     EXPECT_EQ(
         xgl_network_receive(&network_ctx, nullptr, frame.data(), frame.size()),
-        XGL_ERR_TX_FAILED);
+        XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(phy_tx_count, 0);
 }
 
