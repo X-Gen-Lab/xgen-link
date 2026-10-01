@@ -74,6 +74,25 @@ class FootprintStorage(unittest.TestCase):
         self.assertEqual(layout["reliable_bucket_count"], 1)
         self.assertEqual(layout["adaptive_rto"], 0)
 
+    def test_budget_rejects_different_transport_resources(self):
+        policy = {"schema_version": 1, "compiler_version": "15.2.1",
+                  "configuration": {"profile": "boot", "resource_config_id": 1025,
+                                    "compiled_window_capacity": 1,
+                                    "reliable_bucket_count": 1, "adaptive_rto": False},
+                  "baseline": {"flash_bytes": 16168},
+                  "limits": {"flash_bytes": 16384}}
+        report = {"compiler": "arm-none-eabi-gcc 15.2.1",
+                  "build_parameters": {"XGL_PROFILE": "boot"}, "flash_bytes": 15000,
+                  "resource_config_id": 4097, "compiled_window_capacity": 128,
+                  "reliable_bucket_count": 32, "adaptive_rto": True,
+                  "forbidden_heap_symbols": [], "unresolved_symbols": []}
+        result = self.budget.audit(report, policy)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(len(result["violations"]), 4)
+        report.update(resource_config_id=1025, compiled_window_capacity=1,
+                      reliable_bucket_count=1, adaptive_rto=False)
+        self.assertEqual(self.budget.audit(report, policy)["status"], "passed")
+
     def test_budget_rejects_missing_or_nonzero_window_pool_blocks(self):
         policy = {"schema_version": 1, "compiler_version": "15.2.1",
                   "configuration": {"profile": "boot", "window_pool_blocks": 0},
