@@ -363,7 +363,8 @@ TEST_F(TransportRegressionTest, RetryExhaustionRequiresNewEpochAfterReset) {
     regression_time_ms = 201;
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms), XGL_OK);
     regression_time_ms = 402;
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms),
+              XGL_ERR_ACK_TIMEOUT);
     ASSERT_NE(ctx.peers, nullptr);
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 0U);
     EXPECT_EQ(Send(), XGL_ERR_ACK_TIMEOUT);
@@ -444,7 +445,8 @@ TEST_F(TransportRegressionTest, SackCommitsAllAcknowledgementsBeforeBusyRetry) {
     packet.extensions_len = extensions_len;
 
     spy.busy_data_attempts = 1;
-    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_BUSY);
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms), XGL_OK);
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
     EXPECT_EQ(ctx.peers->tx_window.send_base_packet_number, 0U);
     EXPECT_EQ(retries, 0U);
@@ -533,7 +535,7 @@ TEST_F(TransportRegressionTest, ReliableReassemblyTimeoutFailsScopeAtTimeZero) {
     uint32_t timeout = 0;
     ASSERT_TRUE(xgl_transport_next_timeout(&ctx, 0, &timeout));
     EXPECT_EQ(timeout, ctx.fragment_mgr->reassembly_timeout_ms);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, timeout), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, timeout), XGL_ERR_TIMEOUT);
     EXPECT_TRUE(ctx.peers->failed);
     EXPECT_EQ(xgl_fragment_get_reassembly_count(ctx.fragment_mgr), 0U);
     EXPECT_EQ(Receive(1, 'b', true, 1), XGL_ERR_ACK_TIMEOUT);
@@ -630,6 +632,7 @@ TEST_F(TransportRegressionTest,
             EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
             acknowledged++;
         }
+        ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms), XGL_OK);
         if (ctx.peers->tx_message.data == nullptr &&
             xgl_reliable_is_empty(&ctx.peers->reliable_queue)) {
             break;
@@ -667,6 +670,7 @@ TEST_F(TransportRegressionTest,
     EXPECT_GT(ctx.peers->tx_message_offset, 0U);
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
     EXPECT_EQ(Ack(0, 1), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100 + delay), XGL_OK);
     EXPECT_EQ(ctx.peers->tx_window.next_packet_number, 2U);
 }
 
@@ -724,6 +728,9 @@ TEST_F(TransportRegressionTest,
     ASSERT_NE(ctx.peers->tx_message.data, nullptr);
     spy.data_error = XGL_ERR_TX_FAILED;
     EXPECT_EQ(Ack(0, 1), XGL_OK);
+    EXPECT_FALSE(ctx.peers->failed);
+    EXPECT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms),
+              XGL_ERR_TX_FAILED);
     EXPECT_TRUE(ctx.peers->failed);
     EXPECT_EQ(ctx.peers->tx_message.data, nullptr);
     EXPECT_EQ(ctx.peers->tx_message_storage, nullptr);
@@ -748,7 +755,7 @@ TEST_F(TransportRegressionTest, RetryExhaustionAlsoReleasesUnsentMessageBytes) {
     ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
     ASSERT_NE(ctx.peers->tx_message.data, nullptr);
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 200), XGL_OK);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 400), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 400), XGL_ERR_ACK_TIMEOUT);
     EXPECT_TRUE(ctx.peers->failed);
     EXPECT_EQ(ctx.peers->tx_message_storage, nullptr);
     EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
@@ -800,7 +807,7 @@ TEST_F(TransportRegressionTest,
     tx.data_len = sizeof(payload);
     ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
     spy.data_error = XGL_ERR_TX_FAILED;
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 200), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 200), XGL_ERR_TX_FAILED);
     EXPECT_TRUE(ctx.peers->failed);
     EXPECT_EQ(ctx.peers->tx_message_storage, nullptr);
     EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
@@ -869,10 +876,28 @@ TEST_F(TransportRegressionTest,
     auto* packet =
         xgl_reliable_find_packet_number(&ctx.peers->reliable_queue, 0, 2);
     ASSERT_NE(packet, nullptr);
+    const uint8_t bitmap[] = {0};
+    uint8_t value[16] = {}, extensions[20] = {};
+    size_t value_len = 0, extensions_len = 0;
+    ASSERT_EQ(xgl_wire_encode_sack_ext_value(value, sizeof(value), 0, bitmap,
+                                             sizeof(bitmap), &value_len),
+              XGL_OK);
+    ASSERT_EQ(xgl_wire_encode_ext(extensions, sizeof(extensions),
+                                  XGL_WIRE_EXT_SACK, value, value_len,
+                                  &extensions_len),
+              XGL_OK);
+    xgl_packet_t feedback = {};
+    feedback.source_id = 2;
+    feedback.target_id = 1;
+    feedback.packet_type = XGL_PACKET_TYPE_ACK;
+    feedback.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    feedback.reliable = XGL_RELIABILITY_ACK_ONLY;
+    feedback.extensions = extensions;
+    feedback.extensions_len = extensions_len;
     spy.busy_data_attempts = 1;
-    EXPECT_EQ(transport_retransmit_reliable_packet(&ctx, nullptr, ctx.peers,
-                                                   packet, 110),
-              XGL_ERR_BUSY);
+    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &feedback), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 110), XGL_OK);
+    EXPECT_TRUE(packet->retry_pending);
     uint32_t delay = 0;
     ASSERT_TRUE(xgl_transport_next_timeout(&ctx, 110, &delay));
     EXPECT_EQ(delay, 10U);
@@ -1142,6 +1167,8 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
     sack_packet.extensions_len = ext_len;
 
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &sack_packet), XGL_OK);
+    EXPECT_EQ(spy.send_count, send_count_before_sack);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, ctx.current_time_ms), XGL_OK);
     EXPECT_EQ(spy.send_count, send_count_before_sack + 1);
     EXPECT_EQ(spy.last_packet.packet_number, 2U);
     EXPECT_EQ(tx_retries, 1U);
@@ -1218,6 +1245,8 @@ TEST(XglTransportTest, EmptySackBitmapRetransmitsBasePacket) {
     sack_packet.extensions_len = ext_len;
 
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &sack_packet), XGL_OK);
+    EXPECT_EQ(spy.send_count, send_count_before_sack);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, ctx.current_time_ms), XGL_OK);
     EXPECT_EQ(spy.send_count, send_count_before_sack + 1);
     EXPECT_EQ(spy.last_packet.packet_number, 0U);
     EXPECT_EQ(tx_retries, 1U);
@@ -1562,6 +1591,7 @@ TEST(XglTransportTest, FirstReliableDataCreatesExactPeerState) {
     packet_data.data_len = sizeof(payload);
     packet_data.data = payload;
     xgl_packet_t data_packet = {};
+    data_packet.packet_type = XGL_PACKET_TYPE_DATA;
     data_packet.source_id = 4;
     data_packet.target_id = 1;
     data_packet.data_type = 1;
@@ -1600,6 +1630,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsSackForExpectedSequence) {
     packet_data.data_len = sizeof(payload);
     packet_data.data = payload;
     xgl_packet_t packet = {};
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
     packet.source_id = 2;
     packet.target_id = 1;
     packet.packet_number = 2;
@@ -1648,6 +1679,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
     data2.data = payload2;
 
     xgl_packet_t packet = {};
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
     packet.source_id = 2;
     packet.target_id = 1;
     packet.packet_number = 0;
@@ -1701,6 +1733,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     packet_data.data_len = sizeof(payload);
     packet_data.data = payload;
     xgl_packet_t packet = {};
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
     packet.source_id = 2;
     packet.target_id = 1;
     packet.packet_number = 0;
@@ -1905,6 +1938,7 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     packet_data.data_len = sizeof(payload);
     packet_data.data = payload;
     xgl_packet_t packet = {};
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
     packet.source_id = 2;
     packet.target_id = 1;
     packet.packet_number = 0;
@@ -1958,9 +1992,7 @@ TEST(XglTransportTest, SendPlanUsesRouteMtuAndAuthBudget) {
     xgl_transport_send_plan_t plan = {};
     ASSERT_EQ(transport_build_send_plan(&ctx, &tx_data, &plan), XGL_OK);
 
-    EXPECT_EQ(plan.max_frame_size, 80U);
-    EXPECT_EQ(plan.app_extensions_len, XGL_DATA_TYPE_EXT_SIZE);
-    EXPECT_EQ(plan.app_payload_budget,
+    EXPECT_EQ(plan.fragment_payload_budget,
               80U - XGL_WIRE_BASE_HEADER_SIZE - XGL_DATA_TYPE_EXT_SIZE -
                   XGL_SECURITY_EXT_SIZE - 8U - XGL_CRC16_SIZE);
     EXPECT_FALSE(plan.needs_fragmentation);
@@ -1995,9 +2027,6 @@ TEST(XglTransportTest, SendPlanAccountsForFragmentExtensionBudget) {
     ASSERT_EQ(transport_build_send_plan(&ctx, &tx_data, &plan), XGL_OK);
 
     EXPECT_TRUE(plan.needs_fragmentation);
-    EXPECT_EQ(plan.app_extensions_len, XGL_DATA_TYPE_EXT_SIZE);
-    EXPECT_EQ(plan.fragment_extensions_len,
-              XGL_DATA_TYPE_EXT_SIZE + XGL_FRAGMENT_EXT_SIZE);
     EXPECT_EQ(plan.fragment_payload_budget, 5U);
     EXPECT_EQ(plan.fragment_count, 8U);
 
@@ -2361,6 +2390,7 @@ TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
     peer2_data.data_len = sizeof(peer2_part);
     peer2_data.data = peer2_part;
     xgl_packet_t peer2_packet = {};
+    peer2_packet.packet_type = XGL_PACKET_TYPE_DATA;
     peer2_packet.source_id = 2;
     peer2_packet.target_id = 1;
     peer2_packet.connection_id = 11;
@@ -2376,6 +2406,7 @@ TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
     peer3_data.data_len = sizeof(peer3_part);
     peer3_data.data = peer3_part;
     xgl_packet_t peer3_packet = {};
+    peer3_packet.packet_type = XGL_PACKET_TYPE_DATA;
     peer3_packet.source_id = 3;
     peer3_packet.target_id = 1;
     peer3_packet.connection_id = 22;
@@ -2456,6 +2487,7 @@ TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
     packet_data.data_len = sizeof(payload);
     packet_data.data = payload;
     xgl_packet_t packet = {};
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
     packet.source_id = 2;
     packet.target_id = 1;
     packet.data_type = 1;
@@ -2491,6 +2523,7 @@ TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
     packet_data.data_len = sizeof(payload);
     packet_data.data = payload;
     xgl_packet_t packet = {};
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
     packet.source_id = 2;
     packet.target_id = 1;
     packet.data_type = 1;
@@ -2676,8 +2709,7 @@ TEST_F(TransportRegressionTest, GlobalTxPacketBudgetIsReleasedByExactAck) {
     ASSERT_EQ(Send(), XGL_OK);
     EXPECT_EQ(Send(11, 100), XGL_ERR_WINDOW_FULL);
     auto* other = find_peer_scope_for_test(&ctx, 2, 11, 100);
-    ASSERT_NE(other, nullptr);
-    EXPECT_EQ(other->tx_window.next_packet_number, 0U);
+    EXPECT_EQ(other, nullptr);
     ASSERT_EQ(Ack(0, 1), XGL_OK);
     EXPECT_EQ(Send(11, 100), XGL_OK);
 }
@@ -2847,6 +2879,7 @@ TEST_F(TransportRegressionTest, DuplicateSackPreservesRetryBudgetAndRto) {
         ASSERT_EQ(Send(), XGL_OK);
     }
     ASSERT_EQ(Sack(0x0e), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100), XGL_OK);
     ASSERT_EQ(retries, 1U);
     const int sends_after_first = spy.send_count;
     for (unsigned i = 0; i < 4; ++i) {
@@ -2867,7 +2900,7 @@ TEST_F(TransportRegressionTest, DuplicateSackPreservesRetryBudgetAndRto) {
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 700), XGL_OK);
     EXPECT_EQ(retries, 3U);
     EXPECT_FALSE(ctx.peers->failed);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 1500), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 1500), XGL_ERR_ACK_TIMEOUT);
     EXPECT_TRUE(ctx.peers->failed);
     EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_ACK_TIMEOUT}));
 }
@@ -2879,8 +2912,10 @@ TEST_F(TransportRegressionTest,
         ASSERT_EQ(Send(), XGL_OK);
     }
     ASSERT_EQ(Sack(0x02), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100), XGL_OK);
     EXPECT_EQ(retries, 1U);
     ASSERT_EQ(Sack(0x0a), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100), XGL_OK);
     EXPECT_EQ(retries, 2U);
     ASSERT_FALSE(ctx.peers->failed);
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 2U);
@@ -2891,6 +2926,7 @@ TEST_F(TransportRegressionTest, EmptySackCannotRepeatSuccessfulFastRetry) {
     Init(1);
     ASSERT_EQ(Send(), XGL_OK);
     ASSERT_EQ(Sack(0), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100), XGL_OK);
     EXPECT_EQ(retries, 1U);
     EXPECT_EQ(Sack(0), XGL_OK);
     EXPECT_EQ(Sack(0), XGL_OK);
@@ -2906,7 +2942,8 @@ TEST_F(TransportRegressionTest, SackCountsSuccessfulRetryBeforeLaterBusy) {
     }
     spy.selected_error_packet = 2;
     spy.selected_error = XGL_ERR_BUSY;
-    ASSERT_EQ(Sack(0x0a), XGL_ERR_BUSY);
+    ASSERT_EQ(Sack(0x0a), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100), XGL_OK);
     EXPECT_EQ(retries, 1U);
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 2U);
     spy.selected_error_packet = UINT32_MAX;
@@ -2922,7 +2959,8 @@ TEST_F(TransportRegressionTest, SackCountsSuccessfulRetryBeforeLaterHardError) {
     }
     spy.selected_error_packet = 2;
     spy.selected_error = XGL_ERR_TX_FAILED;
-    EXPECT_EQ(Sack(0x0a), XGL_ERR_TX_FAILED);
+    EXPECT_EQ(Sack(0x0a), XGL_OK);
+    EXPECT_EQ(xgl_transport_run(&ctx, nullptr, 100), XGL_ERR_TX_FAILED);
     EXPECT_EQ(retries, 1U);
     EXPECT_TRUE(ctx.peers->failed);
     EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_TX_FAILED}));

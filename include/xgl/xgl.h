@@ -122,7 +122,7 @@ typedef struct {
     size_t management_bytes;     /**< Instance and allocator descriptors */
     size_t initialization_bytes; /**< Routes, links and per-PHY RX caches */
     size_t peer_bytes;           /**< Reliable scope records */
-    size_t window_bytes;         /**< Send-window acknowledgement bits */
+    size_t window_bytes;         /**< Zero; windows belong to peer_bytes */
     size_t tx_record_bytes;      /**< Outstanding reliable packet records */
     size_t tx_payload_bytes;     /**< Reserved reliable payload copies */
     size_t scratch_bytes;        /**< Synchronous frame scratch storage */
@@ -370,6 +370,9 @@ xgl_send_zerocopy_scoped_at(xgl_handle_t handle,
  * \note            The most recent valid receive_timeout_ms applies to every
  *                  incomplete parser; zero disables expiry. Timeout maintenance
  *                  runs even when RX is disabled or a link is not due to poll.
+ * \note            Retained transport work that encounters BUSY/NO_MEMORY
+ *                  remains owned for retry and is not a maintenance error.
+ *                  Immediate receive or ACK transmission errors are returned.
  */
 xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
                      const xgl_work_budget_t* budget);

@@ -1167,7 +1167,8 @@ TEST(XglTransportProperties, Property15_RetryExhaustionHandling) {
         }
         uint32_t delay = 0;
         ASSERT_TRUE(xgl_transport_next_timeout(&probe.ctx, now, &delay));
-        ASSERT_EQ(xgl_transport_run(&probe.ctx, nullptr, now + delay), XGL_OK);
+        ASSERT_EQ(xgl_transport_run(&probe.ctx, nullptr, now + delay),
+                  XGL_ERR_ACK_TIMEOUT);
         EXPECT_TRUE(probe.ctx.peers->failed);
         EXPECT_TRUE(xgl_reliable_is_empty(&probe.ctx.peers->reliable_queue));
         EXPECT_EQ(probe.errors, 1U);
@@ -1185,7 +1186,7 @@ TEST(XglTransportProperties, Property15_RetryExhaustionMultiplePackets) {
     ASSERT_EQ(probe.Admit(100), XGL_OK);
     ASSERT_EQ(probe.Admit(200), XGL_OK);
     ASSERT_EQ(probe.Admit(300), XGL_OK);
-    ASSERT_EQ(xgl_transport_run(&probe.ctx, nullptr, 100), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&probe.ctx, nullptr, 100), XGL_ERR_ACK_TIMEOUT);
     EXPECT_TRUE(probe.ctx.peers->failed);
     EXPECT_EQ(xgl_reliable_get_count(&probe.ctx.peers->reliable_queue), 0U);
     EXPECT_EQ(probe.errors, 1U);

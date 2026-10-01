@@ -29,6 +29,7 @@ class XglTransportRxContract : public ::testing::Test {
     xgl_error_t application_error = XGL_OK;
     size_t feedback_attempts = 0U;
     std::vector<uint8_t> delivered;
+    std::vector<xgl_error_t> errors;
     bool initialized = false;
 
     static xgl_error_t Send(void* opaque, xgl_handle_t, xgl_packet_t*) {
@@ -44,6 +45,11 @@ class XglTransportRxContract : public ::testing::Test {
             self.delivered.insert(self.delivered.end(), data, data + len);
         }
         return self.application_error;
+    }
+
+    static void ReportError(xgl_handle_t, xgl_error_t error, const char*,
+                            void* opaque) {
+        static_cast<XglTransportRxContract*>(opaque)->errors.push_back(error);
     }
 
     void SetUp() override {
@@ -62,6 +68,7 @@ class XglTransportRxContract : public ::testing::Test {
         config.stats = &statistics;
         config.tx_retries = &retries;
         config.rx_accept_callback = Accept;
+        config.error_callback = ReportError;
         config.callback_user_data = this;
 #if XGL_FEATURE_FRAGMENTATION
         config.enable_fragmentation = true;
@@ -347,6 +354,37 @@ TEST_F(XglTransportRxContract, AdmissionErrorPrecedesFeedbackError) {
 #endif
 
 #if XGL_FEATURE_FRAGMENTATION
+TEST_F(XglTransportRxContract, PendingMessageFailureReleasesOwnedBytesOnce) {
+    application_error = XGL_ERR_BUSY;
+    ASSERT_EQ(Receive(0U, 0x41U, Fragment(), true), XGL_OK);
+    ASSERT_NE(context.peers, nullptr);
+    auto* peer = context.peers;
+    ASSERT_NE(peer->rx_pending_message.data, nullptr);
+    const auto* owned = peer->rx_pending_message.data;
+    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 1U);
+    EXPECT_EQ(peer->rx_next_packet_number, 1U);
+    EXPECT_EQ(feedback_attempts, 1U);
+
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 10U), XGL_OK);
+    EXPECT_EQ(peer->rx_pending_message.data, owned);
+    application_error = XGL_ERR_NO_MEMORY;
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 11U), XGL_OK);
+    EXPECT_EQ(peer->rx_pending_message.data, owned);
+    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 1U);
+    EXPECT_TRUE(errors.empty());
+
+    application_error = XGL_ERR_INVALID_PARAM;
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 12U), XGL_ERR_INVALID_PARAM);
+    EXPECT_TRUE(peer->failed);
+    EXPECT_EQ(peer->rx_pending_message.data, nullptr);
+    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 0U);
+    EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_INVALID_PARAM}));
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 13U), XGL_OK);
+    EXPECT_EQ(errors.size(), 1U);
+    EXPECT_EQ(feedback_attempts, 1U);
+    EXPECT_TRUE(delivered.empty());
+}
+
 TEST(XglTransportRxWireContract, DuplicateFragmentMetadataNeverDelivers) {
     PublicReceiver receiver;
     receiver.Init();

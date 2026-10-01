@@ -36,29 +36,28 @@ xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
     }
 
     memset(plan, 0, sizeof(*plan));
-    plan->max_frame_size =
+    uint16_t max_frame_size =
         transport_effective_max_frame_size(ctx, tx_data->target_id);
-    plan->app_extensions_len =
+    size_t app_extensions_len =
         (tx_data->data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
     if (tx_data->session_epoch != 0U) {
-        plan->app_extensions_len += XGL_SESSION_EXT_SIZE;
+        app_extensions_len += XGL_SESSION_EXT_SIZE;
     }
 
     size_t base_budget = 0U;
-    if (!xgl_frame_payload_budget(plan->max_frame_size, 0U, ctx->auth_tag_len,
+    if (!xgl_frame_payload_budget(max_frame_size, 0U, ctx->auth_tag_len,
                                   &base_budget)) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (!xgl_frame_payload_budget(plan->max_frame_size,
-                                  plan->app_extensions_len, ctx->auth_tag_len,
-                                  &plan->app_payload_budget)) {
+    size_t app_payload_budget = 0U;
+    if (!xgl_frame_payload_budget(max_frame_size, app_extensions_len,
+                                  ctx->auth_tag_len, &app_payload_budget)) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    if (tx_data->data_len <= plan->app_payload_budget) {
-        plan->fragment_extensions_len = plan->app_extensions_len;
-        plan->fragment_payload_budget = plan->app_payload_budget;
+    if (tx_data->data_len <= app_payload_budget) {
+        plan->fragment_payload_budget = app_payload_budget;
         plan->fragment_count = 1U;
         return XGL_OK;
     }
@@ -69,14 +68,11 @@ xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
     }
 
     plan->needs_fragmentation = true;
-    plan->fragment_extensions_len =
-        plan->app_extensions_len + XGL_FRAGMENT_EXT_SIZE;
-    if (plan->app_payload_budget <= XGL_FRAGMENT_EXT_SIZE) {
+    if (app_payload_budget <= XGL_FRAGMENT_EXT_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    plan->fragment_payload_budget =
-        plan->app_payload_budget - XGL_FRAGMENT_EXT_SIZE;
+    plan->fragment_payload_budget = app_payload_budget - XGL_FRAGMENT_EXT_SIZE;
     plan->fragment_count = tx_data->data_len / plan->fragment_payload_budget;
     if (tx_data->data_len % plan->fragment_payload_budget != 0U) {
         plan->fragment_count++;

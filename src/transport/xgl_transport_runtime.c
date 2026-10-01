@@ -15,7 +15,7 @@
  * \param[in]       current_time_ms: Current transport clock
  * \return          Send result or XGL_ERR_ACK_TIMEOUT at the retry limit
  */
-xgl_error_t transport_retransmit_reliable_packet(
+static xgl_error_t transport_retransmit_reliable_packet(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     xgl_transport_peer_state_t* peer, xgl_reliable_packet_t* rel_packet,
     uint32_t current_time_ms) {
@@ -91,6 +91,7 @@ xgl_error_t transport_retransmit_reliable_packet(
  * \param[in,out]   peer: Owning peer
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current transport clock
+ * \return          First terminal retry error; retained backpressure is normal
  */
 static xgl_error_t transport_process_retransmission_queue(
     xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
@@ -140,6 +141,7 @@ static xgl_error_t transport_process_retransmission_queue(
  * \param[in,out]   ctx: Transport layer context
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current transport clock
+ * \return          First terminal error while continuing other peer queues
  */
 static xgl_error_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
                                                      xgl_handle_t handle,
@@ -312,6 +314,10 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
     }
     bool active = false;
     *timeout_ms = 0U;
+#if XGL_FEATURE_FRAGMENTATION
+    const bool has_tx_capacity =
+        transport_tx_packet_count(ctx) < ctx->max_tx_packets;
+#endif
     for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
          peer = peer->next) {
         xgct_list_node_t* node;
@@ -341,7 +347,7 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
                                    timeout_ms);
         } else if (peer->tx_message.data != NULL && !peer->failed &&
                    xgl_window_can_send_packet_number(&peer->tx_window) &&
-                   transport_tx_packet_count(ctx) < ctx->max_tx_packets) {
+                   has_tx_capacity) {
             active = true;
             *timeout_ms = 0U;
         }

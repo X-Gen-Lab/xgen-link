@@ -6,6 +6,11 @@
 #include "wire/xgl_wire.h"
 #include "xgl_transport_internal.h"
 
+/* One ACK range uses the fixed 9-byte prefix and one 4-byte range. */
+#define XGL_TRANSPORT_ACK_VALUE_SIZE   13U
+#define XGL_TRANSPORT_SACK_PREFIX_SIZE 5U
+#define XGL_TRANSPORT_SACK_BITMAP_SIZE 8U
+
 /**
  * \brief           Submit a borrowed ACK extension with a shared packet header
  * \param[in]       ctx: Transport context
@@ -60,7 +65,7 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                uint16_t source_id, uint32_t connection_id,
                                uint32_t session_epoch) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    uint8_t ack_value[16] = {0};
+    uint8_t ack_value[XGL_TRANSPORT_ACK_VALUE_SIZE];
     size_t ack_value_len = 0;
     const xgl_wire_ack_range_t ranges[] = {{.gap = 0, .length = 1}};
 
@@ -71,7 +76,7 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
         return err;
     }
 
-    uint8_t ack_ext[32] = {0};
+    uint8_t ack_ext[XGL_WIRE_EXT_HEADER_SIZE + XGL_TRANSPORT_ACK_VALUE_SIZE];
     size_t ack_ext_len = 0;
     err = xgl_wire_encode_ext(ack_ext, sizeof(ack_ext), XGL_WIRE_EXT_ACK_RANGE,
                               ack_value, ack_value_len, &ack_ext_len);
@@ -97,7 +102,7 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    uint8_t bitmap[8] = {0};
+    uint8_t bitmap[XGL_TRANSPORT_SACK_BITMAP_SIZE] = {0};
     size_t highest_bit = 0U;
     bool has_received = false;
     for (const xgl_transport_rx_buffered_packet_t* node = peer->rx_buffered;
@@ -117,7 +122,7 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
     }
 
     size_t bitmap_len = has_received ? ((highest_bit / 8U) + 1U) : 1U;
-    uint8_t sack_value[16] = {0};
+    uint8_t sack_value[XGL_TRANSPORT_SACK_PREFIX_SIZE + sizeof(bitmap)];
     size_t sack_value_len = 0U;
     xgl_error_t err = xgl_wire_encode_sack_ext_value(
         sack_value, sizeof(sack_value), base_packet, bitmap, bitmap_len,
@@ -126,7 +131,7 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
         return err;
     }
 
-    uint8_t sack_ext[32] = {0};
+    uint8_t sack_ext[XGL_WIRE_EXT_HEADER_SIZE + sizeof(sack_value)];
     size_t sack_ext_len = 0U;
     err = xgl_wire_encode_ext(sack_ext, sizeof(sack_ext), XGL_WIRE_EXT_SACK,
                               sack_value, sack_value_len, &sack_ext_len);

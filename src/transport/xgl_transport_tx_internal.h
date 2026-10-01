@@ -16,11 +16,7 @@ extern "C" {
  * \brief           Validated wire budgets shared by admission and fragmentation
  */
 typedef struct {
-    uint16_t max_frame_size;
-    size_t app_extensions_len;
-    size_t app_payload_budget;
     bool needs_fragmentation;
-    size_t fragment_extensions_len;
     size_t fragment_payload_budget;
     size_t fragment_count;
 } xgl_transport_send_plan_t;

@@ -273,9 +273,11 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
  * \param[in]       ctx: Transport layer context
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current time in milliseconds
- * \return          XGL_OK on success, error code otherwise
- * \note            Processes timeouts, retransmissions, and fragment reassembly
- *                  Should be called periodically (e.g., every 10-100ms)
+ * \return          First terminal maintenance error, or XGL_OK
+ * \note            Processes deferred sends, delivery and timeouts. Retained
+ *                  BUSY/NO_MEMORY work remains owned and is retried later.
+ * \note            Service receive events and xgl_transport_next_timeout()
+ *                  deadlines; a zero delay requires maintenance now.
  */
 xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                               uint32_t current_time_ms);

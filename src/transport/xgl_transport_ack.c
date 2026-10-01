@@ -166,7 +166,7 @@ static bool transport_sack_bit_is_set(const uint8_t* bitmap, size_t bit_index) {
 }
 
 /**
- * \brief           Retry a missing original packet before RTO recovery
+ * \brief           Schedule a missing original packet before RTO recovery
  * \param[in,out]   packet: Outstanding packet, or NULL if already acknowledged
  * \note            Maintenance submits the retry after the receive stack has
  *                  unwound. Duplicate feedback preserves a local retry delay.

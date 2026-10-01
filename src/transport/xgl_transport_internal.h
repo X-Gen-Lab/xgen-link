@@ -148,11 +148,6 @@ xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
                                 uint16_t source_id, uint32_t base_packet,
                                 uint32_t connection_id, uint32_t session_epoch);
 
-xgl_error_t transport_retransmit_reliable_packet(
-    xgl_transport_ctx_t* ctx, xgl_handle_t handle,
-    xgl_transport_peer_state_t* peer, xgl_reliable_packet_t* rel_packet,
-    uint32_t current_time_ms);
-
 #if XGL_FEATURE_OUT_OF_ORDER
 xgl_error_t transport_cache_out_of_order_packet(
     const xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,

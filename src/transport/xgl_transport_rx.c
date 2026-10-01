@@ -13,7 +13,7 @@
  * \param[in,out]   ctx: Transport layer context
  * \param[in]       handle: Protocol instance handle
  * \param[in,out]   peer: Owning receive peer
- * \return          XGL_OK after draining, or the first admission error
+ * \return          XGL_OK, or the first admission or feedback error
  */
 xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
                                         xgl_handle_t handle,

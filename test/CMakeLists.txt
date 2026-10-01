@@ -52,7 +52,6 @@ set(TEST_SOURCES
     unit/transport/test_reliable.cpp
     unit/transport/test_fragment.cpp
     unit/transport/test_transport.cpp
-    unit/transport/test_timeout_control.cpp
 
     # Integration tests
     integration/test_integration.cpp
@@ -100,6 +99,7 @@ list(APPEND TEST_SOURCES
     unit/transport/test_transport_tx_contracts.cpp
     unit/transport/test_transport_runtime_contracts.cpp
     unit/transport/test_transport_storage.cpp
+    unit/transport/test_timeout_control.cpp
     unit/datalink/test_parser_recovery.cpp
     unit/datalink/test_parser_resync.cpp
     unit/network/test_network_contracts.cpp
