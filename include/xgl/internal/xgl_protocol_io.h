@@ -22,6 +22,9 @@ extern "C" {
 typedef struct {
     const xgl_frame_t* frame;
     xgl_phy_ops_t* phy;
+    const uint8_t*
+        serialized;        /**< Borrowed complete frame when frame is NULL */
+    size_t serialized_len; /**< Complete frame bytes submitted unchanged */
 } xgl_frame_tx_message_t;
 
 /**

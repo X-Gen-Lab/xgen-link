@@ -114,23 +114,9 @@ xgl_error_t xgl_datalink_send(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
         return err;
     }
 
-    err = phy->tx(frame_buffer, bytes_written, phy->user_data);
-    if (err != XGL_OK) {
-        datalink_count_tx_error(ctx);
-        datalink_report_tx_error(ctx, err,
-                                 "Physical layer transmission failed");
-        xgm_free(ctx->allocator, frame_buffer);
-        return err;
-    }
-
-    if (ctx->stats != NULL) {
-        ctx->stats->tx_packets++;
-        ctx->stats->tx_bytes += bytes_written;
-    }
-
+    err = xgl_datalink_send_raw(ctx, phy, frame_buffer, bytes_written);
     xgm_free(ctx->allocator, frame_buffer);
-
-    return XGL_OK;
+    return err;
 }
 
 xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,

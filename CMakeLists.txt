@@ -145,6 +145,7 @@ set(XGL_SOURCES
     src/network/xgl_route.c
     src/network/xgl_network_send.c
     src/network/xgl_network_receive.c
+    src/network/xgl_network_forward.c
     src/network/xgl_network.c
 
     # Transport Layer

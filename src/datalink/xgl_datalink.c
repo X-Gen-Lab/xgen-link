@@ -82,8 +82,14 @@ static xgl_error_t datalink_send_impl(void* ctx, xgl_handle_t handle,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (send_data->frame == NULL || send_data->phy == NULL) {
+    if (send_data->phy == NULL) {
         return XGL_ERR_NULL_POINTER;
+    }
+
+    if (send_data->frame == NULL) {
+        return xgl_datalink_send_raw(dl_ctx, send_data->phy,
+                                     send_data->serialized,
+                                     send_data->serialized_len);
     }
 
     /* Forward to datalink send function */

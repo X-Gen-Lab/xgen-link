@@ -5,8 +5,8 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_frame.h>
 #include <xgl/internal/xgl_datalink.h>
+#include <xgl/internal/xgl_frame.h>
 #include <xgl/internal/xgl_network.h>
 #include <xgl/internal/xgl_route.h>
 #include <xgl/internal/xgl_wire.h>
@@ -160,6 +160,16 @@ class XglNetworkTest : public ::testing::Test {
         phy_ops.tx = test_phy_tx;
         phy_ops.rx = test_phy_rx;
         phy_ops.user_data = &phy_tx_count;
+
+        xgl_datalink_config_t datalink_config = {};
+        datalink_config.rx_cache = datalink_cache;
+        datalink_config.rx_cache_size = sizeof(datalink_cache);
+        datalink_config.stats = &datalink_stats;
+        datalink_config.allocator = xgm_allocator_libc();
+        ASSERT_EQ(xgl_datalink_init(&datalink_ctx, &datalink_config), XGL_OK);
+        ASSERT_EQ(xgl_datalink_get_interface(&datalink_ctx, &datalink_iface),
+                  XGL_OK);
+        network_ctx.lower_layer = &datalink_iface;
     }
 
     void TearDown() override {
@@ -200,6 +210,10 @@ class XglNetworkTest : public ::testing::Test {
     xgl_route_table_t route_table;
     xgl_network_ctx_t network_ctx;
     xgl_layer_stats_t stats;
+    uint8_t datalink_cache[256] = {};
+    xgl_layer_stats_t datalink_stats = {};
+    xgl_datalink_ctx_t datalink_ctx = {};
+    xgl_frame_interface_t datalink_iface = {};
     xgl_phy_ops_t phy_ops;
     int phy_tx_count;
 };
@@ -693,8 +707,9 @@ TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
 }
 
 TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
-    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256,
-                                  100, 1), XGL_OK);
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
+        XGL_OK);
     uint8_t cache[256] = {};
     xgl_layer_stats_t datalink_stats = {};
     xgl_datalink_config_t config = {};
@@ -708,8 +723,9 @@ TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
     network_ctx.lower_layer = &lower;
     const auto frame = make_frame(REMOTE_ID, FORWARD_ID);
 
-    ASSERT_EQ(xgl_network_receive(&network_ctx, nullptr, frame.data(),
-                                  frame.size()), XGL_OK);
+    ASSERT_EQ(
+        xgl_network_receive(&network_ctx, nullptr, frame.data(), frame.size()),
+        XGL_OK);
     EXPECT_EQ(phy_tx_count, 1);
     EXPECT_EQ(datalink_stats.tx_packets, 1U);
     EXPECT_EQ(datalink_stats.tx_bytes, frame.size());
@@ -717,12 +733,14 @@ TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
 
 TEST_F(XglNetworkTest, ForwardingRejectsMissingPhyTransmitOperation) {
     phy_ops.tx = nullptr;
-    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256,
-                                  100, 1), XGL_OK);
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
+        XGL_OK);
     const auto frame = make_frame(REMOTE_ID, FORWARD_ID);
 
-    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, frame.data(),
-                                  frame.size()), XGL_ERR_TX_FAILED);
+    EXPECT_EQ(
+        xgl_network_receive(&network_ctx, nullptr, frame.data(), frame.size()),
+        XGL_ERR_TX_FAILED);
     EXPECT_EQ(phy_tx_count, 0);
 }
 
@@ -813,6 +831,7 @@ TEST_F(XglNetworkTest, ForwardingAllocatesWholeFrameFromNetworkResource) {
     config.route_table = &route_table;
     config.stats = &local_stats;
     config.allocator = &allocator;
+    config.lower_layer = &datalink_iface;
     ASSERT_EQ(xgl_network_init(&ctx, &config), XGL_OK);
 
     CaptureTx capture;
