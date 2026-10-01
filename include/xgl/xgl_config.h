@@ -9,9 +9,13 @@
 
 #include <xgl/xgl_build_config.h>
 
-/** \brief           Maximum temporary PHY read chunk on the caller's stack. */
+/** \brief           Compiled temporary PHY read capacity on the caller's stack.
+ */
 #ifndef XGL_DATALINK_RX_CHUNK_SIZE
-#define XGL_DATALINK_RX_CHUNK_SIZE 128U
+#define XGL_DATALINK_RX_CHUNK_SIZE XGL_BUILD_RX_CHUNK_SIZE
+#elif XGL_DATALINK_RX_CHUNK_SIZE != XGL_BUILD_RX_CHUNK_SIZE
+#error                                                                         \
+    "Configure XGL_DATALINK_RX_CHUNK_SIZE through CMake, not a consumer macro"
 #endif
 
 /** \brief           Absolute accepted serialized frame size, including CRC. */

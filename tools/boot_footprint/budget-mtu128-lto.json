@@ -5,7 +5,8 @@
     "profile": "boot",
     "frame_bytes": 128,
     "rx_bytes": 128,
-    "lto": true
+    "lto": true,
+    "rx_chunk_bytes": 32
   },
   "qualification": "Cortex-M0 MinSizeRel probe with library IPO and an opaque non-LTO consumer/layout; independent LTO regression ceiling, not an 8 KiB Flash or complete call-chain stack claim.",
   "baseline_kind": "first_explicit_lto_measurement",
@@ -30,5 +31,12 @@
     "reserved_stack_bytes": 1024,
     "ram_with_reserved_stack_bytes": 2224,
     "largest_linked_function_stack_bytes": 320
+  },
+  "baseline_configuration": {
+    "profile": "boot",
+    "frame_bytes": 128,
+    "rx_bytes": 128,
+    "lto": true,
+    "rx_chunk_bytes": 128
   }
 }

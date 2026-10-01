@@ -23,6 +23,12 @@ def audit(report, policy):
     for field in ("frame_bytes", "rx_bytes"):
         if field in configuration and report.get(field) != configuration[field]:
             violations.append(f"Report {field} does not match the selected policy")
+    if "rx_chunk_bytes" in configuration:
+        expected_chunk = configuration["rx_chunk_bytes"]
+        if type(expected_chunk) is not int or expected_chunk not in (16, 32, 64, 128):
+            raise ValueError("Invalid resource policy rx_chunk_bytes")
+        if type(report.get("rx_chunk_bytes")) is not int or report["rx_chunk_bytes"] != expected_chunk:
+            violations.append("Report rx_chunk_bytes does not match the selected policy")
     if "lto" in configuration:
         if type(configuration["lto"]) is not bool:
             raise ValueError("Invalid resource policy lto mode")

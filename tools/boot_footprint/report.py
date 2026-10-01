@@ -48,6 +48,7 @@ def cache_values(build):
         if key.startswith(("CMAKE_C_FLAGS", "CMAKE_EXE_LINKER_FLAGS")) or key in (
             "CMAKE_BUILD_TYPE", "CMAKE_TOOLCHAIN_FILE", "XGL_PROFILE",
             "XGL_FOOTPRINT_FRAME_SIZE", "XGL_FOOTPRINT_RX_SIZE", "XGL_FOOTPRINT_LTO",
+            "XGL_DATALINK_RX_CHUNK_SIZE",
             "CMAKE_INTERPROCEDURAL_OPTIMIZATION") or (
                 key.startswith(("XGL_", "xgen_")) and key.endswith("_SOURCE_DIR")):
             result[key] = value
@@ -65,12 +66,12 @@ def generate_layout(args):
         "route_item", "link", "peer", "reliable_packet",
         "instance", "datalink", "transport", "rx_bytes", "frame_bytes", "peers", "routes",
         "links", "window", "tx_packets", "scratch_blocks", "ack_bytes",
-        "wire_header_bytes", "wire_crc_bytes",
+        "wire_header_bytes", "wire_crc_bytes", "rx_chunk_bytes",
     )
     if len(data) != len(names) * 4:
         raise ValueError("Unexpected target layout section size")
     values = dict(zip(names, struct.unpack("<" + "I" * len(names), data)))
-    if values["magic"] != 0x58474C42 or values["format_version"] != 3:
+    if values["magic"] != 0x58474C42 or values["format_version"] != 4:
         raise ValueError("Unsupported target layout format or endianness")
     if any(values[key] != 1 for key in (
             "routes", "peers", "links", "window", "tx_packets", "scratch_blocks")):
@@ -169,6 +170,7 @@ def report_elf(args):
                           f"{'LTO' if optimization['enabled'] else 'no LTO'}"),
         "frame_bytes": layout["frame_bytes"],
         "rx_bytes": layout["rx_bytes"],
+        "rx_chunk_bytes": layout["rx_chunk_bytes"],
         "lto": optimization["enabled"],
         "optimization": optimization,
         "compiler": run([args.compiler, "--version"]).splitlines()[0],

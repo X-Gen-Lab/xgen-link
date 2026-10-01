@@ -231,6 +231,13 @@ jobs:
             --bytes-source out/deps/xgen-bytes --crc-source out/deps/xgen-crc \
             --memory-source out/deps/xgen-memory --containers-source out/deps/xgen-containers \
             --work-dir out/reports/profile-contracts
+      - name: Validate bounded RX chunk selection and installed configuration
+        run: |
+          python test/cmake/test_rx_chunk_config.py \
+            --link-source . --status-source out/deps/xgen-status \
+            --bytes-source out/deps/xgen-bytes --crc-source out/deps/xgen-crc \
+            --memory-source out/deps/xgen-memory --containers-source out/deps/xgen-containers \
+            --work-dir out/reports/rx-chunk-contracts
       - name: Preserve contract results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -239,6 +246,7 @@ jobs:
           path: |
             out/reports/dependency-contracts
             out/reports/profile-contracts
+            out/reports/rx-chunk-contracts
           if-no-files-found: error
 
   arm-footprint:
