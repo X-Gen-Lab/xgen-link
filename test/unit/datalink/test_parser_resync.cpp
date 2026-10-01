@@ -183,6 +183,25 @@ TEST_F(XglParserResyncTest, MissingBothCrcBytesRetainsTheFollowingMagicPair) {
     EXPECT_EQ(xgl_parser_get_cached_len(&parser), 0U);
 }
 
+TEST_F(XglParserResyncTest,
+       CrcFailureWithoutAnotherMagicDefersDiscardUntilAdvance) {
+    auto invalid = make_frame({0x11U});
+    invalid.back() ^= 1U;
+    ASSERT_EQ(std::count(invalid.begin() + 1U, invalid.end(), XGL_WIRE_MAGIC_0),
+              0);
+    ASSERT_EQ(FeedUntilLastByte(invalid), XGL_PARSE_RESULT_ERROR);
+    EXPECT_EQ(status, XGL_WIRE_DECODE_FRAME_CRC);
+    EXPECT_EQ(parser.state, XGL_PARSE_RECOVER);
+    EXPECT_EQ(xgl_parser_get_cached_len(&parser), invalid.size());
+    EXPECT_TRUE(std::equal(invalid.begin(), invalid.end(), cache.data()));
+
+    EXPECT_EQ(xgl_parser_advance_view(&parser, &view, &status),
+              XGL_PARSE_RESULT_INCOMPLETE);
+    EXPECT_EQ(status, XGL_WIRE_DECODE_INVALID);
+    EXPECT_EQ(parser.state, XGL_PARSE_MAGIC);
+    EXPECT_EQ(xgl_parser_get_cached_len(&parser), 0U);
+}
+
 TEST_F(XglParserResyncTest, BadHeaderRetainsANewHeaderAlreadyInsideTheCache) {
     std::vector<uint8_t> stream(11U, 0x33U);
     stream[0] = XGL_WIRE_MAGIC_0;
