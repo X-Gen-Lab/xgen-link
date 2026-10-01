@@ -101,6 +101,7 @@ list(APPEND TEST_SOURCES
     unit/transport/test_transport_storage.cpp
     unit/transport/test_reliable_owned.cpp
     unit/transport/test_transport_fragment_scope.cpp
+    unit/transport/test_transport_fixed_rto.cpp
     unit/transport/test_timeout_control.cpp
     unit/datalink/test_parser_recovery.cpp
     unit/datalink/test_parser_resync.cpp
