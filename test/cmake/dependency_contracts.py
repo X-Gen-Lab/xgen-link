@@ -195,6 +195,18 @@ class DependencyContracts(unittest.TestCase):
                  '  endif()\nendforeach()\n')
         self.build_project("subdirectory-defaults", body)
 
+    def test_coverage_build_records_only_protocol_execution(self):
+        body = (parent_sources() + disable_helpers() +
+                'set(XGL_ENABLE_COVERAGE ON)\n' + load_link() + consumer())
+        _, binary = self.build_project("coverage", body, build=True)
+        self.run_consumer(binary)
+        self.assertTrue(list((binary / "protocol").rglob("*.gcno")),
+                        "Requested coverage did not instrument the protocol")
+        self.assertTrue(list((binary / "protocol").rglob("*.gcda")),
+                        "The real consumer did not record protocol execution")
+        self.assertFalse(list((binary / "modules").rglob("*.gcno")),
+                         "Protocol coverage leaked into dependency targets")
+
     def test_legacy_source_options_give_migration_errors(self):
         for package in PACKAGES:
             with self.subTest(package=package):
