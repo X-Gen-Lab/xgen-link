@@ -6,8 +6,105 @@
 
 #include "test_host_allocator.h"
 
+#include <algorithm>
 #include <gtest/gtest.h>
+#include <vector>
 #include <xgl/xgl.h>
+
+namespace {
+
+struct StatisticsPort {
+    std::vector<uint8_t> incoming;
+    StatisticsPort* remote = nullptr;
+};
+
+xgl_error_t statistics_tx(const uint8_t* data, size_t size, void* context) {
+    auto& port = *static_cast<StatisticsPort*>(context);
+    port.remote->incoming.insert(port.remote->incoming.end(), data, data + size);
+    return XGL_OK;
+}
+
+xgl_error_t statistics_rx(uint8_t* data, size_t* size, void* context) {
+    auto& port = *static_cast<StatisticsPort*>(context);
+    *size = std::min(*size, port.incoming.size());
+    std::copy_n(port.incoming.begin(), *size, data);
+    port.incoming.erase(port.incoming.begin(),
+                        port.incoming.begin() + static_cast<ptrdiff_t>(*size));
+    return XGL_OK;
+}
+
+}  // namespace
+
+TEST(XglStatisticsBehavior, ReportsAcceptedAckSamplesAndResetKeepsReservations) {
+    StatisticsPort first, second;
+    first.remote = &second;
+    second.remote = &first;
+    xgl_phy_ops_t first_phy = {statistics_tx, statistics_rx, &first};
+    xgl_phy_ops_t second_phy = {statistics_tx, statistics_rx, &second};
+    xgl_route_item_t first_route = {2U, &first_phy, 128U, 1000U, 1U};
+    xgl_route_item_t second_route = {1U, &second_phy, 128U, 1000U, 1U};
+    xgl_config_t sender_config, receiver_config;
+    xgl_config_get_preset_tiny(&sender_config);
+    xgl_config_get_preset_tiny(&receiver_config);
+    sender_config.source_id = 1U;
+    receiver_config.source_id = 2U;
+    sender_config.route_table = &first_route;
+    receiver_config.route_table = &second_route;
+    sender_config.route_table_len = receiver_config.route_table_len = 1U;
+    xgl_test_use_host_allocator(&sender_config);
+    xgl_test_use_host_allocator(&receiver_config);
+    xgl_handle_t sender = xgl_create(&sender_config);
+    xgl_handle_t receiver = xgl_create(&receiver_config);
+    ASSERT_NE(sender, nullptr);
+    ASSERT_NE(receiver, nullptr);
+    ASSERT_EQ(xgl_init(sender), XGL_OK);
+    ASSERT_EQ(xgl_init(receiver), XGL_OK);
+
+    const uint8_t payload = 42U;
+    xgl_tx_data_t tx{};
+    tx.target_id = 2U;
+    tx.data = &payload;
+    tx.data_len = 1U;
+    tx.reliable = true;
+    const xgl_work_budget_t budget = {128U, 1000U};
+    auto round_trip = [&](uint32_t sent_at, uint32_t acknowledged_at) {
+        ASSERT_EQ(xgl_send_at(sender, &tx, sent_at), XGL_OK);
+        for (uint32_t i = 0; i < 8U && !second.incoming.empty(); ++i) {
+            ASSERT_EQ(xgl_step(receiver, sent_at + 1U + i, &budget), XGL_OK);
+        }
+        ASSERT_TRUE(second.incoming.empty());
+        ASSERT_FALSE(first.incoming.empty());
+        for (uint32_t i = 0; i < 8U && !first.incoming.empty(); ++i) {
+            ASSERT_EQ(xgl_step(sender, acknowledged_at + i, &budget), XGL_OK);
+        }
+        ASSERT_TRUE(first.incoming.empty());
+    };
+    round_trip(100U, 150U);
+    round_trip(200U, 300U);
+    xgl_statistics_t stats{};
+    ASSERT_EQ(xgl_stats_get(sender, &stats), XGL_OK);
+    EXPECT_EQ(stats.avg_rtt_ms, 75U);
+    EXPECT_EQ(stats.min_rtt_ms, 50U);
+    EXPECT_EQ(stats.max_rtt_ms, 100U);
+    xgl_memory_requirements_t memory{};
+    ASSERT_EQ(xgl_memory_requirements(&sender_config, &memory), XGL_OK);
+    EXPECT_EQ(stats.memory_used, memory.size);
+    EXPECT_EQ(stats.memory_peak, memory.size);
+
+    ASSERT_EQ(xgl_stats_reset(sender), XGL_OK);
+    ASSERT_EQ(xgl_stats_get(sender, &stats), XGL_OK);
+    EXPECT_EQ(stats.avg_rtt_ms, 0U);
+    EXPECT_EQ(stats.min_rtt_ms, UINT32_MAX);
+    EXPECT_EQ(stats.max_rtt_ms, 0U);
+    EXPECT_EQ(stats.memory_used, memory.size);
+    round_trip(400U, 440U);
+    ASSERT_EQ(xgl_stats_get(sender, &stats), XGL_OK);
+    EXPECT_EQ(stats.avg_rtt_ms, 40U);
+    EXPECT_EQ(stats.min_rtt_ms, 40U);
+    EXPECT_EQ(stats.max_rtt_ms, 40U);
+    xgl_destroy(receiver);
+    xgl_destroy(sender);
+}
 
 /*---------------------------------------------------------------------------*/
 /* Test Fixture                                                              */
@@ -122,8 +219,10 @@ TEST_F(XglStatsTest, InitialStatsAreZero) {
     /* min_rtt_ms is initialized to UINT32_MAX to track minimum */
     EXPECT_EQ(stats.min_rtt_ms, UINT32_MAX);
 
-    EXPECT_EQ(stats.memory_used, 0);
-    EXPECT_EQ(stats.memory_peak, 0);
+    xgl_memory_requirements_t memory{};
+    ASSERT_EQ(xgl_memory_requirements(&config, &memory), XGL_OK);
+    EXPECT_EQ(stats.memory_used, memory.size);
+    EXPECT_EQ(stats.memory_peak, memory.size);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -195,11 +294,13 @@ TEST_F(XglStatsTest, StatsRemainZeroAfterReset) {
 
     EXPECT_EQ(stats.avg_rtt_ms, 0);
     EXPECT_EQ(stats.max_rtt_ms, 0);
-    /* Note: min_rtt_ms is reset to 0, not UINT32_MAX */
-    EXPECT_EQ(stats.min_rtt_ms, 0);
+    /* An empty sample set has the same sentinel before and after reset. */
+    EXPECT_EQ(stats.min_rtt_ms, UINT32_MAX);
 
-    EXPECT_EQ(stats.memory_used, 0);
-    EXPECT_EQ(stats.memory_peak, 0);
+    xgl_memory_requirements_t memory{};
+    ASSERT_EQ(xgl_memory_requirements(&config, &memory), XGL_OK);
+    EXPECT_EQ(stats.memory_used, memory.size);
+    EXPECT_EQ(stats.memory_peak, memory.size);
 }
 
 /*---------------------------------------------------------------------------*/
