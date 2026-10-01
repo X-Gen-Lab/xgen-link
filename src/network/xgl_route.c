@@ -152,11 +152,14 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Change the metric of an existing destination
  */
 xgl_error_t xgl_route_table_update_metric(const xgl_route_table_t* table,
                                           uint16_t target_id, uint8_t metric) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (table == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

@@ -6,12 +6,15 @@
 #include "xgl/internal/xgl_wire.h"
 #include "xgl_transport_internal.h"
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
                                 xgl_handle_t handle,
                                 const xgl_transport_peer_state_t* peer,
                                 uint16_t source_id, uint32_t base_packet,
                                 uint32_t connection_id,
                                 uint32_t session_epoch) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (ctx == NULL || peer == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

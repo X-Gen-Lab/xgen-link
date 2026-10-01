@@ -107,9 +107,12 @@ xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_wire_encode_ext(uint8_t* buffer, size_t buffer_size,
                                 uint8_t type, const uint8_t* value,
                                 size_t value_len, size_t* bytes_written) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

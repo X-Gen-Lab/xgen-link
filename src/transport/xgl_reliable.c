@@ -48,10 +48,13 @@ void xgl_reliable_destroy(xgl_reliable_queue_t* queue) {
     xgl_reliable_clear(queue);
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_reliable_add_packet_number(
     xgl_reliable_queue_t* queue, const uint8_t* data, size_t data_len,
     uint16_t source_id, uint16_t target_id, uint32_t packet_number,
     uint8_t data_type, uint8_t priority, int32_t timeout_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (queue == NULL || data == NULL || data_len == 0) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -155,6 +158,8 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
     xgct_list_node_t* node;
     while ((node = xgct_list_remove_head(&queue->wait_ack_list)) != NULL) {
         xgl_reliable_packet_t* packet =
+            /* Intrusive node membership is established by the owning list. */
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         reliable_unindex_packet(queue, packet);
         reliable_free_packet(queue, packet);

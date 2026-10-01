@@ -15,8 +15,8 @@ void fragment_free_reassembly_buffer(xgl_fragment_manager_t* manager,
         return;
     }
 
-    if (manager != NULL &&
-        buffer->reserved_size <= manager->current_reassembly_bytes) {
+    /* Owning queue traversals always supply their live manager. */
+    if (buffer->reserved_size <= manager->current_reassembly_bytes) {
         manager->current_reassembly_bytes -= buffer->reserved_size;
     }
 
@@ -39,6 +39,8 @@ fragment_find_reassembly_buffer(const xgl_fragment_manager_t* manager,
     xgct_list_node_t* node;
     XGCT_LIST_FOR_EACH(&manager->reassembly_list, node) {
         xgl_reassembly_buffer_t* buffer =
+            /* Intrusive node membership is established by the owning list. */
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
 
         if (buffer->source_id == source_id &&
@@ -52,10 +54,13 @@ fragment_find_reassembly_buffer(const xgl_fragment_manager_t* manager,
     return NULL;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t fragment_create_reassembly_buffer(
     xgl_fragment_manager_t* manager, uint16_t source_id, uint32_t connection_id,
     uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
     uint32_t message_len, xgl_reassembly_buffer_t** buffer_out) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (manager == NULL || buffer_out == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

@@ -23,6 +23,11 @@ void fragment_complete_reassembly(xgl_fragment_manager_t* manager,
                                   uint8_t** complete_data,
                                   size_t* complete_len);
 
+/**
+ * \brief           Free a buffer through its owning manager
+ * \param[in,out]   manager: Live owning manager when buffer is non-NULL
+ * \param[in,out]   buffer: Detached buffer to release, or NULL
+ */
 void fragment_free_reassembly_buffer(xgl_fragment_manager_t* manager,
                                      xgl_reassembly_buffer_t* buffer);
 

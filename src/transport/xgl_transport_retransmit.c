@@ -97,6 +97,8 @@ static uint32_t transport_process_retransmission_queue(
 
     XGCT_LIST_FOR_EACH_SAFE(&queue->wait_ack_list, node, tmp) {
         xgl_reliable_packet_t* rel_packet =
+            /* Intrusive node membership is established by the owning list. */
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
 
         if (!rel_packet->sent) {

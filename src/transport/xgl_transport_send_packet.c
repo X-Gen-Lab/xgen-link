@@ -71,12 +71,15 @@ xgl_error_t transport_queue_reliable_tx(
     return err;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t transport_send_packet_view(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     xgl_transport_peer_state_t* peer, const xgl_tx_data_t* tx_data,
     const uint8_t* data, size_t data_len, uint32_t packet_number, bool fragment,
     uint8_t* extensions, size_t extensions_len,
     xgl_reliable_packet_t** rel_packet) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     xgl_packet_data_t packet_data = {.data_len = data_len, .data = data};
 
     xgl_packet_t packet = {.packet_type = XGL_PACKET_TYPE_DATA,

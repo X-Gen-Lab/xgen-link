@@ -357,6 +357,8 @@ xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
     if (storage_size < plan.requirements.size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
+    /* Successful xgm_size_class_measure returns nonzero max alignment. */
+    /* NOLINTNEXTLINE(clang-analyzer-core.DivideZero) */
     if ((uintptr_t)storage % plan.requirements.alignment != 0U) {
         return XGL_ERR_INVALID_PARAM;
     }

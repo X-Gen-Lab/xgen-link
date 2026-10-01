@@ -7,6 +7,8 @@
 
 #include <string.h>
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Initialize a bounded replay window for one trusted scope
  * \param[out]      window: Replay state
@@ -20,6 +22,7 @@ xgl_error_t xgl_replay_window_init(xgl_replay_window_t* window,
                                    uint16_t source_id, uint32_t connection_id,
                                    uint32_t session_epoch,
                                    uint8_t window_size) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (window == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -37,6 +40,8 @@ xgl_error_t xgl_replay_window_init(xgl_replay_window_t* window,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Classify and commit a security sequence in one replay window
  * \param[in,out]   window: Replay state or a tentative copy before verification
@@ -51,6 +56,7 @@ xgl_replay_result_t xgl_replay_window_check(xgl_replay_window_t* window,
                                             uint32_t connection_id,
                                             uint32_t session_epoch,
                                             uint64_t packet_number) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (window == NULL) {
         return XGL_REPLAY_REJECT;
     }
@@ -261,6 +267,8 @@ xgl_error_t xgl_security_session_close(xgl_security_ctx_t* ctx,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Construct strict nonce and canonical AAD for a provider call
  * \param[in,out]   ctx: Context owning canonical AAD scratch
@@ -278,6 +286,7 @@ static void security_prepare_input(xgl_security_ctx_t* ctx,
                                    const uint8_t* buffer, uint32_t epoch,
                                    uint32_t key_id, uint32_t prefix,
                                    uint64_t sequence) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     memset(input, 0, sizeof(*input));
     input->version = XGL_AUTH_INPUT_VERSION;
     input->wire_version = header->version;

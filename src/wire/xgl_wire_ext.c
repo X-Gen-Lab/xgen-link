@@ -84,9 +84,12 @@ static uint64_t wire_deserialize_u64_le(const uint8_t* buffer) {
     return value;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_wire_encode_fragment_ext_value(
     uint8_t* buffer, size_t buffer_size, uint32_t message_id,
     uint32_t fragment_offset, uint32_t message_len, size_t* bytes_written) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -124,11 +127,14 @@ xgl_error_t xgl_wire_decode_fragment_ext_value(const uint8_t* buffer,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_wire_encode_session_ext_value(uint8_t* buffer,
                                               size_t buffer_size,
                                               uint32_t session_epoch,
                                               uint64_t incarnation_id,
                                               size_t* bytes_written) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -162,10 +168,13 @@ xgl_error_t xgl_wire_decode_session_ext_value(const uint8_t* buffer,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t
 xgl_wire_encode_security_ext_value(uint8_t* buffer, size_t buffer_size,
                                    uint32_t key_id, uint64_t nonce_id,
                                    uint8_t tag_len, size_t* bytes_written) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -210,12 +219,15 @@ xgl_error_t xgl_wire_decode_security_ext_value(const uint8_t* buffer,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_wire_encode_route_ext_value(uint8_t* buffer, size_t buffer_size,
                                             uint16_t previous_hop,
                                             uint16_t next_hop,
                                             uint32_t route_epoch,
                                             uint16_t metric,
                                             size_t* bytes_written) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

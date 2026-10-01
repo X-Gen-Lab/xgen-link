@@ -8,11 +8,14 @@
 #include <string.h>
 #include <xgen/bytes/bytes.h>
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t
 xgl_wire_encode_ack_range_ext_value(uint8_t* buffer, size_t buffer_size,
                                     uint32_t largest_ack, uint32_t ack_delay_us,
                                     const xgl_wire_ack_range_t* ranges,
                                     size_t range_count, size_t* bytes_written) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -87,11 +90,14 @@ xgl_error_t xgl_wire_decode_ack_range_ext_value(
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_wire_encode_sack_ext_value(uint8_t* buffer, size_t buffer_size,
                                            uint32_t base_packet,
                                            const uint8_t* bitmap,
                                            size_t bitmap_len,
                                            size_t* bytes_written) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || bytes_written == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

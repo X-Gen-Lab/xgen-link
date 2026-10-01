@@ -88,6 +88,9 @@ transport_peer_has_pending_data(const xgl_transport_ctx_t* ctx,
         xgct_list_node_t* node;
         XGCT_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
             const xgl_reassembly_buffer_t* buffer =
+                /* Intrusive node membership is established by the owning list.
+                 */
+                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
                 XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
             if (buffer->source_id == peer->peer_id &&
                 buffer->connection_id == peer->connection_id &&

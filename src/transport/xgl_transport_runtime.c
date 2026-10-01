@@ -66,6 +66,9 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         xgct_list_node_t* node;
         XGCT_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
             const xgl_reassembly_buffer_t* buffer =
+                /* Intrusive node membership is established by the owning list.
+                 */
+                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
                 XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
             if (buffer->source_id == peer->peer_id &&
                 buffer->connection_id == peer->connection_id &&
@@ -133,6 +136,8 @@ bool xgl_transport_can_send_to(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
     return count < ctx->max_peers;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Merge a timer into the earliest remaining delay
  * \param[in]       now_ms: Current time
@@ -144,6 +149,7 @@ bool xgl_transport_can_send_to(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
 static void transport_take_timeout(uint32_t now_ms, uint32_t start_ms,
                                    uint32_t interval_ms, bool* active,
                                    uint32_t* timeout_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     uint32_t elapsed = now_ms - start_ms;
     uint32_t remaining = elapsed >= interval_ms ? 0U : interval_ms - elapsed;
     if (!*active || remaining < *timeout_ms) {
@@ -171,6 +177,9 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
         xgct_list_node_t* node;
         XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
             const xgl_reliable_packet_t* packet =
+                /* Intrusive node membership is established by the owning list.
+                 */
+                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
                 XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
             if (packet->retry_pending) {
                 transport_take_timeout(now_ms, packet->retry_started_ms,
@@ -204,6 +213,9 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
         xgct_list_node_t* node;
         XGCT_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
             const xgl_reassembly_buffer_t* buffer =
+                /* Intrusive node membership is established by the owning list.
+                 */
+                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
                 XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
             if (buffer->received_bytes > 0U && buffer->timeout_ms != 0U) {
                 transport_take_timeout(now_ms, buffer->first_fragment_time,

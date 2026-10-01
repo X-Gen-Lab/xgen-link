@@ -21,6 +21,8 @@ uint32_t xgl_fragment_process_timeouts(xgl_fragment_manager_t* manager,
     xgct_list_node_t* tmp;
     XGCT_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
         xgl_reassembly_buffer_t* buffer =
+            /* Intrusive node membership is established by the owning list. */
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
 
         /* Skip if first fragment hasn't been received yet */
@@ -70,6 +72,8 @@ void xgl_fragment_clear_reassembly(xgl_fragment_manager_t* manager) {
     xgct_list_node_t* node;
     while ((node = xgct_list_remove_head(&manager->reassembly_list)) != NULL) {
         xgl_reassembly_buffer_t* buffer =
+            /* Intrusive node membership is established by the owning list. */
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
         fragment_free_reassembly_buffer(manager, buffer);
     }
@@ -88,6 +92,8 @@ size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
     xgct_list_node_t* tmp;
     XGCT_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
         xgl_reassembly_buffer_t* buffer =
+            /* Intrusive node membership is established by the owning list. */
+            /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
 
         bool matches_production_scope =

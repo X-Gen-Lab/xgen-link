@@ -70,6 +70,8 @@ static xgl_error_t ack_ranges_next(ack_ranges_t* cursor, uint32_t* low,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Complete one actually transmitted packet in its owning peer
  * \param[in,out]   ctx: Transport layer context
@@ -80,6 +82,7 @@ static xgl_error_t ack_ranges_next(ack_ranges_t* cursor, uint32_t* low,
 void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
                                   xgl_transport_peer_state_t* peer,
                                   uint32_t packet_number, uint32_t now_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     (void)ctx;
     const xgl_reliable_packet_t* packet = xgl_reliable_find_packet_number(
         &peer->reliable_queue, packet_number, peer->peer_id);
@@ -149,6 +152,9 @@ xgl_error_t transport_try_process_ack_range_ext(
         XGCT_LIST_FOR_EACH_SAFE(&peer->reliable_queue.wait_ack_list, node,
                                 next) {
             const xgl_reliable_packet_t* packet =
+                /* Intrusive node membership is established by the owning list.
+                 */
+                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
                 XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
             (void)ack_ranges_init(&ranges, &ext);
             while (ack_ranges_next(&ranges, &low, &high) == XGL_OK) {

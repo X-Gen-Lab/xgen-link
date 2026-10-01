@@ -7,6 +7,8 @@
 
 #include "xgl_reliable_internal.h"
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Calculate exponential backoff without signed overflow
  * \param[in]       initial_timeout_ms: Initial timeout; nonpositive means zero
@@ -15,6 +17,7 @@
  */
 int32_t xgl_reliable_calc_backoff(int32_t initial_timeout_ms,
                                   uint8_t retry_count) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     const int32_t maximum_timeout_ms = 30000;
     if (initial_timeout_ms <= 0) {
         return 0;

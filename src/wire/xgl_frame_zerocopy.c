@@ -12,12 +12,15 @@
 
 #define XGL_FRAME_DEFAULT_TTL 8U
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer, size_t buffer_size,
                                      size_t data_offset, size_t data_len,
                                      uint16_t source_id, uint16_t target_id,
                                      uint8_t data_type, uint32_t packet_number,
                                      bool reliable, uint8_t priority,
                                      size_t* frame_len) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || frame_len == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

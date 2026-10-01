@@ -17,11 +17,14 @@
 /* Protocol Version                                                          */
 /*---------------------------------------------------------------------------*/
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 static xgl_error_t encode_frame_wire_header(uint8_t* buffer, size_t buffer_size,
                                             const xgl_frame_t* frame,
                                             size_t extension_len,
                                             uint8_t extra_flags,
                                             size_t* header_len) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (buffer == NULL || frame == NULL || header_len == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

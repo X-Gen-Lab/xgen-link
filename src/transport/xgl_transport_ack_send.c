@@ -6,6 +6,8 @@
 #include "xgl/internal/xgl_wire.h"
 #include "xgl_transport_internal.h"
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Send ACK packet for received data
  * \param[in]       ctx: Transport context
@@ -18,6 +20,7 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                xgl_handle_t handle, uint32_t packet_number,
                                uint16_t source_id, uint32_t connection_id,
                                uint32_t session_epoch) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     uint8_t ack_value[16] = {0};
     size_t ack_value_len = 0;
     const xgl_wire_ack_range_t ranges[] = {{.gap = 0, .length = 1}};

@@ -71,12 +71,15 @@ void xgl_parser_reset(xgl_parser_t* parser) {
 /* Parser State Machine                                                      */
 /*---------------------------------------------------------------------------*/
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Feed byte to parser
  * \details         Implements byte-by-byte parsing state machine
  */
 xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
                                         uint32_t current_time_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (parser == NULL) {
         return XGL_PARSE_RESULT_ERROR;
     }
@@ -227,11 +230,14 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
 /* Parser Timeout Handling                                                   */
 /*---------------------------------------------------------------------------*/
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Check for parser timeout
  */
 bool xgl_parser_check_timeout(const xgl_parser_t* parser,
                               uint32_t current_time_ms, uint32_t timeout_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (parser == NULL) {
         return false;
     }

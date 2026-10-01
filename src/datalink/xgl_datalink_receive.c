@@ -28,6 +28,8 @@ xgl_error_t xgl_datalink_receive(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
                                     timeout_ms, XGL_DATALINK_RX_CHUNK_SIZE);
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Receive a bounded byte chunk with the selected link parser
  * \param[in,out]   ctx: Shared datalink policy and delivery context
@@ -42,6 +44,7 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
                                      xgl_parser_t* parser, xgl_phy_ops_t* phy,
                                      uint32_t current_time_ms,
                                      uint32_t timeout_ms, size_t byte_budget) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (ctx == NULL || parser == NULL || phy == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

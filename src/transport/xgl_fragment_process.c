@@ -20,12 +20,15 @@ static xgl_error_t fragment_validate_ext_input(uint32_t fragment_offset,
     return XGL_OK;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_fragment_process_ext(
     xgl_fragment_manager_t* manager, uint16_t source_id, uint32_t connection_id,
     uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
     uint32_t fragment_offset, uint32_t message_len,
     const uint8_t* fragment_payload, size_t fragment_payload_len,
     uint8_t** complete_data, size_t* complete_len, uint32_t current_time_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (manager == NULL || fragment_payload == NULL ||
         fragment_payload_len == 0U) {
         return XGL_ERR_INVALID_PARAM;
