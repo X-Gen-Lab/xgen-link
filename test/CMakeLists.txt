@@ -118,6 +118,7 @@ endif()
 # CTest Entry
 #-----------------------------------------------------------------------------
 
+include(cmake/HeaderContracts.cmake)
 include(GoogleTest)
 gtest_discover_tests(xgl_tests
     DISCOVERY_MODE POST_BUILD
