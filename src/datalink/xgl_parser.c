@@ -67,15 +67,6 @@ static xgl_parse_result_t parser_finish_header(xgl_parser_t* parser) {
     return XGL_PARSE_RESULT_INCOMPLETE;
 }
 
-/** \brief           Validate without retaining a view in each link object. */
-static xgl_error_t
-parser_validate_without_view(const xgl_parser_t* parser,
-                             xgl_wire_decode_status_t* status) {
-    xgl_wire_frame_view_t view;
-    return xgl_wire_decode_frame(&view, parser->cache, parser->cache_len,
-                                 status);
-}
-
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
@@ -86,7 +77,7 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
     if (status != NULL) {
         *status = XGL_WIRE_DECODE_INVALID;
     }
-    if (parser == NULL) {
+    if (parser == NULL || view == NULL) {
         return XGL_PARSE_RESULT_ERROR;
     }
     if (parser->cache_len >= parser->cache_size) {
@@ -107,6 +98,7 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
             if (parser->cache_len == 2U && byte != XGL_WIRE_MAGIC_1) {
                 if (byte == XGL_WIRE_MAGIC_0) {
                     parser->cache_len = 1U;
+                    parser->timestamp = current_time_ms;
                 } else {
                     xgl_parser_reset(parser);
                 }
@@ -120,6 +112,13 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
                     if (status != NULL && error == XGL_ERR_CRC_FAILED) {
                         *status = XGL_WIRE_DECODE_HEADER_CRC;
                     }
+                    return parser_reject(parser);
+                }
+                const size_t minimum_frame_len =
+                    (size_t)header.header_len + XGL_CRC16_SIZE;
+                if (minimum_frame_len > parser->cache_size ||
+                    header.payload_len >
+                        parser->cache_size - minimum_frame_len) {
                     return parser_reject(parser);
                 }
                 parser->expected_header_len = header.header_len;
@@ -151,11 +150,8 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
         case XGL_PARSE_CRC:
             parser->cache[parser->cache_len++] = byte;
             if (++parser->index == XGL_CRC16_SIZE) {
-                xgl_error_t error =
-                    view != NULL
-                        ? xgl_wire_decode_frame(view, parser->cache,
-                                                parser->cache_len, status)
-                        : parser_validate_without_view(parser, status);
+                xgl_error_t error = xgl_wire_decode_frame(
+                    view, parser->cache, parser->cache_len, status);
                 if (error != XGL_OK) {
                     return parser_reject(parser);
                 }
@@ -174,7 +170,9 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
 xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
                                         uint32_t current_time_ms) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    return xgl_parser_feed_byte_view(parser, byte, current_time_ms, NULL, NULL);
+    xgl_wire_frame_view_t view;
+    return xgl_parser_feed_byte_view(parser, byte, current_time_ms, &view,
+                                     NULL);
 }
 
 /* Parameter order follows the documented protocol fields and units. */

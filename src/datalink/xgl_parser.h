@@ -103,10 +103,11 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
  * \param[in,out]   parser: Per-link parser and caller-owned cache
  * \param[in]       byte: Next input byte
  * \param[in]       current_time_ms: Explicit monotonic time
- * \param[out]      view: Optional output, valid only when COMPLETE is returned
+ * \param[out]      view: Required output, valid only when COMPLETE is returned
  * \param[out]      status: Optional wire diagnostic, OK on COMPLETE, a CRC
  *                  classification on CRC failure, otherwise INVALID
- * \return          Parse result; wire validation runs once upon completion
+ * \return          Parse result; NULL parser or view returns ERROR without
+ *                  consuming input. Wire validation runs once on completion.
  * \note            The view borrows the cache until reset or the next feed.
  *                  Authentication is performed by the receiving endpoint.
  */
@@ -121,6 +122,8 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
  * \param[in]       current_time_ms: Current time in milliseconds
  * \param[in]       timeout_ms: Timeout in milliseconds; zero disables expiry
  * \return          true if timeout occurred, false otherwise
+ * \note            The deadline starts at the current candidate's first magic
+ *                  byte. Later header or body bytes do not extend it.
  */
 bool xgl_parser_check_timeout(const xgl_parser_t* parser,
                               uint32_t current_time_ms, uint32_t timeout_ms);
