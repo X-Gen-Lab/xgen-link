@@ -256,6 +256,7 @@ cleanup_datalink:
     memset(&handle->layers.datalink_ctx, 0, sizeof(handle->layers.datalink_ctx));
 
 cleanup_rx_buffer:
+    memset(&handle->layers.datalink_ctx, 0, sizeof(handle->layers.datalink_ctx));
     xgl_free(handle->allocator, rx_buffer);
 
 cleanup_route_read_times:
