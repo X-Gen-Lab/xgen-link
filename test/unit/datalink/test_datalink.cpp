@@ -317,6 +317,64 @@ TEST_F(XglDatalinkTest, InitNullPointer) {
     EXPECT_EQ(xgl_datalink_init(nullptr, &config), XGL_ERR_NULL_POINTER);
 }
 
+TEST_F(XglDatalinkTest, PollClassifiesHeaderAndFrameCrcFailures) {
+    for (bool corrupt_header : {true, false}) {
+        SCOPED_TRACE(corrupt_header);
+        const uint8_t payload = 0x11U;
+        xgl_frame_params_t params = {};
+        params.source_id = SOURCE_ID;
+        params.target_id = TARGET_ID;
+        params.payload = &payload;
+        params.payload_len = 1U;
+        xgl_frame_t frame = {};
+        ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+        uint8_t encoded[64] = {};
+        size_t encoded_length = 0U;
+        ASSERT_EQ(xgl_frame_serialize(encoded, sizeof(encoded), &frame,
+                                      &encoded_length),
+                  XGL_OK);
+        encoded[corrupt_header ? 22U : XGL_WIRE_BASE_HEADER_SIZE] ^= 1U;
+
+        stats = {};
+        rx_header_crc_errors = 0U;
+        rx_crc16_errors = 0U;
+        size_t notifications = 0U;
+        ctx.callback_user_data = &notifications;
+        ctx.error_callback = [](xgl_handle_t, xgl_error_t error,
+                                const char* message, void* user) {
+            EXPECT_EQ(error, XGL_ERR_CRC_FAILED);
+            EXPECT_NE(message, nullptr);
+            ++*static_cast<size_t*>(user);
+        };
+        uint8_t cache[64] = {};
+        xgl_parser_t parser = {};
+        ASSERT_EQ(xgl_parser_init(&parser, cache, sizeof(cache)), XGL_OK);
+        EXPECT_CALL(mock_phy, rx(_, _, _))
+            .WillOnce([&](uint8_t* bytes, size_t* length, void*) {
+                EXPECT_GE(*length, encoded_length);
+                std::memcpy(bytes, encoded, encoded_length);
+                *length = encoded_length;
+                return XGL_OK;
+            });
+        ASSERT_EQ(xgl_datalink_poll_parser(&ctx, &parser, &phy_ops, 0U,
+                                           1000U, sizeof(encoded)),
+                  XGL_OK);
+        EXPECT_EQ(stats.rx_errors, 1U);
+        EXPECT_EQ(stats.rx_packets, 0U);
+        EXPECT_EQ(rx_header_crc_errors, corrupt_header ? 1U : 0U);
+        EXPECT_EQ(rx_crc16_errors, corrupt_header ? 0U : 1U);
+        EXPECT_EQ(notifications, 1U);
+
+        /* The direct complete-frame ingress must classify identically. */
+        EXPECT_EQ(xgl_datalink_process_frame(&ctx, encoded, encoded_length),
+                  XGL_ERR_CRC_FAILED);
+        EXPECT_EQ(stats.rx_errors, 2U);
+        EXPECT_EQ(rx_header_crc_errors, corrupt_header ? 2U : 0U);
+        EXPECT_EQ(rx_crc16_errors, corrupt_header ? 0U : 2U);
+        EXPECT_EQ(notifications, 2U);
+    }
+}
+
 /*---------------------------------------------------------------------------*/
 /* Frame Transmission Tests                                                  */
 /*---------------------------------------------------------------------------*/
