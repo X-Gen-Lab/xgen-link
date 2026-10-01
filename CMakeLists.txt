@@ -2,16 +2,16 @@
 # Modern embedded communication protocol implementation
 # Author: X-Gen Lab
 
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.24)
 
 #-----------------------------------------------------------------------------
 # Project Configuration
 #-----------------------------------------------------------------------------
 
 project(xgl
-    VERSION 2.0.0
+    VERSION 3.0.0
     DESCRIPTION "xgen-link Protocol Stack"
-    LANGUAGES C CXX
+    LANGUAGES C
 )
 
 include(GNUInstallDirs)
@@ -31,16 +31,41 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Build Options
 #-----------------------------------------------------------------------------
 
-option(XGL_BUILD_TESTS "Build tests" OFF)
-option(XGL_BUILD_EXAMPLES "Build examples" ON)
+include(cmake/XglProfiles.cmake)
+if(XGL_PROFILE STREQUAL "boot" OR NOT PROJECT_IS_TOP_LEVEL)
+    set(XGL_HOST_DEFAULT OFF)
+else()
+    set(XGL_HOST_DEFAULT ON)
+endif()
+option(XGL_BUILD_TESTS "Build Full/Embedded regression tests" OFF)
+option(XGL_BUILD_EXAMPLES "Build examples" ${XGL_HOST_DEFAULT})
+if(XGL_PROFILE STREQUAL "boot" AND XGL_BUILD_TESTS)
+    message(FATAL_ERROR "Boot excludes Full test capabilities; use XGL_BUILD_NOHEAP_SMOKE for its static lifecycle tests")
+endif()
 option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
-option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ON)
-option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" ON)
-option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" ON)
-option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" ON)
-option(XGL_ALLOW_FALLBACK_MALLOC "Allow NULL allocator to fall back to malloc/free" ON)
-option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" ON)
+option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ${PROJECT_IS_TOP_LEVEL})
+option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" ${PROJECT_IS_TOP_LEVEL})
+if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" ${PROJECT_IS_TOP_LEVEL})
+option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" ${PROJECT_IS_TOP_LEVEL})
+if(NOT XGL_PROFILE STREQUAL "full")
+    set(XGL_HEAP_DEFAULT OFF)
+else()
+    set(XGL_HEAP_DEFAULT ON)
+endif()
+option(XGL_ALLOW_FALLBACK_MALLOC "Allow instance creation to select the explicit libc allocator backend" ${XGL_HEAP_DEFAULT})
+if(XGL_PROFILE STREQUAL "boot" AND XGL_ALLOW_FALLBACK_MALLOC)
+    message(FATAL_ERROR "The boot profile requires XGL_ALLOW_FALLBACK_MALLOC=OFF")
+endif()
+option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" ${PROJECT_IS_TOP_LEVEL})
+
+include(cmake/XglDependencies.cmake)
+if(XGL_BUILD_TESTS)
+    enable_language(CXX)
+endif()
 
 #-----------------------------------------------------------------------------
 # Compiler Warnings
@@ -75,10 +100,6 @@ endif()
 # Include Directories
 #-----------------------------------------------------------------------------
 
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_BINARY_DIR}/include
-)
 
 #-----------------------------------------------------------------------------
 # Source Files
@@ -88,17 +109,17 @@ set(XGL_SOURCES
     # Public API orchestration
     src/api/xgl_instance.c
     src/api/xgl_instance_lifecycle.c
+    src/api/xgl_instance_links.c
+    src/api/xgl_workspace.c
     src/api/xgl_runtime.c
     src/api/xgl_config.c
     src/api/xgl_send.c
     src/api/xgl_send_zerocopy.c
+    src/api/xgl_security_session.c
     src/api/xgl_stats.c
-    src/api/xgl_log.c
     src/api/xgl_version.c
 
     # Wire format and serialization
-    src/wire/xgl_crc.c
-    src/wire/xgl_serialize.c
     src/wire/xgl_wire_ack_ext.c
     src/wire/xgl_wire_ext.c
     src/wire/xgl_wire.c
@@ -111,23 +132,8 @@ set(XGL_SOURCES
     # Security
     src/security/xgl_security.c
 
-    # Core utilities
-    src/core/xgl_error.c
-    src/core/xgl_list.c
-    src/core/xgl_list_ts.c
-    src/core/xgl_hashtable.c
-
-    # Memory management
-    src/memory/xgl_mempool.c
-    src/memory/xgl_mempool_ts.c
-    src/memory/xgl_tiered_pool.c
-    src/memory/xgl_tiered_pool_stats.c
-    src/memory/xgl_packet_pool.c
-    src/memory/xgl_allocator.c
-    src/memory/xgl_tracking_allocator.c
-
-    # Optional Modules
-    src/codec/xgl_codec.c
+    # Protocol error domain
+    src/api/xgl_error.c
 
     # Data Link Layer
     src/datalink/xgl_datalink_metadata.c
@@ -137,10 +143,6 @@ set(XGL_SOURCES
 
     # Network Layer
     src/network/xgl_route.c
-    src/network/xgl_route_load.c
-    src/network/xgl_route_lookup.c
-    src/network/xgl_route_mutation.c
-    src/network/xgl_network_metadata.c
     src/network/xgl_network_send.c
     src/network/xgl_network_receive.c
     src/network/xgl_network.c
@@ -151,7 +153,6 @@ set(XGL_SOURCES
     src/transport/xgl_reliable_packet.c
     src/transport/xgl_reliable.c
     src/transport/xgl_reliable_timeout.c
-    src/transport/xgl_reliable_ack.c
     src/transport/xgl_reliable_extensions.c
     src/transport/xgl_fragment_range.c
     src/transport/xgl_fragment_reassembly.c
@@ -182,25 +183,39 @@ set(XGL_SOURCES
     src/transport/xgl_transport_runtime.c
     src/transport/xgl_transport.c
 
-    # Platform Abstraction
-    src/platform/xgl_mutex.c
-    src/platform/xgl_mutex_guard.c
-    src/platform/xgl_mutex_noop.c
-    src/platform/xgl_mutex_windows.c
-    src/platform/xgl_time.c
-    src/platform/xgl_timer.c
-    src/platform/xgl_time_provider.c
-    src/platform/xgl_platform.c
 )
 
 #-----------------------------------------------------------------------------
 # Library Target
 #-----------------------------------------------------------------------------
 
+if(NOT XGL_FEATURE_AUTH)
+    list(REMOVE_ITEM XGL_SOURCES src/security/xgl_security.c src/wire/xgl_frame_auth.c)
+endif()
+if(NOT XGL_FEATURE_FRAGMENTATION)
+    list(FILTER XGL_SOURCES EXCLUDE REGEX "src/transport/xgl_fragment.*\\.c$")
+    list(REMOVE_ITEM XGL_SOURCES src/transport/xgl_transport_send_fragment.c)
+endif()
+if(NOT XGL_FEATURE_OUT_OF_ORDER)
+    list(REMOVE_ITEM XGL_SOURCES
+        src/transport/xgl_transport_rx_buffer.c
+        src/transport/xgl_transport_rx_order.c
+        src/transport/xgl_transport_sack_send.c)
+endif()
+
+
 add_library(xgl STATIC ${XGL_SOURCES})
+add_library(xgl::xgl ALIAS xgl)
+target_compile_features(xgl PUBLIC c_std_11)
+target_link_libraries(xgl PUBLIC xgm::allocator
+    PRIVATE ${XGL_PRIVATE_DEPENDENCIES})
 
 target_compile_options(xgl PRIVATE ${XGL_C_WARNINGS})
 if(XGL_ALLOW_FALLBACK_MALLOC)
+    if(NOT TARGET xgm::libc_allocator)
+        message(FATAL_ERROR "Heap compatibility requires xgm::libc_allocator; otherwise disable XGL_ALLOW_FALLBACK_MALLOC")
+    endif()
+    target_link_libraries(xgl PRIVATE xgm::libc_allocator)
     target_compile_definitions(xgl PUBLIC XGL_ALLOW_FALLBACK_MALLOC=1)
 else()
     target_compile_definitions(xgl PUBLIC XGL_ALLOW_FALLBACK_MALLOC=0)
@@ -209,6 +224,7 @@ endif()
 target_include_directories(xgl
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
         $<INSTALL_INTERFACE:include>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -216,18 +232,28 @@ target_include_directories(xgl
 
 if(XGL_BUILD_NOHEAP_SMOKE)
     add_library(xgl_noheap STATIC ${XGL_SOURCES})
+    target_compile_features(xgl_noheap PUBLIC c_std_11)
+    target_link_libraries(xgl_noheap PUBLIC xgm::allocator
+        PRIVATE ${XGL_PRIVATE_DEPENDENCIES})
     target_compile_options(xgl_noheap PRIVATE ${XGL_C_WARNINGS})
     target_compile_definitions(xgl_noheap PUBLIC XGL_ALLOW_FALLBACK_MALLOC=0)
     target_include_directories(xgl_noheap
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
             $<INSTALL_INTERFACE:include>
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
-    add_executable(xgl_noheap_smoke tools/noheap_smoke.c)
-    target_link_libraries(xgl_noheap_smoke PRIVATE xgl_noheap)
+    if(NOT XGL_PROFILE STREQUAL "boot")
+        add_executable(xgl_noheap_smoke tools/noheap_smoke.c)
+        target_link_libraries(xgl_noheap_smoke PRIVATE xgl_noheap)
+    endif()
+    add_executable(xgl_static_workspace_smoke tools/static_workspace_smoke.c)
+    target_link_libraries(xgl_static_workspace_smoke PRIVATE xgl_noheap)
+    enable_testing()
+    add_test(NAME xgl_static_workspace_smoke COMMAND xgl_static_workspace_smoke)
 endif()
 
 if(XGL_BUILD_FOOTPRINT_REPORT)
@@ -254,16 +280,17 @@ if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
                 --std=c11
                 --inline-suppr
                 --error-exitcode=1
-                --suppress=toomanyconfigs
-                -I ${CMAKE_CURRENT_SOURCE_DIR}/include
-                ${XGL_SOURCES}
+                "--project=${CMAKE_BINARY_DIR}/compile_commands.json"
+                "--file-filter=${CMAKE_CURRENT_SOURCE_DIR}/src/*"
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            COMMENT "Running embedded C static analysis baseline"
+            COMMENT "Analyzing protocol sources with their actual compile configuration"
+            COMMAND_EXPAND_LISTS
             VERBATIM
         )
     else()
         add_custom_target(xgl_static_analysis
             COMMAND ${CMAKE_COMMAND} -E echo "cppcheck not found; install cppcheck to run the embedded C static analysis baseline"
+            COMMAND ${CMAKE_COMMAND} -E false
             COMMENT "Static analysis baseline is unavailable"
             VERBATIM
         )
@@ -271,13 +298,31 @@ if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
 endif()
 
 if(XGL_BUILD_SDK_CONSUMER_SMOKE)
+    if(NOT DEFINED XGL_SDK_INSTALL_BINARY_DIR)
+        set(XGL_SDK_INSTALL_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+    endif()
+    # An SDK built against installed dependencies does not install them again.
+    # Preserve their explicit discovery locations for the isolated consumer.
+    set(XGL_SDK_DEPENDENCY_HINTS "${CMAKE_CURRENT_BINARY_DIR}/sdk-dependency-hints.cmake")
+    file(WRITE "${XGL_SDK_DEPENDENCY_HINTS}"
+        "set(XGL_UPSTREAM_PREFIX_PATH [==[${CMAKE_PREFIX_PATH}]==])\n")
+    foreach(dependency STATUS BYTES CRC MEMORY CONTAINERS)
+        string(TOLOWER "${dependency}" package_suffix)
+        set(package_dir "xgen_${package_suffix}_DIR")
+        if(DEFINED ${package_dir} AND IS_DIRECTORY "${${package_dir}}")
+            file(APPEND "${XGL_SDK_DEPENDENCY_HINTS}"
+                "set(${package_dir} [==[${${package_dir}}]==] CACHE PATH \"Explicit dependency package\")\n")
+        endif()
+    endforeach()
     add_custom_target(xgl_sdk_consumer_smoke
         COMMAND ${CMAKE_COMMAND}
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            -D XGL_INSTALL_BINARY_DIR=${XGL_SDK_INSTALL_BINARY_DIR}
             -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
+            -D XGL_DEPENDENCY_HINTS=${XGL_SDK_DEPENDENCY_HINTS}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
-        DEPENDS xgl
+        DEPENDS xgl ${XGL_SDK_DEPENDENCY_TARGETS}
         COMMENT "Validating installed xgl CMake package with a consumer project"
         VERBATIM
     )
@@ -290,20 +335,25 @@ endif()
 if(XGL_BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)
-    if(XGL_BUILD_SDK_CONSUMER_SMOKE)
-        add_test(NAME xgl_sdk_consumer_smoke
-            COMMAND ${CMAKE_COMMAND}
-                -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
-                -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest
-                -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
-        )
-        set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES TIMEOUT 60)
-    endif()
-    if(XGL_BUILD_NOHEAP_SMOKE)
-        add_test(NAME xgl_noheap_smoke COMMAND xgl_noheap_smoke)
-        set_tests_properties(xgl_noheap_smoke PROPERTIES TIMEOUT 30)
-    endif()
+endif()
+
+if(XGL_BUILD_SDK_CONSUMER_SMOKE)
+    enable_testing()
+    add_test(NAME xgl_sdk_consumer_smoke
+        COMMAND ${CMAKE_COMMAND}
+            -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            -D XGL_INSTALL_BINARY_DIR=${XGL_SDK_INSTALL_BINARY_DIR}
+            -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest
+            -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
+            -D XGL_DEPENDENCY_HINTS=${XGL_SDK_DEPENDENCY_HINTS}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
+    )
+    set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES TIMEOUT 60)
+endif()
+
+if(TARGET xgl_noheap_smoke)
+    add_test(NAME xgl_noheap_smoke COMMAND xgl_noheap_smoke)
+    set_tests_properties(xgl_noheap_smoke PROPERTIES TIMEOUT 30)
 endif()
 
 if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
@@ -320,12 +370,15 @@ if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
     if(XGL_BUILD_SDK_CONSUMER_SMOKE)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_sdk_consumer_smoke)
     endif()
-    if(XGL_BUILD_NOHEAP_SMOKE)
+    if(TARGET xgl_noheap_smoke)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_noheap_smoke)
+    endif()
+    if(TARGET xgl_static_workspace_smoke)
+        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_static_workspace_smoke)
     endif()
 
     add_custom_target(xgl_release_validation
-        COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_CURRENT_BINARY_DIR} --output-on-failure
+        COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_CURRENT_BINARY_DIR} --output-on-failure --no-tests=error
         DEPENDS ${XGL_RELEASE_VALIDATION_DEPS}
         COMMENT "Running xgl release validation checks"
         VERBATIM
@@ -339,7 +392,7 @@ endif()
 if(XGL_BUILD_EXAMPLES)
     add_subdirectory(examples)
     if(TARGET xgl_release_validation)
-        foreach(XGL_EXAMPLE_TARGET echo_server file_transfer multi_node)
+        foreach(XGL_EXAMPLE_TARGET echo_server file_transfer multi_node boot_update)
             if(TARGET ${XGL_EXAMPLE_TARGET})
                 add_dependencies(xgl_release_validation ${XGL_EXAMPLE_TARGET})
             endif()
@@ -380,6 +433,8 @@ set(XGL_PUBLIC_HEADERS
 install(FILES ${XGL_PUBLIC_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xgl
 )
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/xgl/xgl_build_config.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xgl)
 
 install(EXPORT xglTargets
     FILE xglTargets.cmake
@@ -402,6 +457,7 @@ write_basic_package_version_file(
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/xglConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/xglConfigVersion.cmake
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/XglDependencyVersions.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/xgl
 )
 

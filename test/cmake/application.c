@@ -26,5 +26,5 @@ int main(void) {
 
     xgm_arena_deinit(&arena);
     return output[0] != 'o' || output[1] != 'k' ||
-           xgl_version_int() != 30000U;
+           xgl_version_int() != XGL_VERSION_INT;
 }

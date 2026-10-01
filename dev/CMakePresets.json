@@ -1,0 +1,92 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {"major": 3, "minor": 24, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "base", "hidden": true, "generator": "Ninja",
+      "binaryDir": "${sourceDir}/../build/dev-${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "XGL_DEV_STATUS_SOURCE_DIR": "$env{XGL_DEV_STATUS_SOURCE_DIR}",
+        "XGL_DEV_BYTES_SOURCE_DIR": "$env{XGL_DEV_BYTES_SOURCE_DIR}",
+        "XGL_DEV_CRC_SOURCE_DIR": "$env{XGL_DEV_CRC_SOURCE_DIR}",
+        "XGL_DEV_MEMORY_SOURCE_DIR": "$env{XGL_DEV_MEMORY_SOURCE_DIR}",
+        "XGL_DEV_CONTAINERS_SOURCE_DIR": "$env{XGL_DEV_CONTAINERS_SOURCE_DIR}"
+      }
+    },
+    {
+      "name": "gcc-base", "hidden": true, "inherits": "base",
+      "cacheVariables": {"CMAKE_C_COMPILER": "gcc", "CMAKE_CXX_COMPILER": "g++"}
+    },
+    {
+      "name": "debug", "inherits": "base",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug", "XGL_BUILD_TESTS": "ON"}
+    },
+    {
+      "name": "release", "inherits": "base",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "Release", "XGL_BUILD_TESTS": "OFF"}
+    },
+    {
+      "name": "test", "inherits": "debug",
+      "cacheVariables": {"XGL_ENABLE_COVERAGE": "ON"}
+    },
+    {"name": "gcc-debug", "inherits": ["gcc-base", "debug"]},
+    {"name": "gcc-test", "inherits": "gcc-debug"},
+    {
+      "name": "ci", "inherits": "gcc-test",
+      "cacheVariables": {"XGL_BUILD_DOCS": "ON", "XGL_ENABLE_COVERAGE": "ON"}
+    },
+    {
+      "name": "asan", "inherits": "gcc-test",
+      "cacheVariables": {
+        "XGL_BUILD_SDK_CONSUMER_SMOKE": "OFF",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
+      "name": "boot", "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel", "XGL_PROFILE": "boot",
+        "XGL_BUILD_TESTS": "OFF", "XGL_BUILD_EXAMPLES": "OFF", "XGL_ALLOW_FALLBACK_MALLOC": "OFF"
+      }
+    },
+    {
+      "name": "embedded", "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel", "XGL_PROFILE": "embedded",
+        "XGL_BUILD_TESTS": "OFF", "XGL_BUILD_EXAMPLES": "OFF", "XGL_ALLOW_FALLBACK_MALLOC": "OFF"
+      }
+    },
+    {
+      "name": "docs", "inherits": "gcc-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug", "XGL_BUILD_TESTS": "OFF",
+        "XGL_BUILD_EXAMPLES": "OFF", "XGL_BUILD_DOCS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {"name": "debug", "configurePreset": "debug"},
+    {"name": "release", "configurePreset": "release"},
+    {"name": "test", "configurePreset": "test"},
+    {"name": "gcc-debug", "configurePreset": "gcc-debug"},
+    {"name": "gcc-test", "configurePreset": "gcc-test"},
+    {"name": "ci", "configurePreset": "ci"},
+    {"name": "asan", "configurePreset": "asan"},
+    {"name": "boot", "configurePreset": "boot"},
+    {"name": "embedded", "configurePreset": "embedded"},
+    {"name": "docs", "configurePreset": "docs", "targets": ["xgl_docs"]}
+  ],
+  "testPresets": [
+    {"name": "debug", "configurePreset": "debug", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "test", "configurePreset": "test", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "gcc-debug", "configurePreset": "gcc-debug", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "gcc-test", "configurePreset": "gcc-test", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "ci", "configurePreset": "ci", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "asan", "configurePreset": "asan", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "boot", "configurePreset": "boot", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "embedded", "configurePreset": "embedded", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}}
+  ]
+}

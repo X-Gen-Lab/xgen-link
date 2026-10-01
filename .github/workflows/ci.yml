@@ -19,6 +19,43 @@ permissions:
   contents: read
 
 jobs:
+  format-check:
+    name: C and C++ layout
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Read explicit quality source
+        id: quality
+        env:
+          QUALITY_REPOSITORY: ${{ vars.XGEN_QUALITY_REPOSITORY }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          repository = os.environ['QUALITY_REPOSITORY']
+          if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+              raise SystemExit('Set XGEN_QUALITY_REPOSITORY to the published tool repository.')
+          revision = json.loads(Path('tools/quality.json').read_text('utf-8'))['quality_source']['revision']
+          if not re.fullmatch(r'[0-9a-f]{40}', revision):
+              raise SystemExit('Pin the full quality source revision.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'revision={revision}\n')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
+          ref: ${{ steps.quality.outputs.revision }}
+          path: out/deps/quality-source
+          persist-credentials: false
+      - name: Install fixed quality package and check layout
+        run: |
+          python -m pip install ./out/deps/quality-source
+          python tools/quality.py format
+
   release-validation:
     name: Release validation
     runs-on: ubuntu-latest
@@ -50,22 +87,34 @@ jobs:
       - name: Install documentation dependencies
         run: python -m pip install -r docs/requirements.txt
 
+      - name: Prepare fixed component sources
+        uses: ./.github/actions/setup-components
+        with:
+          status-repository: ${{ vars.XGEN_STATUS_REPOSITORY }}
+          bytes-repository: ${{ vars.XGEN_BYTES_REPOSITORY }}
+          crc-repository: ${{ vars.XGEN_CRC_REPOSITORY }}
+          memory-repository: ${{ vars.XGEN_MEMORY_REPOSITORY }}
+          containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
+
       - name: Run documentation QA
         shell: pwsh
         run: ./tools/docs_qa.ps1
 
+      - name: Prepare fixed host test dependency
+        uses: ./.github/actions/setup-gtest
+
       - name: Configure
-        run: cmake --preset ci
+        run: cmake -S dev --preset ci
 
       - name: Run release validation
-        run: cmake --build build/ci --target xgl_release_validation --parallel
+        run: cmake --build build/dev-ci --target xgl_release_validation --parallel
 
       - name: Upload footprint report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: xgl-footprint-report
-          path: build/ci/footprint/xgl-footprint.txt
+          path: build/dev-ci/link/footprint/xgl-footprint.txt
           if-no-files-found: ignore
 
   # ---- GCC smoke test (multi-platform) ----
@@ -92,14 +141,31 @@ jobs:
             gcc \
             ninja-build
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare fixed component sources
+        uses: ./.github/actions/setup-components
+        with:
+          status-repository: ${{ vars.XGEN_STATUS_REPOSITORY }}
+          bytes-repository: ${{ vars.XGEN_BYTES_REPOSITORY }}
+          crc-repository: ${{ vars.XGEN_CRC_REPOSITORY }}
+          memory-repository: ${{ vars.XGEN_MEMORY_REPOSITORY }}
+          containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
+
+      - name: Prepare fixed host test dependency
+        uses: ./.github/actions/setup-gtest
+
       - name: Configure
-        run: cmake --preset gcc-test
+        run: cmake -S dev --preset gcc-test
 
       - name: Build tests and examples
-        run: cmake --build build/gcc-test --parallel
+        run: cmake --build build/dev-gcc-test --parallel
 
       - name: Run CTest
-        run: ctest --preset gcc-test --output-on-failure
+        run: ctest --test-dir build/dev-gcc-test --output-on-failure --no-tests=error
 
   # ---- AddressSanitizer smoke test ----
   asan-smoke:
@@ -120,39 +186,88 @@ jobs:
             gcc \
             ninja-build
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare fixed component sources
+        uses: ./.github/actions/setup-components
+        with:
+          status-repository: ${{ vars.XGEN_STATUS_REPOSITORY }}
+          bytes-repository: ${{ vars.XGEN_BYTES_REPOSITORY }}
+          crc-repository: ${{ vars.XGEN_CRC_REPOSITORY }}
+          memory-repository: ${{ vars.XGEN_MEMORY_REPOSITORY }}
+          containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
+
+      - name: Prepare fixed host test dependency
+        uses: ./.github/actions/setup-gtest
+
       - name: Configure
-        run: cmake --preset asan
+        run: cmake -S dev --preset asan
 
       - name: Build
-        run: cmake --build build/asan --target xgl_tests
+        run: cmake --build build/dev-asan --parallel
 
       - name: Test
-        run: ctest --preset asan
+        run: ctest --test-dir build/dev-asan --output-on-failure --no-tests=error
 
-  # ---- Thread-safe smoke test ----
-  threadsafe-smoke:
-    name: Thread-Safe Smoke
+  bounded-profiles:
+    name: Bounded profile (${{ matrix.profile }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile: [boot, embedded]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Prepare fixed component sources
+        uses: ./.github/actions/setup-components
+        with:
+          status-repository: ${{ vars.XGEN_STATUS_REPOSITORY }}
+          bytes-repository: ${{ vars.XGEN_BYTES_REPOSITORY }}
+          crc-repository: ${{ vars.XGEN_CRC_REPOSITORY }}
+          memory-repository: ${{ vars.XGEN_MEMORY_REPOSITORY }}
+          containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
+      - run: sudo apt-get update && sudo apt-get install -y cmake gcc ninja-build
+      - run: cmake -S dev --preset ${{ matrix.profile }}
+      - run: cmake --build build/dev-${{ matrix.profile }} --parallel
+      - run: ctest --test-dir build/dev-${{ matrix.profile }} --output-on-failure --no-tests=error
+
+  dependency-contracts:
+    name: Production dependency contracts
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install system dependencies
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y cmake gcc ninja-build
+      - name: Prepare fixed component sources
+        uses: ./.github/actions/setup-components
+        with:
+          status-repository: ${{ vars.XGEN_STATUS_REPOSITORY }}
+          bytes-repository: ${{ vars.XGEN_BYTES_REPOSITORY }}
+          crc-repository: ${{ vars.XGEN_CRC_REPOSITORY }}
+          memory-repository: ${{ vars.XGEN_MEMORY_REPOSITORY }}
+          containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
+      - name: Check development preparation
+        run: python -m unittest discover -s dev/tests -v
+      - name: Validate consumer targets, installed packages and failure contracts
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            cmake \
-            g++ \
-            gcc \
-            ninja-build
-
-      - name: Configure
-        run: cmake --preset gcc-test-threadsafe
-
-      - name: Build
-        run: cmake --build build/gcc-test-threadsafe --target xgl_tests
-
-      - name: Test
-        run: ctest --preset gcc-test-threadsafe
+          python test/cmake/dependency_contracts.py \
+            --link-source . \
+            --status-source out/deps/xgen-status --bytes-source out/deps/xgen-bytes \
+            --crc-source out/deps/xgen-crc --memory-source out/deps/xgen-memory \
+            --containers-source out/deps/xgen-containers \
+            --work-dir out/reports/dependency-contracts
+      - name: Preserve contract results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-contracts
+          path: out/reports/dependency-contracts
+          if-no-files-found: error

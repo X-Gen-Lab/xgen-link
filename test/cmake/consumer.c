@@ -6,5 +6,5 @@
 #include <xgl/xgl.h>
 
 int main(void) {
-    return xgl_version_int() != 30000U || xgl_create(NULL) != NULL;
+    return xgl_version_int() != XGL_VERSION_INT || xgl_create(NULL) != NULL;
 }

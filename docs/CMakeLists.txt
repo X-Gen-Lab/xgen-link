@@ -21,13 +21,13 @@ add_custom_target(xgl_docs
         build
         --strict
         --clean
-        --config-file ${CMAKE_SOURCE_DIR}/mkdocs.yml
+        --config-file ${PROJECT_SOURCE_DIR}/mkdocs.yml
         --site-dir ${XGL_DOCS_SITE_DIR}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${XGL_DOCS_SITE_DIR}/api/doxygen
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${XGL_DOXYGEN_OUTPUT_DIR}/html
         ${XGL_DOCS_SITE_DIR}/api/doxygen/html
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Building MkDocs bilingual documentation and Doxygen public API reference"
     VERBATIM
 )

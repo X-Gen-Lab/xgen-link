@@ -50,11 +50,20 @@ jobs:
         shell: pwsh
         run: ./tools/docs_qa.ps1
 
+      - name: Prepare fixed component sources
+        uses: ./.github/actions/setup-components
+        with:
+          status-repository: ${{ vars.XGEN_STATUS_REPOSITORY }}
+          bytes-repository: ${{ vars.XGEN_BYTES_REPOSITORY }}
+          crc-repository: ${{ vars.XGEN_CRC_REPOSITORY }}
+          memory-repository: ${{ vars.XGEN_MEMORY_REPOSITORY }}
+          containers-repository: ${{ vars.XGEN_CONTAINERS_REPOSITORY }}
+
       - name: Configure
-        run: cmake --preset ci
+        run: cmake -S dev --preset docs
 
       - name: Build MkDocs and Doxygen
-        run: cmake --build build/ci --target xgl_docs --parallel
+        run: cmake --build build/dev-docs --target xgl_docs --parallel
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -62,7 +71,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/ci/docs/site
+          path: build/dev-docs/link/docs/site
 
   deploy:
     name: Deploy to GitHub Pages

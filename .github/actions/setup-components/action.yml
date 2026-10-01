@@ -1,0 +1,72 @@
+name: Prepare development components
+description: Check out five explicitly named repositories at the development test commits
+inputs:
+  status-repository:
+    description: Published owner/repository for xgen-status
+    required: true
+  bytes-repository:
+    description: Published owner/repository for xgen-bytes
+    required: true
+  crc-repository:
+    description: Published owner/repository for xgen-crc
+    required: true
+  memory-repository:
+    description: Published owner/repository for xgen-memory
+    required: true
+  containers-repository:
+    description: Published owner/repository for xgen-containers
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Validate explicit repository names and fixed commits
+      id: plan
+      shell: bash
+      env:
+        XGEN_STATUS_REPOSITORY: ${{ inputs.status-repository }}
+        XGEN_BYTES_REPOSITORY: ${{ inputs.bytes-repository }}
+        XGEN_CRC_REPOSITORY: ${{ inputs.crc-repository }}
+        XGEN_MEMORY_REPOSITORY: ${{ inputs.memory-repository }}
+        XGEN_CONTAINERS_REPOSITORY: ${{ inputs.containers-repository }}
+      run: |
+        python dev/prepare_dependencies.py --manifest dev/dependencies.json \
+          --workspace "$GITHUB_WORKSPACE" --github-output "$GITHUB_OUTPUT" --github-env "$GITHUB_ENV"
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: ${{ steps.plan.outputs.status_repository }}
+        ref: ${{ steps.plan.outputs.status_revision }}
+        path: out/deps/xgen-status
+        persist-credentials: false
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: ${{ steps.plan.outputs.bytes_repository }}
+        ref: ${{ steps.plan.outputs.bytes_revision }}
+        path: out/deps/xgen-bytes
+        persist-credentials: false
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: ${{ steps.plan.outputs.crc_repository }}
+        ref: ${{ steps.plan.outputs.crc_revision }}
+        path: out/deps/xgen-crc
+        persist-credentials: false
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: ${{ steps.plan.outputs.memory_repository }}
+        ref: ${{ steps.plan.outputs.memory_revision }}
+        path: out/deps/xgen-memory
+        persist-credentials: false
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: ${{ steps.plan.outputs.containers_repository }}
+        ref: ${{ steps.plan.outputs.containers_revision }}
+        path: out/deps/xgen-containers
+        persist-credentials: false
+    - name: Verify detached source identities before configuration
+      shell: bash
+      env:
+        XGEN_STATUS_REPOSITORY: ${{ inputs.status-repository }}
+        XGEN_BYTES_REPOSITORY: ${{ inputs.bytes-repository }}
+        XGEN_CRC_REPOSITORY: ${{ inputs.crc-repository }}
+        XGEN_MEMORY_REPOSITORY: ${{ inputs.memory-repository }}
+        XGEN_CONTAINERS_REPOSITORY: ${{ inputs.containers-repository }}
+      run: python dev/prepare_dependencies.py --manifest dev/dependencies.json --workspace "$GITHUB_WORKSPACE" --verify

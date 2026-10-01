@@ -84,12 +84,13 @@ def consumer(application=False):
 def origins():
     lines = ['set(origins "")']
     for target in REQUIRED:
+        artifact = "-" if target == "xgs::status" else f"$<TARGET_FILE:{target}>"
         lines += [
             f'get_target_property(origin_source {target} SOURCE_DIR)',
             f'get_target_property(origin_imported {target} IMPORTED)',
-            f'string(APPEND origins "{target}|${{origin_source}}|${{origin_imported}}\\n")',
+            f'string(APPEND origins "{target}|${{origin_source}}|${{origin_imported}}|{artifact}\\n")',
         ]
-    lines.append('file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/origins.txt" "${origins}")')
+    lines.append('file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/origins-$<CONFIG>.txt" CONTENT "${origins}")')
     return "\n".join(lines) + "\n"
 
 
@@ -162,19 +163,25 @@ class DependencyContracts(unittest.TestCase):
         body = parent_sources() + disable_helpers() + load_link() + origins() + consumer(True)
         _, binary = self.build_project("parent-union", body, build=True)
         self.run_consumer(binary)
-        for line in (binary / "origins.txt").read_text("utf-8").splitlines():
-            target, source, imported = line.split("|")
+        for line in (binary / f"origins-{ARGS.config}.txt").read_text("utf-8").splitlines():
+            target, source, imported, artifact = line.split("|")
             expected = getattr(ARGS, REQUIRED[target][1] + "_source")
             self.assertEqual(Path(source).resolve(), expected.resolve(), target)
             self.assertIn(imported, ("FALSE", "0"), target)
+            if artifact != "-":
+                self.assertTrue(Path(artifact).is_file(), target)
+                self.assertTrue(Path(artifact).resolve().is_relative_to(binary / "modules"), target)
 
     def test_installed_packages_are_used_without_loading_source_checkouts(self):
         body = disable_helpers() + load_link() + origins() + consumer()
         _, binary = self.build_project("installed", body, build=True, package_prefix=True)
         self.run_consumer(binary)
-        for line in (binary / "origins.txt").read_text("utf-8").splitlines():
-            target, _, imported = line.split("|")
+        for line in (binary / f"origins-{ARGS.config}.txt").read_text("utf-8").splitlines():
+            target, _, imported, artifact = line.split("|")
             self.assertIn(imported, ("TRUE", "1"), f"{target} came from source instead of the package")
+            if artifact != "-":
+                self.assertTrue(Path(artifact).is_file(), target)
+                self.assertTrue(Path(artifact).resolve().is_relative_to(self.prefix), target)
 
     def test_subdirectory_defaults_do_not_add_developer_targets(self):
         body = parent_sources() + load_link()

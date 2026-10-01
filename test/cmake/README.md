@@ -31,7 +31,7 @@ python test/cmake/dependency_contracts.py \
 | 错误 target 类型 | 不能用 INTERFACE target 冒充生产静态库 |
 | 独立镜像 | Full/Boot 分别配置、构建和运行消费者，生成配置 ID 与 hash 依赖不同 |
 
-正例编译和执行真实库。缺 target 与错误 target 类型负例只为配置诊断构造声明，不声称这些声明是可运行实现。临时 external 哨兵复制当前协议构建输入以隔离场景，不修改工作区或子模块。
+正例编译和执行真实库，并检查 target 的源码目录、是否为导入 target 及静态库实际路径；安装消费的库必须来自本次显式准备的安装前缀。缺 target 与错误 target 类型负例只为配置诊断构造声明，不声称这些声明是可运行实现。临时 external 哨兵复制当前协议构建输入以隔离场景，不修改工作区或子模块。
 
 可用 `--case test_subdirectory_defaults_do_not_add_developer_targets` 单独选择用例；重复 `--case` 可选择多个。测试语言为 Python，消费者为 C11，不需要 GoogleTest 或 C++ 编译器。`--config` 默认 Debug，可明确使用 Release；多配置生成器会读取对应配置的可执行文件。
 
