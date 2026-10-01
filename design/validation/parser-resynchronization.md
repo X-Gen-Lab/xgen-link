@@ -57,7 +57,7 @@ Cppcheck 2.21.0 的 43 个生产源文件零诊断。GoogleTest 为 1.16.0、严
 
 相对恢复前的 `fb53b99`，Flash 分别增加 **184 B / 196 B**，常驻 RAM 不变。原有四份预算均未改动；LTO 只剩 **4 B** 余量，不承诺不同编译器版本保持该结果。ARM32 分别实编 Boot/Full 的 parser24 / link40，见 `layout-final2/results.json`。
 
-固定官方 Linux Arm 工具链的四组合也逐项通过同一预算，与 Windows 四组指标相同；102 个生产输入逐文件 SHA 一致，见 `source-comparison-final2.json`。Linux 矩阵的编译与四项预算命令均为 0，外层脚本最后因测量期间更新了 `tools/boot_footprint/README.md` 而退出 3。before/after 唯一变化是该非编译文档，四份报告的生产源码摘要相同；保留原退出码，并单独核对真实编译输入，不把外层命令记录为成功，也不为文档变化重复编译未变的 ELF。
+固定官方 Linux Arm 工具链的四组合也逐项通过同一预算，与 Windows 四组指标相同。跨平台快照对比见 `source-comparison-final2.json`；最终 `production-input-audit-final2.json` 核对 102 项清单中的 100 项非文档输入前后及跨平台一致，8 份预算全部通过，没有实验 override。Linux 矩阵的编译与四项预算命令均为 0，外层脚本最后因测量期间更新了 `tools/boot_footprint/README.md` 而退出 3。before/after 唯一变化是该非编译文档，四份报告的生产源码摘要相同；保留原退出码，并单独核对真实编译输入，不把外层命令记录为成功，也不为文档变化重复编译未变的 ELF。
 
 最大单函数栈不变或下降不等于整条调用链下降。非 LTO `.su` 与反汇编确认 feed32、inspect80、advance40；普通解码调用前缀 step40 + poll80 + span136 + feed32 + inspect80 + wire96 + ext72 共 **536 B**，恢复路径将 feed32 换成 advance40，共 **544 B**。这些真实 BL 调用仍持有父栈，不能作为尾调用抵消；数字还没包含更深的 CRC、应用外层和 ISR。故不能据此宣称 512 B 栈足够，1,024 B 仍只是探针预留。
 
