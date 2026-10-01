@@ -177,25 +177,29 @@ xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer, size_t buffer_size,
 /**
  * \brief           Calculate frame size
  * \param[in]       payload_len: Payload length in bytes
- * \return          Total frame size (fixed header + payload + CRC16)
+ * \return          Total frame size, or zero if payload_len is not representable
  */
 static inline size_t xgl_frame_calculate_size(size_t payload_len) {
-    return XGL_FRAME_HEADER_SIZE + payload_len + XGL_CRC16_SIZE;
+    xgl_frame_layout_t layout;
+    return xgl_frame_measure_lengths(payload_len, 0U, 0U, &layout) == XGL_OK
+               ? layout.frame_len
+               : 0U;
 }
 
-static inline size_t xgl_frame_auth_overhead(size_t auth_tag_len) {
-    return (auth_tag_len > 0U) ? (XGL_SECURITY_EXT_SIZE + auth_tag_len) : 0U;
-}
-
+/** \brief           Return the checked encoded size, or zero on invalid lengths. */
 static inline size_t xgl_frame_serialized_size(size_t payload_len,
                                                size_t extensions_len,
                                                size_t auth_tag_len) {
-    return XGL_WIRE_BASE_HEADER_SIZE + extensions_len +
-           xgl_frame_auth_overhead(auth_tag_len) + payload_len + XGL_CRC16_SIZE;
+    xgl_frame_layout_t layout;
+    return xgl_frame_measure_lengths(payload_len, extensions_len, auth_tag_len,
+                                     &layout) == XGL_OK
+               ? layout.frame_len
+               : 0U;
 }
 
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+/** \brief           Compute a wire-representable payload budget, cleared on failure. */
 static inline bool xgl_frame_payload_budget(size_t max_frame_size,
                                             size_t extensions_len,
                                             size_t auth_tag_len,
@@ -205,14 +209,16 @@ static inline bool xgl_frame_payload_budget(size_t max_frame_size,
         return false;
     }
 
-    size_t overhead = XGL_WIRE_BASE_HEADER_SIZE + extensions_len +
-                      xgl_frame_auth_overhead(auth_tag_len) + XGL_CRC16_SIZE;
-    if (max_frame_size < overhead) {
-        *payload_budget = 0U;
+    *payload_budget = 0U;
+    xgl_frame_layout_t layout;
+    if (xgl_frame_measure_lengths(0U, extensions_len, auth_tag_len, &layout) !=
+            XGL_OK ||
+        max_frame_size < layout.frame_len) {
         return false;
     }
 
-    *payload_budget = max_frame_size - overhead;
+    size_t available = max_frame_size - layout.frame_len;
+    *payload_budget = available < UINT16_MAX ? available : UINT16_MAX;
     return true;
 }
 
