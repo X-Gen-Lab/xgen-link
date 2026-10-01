@@ -773,3 +773,45 @@ TEST(XglFrameTest, FrameSizeCalculation) {
     EXPECT_EQ(xgl_frame_calculate_size(10), 36);
     EXPECT_EQ(xgl_frame_calculate_size(100), 126);
 }
+
+TEST(XglFrameTest, SizeHelpersRejectUnrepresentableLengths) {
+    EXPECT_EQ(xgl_frame_calculate_size(SIZE_MAX), 0U);
+    EXPECT_EQ(xgl_frame_calculate_size(static_cast<size_t>(UINT16_MAX) + 1U),
+              0U);
+    EXPECT_EQ(xgl_frame_serialized_size(1U, SIZE_MAX, 0U), 0U);
+    EXPECT_EQ(xgl_frame_serialized_size(1U, 232U, 0U), 0U);
+    EXPECT_EQ(xgl_frame_serialized_size(1U, 217U, 1U), 0U);
+    EXPECT_EQ(xgl_frame_serialized_size(1U, 0U, SIZE_MAX), 0U);
+    EXPECT_EQ(xgl_frame_serialized_size(1U, 0U, XGL_AUTH_TAG_MAX_LEN + 1U),
+              0U);
+}
+
+TEST(XglFrameTest, PayloadBudgetRejectsInvalidOverheadAndClearsOutput) {
+    const size_t invalid_extensions[] = {232U, SIZE_MAX};
+    for (size_t extension_length : invalid_extensions) {
+        size_t budget = 42U;
+        EXPECT_FALSE(xgl_frame_payload_budget(128U, extension_length, 0U,
+                                              &budget));
+        EXPECT_EQ(budget, 0U);
+    }
+    size_t budget = 42U;
+    EXPECT_FALSE(xgl_frame_payload_budget(128U, 0U, SIZE_MAX, &budget));
+    EXPECT_EQ(budget, 0U);
+    EXPECT_FALSE(xgl_frame_payload_budget(128U, 217U, 1U, &budget));
+    EXPECT_EQ(budget, 0U);
+    EXPECT_FALSE(xgl_frame_payload_budget(128U, 0U, 0U, nullptr));
+}
+
+TEST(XglFrameTest, PayloadBudgetUsesWireLimitsAndExactBoundaries) {
+    size_t budget = 42U;
+    EXPECT_FALSE(xgl_frame_payload_budget(25U, 0U, 0U, &budget));
+    EXPECT_EQ(budget, 0U);
+    EXPECT_TRUE(xgl_frame_payload_budget(26U, 0U, 0U, &budget));
+    EXPECT_EQ(budget, 0U);
+    EXPECT_TRUE(xgl_frame_payload_budget(128U, 3U, 4U, &budget));
+    EXPECT_EQ(budget, 80U);
+    EXPECT_EQ(xgl_frame_serialized_size(budget, 3U, 4U), 128U);
+    EXPECT_TRUE(xgl_frame_payload_budget(SIZE_MAX, 0U, 0U, &budget));
+    EXPECT_EQ(budget, UINT16_MAX);
+    EXPECT_EQ(xgl_frame_serialized_size(UINT16_MAX, 231U, 0U), 65792U);
+}
