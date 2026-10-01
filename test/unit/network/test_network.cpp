@@ -285,6 +285,75 @@ TEST_F(XglNetworkTest, DefaultConnectionDoesNotUseLocalShortSession) {
     EXPECT_EQ(connection_id, 0U);
 }
 
+TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
+    ASSERT_EQ(xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U,
+                                   100U, 1U),
+              XGL_OK);
+    xgl_error_t phy_result = XGL_ERR_TX_FAILED;
+    phy_ops.user_data = &phy_result;
+    phy_ops.tx = [](const uint8_t*, size_t, void* user) {
+        return *static_cast<xgl_error_t*>(user);
+    };
+    const uint8_t payload = 0x39U;
+    xgl_packet_data_t data = {};
+    data.data = &payload;
+    data.data_len = 1U;
+    xgl_packet_t packet = {};
+    packet.target_id = REMOTE_ID;
+    packet.data = &data;
+    uint8_t buffer[128] = {};
+    buffer[XGL_WIRE_BASE_HEADER_SIZE] = payload;
+    xgl_tx_data_zerocopy_t inplace = {};
+    inplace.buffer = buffer;
+    inplace.buffer_size = sizeof(buffer);
+    inplace.data_offset = XGL_WIRE_BASE_HEADER_SIZE;
+    inplace.data_len = 1U;
+    inplace.target_id = REMOTE_ID;
+    for (bool use_inplace : {false, true}) {
+        SCOPED_TRACE(use_inplace);
+        stats = {};
+        phy_result = XGL_ERR_TX_FAILED;
+        auto submit = [&]() {
+            return use_inplace
+                       ? xgl_network_send_zerocopy(&network_ctx, nullptr,
+                                                   &inplace)
+                       : xgl_network_send(&network_ctx, &packet);
+        };
+        EXPECT_EQ(submit(), XGL_ERR_TX_FAILED);
+        EXPECT_EQ(stats.tx_packets, 0U);
+        EXPECT_EQ(stats.tx_bytes, 0U);
+        EXPECT_EQ(stats.tx_errors, 1U);
+        phy_result = XGL_OK;
+        EXPECT_EQ(submit(), XGL_OK);
+        EXPECT_EQ(stats.tx_packets, 1U);
+        EXPECT_EQ(stats.tx_bytes, 1U);
+    }
+}
+
+TEST_F(XglNetworkTest, ForwardTxCountersCommitOnlyAfterPhySuccess) {
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U,
+                                   100U, 1U),
+              XGL_OK);
+    xgl_error_t phy_result = XGL_ERR_TX_FAILED;
+    phy_ops.user_data = &phy_result;
+    phy_ops.tx = [](const uint8_t*, size_t, void* user) {
+        return *static_cast<xgl_error_t*>(user);
+    };
+    const auto bytes = make_frame(REMOTE_ID, FORWARD_ID, 4U, "abc");
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, bytes.data(),
+                                   bytes.size()),
+              XGL_ERR_TX_FAILED);
+    EXPECT_EQ(stats.tx_packets, 0U);
+    EXPECT_EQ(stats.tx_bytes, 0U);
+    EXPECT_EQ(stats.tx_errors, 1U);
+    phy_result = XGL_OK;
+    EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, bytes.data(),
+                                   bytes.size()),
+              XGL_OK);
+    EXPECT_EQ(stats.tx_packets, 1U);
+    EXPECT_EQ(stats.tx_bytes, 3U);
+}
+
 TEST_F(XglNetworkTest, EpochExtensionCountsAgainstRouteMtu) {
     const uint16_t mtu = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE + 1;
     ASSERT_EQ(

@@ -381,6 +381,33 @@ TEST_F(XglSecuritySessionTest, SameKeySameDirectionalPrefixIsRejected) {
               XGL_ERR_INVALID_PARAM);
 }
 
+TEST_F(XglSecuritySessionTest, BroadcastAssociationDoesNotReserveTrustedState) {
+    tx_config.remote_id = UINT16_MAX;
+    EXPECT_EQ(xgl_security_session_install(&sender, &tx_config),
+              XGL_ERR_INVALID_PARAM);
+    for (const auto& session : sender.sessions) {
+        EXPECT_FALSE(session.used);
+    }
+    EXPECT_EQ(spy.sign_calls, 0U);
+}
+
+TEST_F(XglSecuritySessionTest, AuthenticatedBroadcastIsRejectedBeforeSigning) {
+    const uint8_t payload = 0x61U;
+    xgl_frame_params_t params = {};
+    params.source_id = 1U;
+    params.target_id = UINT16_MAX;
+    params.payload = &payload;
+    params.payload_len = 1U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    size_t written = 19U;
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, sizeof(bytes), &frame,
+                                            &sender, &written),
+              XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(written, 0U);
+    EXPECT_EQ(spy.sign_calls, 0U);
+}
+
 TEST_F(XglSecuritySessionTest, ProviderCannotCloseOrReplaceActiveState) {
     Install();
     spy.reenter = &sender;
