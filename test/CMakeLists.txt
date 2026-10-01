@@ -98,6 +98,7 @@ list(APPEND TEST_SOURCES
     unit/transport/test_transport_sack_view.cpp
     unit/datalink/test_parser_recovery.cpp
     unit/datalink/test_parser_resync.cpp
+    unit/network/test_network_contracts.cpp
 )
 
 #-----------------------------------------------------------------------------

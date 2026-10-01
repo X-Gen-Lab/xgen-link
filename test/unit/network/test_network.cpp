@@ -352,6 +352,30 @@ TEST_F(XglNetworkTest, ForwardTxCountersCommitOnlyAfterPhySuccess) {
     EXPECT_EQ(stats.tx_bytes, 3U);
 }
 
+TEST_F(XglNetworkTest, ForwardPreservesSubmissionErrorAndInputBytes) {
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        XGL_OK);
+    xgl_error_t phy_result = XGL_ERR_BUSY;
+    phy_ops.user_data = &phy_result;
+    phy_ops.tx = [](const uint8_t*, size_t, void* user) {
+        return *static_cast<xgl_error_t*>(user);
+    };
+    const auto original = make_frame(REMOTE_ID, FORWARD_ID, 4U, "abc");
+    auto bytes = original;
+    for (const auto error : {XGL_ERR_BUSY, XGL_ERR_NO_MEMORY,
+                             XGL_ERR_INVALID_PARAM, XGL_ERR_TX_FAILED}) {
+        SCOPED_TRACE(error);
+        phy_result = error;
+        EXPECT_EQ(xgl_network_receive(&network_ctx, nullptr, bytes.data(),
+                                      bytes.size()),
+                  error);
+        EXPECT_EQ(bytes, original);
+    }
+    EXPECT_EQ(stats.tx_packets, 0U);
+    EXPECT_EQ(stats.tx_errors, 4U);
+}
+
 TEST_F(XglNetworkTest, EpochExtensionCountsAgainstRouteMtu) {
     const uint16_t mtu = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE + 1;
     ASSERT_EQ(
