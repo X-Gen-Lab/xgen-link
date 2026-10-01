@@ -16,7 +16,22 @@ typedef struct smoke_endpoint_s {
     unsigned deliveries;
     bool busy;
     bool drop;
+    unsigned errors;
+    xgl_error_t last_error;
+    bool error_has_message;
+    bool error_message_empty;
 } smoke_endpoint_t;
+
+/** \brief           Observe error identity independently of optional text. */
+static void smoke_error(xgl_handle_t handle, xgl_error_t error,
+                        const char* message, void* ctx) {
+    (void)handle;
+    smoke_endpoint_t* endpoint = ctx;
+    ++endpoint->errors;
+    endpoint->last_error = error;
+    endpoint->error_has_message = message != NULL;
+    endpoint->error_message_empty = message != NULL && message[0] == '\0';
+}
 
 /**
  * \brief           Synchronously copy a frame into the opposite endpoint.
@@ -90,6 +105,7 @@ int main(void) {
     config_a.route_table = &route_a;
     config_a.route_table_len = 1U;
     config_a.rx_accept_callback = smoke_accept;
+    config_a.error_callback = smoke_error;
     config_a.callback_user_data = &a;
     xgl_config_t config_b = config_a;
     config_b.source_id = 2U;
@@ -129,7 +145,7 @@ int main(void) {
                 XGL_OK) {
             return 4;
         }
-#if !XGL_FEATURE_DIAGNOSTICS
+#if !XGL_FEATURE_STATISTICS
         /* A minimal image must not retain optional statistics storage. */
         xgl_statistics_t statistics;
         memset(&statistics, 0xA5, sizeof(statistics));
@@ -139,6 +155,16 @@ int main(void) {
             return 12;
         }
 #endif
+        xgl_tx_data_t unrouted = tx;
+        unrouted.target_id = 0x7ffeU;
+        unrouted.reliable = false;
+        const unsigned previous_errors = a.errors;
+        if (xgl_send_at(ha, &unrouted, start) != XGL_ERR_ROUTE_NOT_FOUND ||
+            a.errors != previous_errors + 1U ||
+            a.last_error != XGL_ERR_ROUTE_NOT_FOUND || !a.error_has_message ||
+            a.error_message_empty != (XGL_FEATURE_DIAGNOSTICS == 0)) {
+            return 13;
+        }
         b.busy = true;
         if (xgl_send_at(ha, &tx, start) != XGL_OK ||
             xgl_send_at(ha, &tx, start) != XGL_ERR_WINDOW_FULL) {
