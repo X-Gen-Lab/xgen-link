@@ -66,6 +66,16 @@ class FootprintStorage(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.decode(values)
 
+    def test_layout_records_resolved_transport_resource_identity(self):
+        values = self.fixture()
+        values[1] = 6
+        values.extend([67081, 1, 1, 0])
+        layout = self.decode(values)
+        self.assertEqual(layout["resource_config_id"], 67081)
+        self.assertEqual(layout["compiled_window_capacity"], 1)
+        self.assertEqual(layout["reliable_bucket_count"], 1)
+        self.assertEqual(layout["adaptive_rto"], 0)
+
     def test_budget_rejects_missing_or_nonzero_window_pool_blocks(self):
         policy = {"schema_version": 1, "compiler_version": "15.2.1",
                   "configuration": {"profile": "boot", "window_pool_blocks": 0},
