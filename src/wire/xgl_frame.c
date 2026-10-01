@@ -150,8 +150,13 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer, size_t buffer_size,
     }
 
     /* Calculate required buffer size */
-    if (frame->extensions_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
+    if (frame->extensions_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE ||
+        frame->payload_len > UINT16_MAX) {
         return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    if ((frame->payload_len > 0U && frame->payload == NULL) ||
+        (frame->extensions_len > 0U && frame->extensions == NULL)) {
+        return XGL_ERR_NULL_POINTER;
     }
 
     size_t required_size = XGL_FRAME_HEADER_SIZE + frame->extensions_len +

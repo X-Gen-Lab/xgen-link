@@ -266,7 +266,8 @@ xgl_error_t xgl_parser_get_frame(const xgl_parser_t* parser,
     }
 
     /* Check if frame is complete */
-    if (parser->state != XGL_PARSE_CRC || parser->cache_len == 0) {
+    if (parser->state != XGL_PARSE_CRC ||
+        parser->index < XGL_CRC16_SIZE || parser->cache_len == 0U) {
         return XGL_ERR_INVALID_FRAME;
     }
 
