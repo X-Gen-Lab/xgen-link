@@ -466,10 +466,10 @@ install(FILES
 #-----------------------------------------------------------------------------
 
 if(XGL_ENABLE_COVERAGE)
-    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
-        target_compile_options(xgl PRIVATE --coverage)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CROSSCOMPILING)
+        target_compile_options(xgl PRIVATE --coverage -O0 -g)
         target_link_options(xgl PUBLIC --coverage)
-    elseif(WIN32)
-        message(STATUS "Code coverage is not enabled for Windows builds")
+    else()
+        message(FATAL_ERROR "XGL_ENABLE_COVERAGE requires a native GNU compiler and gcov")
     endif()
 endif()
