@@ -91,6 +91,7 @@ endif()
 
 # SACK wire views and bounded transport admission apply to every profile.
 list(APPEND TEST_SOURCES
+    unit/datalink/test_datalink_span.cpp
     unit/wire/test_wire_sack_view.cpp
     unit/wire/test_wire_rx_contracts.cpp
     unit/transport/test_transport_sack_view.cpp
