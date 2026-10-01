@@ -66,13 +66,10 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
         return false;
     }
 
-    /* Source ID should not be zero (reserved) */
-    if (source_id == 0) {
+    /* Zero is reserved for both wire addresses. */
+    if (source_id == 0U || target_id == 0U) {
         return false;
     }
-
-    /* Target ID can be broadcast or specific node */
-    /* Zero is reserved but we allow it for special cases */
 
     if (source_id == target_id && target_id != XGL_BROADCAST_ID) {
         return false;
@@ -125,11 +122,7 @@ static xgl_error_t network_receive_impl(void* ctx, xgl_handle_t handle,
     if (ctx == NULL || message == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    if (message->view != NULL) {
-        return xgl_network_receive_view(ctx, handle, message->view);
-    }
-    return xgl_network_receive(ctx, handle, message->frame_buf,
-                               message->frame_len);
+    return xgl_network_receive_view(ctx, handle, message->view);
 }
 
 /**

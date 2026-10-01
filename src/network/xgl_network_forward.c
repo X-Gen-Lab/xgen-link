@@ -156,7 +156,7 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
             ctx->stats->tx_errors++;
         }
 #endif
-        return XGL_ERR_TX_FAILED;
+        return err;
     }
 #if XGL_FEATURE_STATISTICS
     if (ctx->stats != NULL) {

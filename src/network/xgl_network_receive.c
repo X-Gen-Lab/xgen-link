@@ -77,8 +77,10 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     }
 
     xgl_wire_frame_view_t metadata;
-    xgl_error_t err =
-        xgl_wire_decode_frame(&metadata, frame_buf, frame_len, NULL);
+    xgl_error_t err = XGL_ERR_INVALID_FRAME;
+    if (ctx->max_frame_size == 0U || frame_len <= ctx->max_frame_size) {
+        err = xgl_wire_decode_frame(&metadata, frame_buf, frame_len, NULL);
+    }
     if (err != XGL_OK) {
 #if XGL_FEATURE_STATISTICS
         if (ctx->stats != NULL) {

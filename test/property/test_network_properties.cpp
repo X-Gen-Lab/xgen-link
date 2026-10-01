@@ -314,8 +314,9 @@ TEST(XglNetworkProperties, PacketForwardingToSelf) {
         /* Test 4: Address validation */
         uint16_t source_id =
             static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
-        /* Ensure source_id is valid (not 0 or broadcast) */
-        while (source_id == 0 || source_id == XGL_BROADCAST_ID) {
+        /* A valid sender differs from the local destination. */
+        while (source_id == 0 || source_id == XGL_BROADCAST_ID ||
+               source_id == local_id) {
             source_id =
                 static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         }
