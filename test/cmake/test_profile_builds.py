@@ -27,7 +27,7 @@ class ProfileBuilds(unittest.TestCase):
             json.dumps(cls.commands, indent=2) + "\n", encoding="utf-8")
         print(f"Profile evidence: {cls.root}")
 
-    def execute(self, *command):
+    def execute(self, *command, expected_success=True):
         result = subprocess.run([str(part) for part in command],
                                 capture_output=True, text=True, encoding="utf-8",
                                 errors="replace", timeout=300, check=False)
@@ -35,7 +35,10 @@ class ProfileBuilds(unittest.TestCase):
         log.write_text(result.stdout + result.stderr, encoding="utf-8")
         self.commands.append({"arguments": [str(p) for p in command],
                               "exit_code": result.returncode, "log": str(log)})
-        self.assertEqual(result.returncode, 0, f"{log}\n{result.stdout}{result.stderr}")
+        if expected_success:
+            self.assertEqual(result.returncode, 0, f"{log}\n{result.stdout}{result.stderr}")
+        else:
+            self.assertNotEqual(result.returncode, 0, f"Unexpected acceptance: {log}")
         return result
 
     def configure(self, name, profile, *, tests=False, multi=False):
@@ -69,6 +72,9 @@ class ProfileBuilds(unittest.TestCase):
             with self.subTest(configuration=configuration):
                 self.execute("cmake", "--build", binary, "--config", configuration,
                              "--target", "xgl_release_validation", "--parallel", "2")
+                installed = (binary / "link/sdk-consumer-smoke-ctest" / configuration
+                             / "install/lib/cmake/xgl")
+                self.assertTrue((installed / f"xglTargets-{configuration.lower()}.cmake").is_file())
 
     def test_boot_runs_the_supported_capability_suite(self):
         binary = self.configure("boot", "boot", tests=True)
@@ -91,6 +97,34 @@ class ProfileBuilds(unittest.TestCase):
                            "XGL_FEATURE_FORWARDING 0", "XGL_FEATURE_FRAGMENTATION 1",
                            "XGL_FEATURE_OUT_OF_ORDER 1"):
             self.assertIn("#define " + definition, config)
+
+    def test_installed_lite_package_declares_and_checks_capabilities(self):
+        binary = self.configure("lite-package", "embedded-lite")
+        self.execute("cmake", "--build", binary, "--target", "xgl_sdk_consumer_smoke",
+                     "--parallel", "2")
+        prefix = binary / "link/sdk-consumer-smoke/Debug/install"
+        source = self.root / "capability-consumer"
+        source.mkdir()
+        (source / "CMakeLists.txt").write_text(
+            'cmake_minimum_required(VERSION 3.24)\nproject(capability_consumer C)\n'
+            'find_package(xgl CONFIG REQUIRED COMPONENTS ${REQUESTED_CAPABILITIES})\n'
+            'if(NOT xgl_PROFILE STREQUAL "embedded-lite" OR NOT xgl_BUILD_CONFIG_ID EQUAL 304)\n'
+            '  message(FATAL_ERROR "Installed profile identity does not match")\nendif()\n'
+            'get_target_property(profile xgl::xgl XGL_PROFILE)\n'
+            'if(NOT profile STREQUAL xgl_PROFILE)\n'
+            '  message(FATAL_ERROR "Target and package identities disagree")\nendif()\n',
+            encoding="utf-8")
+        command = ["cmake", "-S", source, "-G", "Ninja",
+                   f"-DCMAKE_PREFIX_PATH={prefix.as_posix()}"]
+        if ARGS.c_compiler:
+            command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")
+        self.execute(*command, "-B", self.root / "capability-valid",
+                     "-DREQUESTED_CAPABILITIES=fragmentation;out_of_order")
+        rejected = self.execute(*command, "-B", self.root / "capability-invalid",
+                                "-DREQUESTED_CAPABILITIES=authentication",
+                                expected_success=False)
+        self.assertIn("Unsupported xgl capability: authentication",
+                      rejected.stdout + rejected.stderr)
 
 
 if __name__ == "__main__":
