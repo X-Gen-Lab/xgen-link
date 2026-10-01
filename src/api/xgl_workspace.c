@@ -12,46 +12,7 @@
 #include <xgen/memory/pool.h>
 #include <xgen/memory/size_class_allocator.h>
 
-#include "xgl_instance_internal.h"
-
-#define XGL_INIT_CLASSES (3U + 2U * XGL_FEATURE_ROUTE_INDEX)
-
-/**
- * \brief           Resource identifiers present in the selected profile
- */
-typedef enum {
-    XGL_RESOURCE_PEER,
-    XGL_RESOURCE_WINDOW,
-    XGL_RESOURCE_TX_PACKET,
-    XGL_RESOURCE_TX_PAYLOAD,
-    XGL_RESOURCE_SCRATCH,
-#if XGL_FEATURE_OUT_OF_ORDER
-    XGL_RESOURCE_RX_PACKET,
-    XGL_RESOURCE_RX_PAYLOAD,
-    XGL_RESOURCE_RX_EXTENSIONS,
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    XGL_RESOURCE_TX_EXTENSIONS,
-    XGL_RESOURCE_TX_MESSAGE,
-    XGL_RESOURCE_REASSEMBLY,
-    XGL_RESOURCE_REASSEMBLY_PAYLOAD,
-#endif
-    XGL_RESOURCE_COUNT
-} xgl_workspace_resource_t;
-
-/**
- * \brief           Instance and independent reusable resource descriptors
- * \note            The instance is first so its handle is the workspace
- * address.
- */
-typedef struct {
-    struct xgl_instance instance;
-    xgl_protocol_memory_t memory;
-    xgm_size_class_allocator_t initialization;
-    xgm_pool_t initial_pools[XGL_INIT_CLASSES];
-    xgm_pool_t runtime_pools[XGL_RESOURCE_COUNT];
-    xgm_allocator_t runtime_services[XGL_RESOURCE_COUNT];
-} xgl_workspace_t;
+#include "xgl_workspace_internal.h"
 
 /**
  * \brief           Validated partition sizes shared by both creation paths
@@ -376,8 +337,10 @@ xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
     workspace->instance.storage_allocator = storage_allocator;
     workspace->instance.memory = &workspace->memory;
     workspace->instance.caller_owned = storage_allocator == NULL;
+#if XGL_FEATURE_STATISTICS
     workspace->instance.stats.memory_used = plan.requirements.size;
     workspace->instance.stats.memory_peak = plan.requirements.size;
+#endif
     *handle = &workspace->instance;
     return XGL_OK;
 }

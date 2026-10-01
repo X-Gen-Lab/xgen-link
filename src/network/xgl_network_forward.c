@@ -5,15 +5,13 @@
  */
 
 #include <string.h>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
 #include <xgen/memory/allocator.h>
 
 #include "xgl_network_internal.h"
 
 #if XGL_FEATURE_FORWARDING
 static void network_count_rx_drop(xgl_network_ctx_t* ctx) {
-    if (ctx->stats != NULL) {
+    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
         ctx->stats->rx_dropped++;
     }
 }
@@ -65,10 +63,10 @@ static xgl_error_t network_validate_forward_size(xgl_network_ctx_t* ctx,
 
 static xgl_error_t network_rewrite_forward_frame(
     xgl_network_ctx_t* ctx, const uint8_t* frame_buf, size_t frame_len,
-    const xgl_wire_header_t* incoming_header, uint8_t* forward_buf) {
+    const xgl_wire_frame_view_t* metadata, uint8_t* forward_buf) {
     memcpy(forward_buf, frame_buf, frame_len);
 
-    xgl_wire_header_t wire_header = *incoming_header;
+    xgl_wire_header_t wire_header = metadata->header;
     wire_header.ttl = (uint8_t)(wire_header.ttl - 1U);
     if (xgl_wire_encode_header(forward_buf, frame_len, &wire_header) !=
         XGL_OK) {
@@ -76,10 +74,14 @@ static xgl_error_t network_rewrite_forward_frame(
         return XGL_ERR_INVALID_FRAME;
     }
 
-    uint16_t forward_crc =
-        xgcrc_crc16_modbus(forward_buf, frame_len - XGL_CRC16_SIZE);
-    xgb_serialize_u16_le(&forward_buf[frame_len - XGL_CRC16_SIZE], forward_crc);
-    return XGL_OK;
+    const xgl_frame_layout_t layout = {
+        .header_len = metadata->header.header_len,
+        .payload_len = metadata->payload_len,
+        .tag_len = metadata->auth_tag_len,
+        .frame_len = frame_len,
+    };
+    size_t written = 0U;
+    return xgl_frame_finalize_crc(forward_buf, frame_len, &layout, &written);
 }
 
 /**
@@ -107,7 +109,7 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         return err;
     }
 
-    if (ctx->stats != NULL) {
+    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += metadata->payload_len;
     }
@@ -120,14 +122,14 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     uint8_t* forward_buf = (uint8_t*)xgm_alloc(ctx->allocator, frame_len);
     if (forward_buf == NULL) {
         network_count_rx_drop(ctx);
-        if (ctx->stats != NULL) {
+        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
         return XGL_ERR_NO_MEMORY;
     }
 
-    err = network_rewrite_forward_frame(ctx, frame_buf, frame_len,
-                                        &metadata->header, forward_buf);
+    err = network_rewrite_forward_frame(ctx, frame_buf, frame_len, metadata,
+                                        forward_buf);
     if (err != XGL_OK) {
         xgm_free(ctx->allocator, forward_buf);
         return err;
@@ -145,7 +147,7 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     }
     xgm_free(ctx->allocator, forward_buf);
     if (err != XGL_OK) {
-        if (ctx->stats != NULL) {
+        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
         return XGL_ERR_TX_FAILED;

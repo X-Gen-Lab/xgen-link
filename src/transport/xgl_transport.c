@@ -1,14 +1,12 @@
 /**
  * \file            xgl_transport.c
- * \brief           Transport Layer Main Interface Implementation
- * \author          X-Gen Lab
+ * \brief           Transport lifecycle and layer entry points
  */
-
-#include <string.h>
 
 #include "xgen/memory/allocator.h"
 #include "xgl/xgl_config.h"
 #include "xgl_transport_internal.h"
+#include <string.h>
 
 /*---------------------------------------------------------------------------*/
 /* Transport Layer Initialization                                            */
@@ -26,7 +24,8 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (config->stats == NULL || !xgm_allocator_is_valid(config->allocator)) {
+    if ((XGL_FEATURE_STATISTICS && config->stats == NULL) ||
+        !xgm_allocator_is_valid(config->allocator)) {
         return XGL_ERR_NULL_POINTER;
     }
     if (config->default_timeout_ms > INT32_MAX || config->window_size == 0U ||
@@ -57,7 +56,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));
-#if XGL_FEATURE_DIAGNOSTICS
+#if XGL_FEATURE_STATISTICS
     ctx->rtt_min_ms = UINT32_MAX;
 #endif
     ctx->local_id = config->local_id;
@@ -183,4 +182,55 @@ void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
 
     /* Clear context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));
+}
+
+/**
+ * \brief           Deliver a borrowed network packet to transport
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       handle: Protocol instance handle
+ * \param[in]       packet: Borrowed received packet
+ * \return          Transport receive result
+ */
+static xgl_error_t transport_receive_impl(void* ctx, xgl_handle_t handle,
+                                          const xgl_packet_t* packet) {
+    return xgl_transport_receive((xgl_transport_ctx_t*)ctx, handle, packet);
+}
+
+/**
+ * \brief           Initialize the typed transport receive boundary
+ * \param[in,out]   ctx: Transport context
+ * \param[out]      iface: Packet interface initialized with receive only
+ * \return          XGL_OK or invalid argument error
+ */
+xgl_error_t xgl_transport_get_interface(xgl_transport_ctx_t* ctx,
+                                        xgl_packet_interface_t* iface) {
+    if (ctx == NULL || iface == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    xgl_packet_interface_init(iface, ctx, NULL, transport_receive_impl);
+    return XGL_OK;
+}
+
+/**
+ * \brief           Record a transport send failure
+ * \param[in,out]   ctx: Transport layer context
+ */
+void transport_count_send_error(xgl_transport_ctx_t* ctx) {
+    if (XGL_FEATURE_STATISTICS && ctx != NULL && ctx->stats != NULL) {
+        ctx->stats->tx_errors++;
+    }
+}
+
+/**
+ * \brief           Report error through error callback
+ */
+void xgl_transport_report_error(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                                xgl_error_t error, const char* message) {
+    if (!ctx) {
+        return;
+    }
+
+    if (ctx->error_callback) {
+        ctx->error_callback(handle, error, message, ctx->callback_user_data);
+    }
 }

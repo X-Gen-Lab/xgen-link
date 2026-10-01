@@ -8,20 +8,6 @@
 
 #include <xgl/internal/xgl_fragment.h>
 
-xgl_reassembly_buffer_t*
-fragment_find_reassembly_buffer(const xgl_fragment_manager_t* manager,
-                                uint16_t source_id, uint32_t connection_id,
-                                uint32_t session_epoch, uint32_t message_id);
-
-xgl_error_t fragment_create_reassembly_buffer(
-    xgl_fragment_manager_t* manager, uint16_t source_id, uint32_t connection_id,
-    uint32_t session_epoch, uint8_t data_type, uint32_t message_id,
-    uint32_t message_len, xgl_reassembly_buffer_t** buffer_out);
-
-void fragment_complete_reassembly(xgl_fragment_manager_t* manager,
-                                  xgl_reassembly_buffer_t* buffer,
-                                  xgl_fragment_message_t* complete);
-
 /**
  * \brief           Free a buffer through its owning manager
  * \param[in,out]   manager: Live owning manager when buffer is non-NULL

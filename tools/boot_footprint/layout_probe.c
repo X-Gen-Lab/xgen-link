@@ -7,10 +7,8 @@
 
 #include "footprint_config.h"
 
-/* The workspace type is deliberately private to the implementation. Including
- * its source here measures that exact type without publishing a second ABI.
- * This object is inspected with objcopy and never linked into the image. */
-#include "../../src/api/xgl_workspace.c"
+#include "../../src/api/xgl_workspace_internal.h"
+#include <xgl/internal/xgl_wire.h>
 
 _Static_assert(XGL_INIT_CLASSES == 3U && XGL_RESOURCE_COUNT == 5U,
                "Update the footprint layout for the new initialization plan");

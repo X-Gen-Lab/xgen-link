@@ -88,9 +88,6 @@ typedef struct {
  * \note            Manages fragment ID assignment and reassembly buffers
  */
 typedef struct {
-    /* Fragment ID tracking */
-    uint32_t next_message_id; /**< Next production message ID to assign */
-
     /* Reassembly buffers */
     xgct_list_t reassembly_list;   /**< List of active reassembly buffers */
     size_t max_reassembly_buffers; /**< Maximum concurrent reassembly buffers */

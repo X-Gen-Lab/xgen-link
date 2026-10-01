@@ -1,14 +1,126 @@
 /**
  * \file            xgl_reliable.c
- * \brief           Reliable Transmission Queue Implementation
- * \author          X-Gen Lab
+ * \brief           Owned reliable records, index and retry backoff
  */
 
-#include <xgl/internal/xgl_reliable.h>
+#include <xgen/memory/allocator.h>
 
 #include <string.h>
+#include <xgl/internal/xgl_reliable.h>
 
-#include "xgl_reliable_internal.h"
+static size_t reliable_index_bucket(uint16_t target_id,
+                                    uint32_t packet_number) {
+    uint32_t mixed = packet_number ^ ((uint32_t)target_id * 2654435761UL);
+    return (size_t)(mixed % XGL_RELIABLE_INDEX_BUCKETS);
+}
+
+static void reliable_index_packet(xgl_reliable_queue_t* queue,
+                                  xgl_reliable_packet_t* packet) {
+    if (queue == NULL || packet == NULL) {
+        return;
+    }
+
+    size_t bucket =
+        reliable_index_bucket(packet->target_id, packet->packet_number);
+    packet->index_next = queue->index_buckets[bucket];
+    queue->index_buckets[bucket] = packet;
+}
+
+static void reliable_unindex_packet(xgl_reliable_queue_t* queue,
+                                    xgl_reliable_packet_t* packet) {
+    if (queue == NULL || packet == NULL) {
+        return;
+    }
+
+    size_t bucket =
+        reliable_index_bucket(packet->target_id, packet->packet_number);
+    xgl_reliable_packet_t* previous = NULL;
+    xgl_reliable_packet_t* current = queue->index_buckets[bucket];
+    while (current != NULL) {
+        if (current == packet) {
+            if (previous == NULL) {
+                queue->index_buckets[bucket] = current->index_next;
+            } else {
+                previous->index_next = current->index_next;
+            }
+            current->index_next = NULL;
+            return;
+        }
+        previous = current;
+        current = current->index_next;
+    }
+}
+
+static void reliable_free_packet(const xgl_reliable_queue_t* queue,
+                                 xgl_reliable_packet_t* packet) {
+    if (packet == NULL) {
+        return;
+    }
+
+    if (packet->data != NULL) {
+        xgm_free(queue->data_allocator, packet->data);
+        packet->data = NULL;
+    }
+
+    if (packet->extensions != NULL) {
+        xgm_free(queue->extensions_allocator, packet->extensions);
+        packet->extensions = NULL;
+    }
+
+    xgm_free(queue->allocator, packet);
+}
+
+xgl_reliable_packet_t*
+xgl_reliable_find_packet_number(const xgl_reliable_queue_t* queue,
+                                uint32_t packet_number, uint16_t target_id) {
+    if (queue == NULL) {
+        return NULL;
+    }
+
+    size_t bucket = reliable_index_bucket(target_id, packet_number);
+    xgl_reliable_packet_t* packet = queue->index_buckets[bucket];
+    while (packet != NULL) {
+        if (packet->packet_number == packet_number &&
+            packet->target_id == target_id) {
+            return packet;
+        }
+        packet = packet->index_next;
+    }
+
+    return NULL;
+}
+
+xgl_error_t xgl_reliable_set_packet_extensions(
+    const xgl_reliable_queue_t* queue, xgl_reliable_packet_t* packet,
+    const uint8_t* extensions, size_t extensions_len) {
+    if (queue == NULL || packet == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    if (extensions == NULL && extensions_len > 0U) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
+    if (packet->extensions != NULL) {
+        xgm_free(queue->extensions_allocator, packet->extensions);
+        packet->extensions = NULL;
+        packet->extensions_len = 0U;
+    }
+
+    if (extensions_len == 0U) {
+        return XGL_OK;
+    }
+
+    packet->extensions =
+        (uint8_t*)xgm_alloc(queue->extensions_allocator, extensions_len);
+    if (packet->extensions == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+
+    memcpy(packet->extensions, extensions, extensions_len);
+    packet->extensions_len = extensions_len;
+    return XGL_OK;
+}
 
 /*---------------------------------------------------------------------------*/
 /* Reliable Queue Functions                                                  */
@@ -173,4 +285,40 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
     }
 
     memset((void*)queue->index_buckets, 0, sizeof(queue->index_buckets));
+}
+
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+/**
+ * \brief           Calculate exponential backoff without signed overflow
+ * \param[in]       initial_timeout_ms: Initial timeout; nonpositive means zero
+ * \param[in]       retry_count: Retry exponent, limited to ten
+ * \return          Timeout saturated to the inclusive range 0 to 30000 ms
+ */
+int32_t xgl_reliable_calc_backoff(int32_t initial_timeout_ms,
+                                  uint8_t retry_count) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    const int32_t maximum_timeout_ms = 30000;
+    if (initial_timeout_ms <= 0) {
+        return 0;
+    }
+    if (initial_timeout_ms >= maximum_timeout_ms) {
+        return maximum_timeout_ms;
+    }
+
+    int32_t backoff = initial_timeout_ms;
+    /* Preserve the bounded exponent used by the reliable queue helpers. */
+    if (retry_count > 10) {
+        retry_count = 10;
+    }
+
+    for (uint8_t i = 0; i < retry_count; i++) {
+        /* Check before multiplication, including large valid initial values. */
+        if (backoff >= maximum_timeout_ms / 2) {
+            return maximum_timeout_ms;
+        }
+        backoff *= 2;
+    }
+
+    return backoff;
 }

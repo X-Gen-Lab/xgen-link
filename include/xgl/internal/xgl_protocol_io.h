@@ -18,6 +18,10 @@ extern "C" {
 
 /**
  * \brief           A frame borrowed until the synchronous send returns
+ * \details         A logical frame uses bounded scratch storage unless buffer
+ *                  supplies caller-owned storage with an exact payload offset.
+ *                  A NULL frame selects serialized bytes for forwarding.
+ *                  All storage remains valid until the submission returns.
  */
 typedef struct {
     const xgl_frame_t* frame;

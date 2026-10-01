@@ -23,7 +23,7 @@ xgl_error_t xgl_datalink_init(xgl_datalink_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (config->stats == NULL) {
+    if (XGL_FEATURE_STATISTICS && config->stats == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     /* Initialize context */

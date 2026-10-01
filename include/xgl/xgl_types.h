@@ -439,14 +439,14 @@ typedef struct {
     /* Performance Metrics                                                   */
     /*-----------------------------------------------------------------------*/
     uint32_t avg_rtt_ms; /**< Average RTT in milliseconds */
-    uint32_t max_rtt_ms; /**< Maximum RTT in milliseconds */
-    uint32_t min_rtt_ms; /**< Minimum RTT in milliseconds */
+    uint32_t max_rtt_ms; /**< Largest accepted first-transmission ACK sample in ms */
+    uint32_t min_rtt_ms; /**< Smallest RTT sample in ms; UINT32_MAX before a sample */
 
     /*-----------------------------------------------------------------------*/
     /* Memory Usage                                                          */
     /*-----------------------------------------------------------------------*/
-    size_t memory_used; /**< Current memory usage in bytes */
-    size_t memory_peak; /**< Peak memory usage in bytes */
+    size_t memory_used; /**< Total workspace bytes reserved for the instance */
+    size_t memory_peak; /**< Peak reservation; equals memory_used for fixed workspace */
 } xgl_statistics_t;
 
 /*---------------------------------------------------------------------------*/

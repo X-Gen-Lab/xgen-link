@@ -147,40 +147,23 @@ set(XGL_SOURCES
     src/network/xgl_network.c
 
     # Transport Layer
-    src/transport/xgl_rtt.c
-    src/transport/xgl_window.c
-    src/transport/xgl_reliable_packet.c
-    src/transport/xgl_reliable.c
-    src/transport/xgl_reliable_timeout.c
-    src/transport/xgl_reliable_extensions.c
+    src/transport/xgl_fragment.c
     src/transport/xgl_fragment_range.c
     src/transport/xgl_fragment_reassembly.c
-    src/transport/xgl_fragment_maintenance.c
-    src/transport/xgl_fragment_process.c
-    src/transport/xgl_fragment.c
-    src/transport/xgl_transport_memory.c
-    src/transport/xgl_transport_packet_number.c
-    src/transport/xgl_transport_peer.c
-    src/transport/xgl_transport_send_plan.c
-    src/transport/xgl_transport_send_packet.c
-    src/transport/xgl_transport_send_fragment.c
-    src/transport/xgl_transport_send.c
-    src/transport/xgl_transport_receive.c
-    src/transport/xgl_transport_receive_ack.c
-    src/transport/xgl_transport_receive_peer.c
-    src/transport/xgl_transport_receive_order.c
-    src/transport/xgl_transport_rx_buffer.c
-    src/transport/xgl_transport_delivery.c
-    src/transport/xgl_transport_control.c
-    src/transport/xgl_transport_retransmit.c
-    src/transport/xgl_transport_rx_order.c
+    src/transport/xgl_reliable.c
+    src/transport/xgl_rtt.c
+    src/transport/xgl_transport.c
     src/transport/xgl_transport_ack.c
     src/transport/xgl_transport_ack_send.c
-    src/transport/xgl_transport_sack.c
-    src/transport/xgl_transport_sack_send.c
-    src/transport/xgl_transport_interface.c
+    src/transport/xgl_transport_control.c
+    src/transport/xgl_transport_peer.c
     src/transport/xgl_transport_runtime.c
-    src/transport/xgl_transport.c
+    src/transport/xgl_transport_rx.c
+    src/transport/xgl_transport_rx_buffer.c
+    src/transport/xgl_transport_rx_delivery.c
+    src/transport/xgl_transport_tx.c
+    src/transport/xgl_transport_tx_message.c
+    src/transport/xgl_window.c
 
 )
 
@@ -193,13 +176,10 @@ if(NOT XGL_FEATURE_AUTH)
 endif()
 if(NOT XGL_FEATURE_FRAGMENTATION)
     list(FILTER XGL_SOURCES EXCLUDE REGEX "src/transport/xgl_fragment.*\\.c$")
-    list(REMOVE_ITEM XGL_SOURCES src/transport/xgl_transport_send_fragment.c)
+    list(REMOVE_ITEM XGL_SOURCES src/transport/xgl_transport_tx_message.c)
 endif()
 if(NOT XGL_FEATURE_OUT_OF_ORDER)
-    list(REMOVE_ITEM XGL_SOURCES
-        src/transport/xgl_transport_rx_buffer.c
-        src/transport/xgl_transport_rx_order.c
-        src/transport/xgl_transport_sack_send.c)
+    list(REMOVE_ITEM XGL_SOURCES src/transport/xgl_transport_rx_buffer.c)
 endif()
 
 

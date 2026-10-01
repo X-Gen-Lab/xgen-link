@@ -100,7 +100,7 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     }
 
     /* Update error statistics */
-    if (ctx->stats != NULL) {
+    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
         ctx->stats->tx_errors++;
     }
 }

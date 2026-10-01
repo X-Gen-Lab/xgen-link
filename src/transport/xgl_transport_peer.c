@@ -1,11 +1,61 @@
 /**
  * \file            xgl_transport_peer.c
- * \brief           Transport peer/session state helpers
+ * \brief           Exact peer identity, lifecycle and bounded reclamation
  */
 
+#include "xgl_transport_internal.h"
 #include <string.h>
 
-#include "xgl_transport_internal.h"
+/**
+ * \brief           Check for owned message data that prevents peer reclamation
+ * \param[in]       ctx: Transport layer context
+ * \param[in]       peer: Peer state
+ * \return          true if message data is still owned by the transport
+ */
+static bool
+transport_peer_has_pending_data(const xgl_transport_ctx_t* ctx,
+                                const xgl_transport_peer_state_t* peer) {
+#if XGL_FEATURE_OUT_OF_ORDER
+    if (peer->rx_buffered != NULL) {
+        return true;
+    }
+#endif
+#if XGL_FEATURE_FRAGMENTATION
+    if (peer->rx_pending_message.data != NULL ||
+        peer->tx_message.data != NULL) {
+        return true;
+    }
+    if (ctx->fragment_mgr != NULL) {
+        xgct_list_node_t* node;
+        XGCT_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
+            const xgl_reassembly_buffer_t* buffer =
+                /* Intrusive node membership is established by the owning list.
+                 */
+                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
+                XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+            if (buffer->source_id == peer->peer_id &&
+                buffer->connection_id == peer->connection_id &&
+                buffer->session_epoch == peer->session_epoch) {
+                return true;
+            }
+        }
+    }
+#endif
+    (void)ctx;
+    (void)peer;
+    return false;
+}
+
+bool transport_peer_can_reclaim(const xgl_transport_ctx_t* ctx,
+                                const xgl_transport_peer_state_t* peer) {
+    return !peer->failed && peer->tx_window.next_packet_number == 0U &&
+           !peer->rx_has_packet_number_state &&
+           xgl_reliable_is_empty(&peer->reliable_queue) &&
+           !transport_peer_has_pending_data(ctx, peer);
+}
+
+static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
+                                      xgl_transport_peer_state_t* peer);
 
 /**
  * \brief           Find an exact node, connection and epoch owner
@@ -135,14 +185,10 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
 
         /* Accepted DATA history survives idle time so the same scope cannot
          * restart its packet numbers or lose duplicate suppression. */
-        bool has_pending = !xgl_reliable_is_empty(&peer->reliable_queue) ||
-                           transport_peer_has_pending_data(ctx, peer) ||
-                           peer->failed ||
-                           peer->tx_window.next_packet_number != 0U ||
-                           peer->rx_has_packet_number_state;
 
         uint32_t idle_ms = current_time_ms - peer->last_active_ms;
-        if (!has_pending && idle_ms >= ctx->peer_idle_timeout_ms) {
+        if (transport_peer_can_reclaim(ctx, peer) &&
+            idle_ms >= ctx->peer_idle_timeout_ms) {
             *prev = next;
             xgl_reliable_destroy(&peer->reliable_queue);
             xgl_window_destroy(&peer->tx_window);
@@ -165,8 +211,8 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
  * \param[in,out]   peer: Exact owner whose identity and failure state are
  * retained
  */
-void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
-                               xgl_transport_peer_state_t* peer) {
+static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
+                                      xgl_transport_peer_state_t* peer) {
     xgl_reliable_clear(&peer->reliable_queue);
 #if XGL_FEATURE_OUT_OF_ORDER
     transport_clear_rx_buffered(ctx, peer);
@@ -247,4 +293,57 @@ xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
         link = &peer->next;
     }
     return XGL_ERR_NOT_FOUND;
+}
+
+/**
+ * \brief           Find the exact peer identified by received metadata
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       packet: Received packet metadata
+ * \return          Matching peer, or NULL
+ */
+xgl_transport_peer_state_t* transport_find_rx_peer(xgl_transport_ctx_t* ctx,
+                                                   const xgl_packet_t* packet) {
+    return transport_find_peer_scope(
+        ctx, packet->source_id, packet->connection_id, packet->session_epoch);
+}
+
+/**
+ * \brief           Admit the exact peer identified by received metadata
+ * \param[in,out]   ctx: Transport context
+ * \param[in]       packet: Received packet metadata
+ * \return          Matching peer, or NULL when capacity is unavailable
+ */
+xgl_transport_peer_state_t*
+transport_get_or_create_rx_peer(xgl_transport_ctx_t* ctx,
+                                const xgl_packet_t* packet) {
+    return transport_get_or_create_peer_scope(
+        ctx, packet->source_id, packet->connection_id, packet->session_epoch);
+}
+
+/**
+ * \brief           Query capacity for an exact peer and session scope
+ * \param[in]       ctx: Transport layer context
+ * \param[in]       peer_id: Remote node ID
+ * \param[in]       connection_id: Connection scope ID
+ * \param[in]       session_epoch: Session epoch
+ * \return          true if a reliable packet can be accepted
+ */
+bool xgl_transport_can_send_to(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
+                               uint32_t connection_id, uint32_t session_epoch) {
+    if (ctx == NULL) {
+        return false;
+    }
+    if (transport_tx_packet_count(ctx) >= ctx->max_tx_packets) {
+        return false;
+    }
+    size_t count = 0U;
+    for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
+         peer = peer->next) {
+        count++;
+        if (peer->peer_id == peer_id && peer->connection_id == connection_id &&
+            peer->session_epoch == session_epoch) {
+            return transport_peer_can_send(peer);
+        }
+    }
+    return count < ctx->max_peers;
 }

@@ -208,7 +208,6 @@ class XglNetworkTest : public ::testing::Test {
     xgl_route_table_t route_table;
     xgl_network_ctx_t network_ctx;
     xgl_layer_stats_t stats;
-    uint8_t datalink_cache[256] = {};
     xgl_layer_stats_t datalink_stats = {};
     xgl_datalink_ctx_t datalink_ctx = {};
     xgl_frame_interface_t datalink_iface = {};
@@ -708,7 +707,6 @@ TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
     ASSERT_EQ(
         xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
         XGL_OK);
-    uint8_t cache[256] = {};
     xgl_layer_stats_t datalink_stats = {};
     xgl_datalink_config_t config = {};
     config.stats = &datalink_stats;

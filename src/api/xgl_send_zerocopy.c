@@ -19,9 +19,11 @@ xgl_error_t xgl_send_zerocopy_at(xgl_handle_t handle,
     handle->layers.transport_ctx.current_time_ms = now_ms;
     xgl_error_t error =
         xgl_network_send_zerocopy(&handle->layers.network_ctx, handle, tx_data);
+#if XGL_FEATURE_STATISTICS
     if (error == XGL_OK) {
         handle->stats.transport.tx_packets++;
         handle->stats.transport.tx_bytes += tx_data->data_len;
     }
+#endif
     return error;
 }

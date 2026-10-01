@@ -345,15 +345,17 @@ xgl_error_t xgl_close_peer(xgl_handle_t handle, uint16_t remote_id,
 /**
  * \brief           Copy counters under caller-serialized instance access
  * \param[in]       handle: Initialized instance
- * \param[out]      stats: Destination for a snapshot of all counters
- * \return          XGL_OK, XGL_ERR_NULL_POINTER, or XGL_ERR_NOT_INITIALIZED
+ * \param[out]      stats: Snapshot destination; unchanged when unsupported
+ * \return          XGL_OK, XGL_ERR_NULL_POINTER, XGL_ERR_NOT_INITIALIZED, or
+ *                  XGL_ERR_UNSUPPORTED when statistics are compiled out
  */
 xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats);
 
 /**
- * \brief           Clear all counters under caller-serialized instance access
+ * \brief           Reset observations while preserving the workspace reservation
  * \param[in]       handle: Initialized instance
- * \return          XGL_OK, XGL_ERR_NULL_POINTER, or XGL_ERR_NOT_INITIALIZED
+ * \return          XGL_OK, XGL_ERR_NULL_POINTER, XGL_ERR_NOT_INITIALIZED, or
+ *                  XGL_ERR_UNSUPPORTED when statistics are compiled out
  */
 xgl_error_t xgl_stats_reset(xgl_handle_t handle);
 

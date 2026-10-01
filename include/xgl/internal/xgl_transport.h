@@ -127,6 +127,7 @@ typedef struct xgl_transport_ctx_s {
     size_t max_message_size; /**< Maximum accepted fragmented message bytes */
     size_t max_tx_message_bytes; /**< Aggregate pending TX message budget */
     size_t tx_message_bytes;     /**< Currently owned TX message bytes */
+    uint32_t next_message_id;    /**< Next outbound fragmented-message ID */
     uint8_t
         max_reassembly_slots; /**< Max concurrent fragment reassembly slots */
 #endif
@@ -153,7 +154,7 @@ typedef struct xgl_transport_ctx_s {
     /* Statistics */
     xgl_layer_stats_t* stats; /**< Layer statistics pointer */
     uint64_t* tx_retries;     /**< Retransmission counter pointer */
-#if XGL_FEATURE_DIAGNOSTICS
+#if XGL_FEATURE_STATISTICS
     uint64_t rtt_total_ms; /**< Sum of admitted first-transmission samples */
     uint32_t
         rtt_sample_count; /**< Number of samples, saturated at UINT32_MAX */

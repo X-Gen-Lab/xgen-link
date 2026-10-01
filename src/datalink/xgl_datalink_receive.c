@@ -14,7 +14,18 @@
  */
 static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
                                          const xgl_wire_frame_view_t* view) {
-    if (ctx->stats != NULL) {
+    if (view->frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
+        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+            ctx->stats->rx_errors++;
+        }
+        if (ctx->error_callback != NULL) {
+            ctx->error_callback(ctx->owner_handle, XGL_ERR_INVALID_FRAME,
+                                "Frame size exceeds maximum allowed",
+                                ctx->callback_user_data);
+        }
+        return XGL_ERR_INVALID_FRAME;
+    }
+    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
         ctx->stats->rx_packets++;
         ctx->stats->rx_bytes += view->frame_len;
     }
@@ -57,7 +68,7 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
 
     if (xgl_parser_check_timeout(parser, current_time_ms, timeout_ms)) {
         xgl_parser_reset(parser);
-        if (ctx->stats != NULL) {
+        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
             ctx->stats->rx_errors++;
         }
         if (ctx->error_callback != NULL) {
@@ -96,7 +107,7 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
             xgl_parser_reset(parser);
 
         } else if (result == XGL_PARSE_RESULT_ERROR) {
-            if (ctx->stats != NULL) {
+            if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
                 ctx->stats->rx_errors++;
             }
         }
@@ -123,14 +134,15 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
     xgl_error_t err =
         xgl_datalink_decode_rx_metadata(frame_buffer, frame_len, &metadata);
     if (err != XGL_OK) {
-        if (ctx->stats != NULL) {
+        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
             ctx->stats->rx_errors++;
         }
-        if (metadata.header_crc_failed && ctx->rx_header_crc_errors != NULL) {
+        if (metadata.header_crc_failed &&
+            (XGL_FEATURE_STATISTICS && ctx->rx_header_crc_errors != NULL)) {
             (*ctx->rx_header_crc_errors)++;
         }
         if (metadata.frame_crc_failed) {
-            if (ctx->rx_crc16_errors != NULL) {
+            if (XGL_FEATURE_STATISTICS && ctx->rx_crc16_errors != NULL) {
                 (*ctx->rx_crc16_errors)++;
             }
             if (ctx->error_callback != NULL) {

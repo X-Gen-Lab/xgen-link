@@ -534,6 +534,7 @@ TEST(XglFrameTest, CopiedAndAuthenticatedPathsRejectInvalidSpansConsistently) {
         size_t extension_length;
         xgl_error_t expected;
     };
+
     const InvalidSpan cases[] = {
         {1U, 0U, XGL_ERR_NULL_POINTER},
         {0U, XGL_DATA_TYPE_EXT_SIZE, XGL_ERR_NULL_POINTER},

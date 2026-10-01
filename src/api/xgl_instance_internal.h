@@ -7,10 +7,6 @@
 #ifndef XGL_INSTANCE_INTERNAL_H
 #define XGL_INSTANCE_INTERNAL_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <xgl/internal/xgl_datalink.h>
 #include <xgl/internal/xgl_network.h>
 #include <xgl/internal/xgl_parser.h>
@@ -21,6 +17,10 @@ extern "C" {
 #include <xgl/internal/xgl_transport.h>
 #include <xgl/internal/xgl_window.h>
 #include <xgl/xgl.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Internal Instance Structure                                               */
@@ -90,8 +90,16 @@ struct xgl_instance {
     /*-----------------------------------------------------------------------*/
     /* Statistics                                                            */
     /*-----------------------------------------------------------------------*/
+#if XGL_FEATURE_STATISTICS
     xgl_statistics_t stats; /**< Protocol statistics */
+#endif
 };
+
+#if XGL_FEATURE_STATISTICS
+#define XGL_INSTANCE_STAT(handle, member) (&(handle)->stats.member)
+#else
+#define XGL_INSTANCE_STAT(handle, member) NULL
+#endif
 
 xgl_error_t xgl_instance_init_links(xgl_handle_t handle);
 void xgl_instance_destroy_links(xgl_handle_t handle);

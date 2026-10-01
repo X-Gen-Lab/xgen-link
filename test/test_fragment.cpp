@@ -27,7 +27,7 @@ class XglFragmentTest : public ::testing::Test {
 
 TEST_F(XglFragmentTest, InitializeManager) {
     EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
-    EXPECT_EQ(manager.next_message_id, 0U);
+    EXPECT_EQ(manager.current_reassembly_bytes, 0U);
 }
 
 TEST_F(XglFragmentTest, ReassembleFragmentsFromFragmentExtensionMetadata) {

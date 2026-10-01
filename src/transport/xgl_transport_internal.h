@@ -66,46 +66,6 @@ static inline size_t transport_tx_packet_count(const xgl_transport_ctx_t* ctx) {
     return count;
 }
 
-/**
- * \brief           Check for owned message data that prevents peer reclamation
- * \param[in]       ctx: Transport layer context
- * \param[in]       peer: Peer state
- * \return          true if message data is still owned by the transport
- */
-static inline bool
-transport_peer_has_pending_data(const xgl_transport_ctx_t* ctx,
-                                const xgl_transport_peer_state_t* peer) {
-#if XGL_FEATURE_OUT_OF_ORDER
-    if (peer->rx_buffered != NULL) {
-        return true;
-    }
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    if (peer->rx_pending_message.data != NULL ||
-        peer->tx_message.data != NULL) {
-        return true;
-    }
-    if (ctx->fragment_mgr != NULL) {
-        xgct_list_node_t* node;
-        XGCT_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
-            const xgl_reassembly_buffer_t* buffer =
-                /* Intrusive node membership is established by the owning list.
-                 */
-                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-                XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
-            if (buffer->source_id == peer->peer_id &&
-                buffer->connection_id == peer->connection_id &&
-                buffer->session_epoch == peer->session_epoch) {
-                return true;
-            }
-        }
-    }
-#endif
-    (void)ctx;
-    (void)peer;
-    return false;
-}
-
 #if XGL_FEATURE_OUT_OF_ORDER
 void transport_free_rx_buffered_packet(
     const xgl_transport_ctx_t* ctx,
@@ -125,21 +85,12 @@ xgl_transport_peer_state_t* transport_find_rx_peer(xgl_transport_ctx_t* ctx,
 xgl_transport_peer_state_t*
 transport_get_or_create_rx_peer(xgl_transport_ctx_t* ctx,
                                 const xgl_packet_t* packet);
-xgl_error_t transport_prepare_rx_peer(xgl_transport_ctx_t* ctx,
-                                      const xgl_packet_t* packet,
-                                      xgl_transport_peer_state_t** peer);
-xgl_error_t transport_process_reliable_rx_order(
-    xgl_transport_ctx_t* ctx, xgl_handle_t handle, const xgl_packet_t* packet,
-    xgl_transport_peer_state_t** peer);
+bool transport_peer_can_reclaim(const xgl_transport_ctx_t* ctx,
+                                const xgl_transport_peer_state_t* peer);
 void transport_destroy_peers(xgl_transport_ctx_t* ctx);
 uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
                                       uint32_t current_time_ms);
-void transport_commit_packet_number(xgl_transport_ctx_t* ctx,
-                                    xgl_transport_peer_state_t* peer);
-uint32_t transport_receive_packet_number(const xgl_packet_t* packet);
 void transport_count_send_error(xgl_transport_ctx_t* ctx);
-void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
-                               xgl_transport_peer_state_t* peer);
 void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                          xgl_transport_peer_state_t* peer, xgl_error_t error);
 #if XGL_FEATURE_FRAGMENTATION
@@ -154,9 +105,6 @@ xgl_error_t transport_drain_pending_message(xgl_transport_ctx_t* ctx,
                                             xgl_handle_t handle,
                                             xgl_transport_peer_state_t* peer);
 #endif
-void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
-                                  xgl_transport_peer_state_t* peer,
-                                  uint32_t packet_number, uint32_t now_ms);
 
 xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
                                    xgl_handle_t handle, uint16_t target_id,
@@ -182,9 +130,6 @@ xgl_error_t transport_retransmit_reliable_packet(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     xgl_transport_peer_state_t* peer, xgl_reliable_packet_t* rel_packet,
     uint32_t current_time_ms);
-uint32_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
-                                           xgl_handle_t handle,
-                                           uint32_t current_time_ms);
 
 #if XGL_FEATURE_OUT_OF_ORDER
 xgl_error_t transport_cache_out_of_order_packet(
@@ -206,15 +151,5 @@ xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
                                         xgl_transport_peer_state_t* peer);
 
 #endif
-
-xgl_error_t transport_try_process_ack_range_ext(
-    xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
-    uint16_t source_id, const uint8_t* data, size_t data_len, bool* handled);
-xgl_error_t transport_try_process_sack_ext(xgl_transport_ctx_t* ctx,
-                                           xgl_handle_t handle,
-                                           xgl_transport_peer_state_t* peer,
-                                           uint16_t source_id,
-                                           const uint8_t* data, size_t data_len,
-                                           bool* handled);
 
 #endif /* XGL_TRANSPORT_INTERNAL_H */

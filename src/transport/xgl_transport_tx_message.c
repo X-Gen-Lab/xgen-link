@@ -1,13 +1,11 @@
 /**
- * \file            xgl_transport_send_fragment.c
- * \brief           Bounded fragmented-message admission and window-driven
- *                  sending
+ * \file            xgl_transport_tx_message.c
+ * \brief           Owned messages advanced through the transmit window
  */
-
-#include <string.h>
 
 #include "xgl/internal/xgl_wire.h"
 #include "xgl_transport_send_internal.h"
+#include <string.h>
 
 /**
  * \brief           Encode a message fragment extension
@@ -176,7 +174,7 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
 #endif
 
     if (!tx_data->reliable) {
-        uint32_t message_id = ctx->fragment_mgr->next_message_id++;
+        uint32_t message_id = ctx->next_message_id++;
         for (size_t offset = 0U; offset < tx_data->data_len;) {
             size_t remaining = tx_data->data_len - offset;
             size_t length = remaining < plan->fragment_payload_budget
@@ -213,7 +211,7 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
     peer->tx_message.data = owned_data;
     peer->tx_message_offset = 0U;
     peer->tx_fragment_payload_size = plan->fragment_payload_budget;
-    peer->tx_message_id = ctx->fragment_mgr->next_message_id++;
+    peer->tx_message_id = ctx->next_message_id++;
 
     /* Admission has completed. Later failures use the peer error callback. */
     (void)transport_pump_tx_message(ctx, handle, peer);

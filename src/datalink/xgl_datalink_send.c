@@ -9,7 +9,7 @@
 #include <xgen/memory/allocator.h>
 
 static void datalink_count_tx_error(xgl_datalink_ctx_t* ctx) {
-    if (ctx->stats != NULL) {
+    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
         ctx->stats->tx_errors++;
     }
 }
@@ -87,12 +87,12 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
         return err;
     }
     const bool owned = buffer == NULL;
+    if (!owned && capacity < layout.frame_len) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
     if (!owned && (payload_offset != layout.header_len ||
                    frame->payload != buffer + payload_offset)) {
         return XGL_ERR_INVALID_PARAM;
-    }
-    if (!owned && capacity < layout.frame_len) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
     }
     const size_t frame_size = owned ? layout.frame_len : capacity;
     uint8_t* frame_buffer =
@@ -170,7 +170,7 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
         return err;
     }
 
-    if (ctx->stats != NULL) {
+    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += frame_len;
     }

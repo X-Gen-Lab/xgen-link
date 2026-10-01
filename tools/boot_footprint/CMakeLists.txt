@@ -31,8 +31,8 @@ include("${XGL_SOURCE_ROOT}/dev/Dependencies.cmake")
 xgl_dev_provide_components()
 add_subdirectory("${XGL_SOURCE_ROOT}" xgen-link)
 
-# This diagnostic object exposes target sizeof values. Its production-source
-# inclusion is intentional; it is never linked into the consumer ELF.
+# The diagnostic object measures private target types without compiling or
+# linking another copy of the protocol implementation.
 add_library(xgl_boot_layout OBJECT layout_probe.c)
 target_link_libraries(xgl_boot_layout PRIVATE xgl::xgl
     xgm::pool xgm::size_class xgct::list xgct::bitset

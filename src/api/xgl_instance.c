@@ -53,12 +53,14 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         return XGL_ERR_ALREADY_INITIALIZED;
     }
 
+#if XGL_FEATURE_STATISTICS
     /* Initialize statistics */
     const size_t reserved_bytes = handle->stats.memory_used;
     memset(&handle->stats, 0, sizeof(xgl_statistics_t));
     handle->stats.min_rtt_ms = UINT32_MAX;
     handle->stats.memory_used = reserved_bytes;
     handle->stats.memory_peak = reserved_bytes;
+#endif
 
     /* Initialize route table */
     err = xgl_route_table_init(&handle->route_table,
@@ -94,9 +96,9 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     /* Initialize data link layer */
     xgl_datalink_config_t datalink_config = {
         .source_id = handle->config->source_id,
-        .stats = &handle->stats.datalink,
-        .rx_header_crc_errors = &handle->stats.rx_header_crc_errors,
-        .rx_crc16_errors = &handle->stats.rx_crc16_errors,
+        .stats = XGL_INSTANCE_STAT(handle, datalink),
+        .rx_header_crc_errors = XGL_INSTANCE_STAT(handle, rx_header_crc_errors),
+        .rx_crc16_errors = XGL_INSTANCE_STAT(handle, rx_crc16_errors),
         .upper_layer = NULL, /* Will be set after network layer init */
         .error_callback = handle->config->error_callback,
         .callback_user_data = handle->config->callback_user_data,
@@ -120,7 +122,7 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .lower_layer = NULL, /* Will be set after creating datalink interface */
         .error_callback = handle->config->error_callback,
         .callback_user_data = handle->config->callback_user_data,
-        .stats = &handle->stats.network,
+        .stats = XGL_INSTANCE_STAT(handle, network),
         .auth_required = handle->config->auth_required,
         .auth_provider = handle->config->auth_provider,
         .allocator = handle->memory->scratch};
@@ -150,8 +152,8 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .rx_accept_callback = handle->config->rx_accept_callback,
         .error_callback = handle->config->error_callback,
         .callback_user_data = handle->config->callback_user_data,
-        .stats = &handle->stats.transport,
-        .tx_retries = &handle->stats.tx_retries,
+        .stats = XGL_INSTANCE_STAT(handle, transport),
+        .tx_retries = XGL_INSTANCE_STAT(handle, tx_retries),
         .allocator = handle->allocator,
         .peer_idle_timeout_ms = handle->config->features.peer_idle_timeout_ms,
         .max_reassembly_slots = handle->config->features.max_reassembly_slots,

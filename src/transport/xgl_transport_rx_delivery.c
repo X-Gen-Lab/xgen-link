@@ -1,6 +1,6 @@
 /**
- * \file            xgl_transport_delivery.c
- * \brief           Transport payload delivery helpers
+ * \file            xgl_transport_rx_delivery.c
+ * \brief           Application admission and completed-message ownership
  */
 
 #include "xgl/internal/xgl_wire.h"
@@ -31,7 +31,7 @@ static xgl_error_t transport_accept_payload(xgl_transport_ctx_t* ctx,
         ctx->rx_callback(handle, source_id, data_type, data, len,
                          ctx->callback_user_data);
     }
-    if (ctx->stats != NULL) {
+    if ((XGL_FEATURE_STATISTICS && ctx->stats != NULL)) {
         ctx->stats->rx_packets++;
         ctx->stats->rx_bytes += len;
     }
