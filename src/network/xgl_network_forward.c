@@ -12,9 +12,13 @@
 
 #if XGL_FEATURE_FORWARDING
 static void network_count_rx_drop(xgl_network_ctx_t* ctx) {
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->rx_dropped++;
     }
+#else
+    (void)ctx;
+#endif
 }
 
 static xgl_error_t network_lookup_forward_route(xgl_network_ctx_t* ctx,
@@ -112,10 +116,12 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         return err;
     }
 
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += metadata->payload_len;
     }
+#endif
 
     err = network_validate_forward_size(ctx, route, frame_len);
     if (err != XGL_OK) {
@@ -125,9 +131,11 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     uint8_t* forward_buf = (uint8_t*)xgm_alloc(ctx->allocator, frame_len);
     if (forward_buf == NULL) {
         network_count_rx_drop(ctx);
-        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+        if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
+#endif
         return XGL_ERR_NO_MEMORY;
     }
 
@@ -150,9 +158,11 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     }
     xgm_free(ctx->allocator, forward_buf);
     if (err != XGL_OK) {
-        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+        if (ctx->stats != NULL) {
             ctx->stats->tx_errors++;
         }
+#endif
         return XGL_ERR_TX_FAILED;
     }
     return XGL_OK;

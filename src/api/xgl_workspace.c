@@ -129,7 +129,8 @@ static bool plan_initialization(const xgl_config_t* config,
         !add_initial(plan, bytes, links != 0U ? 1U : 0U)) {
         return false;
     }
-    /* A route-free instance has a valid empty service without reserving bytes. */
+    /* A route-free instance has a valid empty service without reserving bytes.
+     */
     if (plan->initial_count == 0U) {
         plan->initial_count = 1U;
     }

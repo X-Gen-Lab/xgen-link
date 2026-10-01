@@ -10,8 +10,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "xgen/containers/list.h"
 #include "wire/xgl_wire.h"
+#include "xgen/containers/list.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 

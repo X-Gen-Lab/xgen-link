@@ -120,11 +120,11 @@ TEST(XglFootprintTest, SendsReuseReservedStorageWithoutBackendAllocations) {
 
 TEST(XglFootprintTest, SharedPhyReservesOnlyOneReceiveLink) {
     xgl_phy_ops_t phys[] = {{null_tx, null_rx, nullptr},
-                           {null_tx, null_rx, nullptr},
-                           {null_tx, null_rx, nullptr}};
+                            {null_tx, null_rx, nullptr},
+                            {null_tx, null_rx, nullptr}};
     xgl_route_item_t routes[] = {{2U, &phys[0], 128U, 100U, 1U},
-                                {3U, &phys[0], 128U, 50U, 1U},
-                                {4U, &phys[0], 128U, 25U, 1U}};
+                                 {3U, &phys[0], 128U, 50U, 1U},
+                                 {4U, &phys[0], 128U, 25U, 1U}};
     xgl_config_t config;
     xgl_config_get_preset_tiny(&config);
     config.route_table = routes;

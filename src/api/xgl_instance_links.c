@@ -85,8 +85,8 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
         link->phy = route->phy;
         link->poll_interval_ms = interval;
         link->read_freq_hz = route->read_freq_hz;
-        link->rx_cache = xgm_alloc(handle->allocator,
-                                   handle->config->memory.rx_buffer_size);
+        link->rx_cache =
+            xgm_alloc(handle->allocator, handle->config->memory.rx_buffer_size);
         if (link->rx_cache == NULL) {
             xgl_instance_destroy_links(handle);
             return XGL_ERR_NO_MEMORY;

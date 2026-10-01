@@ -8,10 +8,10 @@
 #define XGL_INSTANCE_INTERNAL_H
 
 #include <datalink/xgl_datalink.h>
-#include <network/xgl_network.h>
 #include <datalink/xgl_parser.h>
 #include <internal/xgl_protocol_io.h>
 #include <internal/xgl_protocol_memory.h>
+#include <network/xgl_network.h>
 #include <network/xgl_route.h>
 #include <transport/xgl_rtt.h>
 #include <transport/xgl_transport.h>

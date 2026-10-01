@@ -104,13 +104,16 @@ xgl_parse_result_t xgl_parser_feed_byte(xgl_parser_t* parser, uint8_t byte,
  * \param[in]       byte: Next input byte
  * \param[in]       current_time_ms: Explicit monotonic time
  * \param[out]      view: Optional output, valid only when COMPLETE is returned
+ * \param[out]      status: Optional wire diagnostic, OK on COMPLETE, a CRC
+ *                  classification on CRC failure, otherwise INVALID
  * \return          Parse result; wire validation runs once upon completion
  * \note            The view borrows the cache until reset or the next feed.
  *                  Authentication is performed by the receiving endpoint.
  */
 xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
                                              uint32_t current_time_ms,
-                                             xgl_wire_frame_view_t* view);
+                                             xgl_wire_frame_view_t* view,
+                                             xgl_wire_decode_status_t* status);
 
 /**
  * \brief           Check for parser timeout

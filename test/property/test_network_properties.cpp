@@ -5,8 +5,8 @@
  * \author          X-Gen Lab
  */
 
-#include <network/xgl_network.h>
 #include <internal/xgl_packet.h>
+#include <network/xgl_network.h>
 #include <network/xgl_route.h>
 
 #include <gmock/gmock.h>

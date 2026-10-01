@@ -81,12 +81,10 @@ xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
     if (tx_data->data_len % plan->fragment_payload_budget != 0U) {
         plan->fragment_count++;
     }
-
+    return XGL_OK;
 #else
     return XGL_ERR_BUFFER_TOO_SMALL;
 #endif
-
-    return XGL_OK;
 }
 
 static int32_t transport_send_timeout_ms(const xgl_transport_ctx_t* ctx,
@@ -336,10 +334,12 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return err;
     }
 
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += tx_data->data_len;
     }
+#endif
 
     if (peer != NULL) {
         peer->last_active_ms = transport_now(ctx);

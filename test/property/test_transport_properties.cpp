@@ -7,10 +7,10 @@
  * \author          X-Gen Lab
  */
 
-#include <wire/xgl_frame.h>
 #include <transport/xgl_reliable.h>
 #include <transport/xgl_rtt.h>
 #include <transport/xgl_window.h>
+#include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_types.h>
 

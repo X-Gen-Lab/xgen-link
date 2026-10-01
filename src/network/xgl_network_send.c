@@ -13,9 +13,13 @@
 #include "xgl_network_internal.h"
 
 static void network_count_tx_error(xgl_network_ctx_t* ctx) {
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->tx_errors++;
     }
+#else
+    (void)ctx;
+#endif
 }
 
 static xgl_error_t network_append_data_type_ext(uint8_t* extensions,
@@ -263,10 +267,12 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
     }
     packet->version = XGL_PROTOCOL_VERSION;
 
-    if (inplace == NULL && (XGL_FEATURE_STATISTICS && ctx->stats != NULL)) {
+#if XGL_FEATURE_STATISTICS
+    if (inplace == NULL && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += packet->data->data_len;
     }
+#endif
 
     uint8_t extensions[UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE] = {0};
     xgl_frame_t frame;
@@ -282,11 +288,12 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
     }
 
     err = network_send_frame_to_lower(ctx, handle, packet, &frame, inplace);
-    if (inplace != NULL && err == XGL_OK &&
-        (XGL_FEATURE_STATISTICS && ctx->stats != NULL)) {
+#if XGL_FEATURE_STATISTICS
+    if (inplace != NULL && err == XGL_OK && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += packet->data->data_len;
     }
+#endif
     return err;
 }
 

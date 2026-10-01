@@ -6,8 +6,8 @@
 
 #include <datalink/xgl_datalink.h>
 #include <datalink/xgl_datalink_metadata.h>
-#include <wire/xgl_frame.h>
 #include <network/xgl_route.h>
+#include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_config.h>
 
@@ -356,8 +356,8 @@ TEST_F(XglDatalinkTest, PollClassifiesHeaderAndFrameCrcFailures) {
                 *length = encoded_length;
                 return XGL_OK;
             });
-        ASSERT_EQ(xgl_datalink_poll_parser(&ctx, &parser, &phy_ops, 0U,
-                                           1000U, sizeof(encoded)),
+        ASSERT_EQ(xgl_datalink_poll_parser(&ctx, &parser, &phy_ops, 0U, 1000U,
+                                           sizeof(encoded)),
                   XGL_OK);
         EXPECT_EQ(stats.rx_errors, 1U);
         EXPECT_EQ(stats.rx_packets, 0U);

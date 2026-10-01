@@ -11,9 +11,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "wire/xgl_frame.h"
 #include "datalink/xgl_parser.h"
 #include "internal/xgl_protocol_io.h"
+#include "wire/xgl_frame.h"
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"

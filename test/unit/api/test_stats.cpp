@@ -20,7 +20,8 @@ struct StatisticsPort {
 
 xgl_error_t statistics_tx(const uint8_t* data, size_t size, void* context) {
     auto& port = *static_cast<StatisticsPort*>(context);
-    port.remote->incoming.insert(port.remote->incoming.end(), data, data + size);
+    port.remote->incoming.insert(port.remote->incoming.end(), data,
+                                 data + size);
     return XGL_OK;
 }
 
@@ -35,7 +36,8 @@ xgl_error_t statistics_rx(uint8_t* data, size_t* size, void* context) {
 
 }  // namespace
 
-TEST(XglStatisticsBehavior, ReportsAcceptedAckSamplesAndResetKeepsReservations) {
+TEST(XglStatisticsBehavior,
+     ReportsAcceptedAckSamplesAndResetKeepsReservations) {
     StatisticsPort first, second;
     first.remote = &second;
     second.remote = &first;

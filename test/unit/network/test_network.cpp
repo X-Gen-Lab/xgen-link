@@ -6,9 +6,9 @@
  */
 
 #include <datalink/xgl_datalink.h>
-#include <wire/xgl_frame.h>
 #include <network/xgl_network.h>
 #include <network/xgl_route.h>
+#include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_config.h>
 

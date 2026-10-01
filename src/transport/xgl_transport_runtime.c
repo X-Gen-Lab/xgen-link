@@ -181,10 +181,13 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         transport_process_retransmissions(ctx, handle, current_time_ms);
 
     /* Update retransmission statistics */
-    if (XGL_FEATURE_STATISTICS && retransmit_count > 0 &&
-        ctx->tx_retries != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (retransmit_count > 0 && ctx->tx_retries != NULL) {
         (*ctx->tx_retries) += retransmit_count;
     }
+#else
+    (void)retransmit_count;
+#endif
 
 #if XGL_FEATURE_FRAGMENTATION
     /* A timed-out reliable reassembly contains acknowledged bytes. Failure
@@ -209,9 +212,11 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                 current_time_ms - buffer->first_fragment_time >=
                     buffer->timeout_ms) {
                 transport_fail_peer(ctx, handle, peer, XGL_ERR_TIMEOUT);
-                if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+                if (ctx->stats != NULL) {
                     ctx->stats->rx_dropped++;
                 }
+#endif
                 break;
             }
         }
@@ -231,9 +236,11 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
             }
 
             /* Update statistics */
-            if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+            if (ctx->stats != NULL) {
                 ctx->stats->rx_dropped += timeout_count;
             }
+#endif
         }
     }
 

@@ -10,13 +10,18 @@
 #include <xgen/memory/allocator.h>
 
 static void datalink_count_tx_error(xgl_datalink_ctx_t* ctx) {
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->tx_errors++;
     }
+#else
+    (void)ctx;
+#endif
 }
 
 static void datalink_report_tx_error(xgl_datalink_ctx_t* ctx, xgl_error_t err,
                                      const char* message) {
+    (void)message;
     if (ctx->error_callback != NULL) {
         ctx->error_callback(ctx->owner_handle, err, XGL_ERROR_MESSAGE(message),
                             ctx->callback_user_data);
@@ -44,8 +49,8 @@ static xgl_error_t datalink_auth_tag_len(const xgl_datalink_ctx_t* ctx,
 #else
     (void)ctx;
     (void)frame;
-#endif
     return XGL_OK;
+#endif
 }
 
 /**
@@ -173,10 +178,12 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
         return err;
     }
 
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->tx_packets++;
         ctx->stats->tx_bytes += frame_len;
     }
+#endif
 
     return XGL_OK;
 }

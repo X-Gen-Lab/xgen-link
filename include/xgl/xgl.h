@@ -352,7 +352,8 @@ xgl_error_t xgl_close_peer(xgl_handle_t handle, uint16_t remote_id,
 xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats);
 
 /**
- * \brief           Reset observations while preserving the workspace reservation
+ * \brief           Reset observations while preserving the workspace
+ * reservation
  * \param[in]       handle: Initialized instance
  * \return          XGL_OK, XGL_ERR_NULL_POINTER, XGL_ERR_NOT_INITIALIZED, or
  *                  XGL_ERR_UNSUPPORTED when statistics are compiled out

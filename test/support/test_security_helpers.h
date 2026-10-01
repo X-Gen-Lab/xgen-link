@@ -4,8 +4,8 @@
  */
 #ifndef TEST_SECURITY_HELPERS_H
 #define TEST_SECURITY_HELPERS_H
-#include <wire/xgl_frame.h>
 #include <security/xgl_security.h>
+#include <wire/xgl_frame.h>
 
 /** \brief           Build a deterministic trusted test association. */
 static inline xgl_security_session_config_t

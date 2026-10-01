@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#include <wire/xgl_frame.h>
 #include <datalink/xgl_parser.h>
+#include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
 
@@ -615,7 +615,7 @@ TEST_F(XglParserTest, CompleteViewBorrowsOnlyTheValidatedFrame) {
     xgl_wire_frame_view_t view = {};
     for (size_t i = 0U; i < frame.size(); ++i) {
         const auto result =
-            xgl_parser_feed_byte_view(&parser, frame[i], 0U, &view);
+            xgl_parser_feed_byte_view(&parser, frame[i], 0U, &view, nullptr);
         if (i + 1U < frame.size()) {
             EXPECT_EQ(result, XGL_PARSE_RESULT_INCOMPLETE);
         } else {
@@ -637,7 +637,7 @@ TEST_F(XglParserTest, LongUnknownExtensionRemainsCompatible) {
     xgl_wire_frame_view_t view = {};
     for (size_t i = 0U; i < frame.size(); ++i) {
         const auto result =
-            xgl_parser_feed_byte_view(&parser, frame[i], 0U, &view);
+            xgl_parser_feed_byte_view(&parser, frame[i], 0U, &view, nullptr);
         EXPECT_EQ(result, i + 1U == frame.size() ? XGL_PARSE_RESULT_COMPLETE
                                                  : XGL_PARSE_RESULT_INCOMPLETE);
     }

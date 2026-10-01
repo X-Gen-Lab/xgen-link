@@ -38,10 +38,10 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats) {
     /* Copy statistics structure */
     memcpy(stats, &inst->stats, sizeof(xgl_statistics_t));
     const xgl_transport_ctx_t* transport = &inst->layers.transport_ctx;
-    stats->avg_rtt_ms = transport->rtt_sample_count == 0U
-                            ? 0U
-                            : (uint32_t)(transport->rtt_total_ms /
-                                         transport->rtt_sample_count);
+    stats->avg_rtt_ms =
+        transport->rtt_sample_count == 0U
+            ? 0U
+            : (uint32_t)(transport->rtt_total_ms / transport->rtt_sample_count);
     stats->min_rtt_ms = transport->rtt_min_ms;
     stats->max_rtt_ms = transport->rtt_max_ms;
 

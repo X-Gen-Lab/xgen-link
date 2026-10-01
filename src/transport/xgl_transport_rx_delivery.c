@@ -31,10 +31,12 @@ static xgl_error_t transport_accept_payload(xgl_transport_ctx_t* ctx,
         ctx->rx_callback(handle, source_id, data_type, data, len,
                          ctx->callback_user_data);
     }
-    if ((XGL_FEATURE_STATISTICS && ctx->stats != NULL)) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->rx_packets++;
         ctx->stats->rx_bytes += len;
     }
+#endif
     return XGL_OK;
 }
 

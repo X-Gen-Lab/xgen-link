@@ -96,9 +96,11 @@ static xgl_error_t transport_process_reliable_rx_order(
         (void)transport_send_sack(ctx, handle, *peer, packet->source_id,
                                   expected_packet_number, packet->connection_id,
                                   packet->session_epoch);
-        if (err != XGL_OK && (XGL_FEATURE_STATISTICS && ctx->stats != NULL)) {
+#if XGL_FEATURE_STATISTICS
+        if (err != XGL_OK && ctx->stats != NULL) {
             ctx->stats->rx_dropped++;
         }
+#endif
         return err;
 #else
         return XGL_ERR_SEQUENCE_ERROR;

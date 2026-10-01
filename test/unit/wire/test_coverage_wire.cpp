@@ -3,12 +3,12 @@
  * \brief           Wire codec rejection boundaries and extension contracts
  */
 
+#include <datalink/xgl_parser.h>
 #include <gtest/gtest.h>
+#include <wire/xgl_frame.h>
+#include <wire/xgl_wire.h>
 #include <xgen/bytes/bytes.h>
 #include <xgen/crc/crc.h>
-#include <wire/xgl_frame.h>
-#include <datalink/xgl_parser.h>
-#include <wire/xgl_wire.h>
 
 #include <array>
 #include <cstring>

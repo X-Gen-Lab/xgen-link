@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#include <wire/xgl_frame.h>
 #include <datalink/xgl_parser.h>
+#include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
 
 #include <cstring>

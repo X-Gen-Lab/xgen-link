@@ -627,67 +627,54 @@ TEST(XglCoverageApi, AuthenticatedFrameBuilderRejectsInvalidBorrowedInputs) {
     EXPECT_EQ(
         xgl_security_serialize_frame(nullptr, 300, &frame, &ctx, &written),
         XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, nullptr, &ctx, &written),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, nullptr,
-                                                &written),
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, nullptr, &ctx, &written),
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, nullptr),
+        xgl_security_serialize_frame(bytes, 300, &frame, nullptr, &written),
         XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, nullptr),
+              XGL_ERR_NULL_POINTER);
     ctx.provider = nullptr;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_NULL_POINTER);
     ctx.provider = &provider;
     ctx.busy = true;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_BUSY);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_BUSY);
     ctx.busy = false;
     frame.payload_len = 1;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_NULL_POINTER);
     frame.payload = bytes;
     frame.payload_len = UINT16_MAX + 1U;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_BUFFER_TOO_SMALL);
     frame.payload_len = 0;
     provider.tag_len = 0;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_INVALID_PARAM);
     provider.tag_len = XGL_AUTH_TAG_MAX_LEN + 1;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_INVALID_PARAM);
     provider.tag_len = 4;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 38, &frame, &ctx, &written),
-        XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 38, &frame, &ctx, &written),
+              XGL_ERR_BUFFER_TOO_SMALL);
     frame.header.source_id = 0;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_INVALID_PARAM);
     frame.header.source_id = 1;
     frame.extensions = extensions;
     frame.extensions_len = sizeof(extensions);
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_INVALID_FRAME);
     extensions[0] = XGL_WIRE_EXT_SECURITY;
     extensions[1] = 13;
     extensions[14] = 4;
-    EXPECT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_ERR_INVALID_FRAME);
     frame.extensions_len = 0;
-    ASSERT_EQ(
-        xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-        XGL_OK);
+    ASSERT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
+              XGL_OK);
     EXPECT_EQ(written, 45U);
 }
 

@@ -214,7 +214,7 @@ typedef struct {
  * returns.
  * \param[in]       handle: Protocol instance handle
  * \param[in]       error: Error code
- * \param[in]       message: Error message string
+ * \param[in]       message: Non-NULL text; empty when diagnostics are disabled
  * \param[in]       user_data: User data
  */
 typedef void (*xgl_error_callback_t)(xgl_handle_t handle, xgl_error_t error,
@@ -439,14 +439,17 @@ typedef struct {
     /* Performance Metrics                                                   */
     /*-----------------------------------------------------------------------*/
     uint32_t avg_rtt_ms; /**< Average RTT in milliseconds */
-    uint32_t max_rtt_ms; /**< Largest accepted first-transmission ACK sample in ms */
-    uint32_t min_rtt_ms; /**< Smallest RTT sample in ms; UINT32_MAX before a sample */
+    uint32_t
+        max_rtt_ms; /**< Largest accepted first-transmission ACK sample in ms */
+    uint32_t min_rtt_ms; /**< Smallest RTT sample in ms; UINT32_MAX before a
+                            sample */
 
     /*-----------------------------------------------------------------------*/
     /* Memory Usage                                                          */
     /*-----------------------------------------------------------------------*/
     size_t memory_used; /**< Total workspace bytes reserved for the instance */
-    size_t memory_peak; /**< Peak reservation; equals memory_used for fixed workspace */
+    size_t memory_peak; /**< Peak reservation; equals memory_used for fixed
+                           workspace */
 } xgl_statistics_t;
 
 /*---------------------------------------------------------------------------*/

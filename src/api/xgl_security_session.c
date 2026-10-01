@@ -20,8 +20,7 @@ xgl_install_security_session(xgl_handle_t handle,
         return XGL_ERR_NOT_INITIALIZED;
     }
 #if XGL_FEATURE_AUTH
-    return xgl_security_session_install(&handle->security,
-                                        config);
+    return xgl_security_session_install(&handle->security, config);
 #else
     return XGL_ERR_UNSUPPORTED;
 #endif
@@ -38,9 +37,8 @@ xgl_error_t xgl_close_security_session(xgl_handle_t handle, uint16_t remote_id,
         return XGL_ERR_NOT_INITIALIZED;
     }
 #if XGL_FEATURE_AUTH
-    xgl_error_t error =
-        xgl_security_session_close(&handle->security,
-                                   remote_id, connection_id, session_epoch);
+    xgl_error_t error = xgl_security_session_close(
+        &handle->security, remote_id, connection_id, session_epoch);
     if (error != XGL_OK) {
         return error;
     }
@@ -48,6 +46,9 @@ xgl_error_t xgl_close_security_session(xgl_handle_t handle, uint16_t remote_id,
                                       remote_id, connection_id, session_epoch);
     return error == XGL_ERR_NOT_FOUND ? XGL_OK : error;
 #else
+    (void)remote_id;
+    (void)connection_id;
+    (void)session_epoch;
     return XGL_ERR_UNSUPPORTED;
 #endif
 }

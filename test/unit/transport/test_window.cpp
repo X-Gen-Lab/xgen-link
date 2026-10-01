@@ -10,8 +10,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "xgen/memory/allocator.h"
 #include "transport/xgl_window.h"
+#include "xgen/memory/allocator.h"
 
 template <typename T, typename = void>
 struct HasLegacySequenceWindowState : std::false_type {};

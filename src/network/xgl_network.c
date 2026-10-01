@@ -92,6 +92,7 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
  */
 void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                               xgl_error_t error, const char* message) {
+    (void)message;
     if (ctx == NULL) {
         return;
     }
@@ -102,9 +103,11 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     }
 
     /* Update error statistics */
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->tx_errors++;
     }
+#endif
 }
 
 /*---------------------------------------------------------------------------*/

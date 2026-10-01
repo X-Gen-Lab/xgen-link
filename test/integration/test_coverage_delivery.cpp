@@ -4,8 +4,8 @@
  * contracts
  */
 
-#include <gtest/gtest.h>
 #include <datalink/xgl_datalink.h>
+#include <gtest/gtest.h>
 #include <network/xgl_network.h>
 #include <wire/xgl_wire.h>
 

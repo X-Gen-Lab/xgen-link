@@ -25,10 +25,14 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if ((XGL_FEATURE_STATISTICS && config->stats == NULL) ||
-        !xgm_allocator_is_valid(config->allocator)) {
+    if (!xgm_allocator_is_valid(config->allocator)) {
         return XGL_ERR_NULL_POINTER;
     }
+#if XGL_FEATURE_STATISTICS
+    if (config->stats == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+#endif
     if (config->default_timeout_ms > INT32_MAX || config->window_size == 0U ||
         config->window_size > 128U || config->max_tx_packets == 0U ||
         config->max_peers == 0U) {
@@ -217,9 +221,13 @@ xgl_error_t xgl_transport_get_interface(xgl_transport_ctx_t* ctx,
  * \param[in,out]   ctx: Transport layer context
  */
 void transport_count_send_error(xgl_transport_ctx_t* ctx) {
-    if (XGL_FEATURE_STATISTICS && ctx != NULL && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx != NULL && ctx->stats != NULL) {
         ctx->stats->tx_errors++;
     }
+#else
+    (void)ctx;
+#endif
 }
 
 /**
@@ -227,6 +235,7 @@ void transport_count_send_error(xgl_transport_ctx_t* ctx) {
  */
 void xgl_transport_report_error(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                 xgl_error_t error, const char* message) {
+    (void)message;
     if (!ctx) {
         return;
     }

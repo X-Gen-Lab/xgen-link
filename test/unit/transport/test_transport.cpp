@@ -5,8 +5,8 @@
  * \author          X-Gen Lab
  */
 
-#include <transport/xgl_reliable.h>
 #include <network/xgl_route.h>
+#include <transport/xgl_reliable.h>
 #include <transport/xgl_transport.h>
 #include <transport/xgl_transport_send.h>
 #include <transport/xgl_window.h>

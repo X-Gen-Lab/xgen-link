@@ -250,7 +250,8 @@ xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
 }
 
 /**
- * \brief           Release protocol resources and an owned workspace exactly once
+ * \brief           Release protocol resources and an owned workspace exactly
+ * once
  */
 void xgl_destroy(xgl_handle_t handle) {
     if (handle == NULL) {

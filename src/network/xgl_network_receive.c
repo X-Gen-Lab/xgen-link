@@ -9,9 +9,13 @@
 #include "xgl_network_internal.h"
 
 static void network_count_rx_drop(xgl_network_ctx_t* ctx) {
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->rx_dropped++;
     }
+#else
+    (void)ctx;
+#endif
 }
 
 /**
@@ -24,10 +28,12 @@ static void network_count_rx_drop(xgl_network_ctx_t* ctx) {
 static xgl_error_t
 network_deliver_local(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                       const xgl_wire_frame_view_t* metadata) {
-    if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
         ctx->stats->rx_packets++;
         ctx->stats->rx_bytes += metadata->payload_len;
     }
+#endif
 
     if (ctx->upper_layer == NULL || ctx->upper_layer->receive == NULL) {
         return XGL_OK;
@@ -75,9 +81,11 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     xgl_error_t err =
         xgl_wire_decode_frame(&metadata, frame_buf, frame_len, NULL);
     if (err != XGL_OK) {
-        if (XGL_FEATURE_STATISTICS && ctx->stats != NULL) {
+#if XGL_FEATURE_STATISTICS
+        if (ctx->stats != NULL) {
             ctx->stats->rx_errors++;
         }
+#endif
         return err;
     }
 

@@ -311,10 +311,11 @@ xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
         err = transport_process_sack_value(ctx, handle, peer, packet->source_id,
                                            acknowledgement.value,
                                            acknowledgement.len, &retransmitted);
-        if (XGL_FEATURE_STATISTICS && err == XGL_OK && retransmitted > 0U &&
-            ctx->tx_retries != NULL) {
+#if XGL_FEATURE_STATISTICS
+        if (err == XGL_OK && retransmitted > 0U && ctx->tx_retries != NULL) {
             *ctx->tx_retries += retransmitted;
         }
+#endif
     }
     if (err != XGL_OK) {
         return err;
