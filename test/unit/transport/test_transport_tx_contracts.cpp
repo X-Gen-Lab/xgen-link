@@ -140,6 +140,45 @@ class XglTransportTxContractTest : public ::testing::Test {
         ASSERT_EQ(Send(2U, 7U), XGL_OK);
         EXPECT_EQ(last_data_number, 0U);
     }
+
+    void Hello(uint32_t now, uint32_t connection = 7U) {
+        Transport().current_time_ms = now;
+        xgl_packet_t hello = {};
+        hello.source_id = 2U;
+        hello.target_id = 1U;
+        hello.connection_id = connection;
+        hello.packet_type = XGL_PACKET_TYPE_CONTROL;
+        hello.data_type = XGL_TRANSPORT_CONTROL_HELLO;
+        ASSERT_EQ(xgl_transport_receive(&Transport(), instance, &hello),
+                  XGL_OK);
+    }
+
+#if XGL_FEATURE_FRAGMENTATION
+    void EnableFragments() {
+        xgl_destroy(instance);
+        instance = nullptr;
+        xgl_config_get_preset_small(&config);
+        config.features.peer_idle_timeout_ms = 0U;
+        config.features.enable_fragmentation = true;
+        config.memory.allocator = xgm_allocator_libc();
+        config.route_table = &route;
+        config.route_table_len = 1U;
+        instance = xgl_create(&config);
+        ASSERT_NE(instance, nullptr);
+        ASSERT_EQ(xgl_init(instance), XGL_OK);
+    }
+
+    xgl_error_t SendFragments(uint32_t connection = 7U) {
+        uint8_t message[160] = {};
+        xgl_tx_data_t request = {};
+        request.target_id = 2U;
+        request.connection_id = connection;
+        request.data = message;
+        request.data_len = sizeof(message);
+        request.reliable = true;
+        return xgl_send_at(instance, &request, 0U);
+    }
+#endif
 };
 
 TEST_F(XglTransportTxContractTest, MissingRouteDoesNotConsumeTheOnlyPeer) {
@@ -161,6 +200,7 @@ TEST_F(XglTransportTxContractTest, BusyHelloRollsBackOnlyTheNewPeer) {
 TEST_F(XglTransportTxContractTest, RecordAllocationFailureReleasesNewPeer) {
     resource.Replace(Transport().memory.tx_packet);
     EXPECT_EQ(Send(), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(hello_calls, 0U);
     EXPECT_EQ(data_calls, 0U);
     resource.reject = false;
     ExpectFreshScopeCanSend();
@@ -169,6 +209,7 @@ TEST_F(XglTransportTxContractTest, RecordAllocationFailureReleasesNewPeer) {
 TEST_F(XglTransportTxContractTest, PayloadAllocationFailureReleasesNewPeer) {
     resource.Replace(Transport().memory.tx_payload);
     EXPECT_EQ(Send(), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(hello_calls, 0U);
     EXPECT_EQ(data_calls, 0U);
     resource.reject = false;
     ExpectFreshScopeCanSend();
@@ -220,5 +261,157 @@ TEST_F(XglTransportTxContractTest, ReliableBroadcastFailsBeforePeerOrPhyUse) {
     EXPECT_EQ(Send(XGL_BROADCAST_ID, 0U, false), XGL_OK);
     EXPECT_EQ(data_calls, 1U);
 }
+
+TEST_F(XglTransportTxContractTest,
+       GlobalCapacityRejectsBeforeAnnouncingNewScope) {
+    Transport().max_peers = 2U;
+    ASSERT_EQ(Send(2U, 6U), XGL_OK);
+    EXPECT_EQ(Send(2U, 7U), XGL_ERR_WINDOW_FULL);
+    EXPECT_EQ(hello_calls, 1U);
+    EXPECT_EQ(data_calls, 1U);
+    EXPECT_EQ(transport_find_peer_scope(&Transport(), 2U, 7U, 0U), nullptr);
+    auto* existing = transport_find_peer_scope(&Transport(), 2U, 6U, 0U);
+    ASSERT_NE(existing, nullptr);
+    EXPECT_EQ(xgl_reliable_get_count(&existing->reliable_queue), 1U);
+}
+
+TEST_F(XglTransportTxContractTest,
+       EmptyHelloExpiresWithIdleReclamationDisabled) {
+    Hello(100U);
+    ASSERT_NE(Transport().peers, nullptr);
+    EXPECT_EQ(xgl_transport_run(&Transport(), instance, 5099U), XGL_OK);
+    ASSERT_NE(Transport().peers, nullptr);
+    EXPECT_EQ(xgl_transport_run(&Transport(), instance, 5100U), XGL_OK);
+    EXPECT_EQ(Transport().peers, nullptr);
+    EXPECT_EQ(Send(2U, 8U), XGL_OK);
+}
+
+TEST_F(XglTransportTxContractTest, EmptyHelloPublishesItsLeaseDeadline) {
+    Hello(100U);
+    uint32_t timeout = UINT32_MAX;
+    EXPECT_TRUE(xgl_transport_next_timeout(&Transport(), 200U, &timeout));
+    EXPECT_EQ(timeout, 4900U);
+    EXPECT_TRUE(xgl_transport_next_timeout(&Transport(), 5100U, &timeout));
+    EXPECT_EQ(timeout, 0U);
+}
+
+TEST_F(XglTransportTxContractTest,
+       DuplicateHelloDoesNotExtendEmptyReservation) {
+    Hello(100U);
+    auto* reserved = Transport().peers;
+    Hello(4900U);
+    EXPECT_EQ(Transport().peers, reserved);
+    EXPECT_EQ(xgl_transport_run(&Transport(), instance, 5100U), XGL_OK);
+    EXPECT_EQ(Transport().peers, nullptr);
+}
+
+TEST_F(XglTransportTxContractTest, EmptyHelloLeaseHandlesClockWrap) {
+    Hello(UINT32_MAX - 99U);
+    EXPECT_EQ(xgl_transport_run(&Transport(), instance, 4899U), XGL_OK);
+    ASSERT_NE(Transport().peers, nullptr);
+    EXPECT_EQ(xgl_transport_run(&Transport(), instance, 4900U), XGL_OK);
+    EXPECT_EQ(Transport().peers, nullptr);
+}
+
+TEST_F(XglTransportTxContractTest, HelloLeasePreservesAcceptedDataHistory) {
+    Hello(100U, 0U);
+    ASSERT_EQ(Send(), XGL_OK);
+    Acknowledge(0U);
+    auto* used = Transport().peers;
+    EXPECT_EQ(xgl_transport_run(&Transport(), instance, 6000U), XGL_OK);
+    EXPECT_EQ(Transport().peers, used);
+    EXPECT_EQ(used->tx_window.next_packet_number, 1U);
+}
+
+TEST_F(XglTransportTxContractTest, HelloLeasePreservesFailedScopeIdentity) {
+    Hello(100U);
+    xgl_packet_t reset = {};
+    reset.source_id = 2U;
+    reset.target_id = 1U;
+    reset.connection_id = 7U;
+    reset.packet_type = XGL_PACKET_TYPE_CONTROL;
+    reset.data_type = XGL_TRANSPORT_CONTROL_RESET;
+    ASSERT_EQ(xgl_transport_receive(&Transport(), instance, &reset), XGL_OK);
+    auto* failed = Transport().peers;
+    ASSERT_TRUE(failed->failed);
+    EXPECT_EQ(xgl_transport_run(&Transport(), instance, 6000U), XGL_OK);
+    EXPECT_EQ(Transport().peers, failed);
+}
+
+#if XGL_FEATURE_FRAGMENTATION
+TEST_F(XglTransportTxContractTest, FragmentBudgetRejectsBeforeHello) {
+    EnableFragments();
+    Transport().max_tx_message_bytes = 159U;
+    EXPECT_EQ(SendFragments(), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(hello_calls, 0U);
+    EXPECT_EQ(data_calls, 0U);
+    EXPECT_EQ(Transport().peers, nullptr);
+}
+
+TEST_F(XglTransportTxContractTest,
+       FragmentMessageAllocationRejectsBeforeHello) {
+    EnableFragments();
+    resource.Replace(Transport().memory.tx_message);
+    EXPECT_EQ(SendFragments(), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(hello_calls, 0U);
+    EXPECT_EQ(data_calls, 0U);
+    EXPECT_EQ(Transport().peers, nullptr);
+    EXPECT_EQ(Transport().tx_message_bytes, 0U);
+}
+
+TEST_F(XglTransportTxContractTest, FirstFragmentRecordRejectsBeforeHello) {
+    EnableFragments();
+    resource.Replace(Transport().memory.tx_packet);
+    EXPECT_EQ(SendFragments(), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(hello_calls, 0U);
+    EXPECT_EQ(data_calls, 0U);
+    EXPECT_EQ(Transport().peers, nullptr);
+    EXPECT_EQ(Transport().tx_message_bytes, 0U);
+}
+
+TEST_F(XglTransportTxContractTest, FirstFragmentPayloadRejectsBeforeHello) {
+    EnableFragments();
+    resource.Replace(Transport().memory.tx_payload);
+    EXPECT_EQ(SendFragments(), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(hello_calls, 0U);
+    EXPECT_EQ(data_calls, 0U);
+    EXPECT_EQ(Transport().peers, nullptr);
+    EXPECT_EQ(Transport().tx_message_bytes, 0U);
+}
+
+TEST_F(XglTransportTxContractTest, FirstFragmentExtensionsRejectBeforeHello) {
+    EnableFragments();
+    resource.Replace(Transport().memory.tx_extensions);
+    EXPECT_EQ(SendFragments(), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(hello_calls, 0U);
+    EXPECT_EQ(data_calls, 0U);
+    EXPECT_EQ(Transport().peers, nullptr);
+    EXPECT_EQ(Transport().tx_message_bytes, 0U);
+}
+
+TEST_F(XglTransportTxContractTest, FragmentSequenceBudgetRejectsBeforeHello) {
+    EnableFragments();
+    auto* peer = transport_get_or_create_peer_scope(&Transport(), 2U, 7U, 0U);
+    ASSERT_NE(peer, nullptr);
+    peer->tx_window.send_base_packet_number = UINT32_MAX - 1U;
+    peer->tx_window.next_packet_number = UINT32_MAX - 1U;
+    EXPECT_EQ(SendFragments(), XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(hello_calls, 0U);
+    EXPECT_EQ(data_calls, 0U);
+    EXPECT_EQ(Transport().peers, peer);
+}
+
+TEST_F(XglTransportTxContractTest, BusyFragmentHelloReturnsAllReservations) {
+    EnableFragments();
+    hello_result = XGL_ERR_BUSY;
+    EXPECT_EQ(SendFragments(), XGL_ERR_BUSY);
+    EXPECT_EQ(hello_calls, 1U);
+    EXPECT_EQ(data_calls, 0U);
+    EXPECT_EQ(Transport().peers, nullptr);
+    EXPECT_EQ(Transport().tx_message_bytes, 0U);
+    hello_result = XGL_OK;
+    EXPECT_EQ(SendFragments(), XGL_OK);
+}
+#endif
 
 }  // namespace
