@@ -176,7 +176,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #endif
 
     xgl_transport_peer_state_t* rx_peer = transport_find_rx_peer(ctx, packet);
-    bool scope_was_absent = rx_peer == NULL;
+    const bool scope_was_absent = rx_peer == NULL;
     if (rx_peer != NULL && rx_peer->failed) {
         return XGL_ERR_ACK_TIMEOUT;
     }

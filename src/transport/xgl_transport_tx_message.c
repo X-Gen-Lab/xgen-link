@@ -4,7 +4,8 @@
  */
 
 #include "wire/xgl_wire.h"
-#include "xgl_transport_send_internal.h"
+#include "xgl_transport_internal.h"
+#include "xgl_transport_tx_internal.h"
 #include <string.h>
 
 /**

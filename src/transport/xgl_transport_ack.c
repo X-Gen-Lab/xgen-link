@@ -166,16 +166,14 @@ static bool transport_sack_bit_is_set(const uint8_t* bitmap, size_t bit_index) {
 }
 
 /**
- * \brief           Retry a missing original transmission once before RTO
- * recovery
+ * \brief           Retry a missing original packet before RTO recovery
  * \param[in,out]   ctx: Transport context
  * \param[in]       handle: Protocol instance handle
  * \param[in,out]   peer: Exact packet owner
  * \param[in,out]   packet: Outstanding packet, or NULL if already acknowledged
  * \return          XGL_OK if suppressed or submitted, otherwise retry error
- * \note            A successful retry closes fast recovery for this packet.
- *                  Duplicate feedback cannot consume its remaining retry
- * budget.
+ * \note            A successful retry disables further fast retries for this
+ *                  packet. Duplicate feedback cannot consume its retry budget.
  */
 static xgl_error_t transport_fast_retransmit(xgl_transport_ctx_t* ctx,
                                              xgl_handle_t handle,

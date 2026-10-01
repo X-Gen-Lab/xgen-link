@@ -56,8 +56,7 @@ xgl_error_t transport_retransmit_reliable_packet(
                            .priority = rel_packet->priority,
                            .data = &packet_data,
                            .extensions = rel_packet->extensions,
-                           .extensions_len = rel_packet->extensions_len,
-                           .phy = NULL};
+                           .extensions_len = rel_packet->extensions_len};
 
     xgl_error_t err = xgl_packet_send(ctx->lower_layer, handle, &packet);
     if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY) {

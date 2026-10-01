@@ -4,11 +4,11 @@
  */
 
 #include "network/xgl_route.h"
-#include "transport/xgl_transport_send.h"
 #include "wire/xgl_frame.h"
 #include "wire/xgl_wire.h"
 #include "xgl/xgl_config.h"
-#include "xgl_transport_send_internal.h"
+#include "xgl_transport_internal.h"
+#include "xgl_transport_tx_internal.h"
 #include <internal/xgl_diagnostics.h>
 #include <string.h>
 
@@ -171,8 +171,7 @@ xgl_error_t transport_send_packet_view(
                            .priority = tx_data->priority,
                            .data = &packet_data,
                            .extensions = extensions,
-                           .extensions_len = extensions_len,
-                           .phy = NULL};
+                           .extensions_len = extensions_len};
 
     xgl_error_t err = xgl_packet_send(ctx->lower_layer, handle, &packet);
     if (err != XGL_OK) {

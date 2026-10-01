@@ -8,19 +8,17 @@
 #include <network/xgl_route.h>
 #include <transport/xgl_reliable.h>
 #include <transport/xgl_transport.h>
-#include <transport/xgl_transport_send.h>
+#include <transport/xgl_transport_tx_internal.h>
 #include <transport/xgl_window.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
 
+#include "transport/xgl_transport_internal.h"
+#include <cstdlib>
+#include <cstring>
 #include <gtest/gtest.h>
 #include <type_traits>
 #include <utility>
-extern "C" {
-#include "transport/xgl_transport_internal.h"
-}
-#include <cstdlib>
-#include <cstring>
 #include <vector>
 
 template <typename T, typename = void>

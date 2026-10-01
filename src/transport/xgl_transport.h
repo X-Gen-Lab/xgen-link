@@ -152,10 +152,10 @@ typedef struct xgl_transport_ctx_s {
     void* callback_user_data;            /**< User data for callbacks */
 
     /* Statistics */
+#if XGL_FEATURE_STATISTICS
     xgl_layer_stats_t* stats; /**< Layer statistics pointer */
     uint64_t* tx_retries;     /**< Retransmission counter pointer */
-#if XGL_FEATURE_STATISTICS
-    uint64_t rtt_total_ms; /**< Sum of admitted first-transmission samples */
+    uint64_t rtt_total_ms;    /**< Sum of admitted first-transmission samples */
     uint32_t
         rtt_sample_count; /**< Number of samples, saturated at UINT32_MAX */
     uint32_t rtt_min_ms;  /**< Minimum sample; UINT32_MAX when empty */
@@ -163,8 +163,6 @@ typedef struct xgl_transport_ctx_s {
 #endif
 
     /* Memory management */
-    const xgm_allocator_t*
-        allocator; /**< Explicit service for initialization */
     xgl_protocol_memory_t
         memory; /**< Borrowed resource allocator descriptors */
 

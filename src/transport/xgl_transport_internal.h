@@ -12,6 +12,10 @@
 
 #include "transport/xgl_transport.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * \brief           Read the selected transport clock; explicit zero is valid
  * \param[in]       ctx: Transport layer context
@@ -150,6 +154,10 @@ xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
                                         xgl_handle_t handle,
                                         xgl_transport_peer_state_t* peer);
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* XGL_TRANSPORT_INTERNAL_H */

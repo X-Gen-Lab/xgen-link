@@ -80,8 +80,10 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->rx_accept_callback = config->rx_accept_callback;
     ctx->error_callback = config->error_callback;
     ctx->callback_user_data = config->callback_user_data;
+#if XGL_FEATURE_STATISTICS
     ctx->stats = config->stats;
     ctx->tx_retries = config->tx_retries;
+#endif
     ctx->max_tx_packets = config->max_tx_packets;
 #if XGL_FEATURE_OUT_OF_ORDER
     ctx->max_rx_buffered_packets = config->max_rx_buffered_packets;

@@ -43,8 +43,7 @@ xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
                            .priority = 7,
                            .data = &packet_data,
                            .extensions = control_ext,
-                           .extensions_len = control_ext_len,
-                           .phy = NULL};
+                           .extensions_len = control_ext_len};
 
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         return XGL_ERR_INVALID_PARAM;
