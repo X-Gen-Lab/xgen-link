@@ -173,6 +173,28 @@ TEST_F(XglFragmentTest, EnforcesAggregateReassemblyByteBudget) {
               XGL_ERR_NO_MEMORY);
 }
 
+TEST_F(XglFragmentTest, CompletedPayloadRetainsBudgetUntilRelease) {
+    ASSERT_EQ(xgl_fragment_set_limits(&manager, 2, 2), XGL_OK);
+    const uint8_t payload[] = {'a', 'b'};
+    uint8_t* complete_data = nullptr;
+    size_t complete_len = 0;
+    ASSERT_EQ(xgl_fragment_process_ext(&manager, 1, 1, 1, 1, 1, 0, 2,
+                                       payload, sizeof(payload),
+                                       &complete_data, &complete_len, 1000),
+              XGL_OK);
+    EXPECT_EQ(manager.current_reassembly_bytes, 2U);
+    EXPECT_EQ(xgl_fragment_get_reassembly_count(&manager), 0U);
+
+    uint8_t* other_data = nullptr;
+    size_t other_len = 0;
+    EXPECT_EQ(xgl_fragment_process_ext(&manager, 2, 2, 2, 1, 2, 0, 2,
+                                       payload, 1, &other_data, &other_len,
+                                       1001),
+              XGL_ERR_NO_MEMORY);
+    xgl_fragment_free_data(&manager, complete_data);
+    EXPECT_EQ(manager.current_reassembly_bytes, 0U);
+}
+
 TEST_F(XglFragmentTest, ReassemblyTracksReceivedRangesInsteadOfByteBitmap) {
     const std::vector<uint8_t> part(64, 0x5A);
     uint8_t* complete_data = nullptr;
