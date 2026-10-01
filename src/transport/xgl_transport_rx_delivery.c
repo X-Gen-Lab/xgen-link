@@ -42,6 +42,55 @@ static xgl_error_t transport_accept_payload(xgl_transport_ctx_t* ctx,
 
 #if XGL_FEATURE_FRAGMENTATION
 /**
+ * \brief           Check every TLV before admitting one fragment identity
+ * \param[in]       ctx: Transport context with fragmentation enabled
+ * \param[in]       packet: Borrowed packet with a valid payload span
+ * \param[out]      fragment: Decoded fragment metadata
+ * \return          XGL_OK or a malformed or oversized fragment error
+ */
+xgl_error_t transport_decode_rx_fragment(const xgl_transport_ctx_t* ctx,
+                                         const xgl_packet_t* packet,
+                                         transport_rx_fragment_t* fragment) {
+    xgl_wire_ext_cursor_t cursor;
+    xgl_error_t err = xgl_wire_ext_cursor_init(&cursor, packet->extensions,
+                                               packet->extensions_len);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    bool found = false;
+    xgl_wire_ext_t ext;
+    while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
+        if (ext.type != XGL_WIRE_EXT_FRAGMENT) {
+            continue;
+        }
+        if (found) {
+            return XGL_ERR_INVALID_FRAME;
+        }
+        err = xgl_wire_decode_fragment_ext_value(
+            ext.value, ext.len, &fragment->message_id, &fragment->offset,
+            &fragment->message_len);
+        if (err != XGL_OK) {
+            return err;
+        }
+        found = true;
+    }
+    if (err != XGL_ERR_NOT_FOUND) {
+        return err;
+    }
+    if (!found || fragment->message_len == 0U ||
+        fragment->offset > fragment->message_len ||
+        packet->data->data_len == 0U ||
+        packet->data->data_len > fragment->message_len - fragment->offset) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+    if (fragment->message_len > ctx->max_message_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    return XGL_OK;
+}
+
+/**
  * \brief           Release a peer-owned completed message and its memory budget
  * \param[in,out]   ctx: Transport layer context
  * \param[in,out]   peer: Owning peer
@@ -113,46 +162,17 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
         if (peer == NULL) {
             return XGL_ERR_NO_MEMORY;
         }
+        transport_rx_fragment_t fragment;
+        xgl_error_t err = transport_decode_rx_fragment(ctx, packet, &fragment);
+        if (err != XGL_OK) {
+            return err;
+        }
         xgl_fragment_message_t complete = {0};
-        uint32_t message_id = 0U;
-        uint32_t fragment_offset = 0U;
-        uint32_t message_len = 0U;
-        bool has_fragment_ext = false;
-
-        if (packet->extensions != NULL && packet->extensions_len > 0U) {
-            xgl_wire_ext_cursor_t cursor;
-            xgl_error_t err = xgl_wire_ext_cursor_init(
-                &cursor, packet->extensions, packet->extensions_len);
-            if (err != XGL_OK) {
-                return err;
-            }
-
-            xgl_wire_ext_t ext;
-            while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
-                if (ext.type == XGL_WIRE_EXT_FRAGMENT) {
-                    err = xgl_wire_decode_fragment_ext_value(
-                        ext.value, ext.len, &message_id, &fragment_offset,
-                        &message_len);
-                    if (err != XGL_OK) {
-                        return err;
-                    }
-                    has_fragment_ext = true;
-                    break;
-                }
-            }
-            if (err != XGL_OK && err != XGL_ERR_NOT_FOUND) {
-                return err;
-            }
-        }
-
-        if (!has_fragment_ext) {
-            return XGL_ERR_INVALID_FRAME;
-        }
-
-        xgl_error_t err = xgl_fragment_process_ext(
+        err = xgl_fragment_process_ext(
             ctx->fragment_mgr, source_id, packet->connection_id,
-            packet->session_epoch, data_type, message_id, fragment_offset,
-            message_len, data, data_len, &complete, transport_now(ctx));
+            packet->session_epoch, data_type, fragment.message_id,
+            fragment.offset, fragment.message_len, data, data_len, &complete,
+            transport_now(ctx));
 
         if (err == XGL_OK) {
             err = transport_accept_payload(ctx, handle, source_id, data_type,

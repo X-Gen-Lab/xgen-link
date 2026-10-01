@@ -98,6 +98,24 @@ void transport_count_send_error(xgl_transport_ctx_t* ctx);
 void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                          xgl_transport_peer_state_t* peer, xgl_error_t error);
 #if XGL_FEATURE_FRAGMENTATION
+/** \brief           Decoded metadata for one admitted fragment. */
+typedef struct {
+    uint32_t message_id;
+    uint32_t offset;
+    uint32_t message_len;
+} transport_rx_fragment_t;
+
+/**
+ * \brief           Validate fragment metadata before retaining or delivering
+ * \param[in]       ctx: Transport context with fragmentation enabled
+ * \param[in]       packet: Borrowed packet with a valid payload span
+ * \param[out]      fragment: Decoded singleton fragment extension
+ * \return          XGL_OK or the metadata admission error
+ */
+xgl_error_t transport_decode_rx_fragment(const xgl_transport_ctx_t* ctx,
+                                         const xgl_packet_t* packet,
+                                         transport_rx_fragment_t* fragment);
+
 void transport_clear_tx_message(xgl_transport_ctx_t* ctx,
                                 xgl_transport_peer_state_t* peer);
 xgl_error_t transport_pump_tx_message(xgl_transport_ctx_t* ctx,
