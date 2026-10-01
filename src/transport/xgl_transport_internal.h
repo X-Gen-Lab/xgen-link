@@ -165,7 +165,8 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
 #if XGL_FEATURE_OUT_OF_ORDER
 xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
                                         xgl_handle_t handle,
-                                        xgl_transport_peer_state_t* peer);
+                                        xgl_transport_peer_state_t* peer,
+                                        bool* retained_backpressure);
 
 #endif
 

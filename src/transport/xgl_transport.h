@@ -273,7 +273,8 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
  * \param[in]       ctx: Transport layer context
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current time in milliseconds
- * \return          First terminal maintenance error, or XGL_OK
+ * \return          First hard maintenance error, otherwise the first immediate
+ *                  feedback error, or XGL_OK
  * \note            Processes deferred sends, delivery and timeouts. Retained
  *                  BUSY/NO_MEMORY work remains owned and is retried later.
  * \note            Service receive events and xgl_transport_next_timeout()

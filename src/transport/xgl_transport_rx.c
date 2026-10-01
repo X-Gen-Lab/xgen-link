@@ -13,11 +13,17 @@
  * \param[in,out]   ctx: Transport layer context
  * \param[in]       handle: Protocol instance handle
  * \param[in,out]   peer: Owning receive peer
- * \return          XGL_OK, or the first admission or feedback error
+ * \param[out]      retained_backpressure: Optional flag; true only when the
+ *                  returned error is temporary delivery refusal of owned data
+ * \return          First hard error, otherwise the first temporary error
  */
 xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
                                         xgl_handle_t handle,
-                                        xgl_transport_peer_state_t* peer) {
+                                        xgl_transport_peer_state_t* peer,
+                                        bool* retained_backpressure) {
+    if (retained_backpressure != NULL) {
+        *retained_backpressure = false;
+    }
     if (ctx == NULL || peer == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -39,13 +45,22 @@ xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
              * another sender retransmission when the application is busy. */
             if (err != XGL_ERR_BUSY && err != XGL_ERR_NO_MEMORY) {
                 transport_fail_peer(ctx, handle, peer, err);
+                if (first_error == XGL_ERR_BUSY ||
+                    first_error == XGL_ERR_NO_MEMORY) {
+                    return err;
+                }
+            } else if (first_error == XGL_OK && retained_backpressure != NULL) {
+                *retained_backpressure = true;
             }
             return first_error != XGL_OK ? first_error : err;
         }
         err = transport_send_ack(
             ctx, handle, packet_number, buffered->packet.source_id,
             buffered->packet.connection_id, buffered->packet.session_epoch);
-        if (first_error == XGL_OK) {
+        if (first_error == XGL_OK || ((first_error == XGL_ERR_BUSY ||
+                                       first_error == XGL_ERR_NO_MEMORY) &&
+                                      err != XGL_OK && err != XGL_ERR_BUSY &&
+                                      err != XGL_ERR_NO_MEMORY)) {
             first_error = err;
         }
         (void)transport_take_rx_buffered(peer, packet_number);
@@ -235,7 +250,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         rx_peer->rx_buffered->packet.packet_number ==
             rx_peer->rx_next_packet_number &&
         packet->reliable == XGL_RELIABILITY_ACK_ELICITING) {
-        return transport_drain_rx_buffered(ctx, handle, rx_peer);
+        return transport_drain_rx_buffered(ctx, handle, rx_peer, NULL);
     }
 
 #endif
@@ -258,7 +273,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                  packet->connection_id, packet->session_epoch);
 #if XGL_FEATURE_OUT_OF_ORDER
         xgl_error_t drain_error =
-            transport_drain_rx_buffered(ctx, handle, rx_peer);
+            transport_drain_rx_buffered(ctx, handle, rx_peer, NULL);
         return err != XGL_OK ? err : drain_error;
 #else
         return err;

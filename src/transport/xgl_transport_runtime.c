@@ -169,6 +169,9 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 
     ctx->current_time_ms = current_time_ms;
     xgl_error_t first_error = XGL_OK;
+#if XGL_FEATURE_OUT_OF_ORDER
+    xgl_error_t transient_feedback_error = XGL_OK;
+#endif
 #if XGL_FEATURE_FRAGMENTATION || XGL_FEATURE_OUT_OF_ORDER
     for (xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
          peer = peer->next) {
@@ -193,11 +196,20 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         }
 #endif
 #if XGL_FEATURE_OUT_OF_ORDER
-        xgl_error_t delivery_error =
-            transport_drain_rx_buffered(ctx, handle, peer);
-        if (delivery_error != XGL_OK && delivery_error != XGL_ERR_BUSY &&
-            delivery_error != XGL_ERR_NO_MEMORY && first_error == XGL_OK) {
-            first_error = delivery_error;
+        bool retained_backpressure = false;
+        xgl_error_t delivery_error = transport_drain_rx_buffered(
+            ctx, handle, peer, &retained_backpressure);
+        if (!retained_backpressure && delivery_error != XGL_OK) {
+            if (delivery_error == XGL_ERR_BUSY ||
+                delivery_error == XGL_ERR_NO_MEMORY) {
+                /* Failed feedback owns no retry work; report it unless a hard
+                 * error takes precedence during this maintenance pass. */
+                if (transient_feedback_error == XGL_OK) {
+                    transient_feedback_error = delivery_error;
+                }
+            } else if (first_error == XGL_OK) {
+                first_error = delivery_error;
+            }
         }
 #endif
     }
@@ -275,6 +287,11 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     /* Reclaim idle peer states */
     (void)transport_reclaim_idle_peers(ctx, current_time_ms);
 
+#if XGL_FEATURE_OUT_OF_ORDER
+    if (first_error == XGL_OK) {
+        return transient_feedback_error;
+    }
+#endif
     return first_error;
 }
 
