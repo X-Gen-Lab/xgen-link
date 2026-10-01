@@ -723,4 +723,161 @@ TEST(XglCoverageApi,
     EXPECT_EQ(xgl_close_security_session(handle, 2, 0, 0), XGL_OK);
     xgl_destroy(handle);
 }
+class ScopedZeroCopyApiTest : public ::testing::Test {
+  protected:
+    void SetUp() override {
+        provider = coverage_provider();
+        provider.user_data = this;
+        provider.sign = [](const xgl_auth_input_t* input, uint8_t* tag,
+                           size_t capacity, size_t* length, void* user) {
+            auto* state = static_cast<ScopedZeroCopyApiTest*>(user);
+            ++state->sign_calls;
+            state->signed_payload = input->payload;
+            state->last_sequence = input->security_seq;
+            return coverage_sign(input, tag, capacity, length, nullptr);
+        };
+        phy = coverage_phy(&phy_state);
+        phy.user_data = this;
+        phy.tx = [](const uint8_t* bytes, size_t length, void* user) {
+            auto* state = static_cast<ScopedZeroCopyApiTest*>(user);
+            ++state->phy_state.writes;
+            state->captured.assign(bytes, bytes + length);
+            return state->phy_state.write_error;
+        };
+        route.target_id = 2U;
+        route.phy = &phy;
+        route.max_frame_size = 128U;
+        route.read_freq_hz = 10U;
+        config = coverage_config();
+        config.route_table = &route;
+        config.route_table_len = 1U;
+        config.auth_required = true;
+        config.auth_provider = &provider;
+        handle = xgl_create(&config);
+        ASSERT_NE(handle, nullptr);
+        ASSERT_EQ(xgl_init(handle), XGL_OK);
+        request.data.target_id = 2U;
+        request.data.data_type = 9U;
+        request.data.data_len = 3U;
+        request.connection_id = 11U;
+        request.session_epoch = 9U;
+    }
+
+    void TearDown() override { xgl_destroy(handle); }
+
+    void Install() {
+        auto session = test_session_config(2U, 11U, 9U);
+        session.tx_initial_seq = 42U;
+        ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
+    }
+
+    xgl_handle_t handle = nullptr;
+    xgl_config_t config = {};
+    xgl_auth_provider_t provider = {};
+    xgl_phy_ops_t phy = {};
+    xgl_route_item_t route = {};
+    CoveragePhy phy_state;
+    xgl_tx_zerocopy_request_t request = {};
+    size_t sign_calls = 0U;
+    const uint8_t* signed_payload = nullptr;
+    uint64_t last_sequence = 0U;
+    std::vector<uint8_t> captured;
+};
+
+TEST_F(ScopedZeroCopyApiTest, PlansExactHeadroomWithoutConsumingSecurityState) {
+    Install();
+    xgl_tx_frame_layout_t layout = {};
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    EXPECT_EQ(layout.payload_offset, 56U);
+    EXPECT_EQ(layout.frame_size, 65U);
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    EXPECT_EQ(sign_calls, 0U);
+    EXPECT_EQ(phy_state.writes, 0U);
+    std::vector<uint8_t> buffer(layout.frame_size, 0U);
+    request.data.buffer = buffer.data();
+    request.data.buffer_size = buffer.size();
+    request.data.data_offset = layout.payload_offset;
+    const uint8_t payload[] = {0x17U, 0x28U, 0x39U};
+    std::memcpy(buffer.data() + layout.payload_offset, payload, sizeof(payload));
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 7U), XGL_OK);
+    EXPECT_EQ(sign_calls, 1U);
+    EXPECT_EQ(last_sequence, 42U);
+    EXPECT_EQ(signed_payload, buffer.data() + layout.payload_offset);
+    EXPECT_EQ(std::memcmp(signed_payload, payload, sizeof(payload)), 0);
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, captured.data(), captured.size(),
+                                     nullptr),
+              XGL_OK);
+    EXPECT_EQ(view.header.connection_id, 11U);
+    EXPECT_EQ(view.session_epoch, 9U);
+    EXPECT_EQ(view.data_type, 9U);
+    EXPECT_EQ(view.header.packet_number, 0U);
+    EXPECT_EQ(view.nonce_id, 42U);
+}
+
+TEST_F(ScopedZeroCopyApiTest, RejectsInvalidMetadataAndStorageBeforeSigning) {
+    xgl_tx_frame_layout_t layout = {19U, 23U};
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_NOT_FOUND);
+    EXPECT_EQ(layout.payload_offset, 0U);
+    EXPECT_EQ(layout.frame_size, 0U);
+    Install();
+    EXPECT_EQ(xgl_send_zerocopy_layout(nullptr, &request, &layout),
+              XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, nullptr, &layout),
+              XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, nullptr),
+              XGL_ERR_NULL_POINTER);
+    request.data.reliable = true;
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_INVALID_PARAM);
+    request.data.reliable = false;
+    request.data.data_len = SIZE_MAX;
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    request.data.data_len = 100U;
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    request.data.data_len = 3U;
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    uint8_t buffer[128] = {};
+    request.data.buffer = buffer;
+    request.data.buffer_size = layout.frame_size - 1U;
+    request.data.data_offset = layout.payload_offset;
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    request.data.buffer_size = sizeof(buffer);
+    request.data.data_offset++;
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
+              XGL_ERR_INVALID_PARAM);
+    request.data.buffer = nullptr;
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
+              XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(sign_calls, 0U);
+    EXPECT_EQ(phy_state.writes, 0U);
+}
+
+TEST_F(ScopedZeroCopyApiTest, LegacyEntryKeepsDefaultScopeAndOriginalRequestAbi) {
+    auto session = test_session_config(2U);
+    ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
+    request.connection_id = 0U;
+    request.session_epoch = 0U;
+    xgl_tx_frame_layout_t layout = {};
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    EXPECT_EQ(layout.payload_offset, 42U);
+    uint8_t buffer[128] = {};
+    request.data.buffer = buffer;
+    request.data.buffer_size = sizeof(buffer);
+    request.data.data_offset = layout.payload_offset;
+    buffer[layout.payload_offset] = 0x43U;
+    ASSERT_EQ(xgl_send_zerocopy_at(handle, &request.data, 0U), XGL_OK);
+    xgl_wire_frame_view_t first = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&first, captured.data(), captured.size(),
+                                     nullptr),
+              XGL_OK);
+    EXPECT_EQ(first.header.connection_id, 0U);
+    EXPECT_EQ(first.session_epoch, 0U);
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U), XGL_OK);
+    EXPECT_EQ(phy_state.writes, 2U);
+}
 #endif
