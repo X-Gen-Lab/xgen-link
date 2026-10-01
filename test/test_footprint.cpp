@@ -117,3 +117,41 @@ TEST(XglFootprintTest, SendsReuseReservedStorageWithoutBackendAllocations) {
     xgl_destroy(handle);
     EXPECT_EQ(counter.frees, 1U);
 }
+
+TEST(XglFootprintTest, SharedPhyReservesOnlyOneReceiveLink) {
+    xgl_phy_ops_t phys[] = {{null_tx, null_rx, nullptr},
+                           {null_tx, null_rx, nullptr},
+                           {null_tx, null_rx, nullptr}};
+    xgl_route_item_t routes[] = {{2U, &phys[0], 128U, 100U, 1U},
+                                {3U, &phys[0], 128U, 50U, 1U},
+                                {4U, &phys[0], 128U, 25U, 1U}};
+    xgl_config_t config;
+    xgl_config_get_preset_tiny(&config);
+    config.route_table = routes;
+    config.route_table_len = 3U;
+    xgl_memory_requirements_t shared{};
+    ASSERT_EQ(xgl_memory_requirements(&config, &shared), XGL_OK);
+
+    routes[1].phy = &phys[1];
+    routes[2].phy = &phys[2];
+    xgl_memory_requirements_t separate{};
+    ASSERT_EQ(xgl_memory_requirements(&config, &separate), XGL_OK);
+
+    /* Sharing PHYs saves their parser descriptors as well as RX bytes. */
+    EXPECT_GT(separate.size - shared.size, 2U * config.memory.rx_buffer_size);
+    for (bool share : {true, false}) {
+        routes[1].phy = share ? &phys[0] : &phys[1];
+        routes[2].phy = share ? &phys[0] : &phys[2];
+        const size_t size = share ? shared.size : separate.size;
+        void* storage = std::malloc(size);
+        ASSERT_NE(storage, nullptr);
+        xgl_handle_t handle = nullptr;
+        EXPECT_EQ(xgl_init_static(&config, storage, size, &handle), XGL_OK);
+        if (handle != nullptr) {
+            xgl_work_budget_t budget = {128U, 100U};
+            EXPECT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+            xgl_destroy(handle);
+        }
+        std::free(storage);
+    }
+}
