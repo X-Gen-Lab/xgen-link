@@ -10,6 +10,8 @@ Parser deadlines participate in `xgl_next_timeout()` independently of the PHY po
 
 A step returns its first parser timeout, PHY, delivery or transport error while continuing to consume the received byte chunk and maintain transport. Malformed stream frames are discarded and reported through diagnostics; they do not stop parsing later frames. A successful PHY read alone does not imply successful application admission.
 
+Each due link reads its PHY only once per step, also bounded by the compiled `XGL_DATALINK_RX_CHUNK_SIZE`. `AUTO` selects 32 bytes for Boot and 128 for other profiles. The runtime budget is an upper bound, not a request to drain that many bytes. When choosing a smaller chunk, recheck polls per complete frame, driver buffering and parser timeout; see [Datalink](../protocol/datalink.md).
+
 `xgl_next_timeout(handle, now_ms, &delay_ms)` returns true when a deadline exists. A zero delay means work is due now. False leaves the output unchanged; handle that case separately instead of sleeping an uninitialized value.
 
 ## Main-Loop Integration

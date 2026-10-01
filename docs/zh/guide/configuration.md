@@ -20,6 +20,8 @@
 
 路由容量在初始化时固定。共享同一 PHY 描述符的路由共享 parser/link；不同 PHY 描述符拥有独立 RX 状态。
 
+临时 PHY 读取块通过 CMake 的 `XGL_DATALINK_RX_CHUNK_SIZE` 选择：AUTO 默认 Boot 为 32，其余为 128，也支持显式 16/32/64/128，例如 `-DXGL_DATALINK_RX_CHUNK_SIZE=64`。它限制每次读取的栈缓冲，不改变 MTU 或持久 RX 空间。实际值写入生成的配置头；不得给已安装库的消费方注入冲突宏。吞吐与超时的配合见 [Datalink](../protocol/datalink.md)。
+
 实际帧必须同时满足协议上限和路由 MTU，包括 24 字节基础头、扩展、payload、启用认证时的 tag 和 2 字节 CRC。`memory.rx_buffer_size` 至少为 `protocol.max_frame_size`。
 
 ## 显式容量

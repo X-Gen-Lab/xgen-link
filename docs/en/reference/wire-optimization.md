@@ -36,7 +36,7 @@ The bitmap is borrowed only during synchronous processing and is not retained in
 
 Fixed-header CRC uses the incremental xgen-crc API for the first 22 bytes followed by two zero bytes, replacing a 24-byte temporary header copy. The algorithm, seed, and byte ranges do not change. The foundation component continues to own the CRC implementation.
 
-Complete-frame decoding writes directly into the output view's header. A common failure exit clears the entire view; payload/TLV spans are exposed only on success. Raw-frame decoding retains fixed-header, TLV boundary, tag-length, consistency, and complete-frame CRC checks. The stream parser's early header check, state, timeout, and resynchronization rules remain unchanged.
+Complete-frame decoding writes directly into the output view's header. A common failure exit clears the entire view; payload/TLV spans are exposed only on success. Raw-frame decoding retains fixed-header, TLV boundary, tag-length, consistency, and complete-frame CRC checks. That wire phase left the stream parser's early header check, state, timeout, and resynchronization rules unchanged; later candidate recovery and state compaction are described in [Datalink Optimization](datalink-optimization.md).
 
 No complete view is cached in each link. A private path that skipped the second header CRC at completion was evaluated: its final ELF added 56 B over the CRC simplification under identical conditions, while TLVs still needed decoding at delivery. This experiment was not adopted in production.
 

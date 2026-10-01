@@ -1,8 +1,18 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。当前阶段为 wire 布局、借用视图与体积优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0007](design/adr/0007-wire-layout-views.md)。
+更新日期：2026-10-01。当前阶段为 datalink 有界接收、单向端点与资源优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0008](design/adr/0008-datalink-runtime.md)。
 
-## 当前：wire 布局、借用视图与体积优化
+## 当前：datalink 有界接收与资源优化
+
+在 `d7bbb75` 基础上修复重叠 magic 候选期限和固定头超容量拒绝；将兼容 view 局部变量移出生产 feed 热路径。删除 parser 冗余 index，头长度采用 wire 原生范围；合并 metadata 包装，poll 通过同步 span 统一组帧和交付。四个实际单向接口改为独立 TX/RX 类型，实例静态绑定，公开 ABI 与 wire v3 保持。
+
+受控 `XGL_DATALINK_RX_CHUNK_SIZE` 支持 AUTO、16、32、64、128；AUTO 的 Boot 为 32，其余为 128。安装头拒绝宏冲突，资源报告与预算核对目标编译的真实 chunk。Boot 旧 smoke 的单次完整 ACK 假设在真实失败后修复，BUSY、重传、窗口复用与回绕断言保留。
+
+GNU Full/Embedded 各 646 项、Boot 95 项、Lite 130 项，MSVC Full 646 项、Boot 含示例 98 项通过；原 510 名称保留。28 个头分别通过 C11/C++17。Linux Full 646 项、ASan/UBSan 645 项通过；生产行/函数/分支覆盖率为 92.2%/99.7%/81.8%，43 个生产 C 文件的 Cppcheck 与 Clang-Tidy 通过。新增配置、安装和报告契约 7 项及其余开发消费契约通过，Boot 显式 chunk16/64/128 的安装和工作区 smoke 也通过。
+
+Windows 与固定官方 Linux ARM 四组合结果一致：普通/LTO Flash 为 **15,988/12,600 B**，最大单函数栈 **192/224 B**；MTU128/64 workspace **1,112/920 B**，含 1 KiB 预留栈 RAM **2,200/2,008 B**。相对前轮普通 Flash 增加 56 B、LTO 不变，工作区各减少 24 B。RAM 与栈预算已收紧，无堆和未解析符号；8 KiB Flash 目标仍未达到，未上板。逐项证据和诊断修正见[验证记录](design/validation/datalink-optimization.md)。
+
+## 历史：wire 布局、借用视图与体积优化
 
 在 `0e08bdf` 基础上统一 checked 长度和发送布局，修复辅助长度运算回绕；移除未使用的私有字段，集中扩展长度常量，零拷贝 helper 合入帧编码文件。SACK 改为借用视图，头 CRC 使用独立 CRC 组件的增量接口，完整接收直接解码到输出头并保持失败清零。生产源从 45 个归并为 44 个，未改变 wire v3 或公开 ABI，也未新增常驻工作区。
 

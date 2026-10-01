@@ -20,6 +20,8 @@ Set a nonzero `source_id` other than `XGL_BROADCAST_ID`. Routes determine reacha
 
 Routes have fixed capacity established at initialization. Routes sharing the same PHY descriptor share a parser/link; distinct PHY descriptors have independent RX state.
 
+Select the temporary PHY read chunk through CMake `XGL_DATALINK_RX_CHUNK_SIZE`: AUTO defaults to 32 for Boot and 128 elsewhere, with explicit 16/32/64/128 also supported, for example `-DXGL_DATALINK_RX_CHUNK_SIZE=64`. It bounds the per-read stack buffer without changing MTU or persistent RX storage. The generated header records the actual value; consumers of an installed library cannot inject a conflicting macro. See [Datalink](../protocol/datalink.md) for throughput and timeout considerations.
+
 The effective frame must fit the configured protocol limit and route MTU, including the 24-byte base header, extensions, payload, authentication tag if enabled, and 2-byte CRC. `memory.rx_buffer_size` must be at least `protocol.max_frame_size`.
 
 ## Explicit Capacities

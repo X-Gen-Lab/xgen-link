@@ -37,6 +37,8 @@ Application → API → Transport → Network → Datalink → synchronous PHY�
 
 公开 SDK 位于 `include/xgl`；私有头和实现同放 `src/<layer>`，不安装给消费者。普通、认证、原地发送和转发共用 datalink 的同步 PHY 出口；每个唯一 PHY 只有一个 parser/RX cache。目录职责见[实现映射](docs/zh/protocol/implementation-map.md)与[结构决策](design/adr/0005-protocol-structure.md)。
 
+Boot 默认每次 PHY 读取最多 32 字节，其余 profile 为 128；可用 CMake `XGL_DATALINK_RX_CHUNK_SIZE` 显式选择 16/32/64/128。工作预算是上限，应用应持续驱动 step 直到完成交付。最新接收契约和 Cortex-M0 资源见 [Datalink 优化](docs/zh/reference/datalink-optimization.md)。
+
 ## Validation / 验证
 
 先显式安装 [tools/quality.json](tools/quality.json) 固定提交的 xgen-quality 包、其要求的原生分析器，以及 `docs/requirements.txt` 中的文档依赖。下面使用原生 GNU 和已安装的基础包；源码开发从 [dev 入口](dev/README.md) 配置，并使用对应的 `build/dev-ci` 目录。

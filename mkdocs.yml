@@ -105,6 +105,7 @@ nav:
           - GitHub CI/CD: zh/reference/github-ci.md
           - 验证矩阵: zh/reference/validation-matrix.md
           - Wire 优化: zh/reference/wire-optimization.md
+          - Datalink 优化: zh/reference/datalink-optimization.md
           - 静态分析: zh/reference/static-analysis.md
           - 术语表: zh/reference/glossary.md
       - 贡献:
@@ -156,6 +157,7 @@ nav:
           - GitHub CI/CD: en/reference/github-ci.md
           - Validation Matrix: en/reference/validation-matrix.md
           - Wire Optimization: en/reference/wire-optimization.md
+          - Datalink Optimization: en/reference/datalink-optimization.md
           - Static Analysis: en/reference/static-analysis.md
           - Glossary: en/reference/glossary.md
       - Contributing:

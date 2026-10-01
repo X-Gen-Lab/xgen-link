@@ -26,11 +26,11 @@
   },
   "limits": {
     "flash_bytes": 12800,
-    "workspace_bytes": 1136,
-    "static_ram_bytes": 1200,
+    "workspace_bytes": 1112,
+    "static_ram_bytes": 1176,
     "reserved_stack_bytes": 1024,
-    "ram_with_reserved_stack_bytes": 2224,
-    "largest_linked_function_stack_bytes": 320
+    "ram_with_reserved_stack_bytes": 2200,
+    "largest_linked_function_stack_bytes": 224
   },
   "baseline_configuration": {
     "profile": "boot",

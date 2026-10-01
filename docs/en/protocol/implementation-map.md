@@ -22,7 +22,11 @@ This map identifies protocol owners. Public applications include `<xgl/xgl.h>`; 
 
 ## Internal Interfaces
 
-`xgl_protocol_io.h` separates packet and frame interfaces using typed arguments. Transport supplies a receive interface and submits logical packets to network. `xgl_packet.h` contains borrowed protocol views. `xgl_protocol_memory.h` describes resource-class services; it does not implement an allocator.
+`xgl_protocol_io.h` defines four directional endpoints: packet TX/RX and frame TX/RX. Each stores only a context and its corresponding callback. Transport provides packet RX, network provides packet TX and frame RX, and datalink provides frame TX. The instance binds them statically. A TX endpoint cannot contain a receive callback, and layers need no access to the private instance layout.
+
+`xgl_packet.h` contains borrowed protocol views. `xgl_protocol_memory.h` describes resource-class services without implementing an allocator. Peers, pending acknowledgements, payloads and encoding scratch retain separate capacities and lifetimes. Sharing an allocator interface does not justify merging their budgets or adding an implicit shared heap fallback.
+
+Datalink source separates initialization, transmit, receive and parser responsibilities. Receive owns span consumption, synchronous delivery and wire error classification. The parser retains only per-PHY incremental state. A complete wire view lives on the synchronous call stack, not persistently in every link.
 
 The reliable queue stores records and indexes them. It does not acknowledge scopes independently or retransmit raw PHY frames. Peer-owned transport code performs these state transitions through the current network/security path.
 

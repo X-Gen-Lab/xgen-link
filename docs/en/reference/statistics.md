@@ -10,6 +10,8 @@ Network and datalink TX packet/byte counters commit only after successful lower-
 
 The streaming parser and raw-frame ingress share CRC classification: header and complete-frame CRC failures increment their respective counters and synchronously report `XGL_ERR_CRC_FAILED`. Classification uses the current validation result without computing CRC again for statistics.
 
+Datalink receive statistics distinguish frame validation from driver calls. Wire format and CRC rejection increment `rx_errors`; CRC also reports its category. Ordinary wire format rejection does not call the error callback, while exceeding the datalink frame-size policy reports `XGL_ERR_INVALID_FRAME`. Partial-frame expiry resets and reports once. Errors returned by the PHY `rx` callback propagate to the step caller without counting as frame errors or triggering a second protocol error callback; driver fault counters belong to the adapter. A valid complete frame counts as received before upper-layer admission, so BUSY does not reverse that count. TX PHY failures increment datalink `tx_errors` and report the failure. These directional meanings remain explicit; adding errors across layers does not yield a fault count.
+
 ## Access
 
 Call `xgl_stats_get()` or `xgl_stats_reset()` while holding the application's exclusive access to the instance. There are no protocol mutexes or atomic snapshot promises. Counter reset does not reset peers, packet numbers, sessions or pending data.

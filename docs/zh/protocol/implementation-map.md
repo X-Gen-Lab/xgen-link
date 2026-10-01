@@ -22,7 +22,11 @@
 
 ## 内部接口
 
-`xgl_protocol_io.h` 使用有类型参数区分 packet 与 frame 接口。Transport 提供 receive 接口，并向 network 提交逻辑包。`xgl_packet.h` 包含借用的协议视图。`xgl_protocol_memory.h` 描述资源类别服务，不实现分配器。
+`xgl_protocol_io.h` 分别定义 packet TX/RX 和 frame TX/RX 四种单向端点，每种只有 context 与对应方向的回调。Transport 提供 packet RX，network 提供 packet TX 与 frame RX，datalink 提供 frame TX；实例负责静态绑定。类型系统不允许给 TX 端点填写 receive 槽位，也不要求各层访问实例的私有布局。
+
+`xgl_packet.h` 包含借用的协议视图。`xgl_protocol_memory.h` 描述资源类别服务，不实现分配器；peer、等待确认记录、载荷与临时编码空间仍保持各自的容量和生命周期。不能仅因使用相同 allocator 接口就合并预算或引入共享堆回退。
+
+Datalink 源码按入口、发送、接收和 parser 划分。接收文件集中处理 span 消费、同步交付与 wire 错误分类；parser 只持有每 PHY 的增量状态。完整 wire view 位于同步调用栈，不为每条链路增加常驻 view。
 
 可靠队列保存并索引记录，不独立确认 scope，也不直接向 PHY 重发原始帧。由 peer 所有者 transport 经当前 network/security 路径执行这些状态转换。
 

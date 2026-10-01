@@ -10,6 +10,8 @@ Parser 截止时间独立于 PHY 轮询间隔参与 `xgl_next_timeout()`。即�
 
 Step 返回最先出现的 parser 超时、PHY、交付或 transport 错误，同时继续消费已读出的整个字节批次并维护 transport。流中的格式错误帧被丢弃并通过诊断报告，不阻断后续帧的解析。PHY 成功读出字节不等于应用成功接纳。
 
+每条到期链路在一次 step 中只读取 PHY 一次，读取量还受构建时 `XGL_DATALINK_RX_CHUNK_SIZE` 限制。`AUTO` 在 Boot 为 32 字节，其余 profile 为 128 字节；运行期预算不是要求把该预算全部读满。选择较小 chunk 时，应重新核对整帧所需的轮询次数、驱动缓冲容量及 parser 超时，详见 [Datalink](../protocol/datalink.md)。
+
 `xgl_next_timeout(handle, now_ms, &delay_ms)` 在存在截止事件时返回 true。延迟为零表示立即有工作；false 不修改输出，必须单独处理，不能按未初始化的值睡眠。
 
 ## 主循环集成

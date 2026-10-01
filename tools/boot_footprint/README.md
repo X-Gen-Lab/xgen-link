@@ -24,7 +24,7 @@ LTO 应使用独立构建目录。`footprint-optimization.json` 和最终报告�
 
 配置固定为一个 peer、一个路由、一个 link、window 1、一个可靠 TX 记录，默认 MTU 128、RX 128，关闭 AUTH、转发、分片、乱序和 libc allocator。可通过 `XGL_FOOTPRINT_FRAME_SIZE`、`XGL_FOOTPRINT_RX_SIZE` 显式选择较小帧和 RX 空间；MTU 范围为 64–2048，RX 必须不小于 MTU 且不大于 4096。布局对象、消费者和报告使用相同参数。全部容量显式给出；不可变配置为 `static const`，在消费者整个生命周期有效并可放入 Flash。
 
-`layout_probe.c` 包含私有 workspace 类型头，不再包含生产 `.c` 文件；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 3 布局常量，分别计算初始化区域以及 peer、window、TX record、TX payload、scratch 五个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。消费者入口仍调用真实 `xgl_memory_requirements` 核对该大小。交叉构建未执行目标代码，因此这项运行时比较只有在将消费者适配至目标或模拟器后才算 ARM 执行验证。
+`layout_probe.c` 包含私有 workspace 类型头，不再包含生产 `.c` 文件；该诊断对象不链接到 ELF。脚本读取目标编译得到的版本 4 布局常量，分别计算初始化区域以及 peer、window、TX record、TX payload、scratch 五个独立资源池，生成精确大小的 workspace 数组；不能用最大块大小乘总块数代替这些分区。消费者入口仍调用真实 `xgl_memory_requirements` 核对该大小。交叉构建未执行目标代码，因此这项运行时比较只有在将消费者适配至目标或模拟器后才算 ARM 执行验证。
 
 2026-09-30 旧 core 组合的 GCC 15.2.1 Cortex-M0 `-Os`、无 LTO 历史测量如下；2026-10-01 迁移前重跑确认同一基线。它不表示新五包组合的最终资源。
 
@@ -102,3 +102,11 @@ python test/cmake/test_footprint_lto.py --link-source . --work-dir out/lto-contr
 ```
 
 测试分别构建默认配置和 LTO 配置，核查真实编译/链接命令、布局与消费者隔离、完整报告、禁堆约束及预算模式拒绝。命令日志保存在显式工作目录中。
+
+## Datalink 接收优化后的当前配置
+
+Boot 的 `XGL_DATALINK_RX_CHUNK_SIZE=AUTO` 解析为 32 字节；可显式选择 16/32/64/128。版本 4 布局从目标编译导出实际 `rx_chunk_bytes`，报告与预算据此拒绝缺失或冲突配置。该参数独立于 MTU/RX cache，消费方不能用冲突的预处理宏覆盖已编译值。
+
+当前 Cortex-M0 非 LTO/LTO Flash 为 15,988/12,600 B；MTU128/64 workspace 为 1,112/920 B，静态 RAM 为 1,176/984 B，含 1,024 B 预留栈的总 RAM 为 2,200/2,008 B。最大单函数栈为 192/224 B。四份 policy 已收紧 RAM 与单函数栈限额，Flash 上限仍为 16,384/12,800 B。历史基线保留 chunk128，不把读取工作量变化写成相同配置。
+
+Windows 与固定官方 Linux 工具链的四组合及收紧预算均通过，无堆与未解析符号。资源、源码、测试与未完成的板级验收边界见[本轮验证记录](../../design/validation/datalink-optimization.md)。

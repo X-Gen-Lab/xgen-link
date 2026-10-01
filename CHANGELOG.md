@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bounded RX chunk selection through CMake, with installed-header consistency and target-derived footprint budget identity.
 - Checked borrowed SACK views and opt-in Cortex-M0 footprint LTO with separate mode-specific budgets.
 - Scoped zero-copy sends and side-effect-free exact layout queries, while retaining the original zero-copy request ABI.
 - Exact workspace reports by resource category, including alignment and fixed reservations.
@@ -24,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Boot now defaults to a 32-byte PHY read chunk; other profiles retain 128 bytes. Products may explicitly select 16/32/64/128 and must account for partial reads when driving steps.
+- Datalink shares synchronous span consumption and direct wire status classification, with compact per-PHY parser state and four directional packet/frame endpoints.
 - Reuse checked TX layouts during synchronous encoding; consolidate frame construction and remove unused private metadata fields.
 - Decode directly into the borrowed frame view and calculate header CRC incrementally; preserve complete validation and failure-output contracts.
 - Read SACK bitmaps without a transport stack copy, retaining the 64-byte acceptance limit.
@@ -43,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Restart the candidate deadline when overlapping magic replaces a partial header, and reject impossible frame lengths as soon as the fixed header is available.
+- Keep the legacy parser view allocation off the production receive hot path; retain complete validation and update installed-SDK smoke scheduling for bounded reads.
 - Reject overflowing frame-size calculations and invalid extension/tag budgets before arithmetic; bound payload budgets to wire limits.
 - Keep the Boot update simulation valid when statistics are compiled out, while retaining dropped-ACK recovery and write-once checks.
 - Bound successful SACK fast retransmission per pending record, preserve deferred retries after BUSY, and count successful retries before later failures.
