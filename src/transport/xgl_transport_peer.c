@@ -4,6 +4,7 @@
  */
 
 #include "xgl_transport_internal.h"
+#include <internal/xgl_diagnostics.h>
 #include <string.h>
 
 /**
@@ -246,8 +247,9 @@ void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     transport_clear_peer_data(ctx, peer);
 
     transport_count_send_error(ctx);
-    xgl_transport_report_error(ctx, handle, error,
-                               "Reliable peer failed; new epoch required");
+    xgl_transport_report_error(
+        ctx, handle, error,
+        XGL_ERROR_MESSAGE("Reliable peer failed; new epoch required"));
 }
 
 /**
@@ -286,7 +288,8 @@ xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
             if (cancelled) {
                 xgl_transport_report_error(
                     ctx, handle, XGL_ERR_CANCELLED,
-                    "Transport scope closed with pending data");
+                    XGL_ERROR_MESSAGE(
+                        "Transport scope closed with pending data"));
             }
             return XGL_OK;
         }

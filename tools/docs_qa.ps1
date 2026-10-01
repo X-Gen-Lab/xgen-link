@@ -106,18 +106,18 @@ foreach ($match in $todoMatches) {
 }
 
 $requiredProtocolRefs = @{
-    "docs/en/protocol/wire-format.md" = "test/test_wire.cpp"
-    "docs/en/protocol/extensions.md" = "test/test_wire.cpp"
-    "docs/en/protocol/reliability.md" = "test/test_reliable.cpp"
-    "docs/en/protocol/security.md" = "test/test_security.cpp"
-    "docs/en/protocol/routing.md" = "test/test_network.cpp"
-    "docs/en/protocol/fragmentation.md" = "test/test_fragment.cpp"
-    "docs/zh/protocol/wire-format.md" = "test/test_wire.cpp"
-    "docs/zh/protocol/extensions.md" = "test/test_wire.cpp"
-    "docs/zh/protocol/reliability.md" = "test/test_reliable.cpp"
-    "docs/zh/protocol/security.md" = "test/test_security.cpp"
-    "docs/zh/protocol/routing.md" = "test/test_network.cpp"
-    "docs/zh/protocol/fragmentation.md" = "test/test_fragment.cpp"
+    "docs/en/protocol/wire-format.md" = "test/unit/wire/test_wire.cpp"
+    "docs/en/protocol/extensions.md" = "test/unit/wire/test_wire.cpp"
+    "docs/en/protocol/reliability.md" = "test/unit/transport/test_reliable.cpp"
+    "docs/en/protocol/security.md" = "test/unit/security/test_security.cpp"
+    "docs/en/protocol/routing.md" = "test/unit/network/test_network.cpp"
+    "docs/en/protocol/fragmentation.md" = "test/unit/transport/test_fragment.cpp"
+    "docs/zh/protocol/wire-format.md" = "test/unit/wire/test_wire.cpp"
+    "docs/zh/protocol/extensions.md" = "test/unit/wire/test_wire.cpp"
+    "docs/zh/protocol/reliability.md" = "test/unit/transport/test_reliable.cpp"
+    "docs/zh/protocol/security.md" = "test/unit/security/test_security.cpp"
+    "docs/zh/protocol/routing.md" = "test/unit/network/test_network.cpp"
+    "docs/zh/protocol/fragmentation.md" = "test/unit/transport/test_fragment.cpp"
 }
 
 foreach ($entry in $requiredProtocolRefs.GetEnumerator()) {

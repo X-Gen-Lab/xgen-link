@@ -3,7 +3,7 @@
  * \brief           Production wire-format encoding primitives
  */
 
-#include <xgl/internal/xgl_wire.h>
+#include <wire/xgl_wire.h>
 #include <xgl/xgl_config.h>
 
 #include <string.h>

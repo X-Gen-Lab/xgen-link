@@ -17,44 +17,42 @@ find_package(GTest 1.16.0 EXACT CONFIG REQUIRED)
 #-----------------------------------------------------------------------------
 
 set(TEST_SOURCES
-    test_main.cpp
-    test_cpp17_presets.cpp
-    test_coverage_wire.cpp
-    test_coverage_api.cpp
-    test_coverage_delivery.cpp
-    # Core tests
-    test_types.cpp
-    test_instance.cpp
-    test_config.cpp
-    test_creation_policy.cpp
-    test_footprint.cpp
-    test_send.cpp
-    test_stats.cpp
-    test_security.cpp
+    support/test_main.cpp
+    unit/api/test_cpp17_presets.cpp
+    unit/wire/test_coverage_wire.cpp
+    unit/api/test_coverage_api.cpp
+    integration/test_coverage_delivery.cpp
+    # Public API contracts
+    unit/api/test_types.cpp
+    unit/api/test_instance.cpp
+    unit/api/test_config.cpp
+    unit/api/test_creation_policy.cpp
+    unit/api/test_footprint.cpp
+    unit/api/test_send.cpp
+    unit/api/test_stats.cpp
+    unit/security/test_security.cpp
 
-    # Architecture improvement tests
-    test_layered_stats.cpp
+    # Cross-layer statistics
+    integration/test_layered_stats.cpp
 
-    # Data link tests
-    test_frame.cpp
-    test_wire.cpp
-    test_parser.cpp
-    test_datalink.cpp
+    # Wire and stream framing
+    unit/wire/test_frame.cpp
+    unit/wire/test_wire.cpp
+    unit/datalink/test_parser.cpp
+    unit/datalink/test_datalink.cpp
 
     # Network tests
-    test_route.cpp
-    test_network.cpp
+    unit/network/test_route.cpp
+    unit/network/test_network.cpp
 
     # Transport tests
-    test_rtt.cpp
-    test_window.cpp
-    test_window_storage.cpp
-    test_reliable.cpp
-    test_fragment.cpp
-    test_transport.cpp
-    test_timeout_control.cpp
-
-    # Platform tests
+    unit/transport/test_rtt.cpp
+    unit/transport/test_window.cpp
+    unit/transport/test_window_storage.cpp
+    unit/transport/test_reliable.cpp
+    unit/transport/test_fragment.cpp
+    unit/transport/test_transport.cpp
+    unit/transport/test_timeout_control.cpp
 
     # Integration tests
     integration/test_integration.cpp
@@ -90,7 +88,6 @@ add_executable(xgl_tests
     ${MOCK_SOURCES}
 )
 
-
 target_link_libraries(xgl_tests
     PRIVATE
         xgl
@@ -104,6 +101,8 @@ target_include_directories(xgl_tests
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${PROJECT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/property
 )
 
@@ -193,6 +192,8 @@ if(XGL_BUILD_BENCHMARKS)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+            ${CMAKE_CURRENT_SOURCE_DIR}/support
+            ${PROJECT_SOURCE_DIR}/src
     )
 
     # Latency benchmark
@@ -205,6 +206,8 @@ if(XGL_BUILD_BENCHMARKS)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+            ${CMAKE_CURRENT_SOURCE_DIR}/support
+            ${PROJECT_SOURCE_DIR}/src
     )
 
     # Memory usage benchmark
@@ -217,6 +220,8 @@ if(XGL_BUILD_BENCHMARKS)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+            ${CMAKE_CURRENT_SOURCE_DIR}/support
+            ${PROJECT_SOURCE_DIR}/src
     )
 
     # Convenience target to build all benchmarks

@@ -4,7 +4,7 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_route.h>
+#include <network/xgl_route.h>
 
 #include <string.h>
 #include <xgen/memory/allocator.h>

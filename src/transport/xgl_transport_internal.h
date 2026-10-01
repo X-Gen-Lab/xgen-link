@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "xgl/internal/xgl_transport.h"
+#include "transport/xgl_transport.h"
 
 /**
  * \brief           Read the selected transport clock; explicit zero is valid

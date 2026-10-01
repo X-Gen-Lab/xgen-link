@@ -3,7 +3,7 @@
  * \brief           Transport control packet helpers
  */
 
-#include "xgl/internal/xgl_wire.h"
+#include "wire/xgl_wire.h"
 #include "xgl_transport_internal.h"
 
 /**

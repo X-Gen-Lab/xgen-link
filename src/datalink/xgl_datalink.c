@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_datalink.h>
-#include <xgl/internal/xgl_parser.h>
+#include <datalink/xgl_datalink.h>
+#include <datalink/xgl_parser.h>
 #include <xgl/xgl_error.h>
 
 #include <string.h>

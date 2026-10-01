@@ -6,7 +6,7 @@
 #ifndef XGL_FRAGMENT_INTERNAL_H
 #define XGL_FRAGMENT_INTERNAL_H
 
-#include <xgl/internal/xgl_fragment.h>
+#include <transport/xgl_fragment.h>
 
 /**
  * \brief           Free a buffer through its owning manager

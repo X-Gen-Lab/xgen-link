@@ -5,7 +5,7 @@
  */
 
 #include "xgl_fragment_internal.h"
-#include <xgl/internal/xgl_fragment.h>
+#include <transport/xgl_fragment.h>
 
 /*---------------------------------------------------------------------------*/
 /* Fragmentation Manager Functions                                           */

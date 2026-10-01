@@ -4,7 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_wire.h>
+#include <internal/xgl_diagnostics.h>
+#include <wire/xgl_wire.h>
 #include <xgl/xgl_error.h>
 
 #include <string.h>
@@ -96,7 +97,8 @@ void xgl_network_report_error(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     }
 
     if (ctx->error_callback != NULL) {
-        ctx->error_callback(handle, error, message, ctx->callback_user_data);
+        ctx->error_callback(handle, error, XGL_ERROR_MESSAGE(message),
+                            ctx->callback_user_data);
     }
 
     /* Update error statistics */

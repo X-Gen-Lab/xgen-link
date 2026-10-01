@@ -6,7 +6,7 @@
 #ifndef XGL_TRANSPORT_SEND_INTERNAL_H
 #define XGL_TRANSPORT_SEND_INTERNAL_H
 
-#include "xgl/internal/xgl_transport_send.h"
+#include "transport/xgl_transport_send.h"
 #include "xgl_transport_internal.h"
 
 xgl_error_t transport_queue_reliable_tx(

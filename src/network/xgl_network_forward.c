@@ -4,6 +4,7 @@
  * \author          X-Gen Lab
  */
 
+#include <internal/xgl_diagnostics.h>
 #include <string.h>
 #include <xgen/memory/allocator.h>
 
@@ -27,7 +28,8 @@ static xgl_error_t network_lookup_forward_route(xgl_network_ctx_t* ctx,
 
     if (ctx->error_callback != NULL) {
         ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
-                            "No route for forwarding", ctx->callback_user_data);
+                            XGL_ERROR_MESSAGE("No route for forwarding"),
+                            ctx->callback_user_data);
     }
 
     network_count_rx_drop(ctx);
@@ -43,7 +45,8 @@ static xgl_error_t network_validate_forward_ttl(xgl_network_ctx_t* ctx,
 
     network_count_rx_drop(ctx);
     if (ctx->error_callback != NULL) {
-        ctx->error_callback(handle, XGL_ERR_TTL_EXPIRED, "Packet TTL expired",
+        ctx->error_callback(handle, XGL_ERR_TTL_EXPIRED,
+                            XGL_ERROR_MESSAGE("Packet TTL expired"),
                             ctx->callback_user_data);
     }
     return XGL_ERR_TTL_EXPIRED;

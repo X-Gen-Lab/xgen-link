@@ -3,7 +3,7 @@
  * \brief           Acknowledgement validation and reliable completion
  */
 
-#include "xgl/internal/xgl_wire.h"
+#include "wire/xgl_wire.h"
 #include "xgl_transport_internal.h"
 #include <limits.h>
 

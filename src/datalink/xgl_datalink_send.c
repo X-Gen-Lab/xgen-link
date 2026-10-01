@@ -3,7 +3,8 @@
  * \brief           Data link TX path implementation
  */
 
-#include <xgl/internal/xgl_datalink.h>
+#include <datalink/xgl_datalink.h>
+#include <internal/xgl_diagnostics.h>
 #include <xgl/xgl_config.h>
 
 #include <xgen/memory/allocator.h>
@@ -17,7 +18,7 @@ static void datalink_count_tx_error(xgl_datalink_ctx_t* ctx) {
 static void datalink_report_tx_error(xgl_datalink_ctx_t* ctx, xgl_error_t err,
                                      const char* message) {
     if (ctx->error_callback != NULL) {
-        ctx->error_callback(ctx->owner_handle, err, message,
+        ctx->error_callback(ctx->owner_handle, err, XGL_ERROR_MESSAGE(message),
                             ctx->callback_user_data);
     }
 }
@@ -99,8 +100,9 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
         owned ? xgm_alloc(ctx->allocator, frame_size) : buffer;
     if (frame_buffer == NULL) {
         datalink_count_tx_error(ctx);
-        datalink_report_tx_error(ctx, XGL_ERR_NO_MEMORY,
-                                 "Failed to allocate frame buffer");
+        datalink_report_tx_error(
+            ctx, XGL_ERR_NO_MEMORY,
+            XGL_ERROR_MESSAGE("Failed to allocate frame buffer"));
         return XGL_ERR_NO_MEMORY;
     }
 
@@ -117,7 +119,8 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
     }
     if (err != XGL_OK) {
         datalink_count_tx_error(ctx);
-        datalink_report_tx_error(ctx, err, "Frame serialization failed");
+        datalink_report_tx_error(
+            ctx, err, XGL_ERROR_MESSAGE("Frame serialization failed"));
         if (owned) {
             xgm_free(ctx->allocator, frame_buffer);
         }
@@ -165,8 +168,8 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
     xgl_error_t err = phy->tx(frame_buffer, frame_len, phy->user_data);
     if (err != XGL_OK) {
         datalink_count_tx_error(ctx);
-        datalink_report_tx_error(ctx, err,
-                                 "Physical layer transmission failed");
+        datalink_report_tx_error(
+            ctx, err, XGL_ERROR_MESSAGE("Physical layer transmission failed"));
         return err;
     }
 

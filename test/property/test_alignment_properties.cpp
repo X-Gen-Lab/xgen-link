@@ -4,7 +4,7 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_frame.h>
+#include <wire/xgl_frame.h>
 
 #include <array>
 #include <cstring>

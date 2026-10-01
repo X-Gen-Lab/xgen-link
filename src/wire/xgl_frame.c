@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_frame.h>
-#include <xgl/internal/xgl_wire.h>
+#include <wire/xgl_frame.h>
+#include <wire/xgl_wire.h>
 #include <xgl/xgl_error.h>
 #include <xgl/xgl_types.h>
 

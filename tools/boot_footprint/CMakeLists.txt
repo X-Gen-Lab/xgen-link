@@ -34,6 +34,7 @@ add_subdirectory("${XGL_SOURCE_ROOT}" xgen-link)
 # The diagnostic object measures private target types without compiling or
 # linking another copy of the protocol implementation.
 add_library(xgl_boot_layout OBJECT layout_probe.c)
+target_include_directories(xgl_boot_layout PRIVATE "${XGL_SOURCE_ROOT}/src")
 target_link_libraries(xgl_boot_layout PRIVATE xgl::xgl
     xgm::pool xgm::size_class xgct::list xgct::bitset
     xgb::bytes xgcrc::crc16)

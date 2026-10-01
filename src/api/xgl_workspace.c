@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_protocol_memory.h>
-#include <xgl/internal/xgl_wire.h>
+#include <internal/xgl_protocol_memory.h>
+#include <wire/xgl_wire.h>
 
 #include <string.h>
 #include <xgen/containers/bitset.h>

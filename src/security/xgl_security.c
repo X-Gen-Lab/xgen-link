@@ -3,7 +3,7 @@
  * \brief           Security helpers for authenticated production transport
  */
 
-#include <xgl/internal/xgl_security.h>
+#include <security/xgl_security.h>
 
 #include <string.h>
 #include <xgen/bytes/bytes.h>

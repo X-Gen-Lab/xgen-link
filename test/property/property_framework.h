@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 #include <random>
 #include <vector>
-#include <xgl/internal/xgl_wire.h>
+#include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
 
 #include "property_seed.h"

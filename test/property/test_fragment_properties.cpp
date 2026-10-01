@@ -3,9 +3,9 @@
  * \brief           Production FRAGMENT_EXT property tests
  */
 
-#include <xgl/internal/xgl_fragment.h>
-#include <xgl/internal/xgl_transport.h>
-#include <xgl/internal/xgl_wire.h>
+#include <transport/xgl_fragment.h>
+#include <transport/xgl_transport.h>
+#include <wire/xgl_wire.h>
 #include <xgl/xgl_error.h>
 
 #include <cstring>

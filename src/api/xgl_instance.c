@@ -4,10 +4,10 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_parser.h>
-#include <xgl/internal/xgl_route.h>
-#include <xgl/internal/xgl_rtt.h>
-#include <xgl/internal/xgl_window.h>
+#include <datalink/xgl_parser.h>
+#include <network/xgl_route.h>
+#include <transport/xgl_rtt.h>
+#include <transport/xgl_window.h>
 #include <xgl/xgl.h>
 
 #include <string.h>

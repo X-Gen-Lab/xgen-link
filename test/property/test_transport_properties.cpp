@@ -1,4 +1,4 @@
-#include <xgl/internal/xgl_transport.h>
+#include <transport/xgl_transport.h>
 
 #include <xgen/memory/libc_allocator.h>
 /**
@@ -7,11 +7,11 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_frame.h>
-#include <xgl/internal/xgl_reliable.h>
-#include <xgl/internal/xgl_rtt.h>
-#include <xgl/internal/xgl_window.h>
-#include <xgl/internal/xgl_wire.h>
+#include <wire/xgl_frame.h>
+#include <transport/xgl_reliable.h>
+#include <transport/xgl_rtt.h>
+#include <transport/xgl_window.h>
+#include <wire/xgl_wire.h>
 #include <xgl/xgl_types.h>
 
 #include <cmath>

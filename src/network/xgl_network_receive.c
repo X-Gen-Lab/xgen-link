@@ -3,8 +3,8 @@
  * \brief           Network receive and forwarding path implementation
  */
 
-#include "xgl/internal/xgl_route.h"
-#include "xgl/internal/xgl_wire.h"
+#include "network/xgl_route.h"
+#include "wire/xgl_wire.h"
 #include "xgl/xgl_config.h"
 #include "xgl_network_internal.h"
 

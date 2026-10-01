@@ -3,7 +3,7 @@
  * \brief           Wire-format extension value encoding primitives
  */
 
-#include <xgl/internal/xgl_wire.h>
+#include <wire/xgl_wire.h>
 
 #include <string.h>
 #include <xgen/bytes/bytes.h>

@@ -4,7 +4,7 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_network.h>
+#include <network/xgl_network.h>
 #include <xgl/xgl.h>
 
 #include <string.h>

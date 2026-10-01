@@ -6,7 +6,7 @@
 #include <xgen/memory/allocator.h>
 
 #include <string.h>
-#include <xgl/internal/xgl_reliable.h>
+#include <transport/xgl_reliable.h>
 
 static size_t reliable_index_bucket(uint16_t target_id,
                                     uint32_t packet_number) {

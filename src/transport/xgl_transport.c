@@ -6,6 +6,7 @@
 #include "xgen/memory/allocator.h"
 #include "xgl/xgl_config.h"
 #include "xgl_transport_internal.h"
+#include <internal/xgl_diagnostics.h>
 #include <string.h>
 
 /*---------------------------------------------------------------------------*/
@@ -231,6 +232,7 @@ void xgl_transport_report_error(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
 
     if (ctx->error_callback) {
-        ctx->error_callback(handle, error, message, ctx->callback_user_data);
+        ctx->error_callback(handle, error, XGL_ERROR_MESSAGE(message),
+                            ctx->callback_user_data);
     }
 }

@@ -7,15 +7,15 @@
 #ifndef XGL_INSTANCE_INTERNAL_H
 #define XGL_INSTANCE_INTERNAL_H
 
-#include <xgl/internal/xgl_datalink.h>
-#include <xgl/internal/xgl_network.h>
-#include <xgl/internal/xgl_parser.h>
-#include <xgl/internal/xgl_protocol_io.h>
-#include <xgl/internal/xgl_protocol_memory.h>
-#include <xgl/internal/xgl_route.h>
-#include <xgl/internal/xgl_rtt.h>
-#include <xgl/internal/xgl_transport.h>
-#include <xgl/internal/xgl_window.h>
+#include <datalink/xgl_datalink.h>
+#include <network/xgl_network.h>
+#include <datalink/xgl_parser.h>
+#include <internal/xgl_protocol_io.h>
+#include <internal/xgl_protocol_memory.h>
+#include <network/xgl_route.h>
+#include <transport/xgl_rtt.h>
+#include <transport/xgl_transport.h>
+#include <transport/xgl_window.h>
 #include <xgl/xgl.h>
 
 #ifdef __cplusplus

@@ -4,7 +4,7 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_security.h>
+#include <security/xgl_security.h>
 
 /** \brief           Resolve authentication overhead before reserving storage.
  */

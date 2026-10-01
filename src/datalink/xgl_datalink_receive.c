@@ -4,9 +4,10 @@
  * \author          X-Gen Lab
  */
 
-#include <xgl/internal/xgl_datalink.h>
-#include <xgl/internal/xgl_datalink_metadata.h>
-#include <xgl/internal/xgl_wire.h>
+#include <datalink/xgl_datalink.h>
+#include <datalink/xgl_datalink_metadata.h>
+#include <internal/xgl_diagnostics.h>
+#include <wire/xgl_wire.h>
 #include <xgl/xgl_config.h>
 #include <xgl/xgl_error.h>
 
@@ -19,9 +20,10 @@ static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
             ctx->stats->rx_errors++;
         }
         if (ctx->error_callback != NULL) {
-            ctx->error_callback(ctx->owner_handle, XGL_ERR_INVALID_FRAME,
-                                "Frame size exceeds maximum allowed",
-                                ctx->callback_user_data);
+            ctx->error_callback(
+                ctx->owner_handle, XGL_ERR_INVALID_FRAME,
+                XGL_ERROR_MESSAGE("Frame size exceeds maximum allowed"),
+                ctx->callback_user_data);
         }
         return XGL_ERR_INVALID_FRAME;
     }
@@ -73,7 +75,8 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
         }
         if (ctx->error_callback != NULL) {
             ctx->error_callback(ctx->owner_handle, XGL_ERR_TIMEOUT,
-                                "Parser timeout", ctx->callback_user_data);
+                                XGL_ERROR_MESSAGE("Parser timeout"),
+                                ctx->callback_user_data);
         }
     }
 
@@ -146,16 +149,18 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
                 (*ctx->rx_crc16_errors)++;
             }
             if (ctx->error_callback != NULL) {
-                ctx->error_callback(ctx->owner_handle, XGL_ERR_CRC_FAILED,
-                                    "Frame CRC16 validation failed",
-                                    ctx->callback_user_data);
+                ctx->error_callback(
+                    ctx->owner_handle, XGL_ERR_CRC_FAILED,
+                    XGL_ERROR_MESSAGE("Frame CRC16 validation failed"),
+                    ctx->callback_user_data);
             }
         }
         if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE &&
             ctx->error_callback != NULL) {
-            ctx->error_callback(ctx->owner_handle, XGL_ERR_INVALID_FRAME,
-                                "Frame size exceeds maximum allowed",
-                                ctx->callback_user_data);
+            ctx->error_callback(
+                ctx->owner_handle, XGL_ERR_INVALID_FRAME,
+                XGL_ERROR_MESSAGE("Frame size exceeds maximum allowed"),
+                ctx->callback_user_data);
         }
         return err;
     }

@@ -3,12 +3,13 @@
  * \brief           Transport transmit planning, admission and submission
  */
 
-#include "xgl/internal/xgl_frame.h"
-#include "xgl/internal/xgl_route.h"
-#include "xgl/internal/xgl_transport_send.h"
-#include "xgl/internal/xgl_wire.h"
+#include "network/xgl_route.h"
+#include "transport/xgl_transport_send.h"
+#include "wire/xgl_frame.h"
+#include "wire/xgl_wire.h"
 #include "xgl/xgl_config.h"
 #include "xgl_transport_send_internal.h"
+#include <internal/xgl_diagnostics.h>
 #include <string.h>
 
 static uint16_t
@@ -278,7 +279,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         if (ctx->error_callback != NULL) {
             ctx->error_callback(
                 handle, XGL_ERR_INVALID_PARAM,
-                "Transport layer not connected to network layer",
+                XGL_ERROR_MESSAGE(
+                    "Transport layer not connected to network layer"),
                 ctx->callback_user_data);
         }
         return XGL_ERR_INVALID_PARAM;
@@ -289,9 +291,10 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     if (err != XGL_OK) {
         transport_count_send_error(ctx);
         if (err == XGL_ERR_INVALID_PARAM && ctx->error_callback != NULL) {
-            ctx->error_callback(handle, XGL_ERR_INVALID_PARAM,
-                                "max_frame_size too small for headers",
-                                ctx->callback_user_data);
+            ctx->error_callback(
+                handle, XGL_ERR_INVALID_PARAM,
+                XGL_ERROR_MESSAGE("max_frame_size too small for headers"),
+                ctx->callback_user_data);
         }
         return err;
     }

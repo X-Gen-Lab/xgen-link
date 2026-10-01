@@ -3,7 +3,7 @@
  * \brief           Wire-format ACK extension value codecs
  */
 
-#include <xgl/internal/xgl_wire.h>
+#include <wire/xgl_wire.h>
 
 #include <string.h>
 #include <xgen/bytes/bytes.h>

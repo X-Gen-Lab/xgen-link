@@ -4,7 +4,7 @@
  * \author          X-Gen Lab
  */
 
-#include "xgl/internal/xgl_window.h"
+#include "transport/xgl_window.h"
 
 #include <string.h>
 #include <xgen/containers/bitset.h>

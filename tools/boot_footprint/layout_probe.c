@@ -7,8 +7,8 @@
 
 #include "footprint_config.h"
 
-#include "../../src/api/xgl_workspace_internal.h"
-#include <xgl/internal/xgl_wire.h>
+#include "api/xgl_workspace_internal.h"
+#include <wire/xgl_wire.h>
 
 _Static_assert(XGL_INIT_CLASSES == 3U && XGL_RESOURCE_COUNT == 5U,
                "Update the footprint layout for the new initialization plan");

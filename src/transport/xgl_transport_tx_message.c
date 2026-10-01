@@ -3,7 +3,7 @@
  * \brief           Owned messages advanced through the transmit window
  */
 
-#include "xgl/internal/xgl_wire.h"
+#include "wire/xgl_wire.h"
 #include "xgl_transport_send_internal.h"
 #include <string.h>
 

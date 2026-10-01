@@ -3,7 +3,7 @@
  * \brief           Datalink policy around the shared validated wire view
  */
 
-#include "xgl/internal/xgl_datalink_metadata.h"
+#include "datalink/xgl_datalink_metadata.h"
 
 #include <string.h>
 

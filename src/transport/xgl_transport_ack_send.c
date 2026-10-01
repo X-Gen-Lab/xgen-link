@@ -3,7 +3,7 @@
  * \brief           ACK and selective acknowledgement emission
  */
 
-#include "xgl/internal/xgl_wire.h"
+#include "wire/xgl_wire.h"
 #include "xgl_transport_internal.h"
 
 /**

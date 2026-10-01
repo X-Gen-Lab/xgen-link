@@ -6,8 +6,8 @@
 #ifndef XGL_NETWORK_INTERNAL_H
 #define XGL_NETWORK_INTERNAL_H
 
-#include "xgl/internal/xgl_network.h"
-#include "xgl/internal/xgl_wire.h"
+#include "network/xgl_network.h"
+#include "wire/xgl_wire.h"
 
 xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
                                          xgl_handle_t handle,

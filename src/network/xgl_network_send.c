@@ -3,11 +3,12 @@
  * \brief           Network send path implementation
  */
 
+#include <internal/xgl_diagnostics.h>
 #include <string.h>
 
-#include "xgl/internal/xgl_frame.h"
-#include "xgl/internal/xgl_route.h"
-#include "xgl/internal/xgl_wire.h"
+#include "network/xgl_route.h"
+#include "wire/xgl_frame.h"
+#include "wire/xgl_wire.h"
 #include "xgl/xgl_config.h"
 #include "xgl_network_internal.h"
 
@@ -248,7 +249,8 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
     if (route == NULL) {
         if (ctx->error_callback != NULL) {
             ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
-                                "Route not found", ctx->callback_user_data);
+                                XGL_ERROR_MESSAGE("Route not found"),
+                                ctx->callback_user_data);
         }
 
         network_count_tx_error(ctx);

@@ -4,6 +4,7 @@
  */
 
 #include "xgl_transport_internal.h"
+#include <internal/xgl_diagnostics.h>
 
 /**
  * \brief           Retry an owned packet or fail its peer at the retry limit
@@ -223,9 +224,10 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         if (timeout_count > 0) {
             /* Report error */
             if (ctx->error_callback) {
-                ctx->error_callback(handle, XGL_ERR_TIMEOUT,
-                                    "Fragment reassembly timeout",
-                                    ctx->callback_user_data);
+                ctx->error_callback(
+                    handle, XGL_ERR_TIMEOUT,
+                    XGL_ERROR_MESSAGE("Fragment reassembly timeout"),
+                    ctx->callback_user_data);
             }
 
             /* Update statistics */
