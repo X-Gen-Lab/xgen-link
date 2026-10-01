@@ -24,16 +24,36 @@ class XglTransportRuntimeTest : public ::testing::Test {
     uint16_t failing_target = 0U;
     xgl_error_t failure = XGL_OK;
     std::vector<xgl_error_t> errors;
+    xgl_error_t feedback_failure = XGL_OK;
+    std::vector<xgl_error_t> acceptance_results;
+    size_t acceptance_index = 0U;
+    std::vector<uint8_t> delivered;
 
     static xgl_error_t SendPacket(void* user, xgl_handle_t,
                                   xgl_packet_t* packet) {
         auto* self = static_cast<XglTransportRuntimeTest*>(user);
+        if (packet->packet_type == XGL_PACKET_TYPE_ACK) {
+            return self->feedback_failure;
+        }
         if (packet->packet_type != XGL_PACKET_TYPE_DATA) {
             return XGL_OK;
         }
         ++self->attempts;
         return packet->target_id == self->failing_target ? self->failure
                                                          : XGL_OK;
+    }
+
+    static xgl_error_t Accept(xgl_handle_t, uint16_t, uint8_t,
+                              const uint8_t* data, size_t length, void* user) {
+        auto* self = static_cast<XglTransportRuntimeTest*>(user);
+        const xgl_error_t result =
+            self->acceptance_index < self->acceptance_results.size()
+                ? self->acceptance_results[self->acceptance_index++]
+                : XGL_OK;
+        if (result == XGL_OK) {
+            self->delivered.insert(self->delivered.end(), data, data + length);
+        }
+        return result;
     }
 
     static void Error(xgl_handle_t, xgl_error_t error, const char*,
@@ -57,6 +77,7 @@ class XglTransportRuntimeTest : public ::testing::Test {
         config.tx_retries = &retries;
         config.allocator = xgm_allocator_libc();
         config.error_callback = Error;
+        config.rx_accept_callback = Accept;
         config.callback_user_data = this;
         config.enable_fragmentation = fragmentation;
         config.max_message_size = 128U;
@@ -108,6 +129,19 @@ class XglTransportRuntimeTest : public ::testing::Test {
         packet.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
         packet.extensions = extensions.data();
         packet.extensions_len = extensions_length;
+        return xgl_transport_receive(&context, nullptr, &packet);
+    }
+
+    xgl_error_t Receive(uint32_t number, uint16_t source = 2U) {
+        const uint8_t payload = static_cast<uint8_t>(number);
+        xgl_packet_data_t data = {1U, &payload};
+        xgl_packet_t packet = {};
+        packet.source_id = source;
+        packet.target_id = 1U;
+        packet.packet_type = XGL_PACKET_TYPE_DATA;
+        packet.packet_number = number;
+        packet.reliable = XGL_RELIABILITY_ACK_ELICITING;
+        packet.data = &data;
         return xgl_transport_receive(&context, nullptr, &packet);
     }
 
@@ -208,6 +242,83 @@ TEST_F(XglTransportRuntimeTest, RetryLimitIsReturnedOnceAtTerminalTransition) {
     ASSERT_EQ(errors.size(), 1U);
     EXPECT_EQ(errors.front(), XGL_ERR_ACK_TIMEOUT);
 }
+
+#if XGL_FEATURE_OUT_OF_ORDER
+TEST_F(XglTransportRuntimeTest, BufferedDeliveryReturnsAckBusyAfterAcceptance) {
+    Init();
+    ASSERT_EQ(Receive(1U), XGL_OK);
+    acceptance_results = {XGL_OK, XGL_ERR_BUSY};
+    ASSERT_EQ(Receive(0U), XGL_ERR_BUSY);
+    ASSERT_NE(context.peers, nullptr);
+    ASSERT_EQ(context.peers->rx_buffered_count, 1U);
+    EXPECT_EQ(delivered, (std::vector<uint8_t>{0U}));
+
+    feedback_failure = XGL_ERR_BUSY;
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 1U), XGL_ERR_BUSY);
+    EXPECT_EQ(delivered, (std::vector<uint8_t>{0U, 1U}));
+    EXPECT_EQ(context.peers->rx_buffered_count, 0U);
+    EXPECT_EQ(context.peers->rx_next_packet_number, 2U);
+    EXPECT_FALSE(context.peers->failed);
+    EXPECT_TRUE(errors.empty());
+
+    feedback_failure = XGL_OK;
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 2U), XGL_OK);
+    EXPECT_EQ(Receive(1U), XGL_OK);
+    EXPECT_EQ(delivered, (std::vector<uint8_t>{0U, 1U}));
+}
+
+TEST_F(XglTransportRuntimeTest,
+       BufferedHardFailureOutranksEarlierTemporaryAckFailure) {
+    Init();
+    ASSERT_EQ(Receive(1U), XGL_OK);
+    ASSERT_EQ(Receive(2U), XGL_OK);
+    acceptance_results = {XGL_OK, XGL_ERR_BUSY};
+    ASSERT_EQ(Receive(0U), XGL_ERR_BUSY);
+    ASSERT_NE(context.peers, nullptr);
+    ASSERT_EQ(context.peers->rx_buffered_count, 2U);
+
+    acceptance_results = {XGL_OK, XGL_ERR_INVALID_PARAM};
+    acceptance_index = 0U;
+    feedback_failure = XGL_ERR_BUSY;
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 1U), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(delivered, (std::vector<uint8_t>{0U, 1U}));
+    EXPECT_TRUE(context.peers->failed);
+    EXPECT_EQ(context.peers->rx_buffered_count, 0U);
+    EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_INVALID_PARAM}));
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 2U), XGL_OK);
+    EXPECT_EQ(errors.size(), 1U);
+}
+
+TEST_F(XglTransportRuntimeTest,
+       BufferedHardFailureOutranksOtherPeersTemporaryAckFailure) {
+    Init();
+    ASSERT_EQ(Receive(1U, 3U), XGL_OK);
+    acceptance_results = {XGL_OK, XGL_ERR_BUSY};
+    ASSERT_EQ(Receive(0U, 3U), XGL_ERR_BUSY);
+    ASSERT_EQ(Receive(1U), XGL_OK);
+    acceptance_index = 0U;
+    ASSERT_EQ(Receive(0U), XGL_ERR_BUSY);
+    auto* accepting_peer = transport_find_peer_scope(&context, 2U, 0U, 0U);
+    auto* failing_peer = transport_find_peer_scope(&context, 3U, 0U, 0U);
+    ASSERT_NE(accepting_peer, nullptr);
+    ASSERT_NE(failing_peer, nullptr);
+    ASSERT_EQ(accepting_peer->rx_buffered_count, 1U);
+    ASSERT_EQ(failing_peer->rx_buffered_count, 1U);
+
+    acceptance_results = {XGL_OK, XGL_ERR_INVALID_PARAM};
+    acceptance_index = 0U;
+    feedback_failure = XGL_ERR_BUSY;
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 1U), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(delivered, (std::vector<uint8_t>{0U, 0U, 1U}));
+    EXPECT_FALSE(accepting_peer->failed);
+    EXPECT_EQ(accepting_peer->rx_buffered_count, 0U);
+    EXPECT_TRUE(failing_peer->failed);
+    EXPECT_EQ(failing_peer->rx_buffered_count, 0U);
+    EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_INVALID_PARAM}));
+    EXPECT_EQ(xgl_transport_run(&context, nullptr, 2U), XGL_OK);
+    EXPECT_EQ(errors.size(), 1U);
+}
+#endif
 
 #if XGL_FEATURE_FRAGMENTATION
 TEST_F(XglTransportRuntimeTest, AckDefersMessagePumpAndPublishesImmediateWork) {
