@@ -59,6 +59,7 @@ typedef struct xgl_reliable_packet_s {
     uint8_t retry_count; /**< Current retry count */
     bool sent; /**< First transmission accepted; timestamp zero is valid */
     bool retry_pending;         /**< A local-capacity retry is scheduled */
+    bool fast_retry_pending;    /**< Validated SACK requests deferred work */
     uint32_t retry_started_ms;  /**< Start of the bounded local retry delay */
     uint32_t send_timestamp;    /**< Last send timestamp in ms */
     int32_t timeout_ms;         /**< Current timeout value in ms */

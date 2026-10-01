@@ -167,30 +167,19 @@ static bool transport_sack_bit_is_set(const uint8_t* bitmap, size_t bit_index) {
 
 /**
  * \brief           Retry a missing original packet before RTO recovery
- * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle
- * \param[in,out]   peer: Exact packet owner
  * \param[in,out]   packet: Outstanding packet, or NULL if already acknowledged
- * \return          XGL_OK if suppressed or submitted, otherwise retry error
- * \note            A successful retry disables further fast retries for this
- *                  packet. Duplicate feedback cannot consume its retry budget.
+ * \note            Maintenance submits the retry after the receive stack has
+ *                  unwound. Duplicate feedback preserves a local retry delay.
  */
-static xgl_error_t transport_fast_retransmit(xgl_transport_ctx_t* ctx,
-                                             xgl_handle_t handle,
-                                             xgl_transport_peer_state_t* peer,
-                                             xgl_reliable_packet_t* packet) {
-    if (packet == NULL || packet->retry_count != 0U) {
-        return XGL_OK;
+static void transport_schedule_fast_retry(xgl_reliable_packet_t* packet) {
+    if (packet != NULL && packet->sent && packet->retry_count == 0U) {
+        packet->fast_retry_pending = true;
     }
-    return transport_retransmit_reliable_packet(ctx, handle, peer, packet,
-                                                transport_now(ctx));
 }
 
-static xgl_error_t
-transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
-                             xgl_transport_peer_state_t* peer,
-                             uint16_t source_id, const uint8_t* value,
-                             size_t value_len) {
+static xgl_error_t transport_process_sack_value(
+    xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
+    uint16_t source_id, const uint8_t* value, size_t value_len) {
     if (ctx == NULL || peer == NULL || value == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -225,7 +214,8 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     if (!has_set) {
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
             &peer->reliable_queue, view.base_packet, source_id);
-        return transport_fast_retransmit(ctx, handle, peer, missing);
+        transport_schedule_fast_retry(missing);
+        return XGL_OK;
     }
 
     uint32_t now = transport_now(ctx);
@@ -246,10 +236,7 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         uint32_t packet_number = view.base_packet + (uint32_t)i;
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
             &peer->reliable_queue, packet_number, source_id);
-        err = transport_fast_retransmit(ctx, handle, peer, missing);
-        if (err != XGL_OK) {
-            return err;
-        }
+        transport_schedule_fast_retry(missing);
     }
 
     return XGL_OK;
@@ -266,6 +253,7 @@ transport_process_sack_value(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
                                          xgl_handle_t handle,
                                          const xgl_packet_t* packet) {
+    (void)handle;
     if (packet->packet_type != XGL_PACKET_TYPE_ACK) {
         return XGL_ERR_INVALID_FRAME;
     }
@@ -315,15 +303,12 @@ xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
     if (acknowledgement.type == XGL_WIRE_EXT_ACK_RANGE) {
         err = transport_process_ack_range(ctx, peer, &acknowledgement);
     } else {
-        err = transport_process_sack_value(ctx, handle, peer, packet->source_id,
+        err = transport_process_sack_value(ctx, peer, packet->source_id,
                                            acknowledgement.value,
                                            acknowledgement.len);
     }
     if (err != XGL_OK) {
         return err;
     }
-#if XGL_FEATURE_FRAGMENTATION
-    (void)transport_pump_tx_message(ctx, handle, peer);
-#endif
     return XGL_OK;
 }

@@ -70,6 +70,7 @@ xgl_error_t transport_retransmit_reliable_packet(
     }
 
     rel_packet->retry_pending = false;
+    rel_packet->fast_retry_pending = false;
     rel_packet->retry_count++;
     rel_packet->timeout_ms = xgl_reliable_calc_backoff(
         rel_packet->initial_timeout_ms, rel_packet->retry_count);
@@ -91,12 +92,13 @@ xgl_error_t transport_retransmit_reliable_packet(
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current transport clock
  */
-static void transport_process_retransmission_queue(
+static xgl_error_t transport_process_retransmission_queue(
     xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
     xgl_handle_t handle, uint32_t current_time_ms) {
     xgl_reliable_queue_t* queue = &peer->reliable_queue;
     xgct_list_node_t* node;
     xgct_list_node_t* tmp;
+    xgl_error_t first_error = XGL_OK;
 
     XGCT_LIST_FOR_EACH_SAFE(&queue->wait_ack_list, node, tmp) {
         xgl_reliable_packet_t* rel_packet =
@@ -109,18 +111,28 @@ static void transport_process_retransmission_queue(
         }
 
         uint32_t elapsed_ms = current_time_ms - rel_packet->send_timestamp;
-        if (!rel_packet->retry_pending &&
-            elapsed_ms < (uint32_t)rel_packet->timeout_ms) {
+        if (rel_packet->retry_pending) {
+            if (current_time_ms - rel_packet->retry_started_ms <
+                transport_retry_delay_ms(ctx)) {
+                continue;
+            }
+        } else if (!rel_packet->fast_retry_pending &&
+                   elapsed_ms < (uint32_t)rel_packet->timeout_ms) {
             continue;
         }
 
-        (void)transport_retransmit_reliable_packet(ctx, handle, peer,
-                                                   rel_packet, current_time_ms);
+        xgl_error_t error = transport_retransmit_reliable_packet(
+            ctx, handle, peer, rel_packet, current_time_ms);
+        if (error != XGL_OK && error != XGL_ERR_BUSY &&
+            error != XGL_ERR_NO_MEMORY && first_error == XGL_OK) {
+            first_error = error;
+        }
         /* Failure clears the entire queue. */
         if (peer->failed) {
             break;
         }
     }
+    return first_error;
 }
 
 /**
@@ -129,14 +141,19 @@ static void transport_process_retransmission_queue(
  * \param[in]       handle: Protocol instance handle
  * \param[in]       current_time_ms: Current transport clock
  */
-static void transport_process_retransmissions(xgl_transport_ctx_t* ctx,
-                                              xgl_handle_t handle,
-                                              uint32_t current_time_ms) {
+static xgl_error_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
+                                                     xgl_handle_t handle,
+                                                     uint32_t current_time_ms) {
+    xgl_error_t first_error = XGL_OK;
     for (xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
          peer = peer->next) {
-        transport_process_retransmission_queue(ctx, peer, handle,
-                                               current_time_ms);
+        xgl_error_t error = transport_process_retransmission_queue(
+            ctx, peer, handle, current_time_ms);
+        if (first_error == XGL_OK) {
+            first_error = error;
+        }
     }
+    return first_error;
 }
 
 /**
@@ -149,6 +166,7 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
 
     ctx->current_time_ms = current_time_ms;
+    xgl_error_t first_error = XGL_OK;
 #if XGL_FEATURE_FRAGMENTATION || XGL_FEATURE_OUT_OF_ORDER
     for (xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
          peer = peer->next) {
@@ -156,21 +174,38 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
             continue;
         }
 #if XGL_FEATURE_FRAGMENTATION
-        (void)transport_pump_tx_message(ctx, handle, peer);
+        xgl_error_t error = transport_pump_tx_message(ctx, handle, peer);
+        if (first_error == XGL_OK) {
+            first_error = error;
+        }
         if (peer->failed) {
             continue;
         }
-        if (transport_drain_pending_message(ctx, handle, peer) != XGL_OK) {
+        error = transport_drain_pending_message(ctx, handle, peer);
+        if (error != XGL_OK) {
+            if (error != XGL_ERR_BUSY && error != XGL_ERR_NO_MEMORY &&
+                first_error == XGL_OK) {
+                first_error = error;
+            }
             continue;
         }
 #endif
 #if XGL_FEATURE_OUT_OF_ORDER
-        (void)transport_drain_rx_buffered(ctx, handle, peer);
+        xgl_error_t delivery_error =
+            transport_drain_rx_buffered(ctx, handle, peer);
+        if (delivery_error != XGL_OK && delivery_error != XGL_ERR_BUSY &&
+            delivery_error != XGL_ERR_NO_MEMORY && first_error == XGL_OK) {
+            first_error = delivery_error;
+        }
 #endif
     }
 #endif
 
-    transport_process_retransmissions(ctx, handle, current_time_ms);
+    xgl_error_t retry_error =
+        transport_process_retransmissions(ctx, handle, current_time_ms);
+    if (first_error == XGL_OK) {
+        first_error = retry_error;
+    }
 
 #if XGL_FEATURE_FRAGMENTATION
     /* A timed-out reliable reassembly contains acknowledged bytes. Failure
@@ -195,6 +230,9 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                 current_time_ms - buffer->first_fragment_time >=
                     buffer->timeout_ms) {
                 transport_fail_peer(ctx, handle, peer, XGL_ERR_TIMEOUT);
+                if (first_error == XGL_OK) {
+                    first_error = XGL_ERR_TIMEOUT;
+                }
 #if XGL_FEATURE_STATISTICS
                 if (ctx->stats != NULL) {
                     ctx->stats->rx_dropped++;
@@ -210,6 +248,9 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         uint32_t timeout_count =
             xgl_fragment_process_timeouts(ctx->fragment_mgr, current_time_ms);
         if (timeout_count > 0) {
+            if (first_error == XGL_OK) {
+                first_error = XGL_ERR_TIMEOUT;
+            }
             /* Report error */
             if (ctx->error_callback) {
                 ctx->error_callback(
@@ -232,7 +273,7 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     /* Reclaim idle peer states */
     (void)transport_reclaim_idle_peers(ctx, current_time_ms);
 
-    return XGL_OK;
+    return first_error;
 }
 
 /* Parameter order follows the documented protocol fields and units. */
@@ -284,6 +325,9 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
                 transport_take_timeout(now_ms, packet->retry_started_ms,
                                        transport_retry_delay_ms(ctx), &active,
                                        timeout_ms);
+            } else if (packet->fast_retry_pending) {
+                active = true;
+                *timeout_ms = 0U;
             } else if (packet->sent && packet->timeout_ms > 0) {
                 transport_take_timeout(now_ms, packet->send_timestamp,
                                        (uint32_t)packet->timeout_ms, &active,
@@ -295,6 +339,11 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
             transport_take_timeout(now_ms, peer->tx_message_retry_started_ms,
                                    transport_retry_delay_ms(ctx), &active,
                                    timeout_ms);
+        } else if (peer->tx_message.data != NULL && !peer->failed &&
+                   xgl_window_can_send_packet_number(&peer->tx_window) &&
+                   transport_tx_packet_count(ctx) < ctx->max_tx_packets) {
+            active = true;
+            *timeout_ms = 0U;
         }
 #endif
         if (ctx->peer_idle_timeout_ms != 0U &&
