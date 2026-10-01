@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Require validated views at internal frame RX endpoints; keep raw decoding separate with instance-size admission, and share PHY deduplication between workspace planning and link setup.
+- Preserve original forwarding submission errors and remove redundant TX extension clearing without reducing supported extension capacity.
 - Recover stream framing from retained bytes after malformed headers or CRC failures; consume one validated frame at a time and drain cached successors without new input. Private parser callers must advance after COMPLETE/ERROR; explicit reset still discards the cache.
 - Boot now defaults to a 32-byte PHY read chunk; other profiles retain 128 bytes. Products may explicitly select 16/32/64/128 and must account for partial reads when driving steps.
 - Datalink shares synchronous span consumption and direct wire status classification, with compact per-PHY parser state and four directional packet/frame endpoints.
@@ -47,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject zero, local and duplicate static destinations before instance allocation; validate whole route sets before replacing existing entries.
+- Count failed zero-copy logical submissions consistently with ordinary transport sends while keeping basic request rejection and layout queries free of TX counter changes.
+- Correct the network property generator to exclude the local destination from valid random senders; add real reliable/authenticated multihop and reverse-ACK regressions.
 - Restart the candidate deadline when overlapping magic replaces a partial header, and reject impossible frame lengths as soon as the fixed header is available.
 - Keep the legacy parser view allocation off the production receive hot path; retain complete validation and update installed-SDK smoke scheduling for bounded reads.
 - Reject overflowing frame-size calculations and invalid extension/tag budgets before arithmetic; bound payload budgets to wire limits.

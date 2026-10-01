@@ -1,8 +1,18 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-01。当前阶段为 parser CRC 错误后的缓存重新同步。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0009](design/adr/0009-parser-resynchronization.md)。
+更新日期：2026-10-01。当前阶段为 network 契约与资源优化。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0010](design/adr/0010-network-contracts.md)。
 
-## 当前：CRC 错误后的缓存重新同步
+## 当前：Network 契约与资源优化
+
+静态配置提前拒绝目标零、本机目标和重复目标；整表加载先检查再替换。工作区规划与链路初始化共用 PHY 去重规则，并按唯一 PHY 合并轮询周期。保留兼容配置布局，metric 不参与择优，私有路由更新不改变链路生命周期。
+
+内部帧 RX 端点只携带必需的已验证 view；raw 解码入口独立保留并检查实例帧长。转发参数从 view 获取、失败透传原始错误并释放 scratch。零拷贝区分基础请求拒绝和实际逻辑提交，普通/原地/scoped 发送的错误统计一致。删除无生产用途的错误包装，扩展数组保持容量并取消多余清零。
+
+新增跨 profile 边界、路由装配、统计和真实三节点可靠/认证/未知 TLV/广播/MTU/BUSY 测试。GNU Full/Embedded、MSVC Full、Linux Full 各 697 项通过，GNU Boot/Lite 为 128/169 项，MSVC Boot 为 131 项，ASan/UBSan 为 696 项。覆盖率行/函数/分支为 92.7%/99.7%/82.7%；Cppcheck 与 Clang-Tidy 的 43 个生产 C 文件通过。
+
+Windows/Linux 八组 ARM 预算全部通过且生产输入一致：非 LTO/LTO Flash 为 16,168/12,704 B；MTU128/64 工作区仍为 1,112/920 B，含 1 KiB 栈预留 RAM 为 2,200/2,008 B。LTO 正常 network 接收栈前缀从 192 B 减到 72 B，不代表完整调用链峰值。具体命令、TDD 检查点、接口边界和未上板限制见 [network 验证记录](design/validation/network-optimization.md)。
+
+## 历史：CRC 错误后的缓存重新同步
 
 错误只拒绝当前候选，缓存由私有 advance 入口继续寻找有效帧头；完整帧优先，无完整帧时保留最早可能半帧，包括尾部单个 `A5`。接收层同步排空多个缓存帧，仅释放已交付帧，返回首个上层错误。正常载荷内的 magic 不抢占候选，BUSY/认证拒绝不触发载荷重新同步。借用 view、固定容量和绝对期限均显式约定。
 
