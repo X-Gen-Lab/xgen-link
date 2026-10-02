@@ -30,6 +30,8 @@ RED 从 `71bfb73` 的独立、未修改 detached worktree 重新链接并保留�
 
 四个既有 small policy 全部通过。工作区和 RAM 相对这些 policy 的同配置基线均不增加；普通/LTO Flash 分别增加 88/8 B，保留新增行为检查的实际成本。单函数栈普通/LTO 为 192/208 B，额外栈预留为 1,024 B。小 profile 指编译 window 1、RTO OFF 和 RX chunk 32，不与默认 window 128/RTO ON 的探针混比。没有达到 8 KiB Flash 目标；栈预留不是实测调用链上界，探针不代表板级 Boot 验收。
 
+默认 window 128/RTO ON 另行检查发现普通模式新增资源 RED：`f2e3310` 为 16,420 B，超过既有 16,384 B 门槛 36 B；修改前相同默认配置为 16,336 B。LTO 为 12,972 B，仍超过 12,800 B；修改前的 12,964 B 已超限。四个默认报告保存在 `out/api-refinement/arm-final-default-{128,64}-{off,on}/`，继续消除兼容查询入口引用公共实现时保留的额外运行期分支，不将 small 的通过冒充默认通过。
+
 安装包 fixed-RTO 的四项测试标签也取得有效 RED：发现结果只包含 `xgl`，缺少 `unit;transport;fixed-rto`。新断言和发现 JSON 在 `out/api-refinement/matrix/fixed-rto-labels-red/`，真实安装消费和编译已执行。
 
 转义修复后，四项安装测试及完整 7 项资源配置契约 GREEN。冻结阶段的 API 196/196、Full 默认 801/801、RTO OFF 805/805、7 项构建/安装契约分别保留 before/after 输入哈希，汇总为 `out/api-refinement/matrix/final-summary.json`；原 510 个历史名称全部保留，无跳过。
