@@ -66,6 +66,10 @@ typedef struct xgl_transport_peer_state_s {
     bool hello_sent;        /**< HELLO has been sent for this session */
     bool failed; /**< Scope is terminal after failure; use a new epoch */
     bool hello_reserved; /**< Received HELLO holds an unused scope lease */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    bool tx_busy;           /**< Accepted reliable TX remains unacknowledged */
+    uint32_t tx_started_ms; /**< Absolute start of the current TX busy period */
+#endif
     xgl_sliding_window_t tx_window;      /**< Peer-specific TX window */
     xgl_reliable_queue_t reliable_queue; /**< Peer-specific wait-ACK queue */
 #if XGL_FEATURE_ADAPTIVE_RTO
@@ -78,6 +82,9 @@ typedef struct xgl_transport_peer_state_s {
                                         from peer */
     bool rx_has_packet_number_state; /**< Receive packet-number state
                                         initialized */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    bool work_blocked; /**< This maintenance pass stopped at its TX budget */
+#endif
 #if XGL_FEATURE_OUT_OF_ORDER
     xgl_transport_rx_buffered_packet_t*
         rx_buffered;           /**< Out-of-order RX packets */
@@ -95,6 +102,10 @@ typedef struct xgl_transport_peer_state_s {
         tx_message_retry_started_ms; /**< Retry delay start; zero is valid */
     xgl_fragment_message_t rx_pending_message; /**< Owned completed RX bytes */
     uint8_t rx_pending_message_type;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    xgl_rx_info_t
+        rx_pending_info; /**< Identity retained with complete RX data */
+#endif
 #endif
 } xgl_transport_peer_state_t;
 
@@ -104,6 +115,14 @@ typedef struct xgl_transport_peer_state_s {
  * \brief           Transport layer context structure
  * \note            Integrates all transport layer components
  */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/** \brief           Stack-owned limits borrowed during one maintenance call. */
+typedef struct {
+    size_t remaining;
+    xgl_transport_peer_state_t* first;
+} xgl_transport_work_t;
+#endif
+
 typedef struct xgl_transport_ctx_s {
     /* Configuration */
     uint16_t local_id;       /**< Local node ID */
@@ -142,6 +161,15 @@ typedef struct xgl_transport_ctx_s {
 #endif
     xgl_transport_peer_state_t*
         peers; /**< Peer-specific reliable transport state */
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    uint32_t tx_lifetime_ms;
+    xgl_rx_scoped_fn rx_scoped_callback;
+    xgl_scope_event_fn scope_event_callback;
+    void* extended_user_data;
+    xgl_transport_peer_state_t* maintenance_cursor;
+    xgl_transport_work_t* work; /**< Borrowed only within bounded maintenance */
+#endif
 
     /* Layer interface for decoupled communication */
     xgl_packet_tx_endpoint_t*
@@ -209,6 +237,14 @@ typedef struct {
                                     enabled */
     size_t max_tx_message_bytes; /**< Required aggregate TX message budget when
                                     enabled */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    uint32_t
+        reassembly_timeout_ms; /**< Zero selects the legacy 5000 ms limit */
+    uint32_t tx_lifetime_ms;   /**< Zero leaves the TX busy period unlimited */
+    xgl_rx_scoped_fn rx_scoped_callback;
+    xgl_scope_event_fn scope_event_callback;
+    void* extended_user_data;
+#endif
 } xgl_transport_config_t;
 
 /*---------------------------------------------------------------------------*/
@@ -230,6 +266,32 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
  * \param[in,out]   ctx: Transport layer context
  */
 void xgl_transport_destroy(xgl_transport_ctx_t* ctx);
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/**
+ * \brief           Bound maintenance submission attempts and rotate peer order
+ * \param[in,out]   ctx: Initialized, serialized transport owner
+ * \param[in]       handle: Instance passed to synchronous callbacks
+ * \param[in]       now_ms: Current explicit transport time
+ * \param[in]       tx_budget: Lower submission attempts; SIZE_MAX is unlimited
+ * \param[out]      pending: Surviving work was blocked by this call's budget
+ * \return          First maintenance error; pending is independent of errors
+ * \note            Zero budget still expires owned work. Scans and application
+ *                  callbacks do not count as lower submission attempts.
+ */
+xgl_error_t xgl_transport_run_bounded(xgl_transport_ctx_t* ctx,
+                                      xgl_handle_t handle, uint32_t now_ms,
+                                      size_t tx_budget, bool* pending);
+/**
+ * \brief           Count current owners without allocation or state mutation
+ * \param[in]       ctx: Initialized, serialized transport owner
+ * \param[out]      resources: Current objects and payload bytes, not reserved
+ * RAM
+ * \return          XGL_OK, or XGL_ERR_NULL_POINTER for missing arguments
+ */
+xgl_error_t xgl_transport_get_resources(const xgl_transport_ctx_t* ctx,
+                                        xgl_resource_snapshot_t* resources);
+#endif
 
 /**
  * \brief           Retire one scope and release its bounded resource

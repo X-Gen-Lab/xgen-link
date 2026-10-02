@@ -8,6 +8,7 @@
 #define XGL_PARSER_H
 
 #include "wire/xgl_wire.h"
+#include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 #include <stdbool.h>
@@ -42,6 +43,9 @@ typedef enum {
     XGL_PARSE_RESULT_INCOMPLETE, /**< Frame incomplete, need more data */
     XGL_PARSE_RESULT_COMPLETE,   /**< Frame complete and valid */
     XGL_PARSE_RESULT_ERROR,      /**< Parse error occurred */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    XGL_PARSE_RESULT_PENDING, /**< Retained work requires another quota */
+#endif
 } xgl_parse_result_t;
 
 /**
@@ -56,6 +60,14 @@ typedef struct {
     uint16_t expected_payload_len; /**< Expected payload length from header */
     uint8_t expected_header_len;   /**< Header length including extensions */
     uint8_t expected_auth_tag_len; /**< Authentication trailer length */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    size_t input_offset;      /**< First unread byte in the same cache */
+    size_t input_end;         /**< End of the retained input batch */
+    size_t recovery_offset;   /**< Next cached recovery candidate */
+    size_t recovery_partial;  /**< Earliest incomplete recovery candidate */
+    uint32_t input_timestamp; /**< Arrival time of the retained input batch */
+    bool recovery_active;     /**< Recovery scan can resume without restart */
+#endif
 } xgl_parser_t;
 
 /*---------------------------------------------------------------------------*/
@@ -139,6 +151,43 @@ xgl_parse_result_t xgl_parser_feed_byte_view(xgl_parser_t* parser, uint8_t byte,
 xgl_parse_result_t xgl_parser_advance_view(xgl_parser_t* parser,
                                            xgl_wire_frame_view_t* view,
                                            xgl_wire_decode_status_t* status);
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/** \brief           Query locally retained input or resumable recovery work. */
+bool xgl_parser_has_pending(const xgl_parser_t* parser);
+
+/**
+ * \brief           Process retained input with a candidate-check quota
+ * \param[in,out]   parser: Parser and persistent input storage
+ * \param[in,out]   candidates: Remaining header, extension or frame checks
+ * \param[out]      view: Borrowed complete frame until the next parser call
+ * \param[out]      status: Optional detailed wire validation result
+ * \return          COMPLETE, ERROR, INCOMPLETE or quota-limited PENDING
+ * \note            One check may process a complete CRC; this is not a byte
+ *                  or CPU-cycle budget. Failed recovery candidates are silent.
+ */
+xgl_parse_result_t xgl_parser_buffered_view(xgl_parser_t* parser,
+                                            size_t* candidates,
+                                            xgl_wire_frame_view_t* view,
+                                            xgl_wire_decode_status_t* status);
+
+/**
+ * \brief           Compact retained input and expose unused cache storage
+ * \param[in,out]   parser: Parser without an outstanding borrowed view
+ * \param[out]      buffer: Writable tail; commit only the actual written count
+ * \return          Available tail capacity, possibly zero
+ */
+size_t xgl_parser_input_space(xgl_parser_t* parser, uint8_t** buffer);
+
+/**
+ * \brief           Commit bytes written into a previously exposed empty tail
+ * \param[in,out]   parser: Parser with no unread previous input batch
+ * \param[in]       length: Written bytes, at most the exposed capacity
+ * \param[in]       now_ms: Arrival time retained across budget suspensions
+ */
+void xgl_parser_commit_input(xgl_parser_t* parser, size_t length,
+                             uint32_t now_ms);
+#endif
 
 /**
  * \brief           Check for parser timeout

@@ -59,10 +59,23 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     }
 #endif
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (config->reassembly_timeout_ms > INT32_MAX ||
+        config->tx_lifetime_ms > INT32_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#endif
+
     /* Initialize context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));
 #if XGL_FEATURE_STATISTICS
     ctx->rtt_min_ms = UINT32_MAX;
+#endif
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    ctx->tx_lifetime_ms = config->tx_lifetime_ms;
+    ctx->rx_scoped_callback = config->rx_scoped_callback;
+    ctx->scope_event_callback = config->scope_event_callback;
+    ctx->extended_user_data = config->extended_user_data;
 #endif
     ctx->local_id = config->local_id;
     ctx->max_retry_count = config->max_retry_count;
@@ -138,9 +151,15 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
         ctx->max_tx_message_bytes = config->max_tx_message_bytes;
         size_t max_reassembly_bytes = config->max_reassembly_bytes;
         ctx->fragment_mgr = &ctx->fragment_storage;
+        uint32_t reassembly_timeout = XGL_FRAGMENT_TIMEOUT_MS;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        if (config->reassembly_timeout_ms != 0U) {
+            reassembly_timeout = config->reassembly_timeout_ms;
+        }
+#endif
         xgl_error_t err =
             xgl_fragment_init(ctx->fragment_mgr, ctx->max_reassembly_slots,
-                              XGL_FRAGMENT_TIMEOUT_MS, ctx->memory.reassembly);
+                              reassembly_timeout, ctx->memory.reassembly);
         if (err != XGL_OK) {
             ctx->fragment_mgr = NULL;
             return err;

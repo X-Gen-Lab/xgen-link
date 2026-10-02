@@ -91,6 +91,7 @@ endif()
 list(APPEND TEST_SOURCES
     unit/api/test_api_contracts.cpp
     unit/api/test_extended_options.cpp
+    unit/transport/test_transport_advanced.cpp
     unit/api/test_config_consistency.cpp
     unit/api/test_send_policy.cpp
     unit/datalink/test_datalink_span.cpp

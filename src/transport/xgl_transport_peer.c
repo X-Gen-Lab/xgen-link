@@ -191,6 +191,9 @@ void transport_destroy_peers(xgl_transport_ctx_t* ctx) {
         peer = next;
     }
     ctx->peers = NULL;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    ctx->maintenance_cursor = NULL;
+#endif
 }
 
 /**
@@ -221,6 +224,11 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
                                            &remaining) &&
             remaining == 0U) {
             *prev = next;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+            if (ctx->maintenance_cursor == peer) {
+                ctx->maintenance_cursor = next;
+            }
+#endif
             xgl_reliable_destroy(&peer->reliable_queue);
             xgl_window_destroy(&peer->tx_window);
             xgm_free(ctx->memory.peer, peer);
@@ -245,6 +253,10 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
 static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
                                       xgl_transport_peer_state_t* peer) {
     xgl_reliable_clear(&peer->reliable_queue);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    peer->tx_busy = false;
+    peer->work_blocked = false;
+#endif
 #if XGL_FEATURE_OUT_OF_ORDER
     transport_clear_rx_buffered(ctx, peer);
 #endif
@@ -275,6 +287,13 @@ void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
     peer->failed = true;
     transport_clear_peer_data(ctx, peer);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (ctx->scope_event_callback != NULL) {
+        ctx->scope_event_callback(handle, peer->peer_id, peer->connection_id,
+                                  peer->session_epoch, XGL_SCOPE_FAILED, error,
+                                  ctx->extended_user_data);
+    }
+#endif
 
     transport_count_send_error(ctx);
     xgl_transport_report_error(
@@ -311,10 +330,27 @@ xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
             bool cancelled = !peer->failed &&
                              (!xgl_reliable_is_empty(&peer->reliable_queue) ||
                               transport_peer_has_pending_data(ctx, peer));
+#if XGL_FEATURE_ADVANCED_RUNTIME
+            const bool notify =
+                !peer->failed && (cancelled || peer->hello_reserved ||
+                                  peer->rx_has_packet_number_state ||
+                                  peer->tx_window.next_packet_number != 0U);
+            if (ctx->maintenance_cursor == peer) {
+                ctx->maintenance_cursor = peer->next;
+            }
+#endif
             *link = peer->next;
             transport_clear_peer_data(ctx, peer);
             xgl_window_destroy(&peer->tx_window);
             xgm_free(ctx->memory.peer, peer);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+            if (notify && ctx->scope_event_callback != NULL) {
+                ctx->scope_event_callback(handle, remote_id, connection_id,
+                                          session_epoch, XGL_SCOPE_FAILED,
+                                          XGL_ERR_CANCELLED,
+                                          ctx->extended_user_data);
+            }
+#endif
             if (cancelled) {
                 xgl_transport_report_error(
                     ctx, handle, XGL_ERR_CANCELLED,
@@ -380,3 +416,85 @@ bool xgl_transport_can_send_to(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
     }
     return count < ctx->max_peers;
 }
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+void transport_note_tx_admission(xgl_transport_ctx_t* ctx,
+                                 xgl_transport_peer_state_t* peer) {
+    if (!peer->tx_busy && !peer->failed) {
+        peer->tx_busy = true;
+        peer->tx_started_ms = transport_now(ctx);
+    }
+}
+
+void transport_notify_tx_drained(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                                 xgl_transport_peer_state_t* peer) {
+    if (!peer->tx_busy || !xgl_reliable_is_empty(&peer->reliable_queue)) {
+        return;
+    }
+#if XGL_FEATURE_FRAGMENTATION
+    if (peer->tx_message.data != NULL) {
+        return;
+    }
+#endif
+    peer->tx_busy = false;
+    if (ctx->scope_event_callback != NULL) {
+        ctx->scope_event_callback(handle, peer->peer_id, peer->connection_id,
+                                  peer->session_epoch, XGL_SCOPE_TX_DRAINED,
+                                  XGL_OK, ctx->extended_user_data);
+    }
+}
+
+bool transport_expire_tx(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                         xgl_transport_peer_state_t* peer) {
+    if (peer->tx_busy && ctx->tx_lifetime_ms != 0U &&
+        transport_now(ctx) - peer->tx_started_ms >= ctx->tx_lifetime_ms) {
+        transport_fail_peer(ctx, handle, peer, XGL_ERR_TIMEOUT);
+        return true;
+    }
+    return false;
+}
+
+xgl_error_t xgl_transport_get_resources(const xgl_transport_ctx_t* ctx,
+                                        xgl_resource_snapshot_t* resources) {
+    if (ctx == NULL || resources == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    memset(resources, 0, sizeof(*resources));
+    for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
+         peer = peer->next) {
+        resources->peer_count++;
+        resources->failed_peers += peer->failed ? 1U : 0U;
+        xgct_list_node_t* node;
+        XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+            /* The reliable queue owns this intrusive record. */
+            const xgl_reliable_packet_t* packet =
+                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
+                XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            resources->tx_packets++;
+            resources->tx_payload_bytes += packet->data_len;
+        }
+#if XGL_FEATURE_OUT_OF_ORDER
+        for (const xgl_transport_rx_buffered_packet_t* packet =
+                 peer->rx_buffered;
+             packet != NULL; packet = packet->next) {
+            resources->rx_buffered_packets++;
+            resources->rx_buffered_bytes += packet->packet_data.data_len;
+        }
+#endif
+#if XGL_FEATURE_FRAGMENTATION
+        resources->pending_rx_messages +=
+            peer->rx_pending_message.data != NULL ? 1U : 0U;
+#endif
+    }
+#if XGL_FEATURE_FRAGMENTATION
+    resources->tx_message_bytes = ctx->tx_message_bytes;
+    if (ctx->fragment_mgr != NULL) {
+        resources->reassembly_slots =
+            xgl_fragment_get_reassembly_count(ctx->fragment_mgr);
+        resources->reassembly_bytes =
+            ctx->fragment_mgr->current_reassembly_bytes;
+    }
+#endif
+    return XGL_OK;
+}
+#endif

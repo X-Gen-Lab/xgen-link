@@ -281,18 +281,17 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
         return;
     }
 
-    /* Remove and free all packets */
+    /* Invalidate the lookup once; unlinking each oldest record would rescan
+     * the reverse collision chain and make a full clear quadratic. */
+    memset(queue->index_buckets, 0, sizeof(queue->index_buckets));
     xgct_list_node_t* node;
     while ((node = xgct_list_remove_head(&queue->wait_ack_list)) != NULL) {
         xgl_reliable_packet_t* packet =
             /* Intrusive node membership is established by the owning list. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        reliable_unindex_packet(queue, packet);
         reliable_free_packet(queue, packet);
     }
-
-    memset((void*)queue->index_buckets, 0, sizeof(queue->index_buckets));
 }
 
 /* Parameter order follows the documented protocol fields and units. */

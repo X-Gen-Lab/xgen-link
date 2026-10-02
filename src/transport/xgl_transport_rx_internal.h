@@ -61,6 +61,22 @@ transport_deliver_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                               size_t data_len,
                               const transport_rx_fragment_t* fragment);
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/**
+ * \brief           Enforce the original reassembly deadline before admission
+ * \param[in,out]   ctx: Transport owner
+ * \param[in]       handle: Instance used by synchronous error callbacks
+ * \param[in,out]   peer: Existing scope owning the active message
+ * \param[in]       packet: Validated immutable message attributes
+ * \param[in]       fragment: Validated message identity
+ * \return          true if the message expired and was released
+ */
+bool transport_expire_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                                  xgl_transport_peer_state_t* peer,
+                                  const xgl_packet_t* packet,
+                                  const transport_rx_fragment_t* fragment);
+#endif
+
 void transport_clear_pending_message(xgl_transport_ctx_t* ctx,
                                      xgl_transport_peer_state_t* peer);
 xgl_error_t transport_drain_pending_message(xgl_transport_ctx_t* ctx,

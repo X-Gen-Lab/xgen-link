@@ -322,6 +322,11 @@ xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (transport_expire_tx(ctx, handle, peer)) {
+        return XGL_ERR_TIMEOUT;
+    }
+#endif
     xgl_error_t err;
     if (acknowledgement.type == XGL_WIRE_EXT_ACK_RANGE) {
         err = transport_process_ack_range(ctx, peer, &acknowledgement);
@@ -333,5 +338,8 @@ xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
     if (err != XGL_OK) {
         return err;
     }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    transport_notify_tx_drained(ctx, handle, peer);
+#endif
     return XGL_OK;
 }

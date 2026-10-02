@@ -84,8 +84,19 @@ else()
 endif()
 unset(adaptive_rto_option)
 
+option(XGL_ENABLE_ADVANCED_RUNTIME "Enable explicit runtime limits, scoped observation and message storage options" OFF)
+string(TOUPPER "${XGL_ENABLE_ADVANCED_RUNTIME}" advanced_runtime_option)
+if(advanced_runtime_option MATCHES "^(1|ON|YES|TRUE|Y)$")
+    set(XGL_FEATURE_ADVANCED_RUNTIME 1)
+elseif(advanced_runtime_option MATCHES "^(0|OFF|NO|FALSE|N)$")
+    set(XGL_FEATURE_ADVANCED_RUNTIME 0)
+else()
+    message(FATAL_ERROR "XGL_ENABLE_ADVANCED_RUNTIME must be ON or OFF")
+endif()
+unset(advanced_runtime_option)
+
 set(XGL_CAPABILITIES wire reliable)
-foreach(capability AUTH FORWARDING FRAGMENTATION OUT_OF_ORDER STATISTICS DIAGNOSTICS)
+foreach(capability AUTH FORWARDING FRAGMENTATION OUT_OF_ORDER STATISTICS DIAGNOSTICS ADVANCED_RUNTIME)
     if(XGL_FEATURE_${capability})
         if(capability STREQUAL "AUTH")
             list(APPEND XGL_CAPABILITIES authentication)
@@ -112,7 +123,7 @@ function(xgl_finalize_build_config)
     endif()
     math(EXPR profile_code "${XGL_BUILD_CONFIG_ID} - 300")
     math(EXPR resource_id
-        "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * ${heap_code}))))")
+        "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * (${heap_code} + 2 * ${XGL_FEATURE_ADVANCED_RUNTIME})))))")
 
     set(default_buckets 32)
     set(default_chunk 128)
@@ -129,7 +140,8 @@ function(xgl_finalize_build_config)
             XGL_BUILD_WINDOW_CAPACITY EQUAL 128 AND
             XGL_FEATURE_ADAPTIVE_RTO EQUAL 1 AND
             XGL_BUILD_RX_CHUNK_SIZE EQUAL default_chunk AND
-            heap_code EQUAL default_heap))
+            heap_code EQUAL default_heap AND
+            XGL_FEATURE_ADVANCED_RUNTIME EQUAL 0))
         math(EXPR XGL_BUILD_CONFIG_ID "65536 + ${resource_id}")
     endif()
     set(XGL_RESOURCE_CONFIG_ID "${resource_id}" PARENT_SCOPE)
@@ -145,10 +157,11 @@ function(xgl_apply_build_contract target)
         XGL_RELIABLE_INDEX_BUCKETS "${XGL_RELIABLE_BUCKET_COUNT}"
         XGL_TRANSPORT_WINDOW_CAPACITY "${XGL_BUILD_WINDOW_CAPACITY}"
         XGL_ENABLE_ADAPTIVE_RTO "${XGL_FEATURE_ADAPTIVE_RTO}"
+        XGL_ENABLE_ADVANCED_RUNTIME "${XGL_FEATURE_ADVANCED_RUNTIME}"
         INTERFACE_XGL_RESOURCE_CONFIG_ID "${XGL_RESOURCE_CONFIG_ID}")
     set_property(TARGET ${target} APPEND PROPERTY EXPORT_PROPERTIES
         XGL_RESOURCE_CONFIG_ID XGL_RELIABLE_INDEX_BUCKETS
-        XGL_TRANSPORT_WINDOW_CAPACITY XGL_ENABLE_ADAPTIVE_RTO)
+        XGL_TRANSPORT_WINDOW_CAPACITY XGL_ENABLE_ADAPTIVE_RTO XGL_ENABLE_ADVANCED_RUNTIME)
     set_property(TARGET ${target} APPEND PROPERTY COMPATIBLE_INTERFACE_STRING
         XGL_RESOURCE_CONFIG_ID)
     target_compile_definitions(${target} PUBLIC

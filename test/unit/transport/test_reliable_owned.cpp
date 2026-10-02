@@ -84,3 +84,32 @@ TEST_F(XglReliableOwnedTest, NullRemovalLeavesQueueUnchanged) {
     EXPECT_EQ(xgl_reliable_remove_owned(&queue, nullptr), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 10U, 2U), owned);
 }
+
+TEST_F(XglReliableOwnedTest,
+       ClearCollisionChainReleasesEveryOwnerAndAllowsReuse) {
+    constexpr uint32_t count = 64U;
+    for (uint32_t index = 0U; index < count; ++index) {
+        auto* packet = Add(queue, index * XGL_RELIABLE_INDEX_BUCKETS);
+        ASSERT_NE(packet, nullptr);
+        const uint8_t extensions[] = {0x71U, 0x01U, 0x55U};
+        ASSERT_EQ(xgl_reliable_set_packet_extensions(&queue, packet, extensions,
+                                                     sizeof(extensions)),
+                  XGL_OK);
+    }
+    auto* foreign = Add(other, 0U);
+    ASSERT_NE(foreign, nullptr);
+    xgl_reliable_clear(&queue);
+    EXPECT_EQ(xgl_reliable_get_count(&queue), 0U);
+    for (uint32_t index = 0U; index < count; ++index) {
+        EXPECT_EQ(xgl_reliable_find_packet_number(
+                      &queue, index * XGL_RELIABLE_INDEX_BUCKETS, 2U),
+                  nullptr);
+    }
+    EXPECT_EQ(xgl_reliable_find_packet_number(&other, 0U, 2U), foreign);
+    auto* reused = Add(queue, 0U);
+    ASSERT_NE(reused, nullptr);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 0U, 2U), reused);
+    xgl_reliable_clear(&queue);
+    xgl_reliable_clear(&queue);
+    EXPECT_TRUE(xgl_reliable_is_empty(&queue));
+}

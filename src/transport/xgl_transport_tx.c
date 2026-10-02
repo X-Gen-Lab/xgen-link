@@ -192,7 +192,7 @@ xgl_error_t transport_send_packet_view(
                            .extensions = extensions,
                            .extensions_len = extensions_len};
 
-    xgl_error_t err = xgl_packet_send(ctx->lower_layer, handle, &packet);
+    xgl_error_t err = transport_submit_packet(ctx, handle, &packet);
     if (err != XGL_OK) {
         transport_count_send_error(ctx);
         if (tx_data->reliable && peer != NULL) {
@@ -222,12 +222,19 @@ xgl_error_t transport_send_packet_view(
  * \return          XGL_OK or admission error
  */
 static xgl_error_t transport_prepare_reliable_send(
-    xgl_transport_ctx_t* ctx, const xgl_tx_data_t* tx_data,
+    xgl_transport_ctx_t* ctx, xgl_handle_t handle, const xgl_tx_data_t* tx_data,
     xgl_transport_peer_state_t** peer, bool* created) {
     *peer = transport_find_peer_scope(ctx, tx_data->target_id,
                                       tx_data->connection_id,
                                       tx_data->session_epoch);
     *created = false;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (*peer != NULL && transport_expire_tx(ctx, handle, *peer)) {
+        return XGL_ERR_TIMEOUT;
+    }
+#else
+    (void)handle;
+#endif
 
     if (*peer != NULL && (*peer)->failed) {
         return XGL_ERR_ACK_TIMEOUT;
@@ -352,7 +359,8 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     /* Validate the complete frame budget before reserving a scope or HELLO. */
     xgl_transport_peer_state_t* peer = NULL;
     bool created = false;
-    err = transport_prepare_reliable_send(ctx, tx_data, &peer, &created);
+    err =
+        transport_prepare_reliable_send(ctx, handle, tx_data, &peer, &created);
     if (err != XGL_OK) {
         transport_rollback_new_peer(ctx, handle, peer, created);
         return err;
@@ -405,6 +413,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #endif
 
     if (peer != NULL) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        transport_note_tx_admission(ctx, peer);
+#endif
         peer->last_active_ms = transport_now(ctx);
     }
 

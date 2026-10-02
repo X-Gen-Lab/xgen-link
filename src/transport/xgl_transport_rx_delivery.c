@@ -4,8 +4,10 @@
  */
 
 #include "wire/xgl_wire.h"
+#include "xgl_fragment_internal.h"
 #include "xgl_transport_internal.h"
 #include "xgl_transport_rx_internal.h"
+#include <internal/xgl_diagnostics.h>
 
 /**
  * \brief           Offer borrowed payload bytes to the application
@@ -17,20 +19,31 @@
  * \param[in]       len: Payload size
  * \return          Application admission result
  */
-static xgl_error_t transport_accept_payload(xgl_transport_ctx_t* ctx,
-                                            xgl_handle_t handle,
-                                            uint16_t source_id,
-                                            uint8_t data_type,
-                                            const uint8_t* data, size_t len) {
-    if (ctx->rx_accept_callback != NULL) {
-        xgl_error_t err = ctx->rx_accept_callback(
-            handle, source_id, data_type, data, len, ctx->callback_user_data);
-        if (err != XGL_OK) {
-            return err;
+static xgl_error_t transport_accept_payload(
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    const xgl_rx_info_t* info,
+#endif
+    xgl_transport_ctx_t* ctx, xgl_handle_t handle, uint16_t source_id,
+    uint8_t data_type, const uint8_t* data, size_t len) {
+    xgl_error_t err = XGL_OK;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (ctx->rx_scoped_callback != NULL) {
+        err = ctx->rx_scoped_callback(handle, info, data, len,
+                                      ctx->extended_user_data);
+    } else {
+#endif
+        if (ctx->rx_accept_callback != NULL) {
+            err = ctx->rx_accept_callback(handle, source_id, data_type, data,
+                                          len, ctx->callback_user_data);
+        } else if (ctx->rx_callback != NULL) {
+            ctx->rx_callback(handle, source_id, data_type, data, len,
+                             ctx->callback_user_data);
         }
-    } else if (ctx->rx_callback != NULL) {
-        ctx->rx_callback(handle, source_id, data_type, data, len,
-                         ctx->callback_user_data);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    }
+#endif
+    if (err != XGL_OK) {
+        return err;
     }
 #if XGL_FEATURE_STATISTICS
     if (ctx->stats != NULL) {
@@ -133,6 +146,32 @@ xgl_error_t transport_validate_rx_fragment_scope(
     return XGL_OK;
 }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+bool transport_expire_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                                  xgl_transport_peer_state_t* peer,
+                                  const xgl_packet_t* packet,
+                                  const transport_rx_fragment_t* fragment) {
+    if (!fragment_expire_message(ctx->fragment_mgr, packet->source_id,
+                                 packet->connection_id, packet->session_epoch,
+                                 fragment->message_id, transport_now(ctx))) {
+        return false;
+    }
+    if (packet->reliable == XGL_RELIABILITY_ACK_ELICITING && peer != NULL) {
+        transport_fail_peer(ctx, handle, peer, XGL_ERR_TIMEOUT);
+    } else {
+        xgl_transport_report_error(
+            ctx, handle, XGL_ERR_TIMEOUT,
+            XGL_ERROR_MESSAGE("Fragment reassembly timeout"));
+    }
+#if XGL_FEATURE_STATISTICS
+    if (ctx->stats != NULL) {
+        ctx->stats->rx_dropped++;
+    }
+#endif
+    return true;
+}
+#endif
+
 /**
  * \brief           Release a peer-owned completed message and its memory budget
  * \param[in,out]   ctx: Transport layer context
@@ -161,6 +200,9 @@ xgl_error_t transport_drain_pending_message(xgl_transport_ctx_t* ctx,
         return XGL_OK;
     }
     xgl_error_t err = transport_accept_payload(
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        &peer->rx_pending_info,
+#endif
         ctx, handle, peer->peer_id, peer->rx_pending_message_type,
         peer->rx_pending_message.data, peer->rx_pending_message.len);
     if (err == XGL_OK) {
@@ -190,6 +232,11 @@ transport_deliver_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_BUSY;
     }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (transport_expire_rx_fragment(ctx, handle, peer, packet, fragment)) {
+        return XGL_ERR_TIMEOUT;
+    }
+#endif
     xgl_fragment_message_t complete = {0};
     xgl_error_t err = xgl_fragment_process_ext_scoped(
         ctx->fragment_mgr, packet->source_id, packet->connection_id,
@@ -204,12 +251,23 @@ transport_deliver_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return err;
     }
 
-    err = transport_accept_payload(ctx, handle, packet->source_id,
-                                   packet->data_type, complete.data,
-                                   complete.len);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    const xgl_rx_info_t info = {
+        packet->source_id, packet->connection_id, packet->session_epoch,
+        packet->data_type, packet->reliable == XGL_RELIABILITY_ACK_ELICITING};
+#endif
+    err = transport_accept_payload(
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        &info,
+#endif
+        ctx, handle, packet->source_id, packet->data_type, complete.data,
+        complete.len);
     if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY) {
         peer->rx_pending_message = complete;
         peer->rx_pending_message_type = packet->data_type;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        peer->rx_pending_info = info;
+#endif
         /* Ownership was admitted; retry the application during maintenance. */
         return XGL_OK;
     }
@@ -258,6 +316,14 @@ xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
     }
 #endif
 
-    return transport_accept_payload(ctx, handle, source_id, data_type, data,
-                                    data_len);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    const xgl_rx_info_t info = {
+        source_id, packet->connection_id, packet->session_epoch, data_type,
+        packet->reliable == XGL_RELIABILITY_ACK_ELICITING};
+#endif
+    return transport_accept_payload(
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        &info,
+#endif
+        ctx, handle, source_id, data_type, data, data_len);
 }

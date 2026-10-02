@@ -276,8 +276,8 @@ TEST_F(XglTransportAdvancedTest,
     EXPECT_TRUE(events.empty());
 }
 
-
-TEST_F(XglTransportAdvancedTest, ExpiringScopeClearsObsoleteBudgetContinuation) {
+TEST_F(XglTransportAdvancedTest,
+       ExpiringScopeClearsObsoleteBudgetContinuation) {
     Init(0U, 100U);
     ASSERT_EQ(Fragment(0U, 0U), XGL_OK);
     submit_result = XGL_ERR_BUSY;
@@ -291,10 +291,27 @@ TEST_F(XglTransportAdvancedTest, ExpiringScopeClearsObsoleteBudgetContinuation) 
     tx.data_len = payload.size();
     ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
     bool pending = true;
-    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 100U, 0U, &pending), XGL_ERR_TIMEOUT);
+    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 100U, 0U, &pending),
+              XGL_ERR_TIMEOUT);
     EXPECT_TRUE(ctx.peers->failed);
     EXPECT_EQ(ctx.tx_message_bytes, 0U);
     EXPECT_FALSE(pending);
+}
+
+TEST_F(XglTransportAdvancedTest,
+       GlobalPacketCapacityWaitDoesNotRequestBudgetContinuation) {
+    Init();
+    ctx.max_tx_packets = 1U;
+    submit_result = XGL_ERR_BUSY;
+    ASSERT_EQ(Send(2U, 128U), XGL_OK);
+    submit_result = XGL_OK;
+    ctx.current_time_ms = 100U;
+    ASSERT_EQ(Send(3U), XGL_OK);
+    bool pending = true;
+    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 100U, 0U, &pending),
+              XGL_OK);
+    EXPECT_FALSE(pending);
+    EXPECT_EQ(ctx.tx_message_bytes, 128U);
 }
 
 TEST_F(XglTransportAdvancedTest, ReassemblyUsesConfiguredAbsoluteDeadline) {

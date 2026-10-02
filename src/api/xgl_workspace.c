@@ -10,6 +10,9 @@
 #include <string.h>
 #include <xgen/memory/pool.h>
 #include <xgen/memory/size_class_allocator.h>
+#if XGL_ALLOW_FALLBACK_MALLOC
+#include <xgen/memory/libc_allocator.h>
+#endif
 
 #include "xgl_workspace_internal.h"
 
@@ -273,6 +276,130 @@ static size_t resource_bytes(const xgl_workspace_plan_t* plan,
     return spec->block_size * spec->block_count;
 }
 
+/** \brief           Reject foreign descriptors before inspecting their policy.
+ */
+xgl_error_t xgl_options_validate(const xgl_config_t* config,
+                                 const xgl_instance_options_t* options) {
+    if (options == NULL || config == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (options->size != sizeof(*options) || options->version != 1U ||
+        options->config_size != sizeof(*config) ||
+        options->config_abi != XGL_CONFIG_ABI_VERSION ||
+        options->build_config_id != XGL_BUILD_CONFIG_ID) {
+        return XGL_ERR_INVALID_VERSION;
+    }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (options->reassembly_timeout_ms >= UINT32_C(0x80000000) ||
+        options->tx_lifetime_ms >= UINT32_C(0x80000000)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    if (!config->features.enable_fragmentation &&
+        (options->tx_message_slots != 0U || options->rx_message_slots != 0U ||
+         options->reassembly_timeout_ms != 0U)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    size_t rx_slots;
+    if (!add_size(config->features.max_peers,
+                  config->features.max_reassembly_slots, &rx_slots) ||
+        options->tx_message_slots > config->features.max_peers ||
+        options->rx_message_slots > rx_slots) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    if (options->protect_installed_scopes) {
+#if XGL_FEATURE_AUTH
+        if (config->auth_provider == NULL) {
+            return XGL_ERR_INVALID_PARAM;
+        }
+        xgl_config_t authenticated = *config;
+        authenticated.auth_required = true;
+        xgl_error_t error = xgl_config_validate(&authenticated);
+        if (error != XGL_OK) {
+            return error;
+        }
+#else
+        return XGL_ERR_UNSUPPORTED;
+#endif
+    }
+    return XGL_OK;
+#else
+    return XGL_ERR_UNSUPPORTED;
+#endif
+}
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+#if XGL_FEATURE_FRAGMENTATION
+/* Resource identity precedes its validated slot count. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+/** \brief           Replace a slot count while retaining the exact pool stride.
+ */
+static void resize_resource(xgl_workspace_plan_t* plan,
+                            xgl_workspace_resource_t resource, size_t count) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    xgm_size_class_spec_t* spec = &plan->runtime[resource];
+    plan->requirements.size -= spec->block_size * (spec->block_count - count);
+    plan->requirements.runtime_blocks -= spec->block_count - count;
+    spec->block_count = count;
+}
+
+#endif
+
+/** \brief           Plan supported reductions without changing legacy defaults.
+ */
+static xgl_error_t make_options_plan(const xgl_config_t* config,
+                                     const xgl_instance_options_t* options,
+                                     xgl_workspace_plan_t* plan) {
+    xgl_error_t error = xgl_options_validate(config, options);
+    if (error != XGL_OK) {
+        return error;
+    }
+    error = make_plan(config, plan);
+    if (error != XGL_OK) {
+        return error;
+    }
+#if XGL_FEATURE_FRAGMENTATION
+    if (config->features.enable_fragmentation) {
+        if (options->tx_message_slots != 0U) {
+            resize_resource(plan, XGL_RESOURCE_TX_MESSAGE,
+                            options->tx_message_slots);
+        }
+        if (options->rx_message_slots != 0U) {
+            resize_resource(plan, XGL_RESOURCE_REASSEMBLY_PAYLOAD,
+                            options->rx_message_slots);
+        }
+    }
+#endif
+    return XGL_OK;
+}
+#endif
+
+/** \brief           Describe an already validated storage plan. */
+static void report_plan(const xgl_workspace_plan_t* plan,
+                        xgl_memory_report_t* report) {
+    xgl_memory_report_t result = {
+        .requirements = plan->requirements,
+        .management_bytes = plan->prefix_size,
+        .initialization_bytes = plan->initialization_size,
+        .peer_bytes = resource_bytes(plan, XGL_RESOURCE_PEER),
+        .window_bytes = 0U,
+        .tx_record_bytes = resource_bytes(plan, XGL_RESOURCE_TX_PACKET),
+        .tx_payload_bytes = resource_bytes(plan, XGL_RESOURCE_TX_PAYLOAD),
+        .scratch_bytes = resource_bytes(plan, XGL_RESOURCE_SCRATCH),
+    };
+#if XGL_FEATURE_OUT_OF_ORDER
+    result.rx_buffered_bytes = resource_bytes(plan, XGL_RESOURCE_RX_PACKET) +
+                               resource_bytes(plan, XGL_RESOURCE_RX_PAYLOAD);
+#endif
+#if XGL_FEATURE_FRAGMENTATION
+    result.fragment_bytes =
+        resource_bytes(plan, XGL_RESOURCE_TX_EXTENSIONS) +
+        resource_bytes(plan, XGL_RESOURCE_TX_MESSAGE) +
+        resource_bytes(plan, XGL_RESOURCE_REASSEMBLY) +
+        resource_bytes(plan, XGL_RESOURCE_REASSEMBLY_PAYLOAD);
+#endif
+    *report = result;
+}
+
 /** \brief           Report the same validated layout used by initialization. */
 xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
                                       size_t config_size, uint32_t abi_version,
@@ -291,28 +418,59 @@ xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
     if (error != XGL_OK) {
         return error;
     }
-    xgl_memory_report_t result = {
-        .requirements = plan.requirements,
-        .management_bytes = plan.prefix_size,
-        .initialization_bytes = plan.initialization_size,
-        .peer_bytes = resource_bytes(&plan, XGL_RESOURCE_PEER),
-        .window_bytes = 0U,
-        .tx_record_bytes = resource_bytes(&plan, XGL_RESOURCE_TX_PACKET),
-        .tx_payload_bytes = resource_bytes(&plan, XGL_RESOURCE_TX_PAYLOAD),
-        .scratch_bytes = resource_bytes(&plan, XGL_RESOURCE_SCRATCH),
-    };
-#if XGL_FEATURE_OUT_OF_ORDER
-    result.rx_buffered_bytes = resource_bytes(&plan, XGL_RESOURCE_RX_PACKET) +
-                               resource_bytes(&plan, XGL_RESOURCE_RX_PAYLOAD);
+    report_plan(&plan, report);
+    return XGL_OK;
+}
+
+/** \brief           Populate caller storage from a validated plan. */
+static xgl_error_t prepare_storage(const xgl_config_t* config,
+                                   const xgl_workspace_plan_t* plan,
+                                   void* storage, size_t storage_size,
+                                   const xgm_allocator_t* storage_allocator,
+                                   xgl_handle_t* handle) {
+    if (storage_size < plan->requirements.size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    /* Successful xgm_size_class_measure returns nonzero max alignment. */
+    /* NOLINTNEXTLINE(clang-analyzer-core.DivideZero) */
+    if ((uintptr_t)storage % plan->requirements.alignment != 0U) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    xgl_workspace_t* workspace = storage;
+    memset(workspace, 0, sizeof(*workspace));
+    uint8_t* cursor = (uint8_t*)storage + plan->prefix_size;
+    if (xgm_size_class_init(&workspace->initialization,
+                            workspace->initial_pools, XGL_INIT_CLASSES,
+                            plan->initial, plan->initial_count, cursor,
+                            plan->initialization_size) != XGS_OK) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    cursor += plan->initialization_size;
+    for (size_t i = 0U; i < XGL_RESOURCE_COUNT; ++i) {
+        const xgm_size_class_spec_t* spec = &plan->runtime[i];
+        if (spec->block_count != 0U) {
+            const size_t bytes = spec->block_size * spec->block_count;
+            if (xgm_pool_init(&workspace->runtime_pools[i], cursor, bytes,
+                              spec->block_size, plan->requirements.alignment,
+                              spec->block_count) != XGS_OK) {
+                return XGL_ERR_INVALID_PARAM;
+            }
+            cursor += bytes;
+        }
+        workspace->runtime_services[i] =
+            xgm_pool_allocator(&workspace->runtime_pools[i]);
+    }
+    bind_services(workspace);
+    workspace->instance.config = config;
+    workspace->instance.allocator = &workspace->initialization.service;
+    workspace->instance.storage_allocator = storage_allocator;
+    workspace->instance.memory = &workspace->memory;
+    workspace->instance.caller_owned = storage_allocator == NULL;
+#if XGL_FEATURE_STATISTICS
+    workspace->instance.stats.memory_used = plan->requirements.size;
+    workspace->instance.stats.memory_peak = plan->requirements.size;
 #endif
-#if XGL_FEATURE_FRAGMENTATION
-    result.fragment_bytes =
-        resource_bytes(&plan, XGL_RESOURCE_TX_EXTENSIONS) +
-        resource_bytes(&plan, XGL_RESOURCE_TX_MESSAGE) +
-        resource_bytes(&plan, XGL_RESOURCE_REASSEMBLY) +
-        resource_bytes(&plan, XGL_RESOURCE_REASSEMBLY_PAYLOAD);
-#endif
-    *report = result;
+    *handle = &workspace->instance;
     return XGL_OK;
 }
 
@@ -342,50 +500,8 @@ xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
     if (error != XGL_OK) {
         return error;
     }
-    if (storage_size < plan.requirements.size) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-    /* Successful xgm_size_class_measure returns nonzero max alignment. */
-    /* NOLINTNEXTLINE(clang-analyzer-core.DivideZero) */
-    if ((uintptr_t)storage % plan.requirements.alignment != 0U) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-    xgl_workspace_t* workspace = storage;
-    memset(workspace, 0, sizeof(*workspace));
-    uint8_t* cursor = (uint8_t*)storage + plan.prefix_size;
-    if (xgm_size_class_init(&workspace->initialization,
-                            workspace->initial_pools, XGL_INIT_CLASSES,
-                            plan.initial, plan.initial_count, cursor,
-                            plan.initialization_size) != XGS_OK) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-    cursor += plan.initialization_size;
-    for (size_t i = 0U; i < XGL_RESOURCE_COUNT; ++i) {
-        const xgm_size_class_spec_t* spec = &plan.runtime[i];
-        if (spec->block_count != 0U) {
-            const size_t bytes = spec->block_size * spec->block_count;
-            if (xgm_pool_init(&workspace->runtime_pools[i], cursor, bytes,
-                              spec->block_size, plan.requirements.alignment,
-                              spec->block_count) != XGS_OK) {
-                return XGL_ERR_INVALID_PARAM;
-            }
-            cursor += bytes;
-        }
-        workspace->runtime_services[i] =
-            xgm_pool_allocator(&workspace->runtime_pools[i]);
-    }
-    bind_services(workspace);
-    workspace->instance.config = config;
-    workspace->instance.allocator = &workspace->initialization.service;
-    workspace->instance.storage_allocator = storage_allocator;
-    workspace->instance.memory = &workspace->memory;
-    workspace->instance.caller_owned = storage_allocator == NULL;
-#if XGL_FEATURE_STATISTICS
-    workspace->instance.stats.memory_used = plan.requirements.size;
-    workspace->instance.stats.memory_peak = plan.requirements.size;
-#endif
-    *handle = &workspace->instance;
-    return XGL_OK;
+    return prepare_storage(config, &plan, storage, storage_size,
+                           storage_allocator, handle);
 }
 
 /**
@@ -415,4 +531,97 @@ xgl_error_t xgl_init_static_checked(const xgl_config_t* config,
         *handle = prepared;
     }
     return error;
+}
+
+xgl_error_t
+xgl_memory_report_with_options(const xgl_config_t* config,
+                               const xgl_instance_options_t* options,
+                               xgl_memory_report_t* report) {
+    if (report == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    xgl_workspace_plan_t plan;
+    xgl_error_t error = make_options_plan(config, options, &plan);
+    if (error == XGL_OK) {
+        report_plan(&plan, report);
+    }
+    return error;
+#else
+    return xgl_options_validate(config, options);
+#endif
+}
+
+xgl_error_t xgl_create_with_options(const xgl_config_t* config,
+                                    const xgl_instance_options_t* options,
+                                    xgl_handle_t* handle) {
+    if (handle == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *handle = NULL;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    xgl_workspace_plan_t plan;
+    xgl_error_t error = make_options_plan(config, options, &plan);
+    if (error != XGL_OK) {
+        return error;
+    }
+    const xgm_allocator_t* allocator = config->memory.allocator;
+#if XGL_ALLOW_FALLBACK_MALLOC
+    if (allocator == NULL) {
+        allocator = xgm_allocator_libc();
+    }
+#endif
+    if (!xgm_allocator_is_valid(allocator)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    void* storage = xgm_alloc(allocator, plan.requirements.size);
+    if (storage == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+    error = prepare_storage(config, &plan, storage, plan.requirements.size,
+                            allocator, handle);
+    if (error != XGL_OK) {
+        xgm_free(allocator, storage);
+    } else {
+        (*handle)->options = options;
+    }
+    return error;
+#else
+    return xgl_options_validate(config, options);
+#endif
+}
+
+xgl_error_t xgl_init_static_with_options(const xgl_config_t* config,
+                                         const xgl_instance_options_t* options,
+                                         void* storage, size_t storage_size,
+                                         xgl_handle_t* handle) {
+    if (handle == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *handle = NULL;
+    if (storage == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    xgl_workspace_plan_t plan;
+    xgl_error_t error = make_options_plan(config, options, &plan);
+    if (error != XGL_OK) {
+        return error;
+    }
+    xgl_handle_t prepared;
+    error =
+        prepare_storage(config, &plan, storage, storage_size, NULL, &prepared);
+    if (error != XGL_OK) {
+        return error;
+    }
+    prepared->options = options;
+    error = xgl_init(prepared);
+    if (error == XGL_OK) {
+        *handle = prepared;
+    }
+    return error;
+#else
+    (void)storage_size;
+    return xgl_options_validate(config, options);
+#endif
 }

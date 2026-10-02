@@ -265,20 +265,23 @@ TEST_F(XglDatalinkSpanTest, BoundedPollKeepsTailAndLegacyZeroRxDrains) {
     const auto second = frame(0x22U);
     driver_bytes.insert(driver_bytes.end(), second.begin(), second.end());
     size_t remaining = 1U;
+    bool polled = false;
     bool pending = false;
-    ASSERT_EQ(xgl_datalink_poll_parser_bounded(
-                  &context, &parser, &phy, 10U, 1000U, 128U, &remaining,
-                  &pending),
+    ASSERT_EQ(xgl_datalink_poll_parser_bounded(&context, &parser, &phy, 10U,
+                                               1000U, 128U, &remaining, &polled,
+                                               &pending),
               XGL_OK);
     EXPECT_TRUE(pending);
+    EXPECT_TRUE(polled);
     EXPECT_EQ(reads, 1U);
     EXPECT_EQ(driver_cursor, driver_bytes.size());
     remaining = 0U;
-    EXPECT_EQ(xgl_datalink_poll_parser_bounded(
-                  &context, &parser, &phy, 20U, 1000U, 128U, &remaining,
-                  &pending),
+    EXPECT_EQ(xgl_datalink_poll_parser_bounded(&context, &parser, &phy, 20U,
+                                               1000U, 128U, &remaining, &polled,
+                                               &pending),
               XGL_OK);
     EXPECT_EQ(reads, 1U);
+    EXPECT_FALSE(polled);
     EXPECT_TRUE(pending);
     EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 30U, 1000U, 0U),
               XGL_OK);
@@ -292,12 +295,14 @@ TEST_F(XglDatalinkSpanTest, BoundedPollNeverRequestsMoreThanCacheFreeSpace) {
     driver_bytes = frame(0x11U);
     ASSERT_EQ(driver_bytes.size(), 34U);
     size_t remaining = 1U;
+    bool polled = false;
     bool pending = false;
-    EXPECT_EQ(xgl_datalink_poll_parser_bounded(
-                  &context, &parser, &phy, 10U, 1000U, 128U, &remaining,
-                  &pending),
+    EXPECT_EQ(xgl_datalink_poll_parser_bounded(&context, &parser, &phy, 10U,
+                                               1000U, 128U, &remaining, &polled,
+                                               &pending),
               XGL_OK);
     EXPECT_LE(driver_cursor, 33U);
+    EXPECT_TRUE(polled);
     EXPECT_TRUE(delivered.empty());
 }
 #endif

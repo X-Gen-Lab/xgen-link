@@ -37,6 +37,10 @@ xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
             return first_error;
         }
 
+        if (!transport_tx_budget_available(ctx, peer)) {
+            return first_error;
+        }
+
         uint32_t packet_number = buffered->packet.packet_number;
         xgl_error_t err = transport_deliver_packet(
             ctx, handle, &buffered->packet, buffered->packet_data.data,
@@ -237,6 +241,12 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         if (err != XGL_OK) {
             return err;
         }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        if (transport_expire_rx_fragment(ctx, handle, rx_peer, packet,
+                                         &fragment)) {
+            return XGL_ERR_TIMEOUT;
+        }
+#endif
     }
 #endif
     if (rx_peer != NULL) {

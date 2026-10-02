@@ -74,6 +74,49 @@ static inline size_t transport_tx_packet_count(const xgl_transport_ctx_t* ctx) {
     return count;
 }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+void transport_note_tx_admission(xgl_transport_ctx_t* ctx,
+                                 xgl_transport_peer_state_t* peer);
+void transport_notify_tx_drained(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                                 xgl_transport_peer_state_t* peer);
+bool transport_expire_tx(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                         xgl_transport_peer_state_t* peer);
+#endif
+
+/** \brief           Test maintenance capacity without consuming an attempt. */
+static inline bool
+transport_tx_budget_available(const xgl_transport_ctx_t* ctx,
+                              xgl_transport_peer_state_t* peer) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (ctx->work != NULL && ctx->work->remaining == 0U) {
+        if (peer != NULL) {
+            peer->work_blocked = true;
+        }
+        return false;
+    }
+#else
+    (void)ctx;
+    (void)peer;
+#endif
+    return true;
+}
+
+/** \brief           Charge a lower-layer submission only during bounded work.
+ */
+static inline xgl_error_t
+transport_submit_packet(const xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                        xgl_packet_t* packet) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (!transport_tx_budget_available(ctx, NULL)) {
+        return XGL_ERR_BUSY;
+    }
+    if (ctx->work != NULL) {
+        ctx->work->remaining--;
+    }
+#endif
+    return xgl_packet_send(ctx->lower_layer, handle, packet);
+}
+
 xgl_transport_peer_state_t*
 transport_find_peer_scope(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
                           uint32_t connection_id, uint32_t session_epoch);

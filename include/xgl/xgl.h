@@ -495,6 +495,70 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats);
  */
 xgl_error_t xgl_stats_reset(xgl_handle_t handle);
 
+/**
+ * \brief           Measure independent message storage with versioned policy
+ * \param[in]       config: Immutable instance configuration
+ * \param[in]       options: Initialized versioned policy
+ * \param[out]      report: Exact reservation, unchanged on failure
+ * \return          XGL_OK, validation error, or UNSUPPORTED without capability
+ */
+xgl_error_t
+xgl_memory_report_with_options(const xgl_config_t* config,
+                               const xgl_instance_options_t* options,
+                               xgl_memory_report_t* report);
+
+/**
+ * \brief           Reserve an instance borrowing versioned optional policy
+ * \param[in]       config: Immutable configuration borrowed until destroy
+ * \param[in]       options: Immutable policy borrowed until destroy
+ * \param[out]      handle: Reserved instance, cleared on failure
+ * \return          XGL_OK or validation/allocation error; call xgl_init next
+ */
+xgl_error_t xgl_create_with_options(const xgl_config_t* config,
+                                    const xgl_instance_options_t* options,
+                                    xgl_handle_t* handle);
+
+/**
+ * \brief           Initialize caller storage with explicit optional policy
+ * \param[in]       config: Immutable configuration borrowed until destroy
+ * \param[in]       options: Immutable policy borrowed until destroy
+ * \param[in,out]   storage: Aligned caller-owned workspace
+ * \param[in]       storage_size: Available bytes from the options-aware report
+ * \param[out]      handle: Initialized instance, cleared on failure
+ * \return          XGL_OK or validation, storage or initialization error
+ */
+xgl_error_t xgl_init_static_with_options(const xgl_config_t* config,
+                                         const xgl_instance_options_t* options,
+                                         void* storage, size_t storage_size,
+                                         xgl_handle_t* handle);
+
+/**
+ * \brief           Run a step with additional candidate and TX-attempt limits
+ * \param[in,out]   handle: Caller-serialized initialized instance
+ * \param[in]       now_ms: Same monotonic clock as all instance operations
+ * \param[in]       budget: Per-PHY read and parser timeout policy
+ * \param[in]       limits: Per-link candidate and whole-maintenance TX limits
+ * \param[out]      result: Continuation flag, initialized even on failure
+ * \return          First processing error, or XGL_OK; UNSUPPORTED if disabled
+ * \note            Timers still run with zero limits. Callback time, a single
+ *                  CRC, receive ACKs and application send calls are not bounded
+ *                  by these limits. Pending work requires another step with
+ *                  positive limits; application BUSY requires an external wake.
+ */
+xgl_error_t xgl_step_bounded(xgl_handle_t handle, uint32_t now_ms,
+                             const xgl_work_budget_t* budget,
+                             const xgl_execution_limits_t* limits,
+                             xgl_execution_result_t* result);
+
+/**
+ * \brief           Inspect currently owned resources without allocation
+ * \param[in]       handle: Caller-serialized initialized instance
+ * \param[out]      snapshot: Current resource counts, unchanged on error
+ * \return          XGL_OK, argument error, or UNSUPPORTED if disabled
+ */
+xgl_error_t xgl_resources_get(xgl_handle_t handle,
+                              xgl_resource_snapshot_t* snapshot);
+
 #ifdef __cplusplus
 }
 #endif

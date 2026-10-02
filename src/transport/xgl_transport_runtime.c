@@ -7,6 +7,37 @@
 #include "xgl_transport_rx_internal.h"
 #include <internal/xgl_diagnostics.h>
 
+/** \brief           Start at the rotating owner only during bounded work. */
+static xgl_transport_peer_state_t*
+transport_first_work_peer(const xgl_transport_ctx_t* ctx) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (ctx->work != NULL) {
+        return ctx->work->first;
+    }
+#endif
+    return ctx->peers;
+}
+
+/** \brief           Visit every owner once, wrapping only in bounded mode. */
+static xgl_transport_peer_state_t*
+transport_next_work_peer(const xgl_transport_ctx_t* ctx,
+                         const xgl_transport_peer_state_t* peer) {
+    xgl_transport_peer_state_t* next = peer->next;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (ctx->work != NULL) {
+        if (next == NULL) {
+            next = ctx->peers;
+        }
+        if (next == ctx->work->first) {
+            next = NULL;
+        }
+    }
+#else
+    (void)ctx;
+#endif
+    return next;
+}
+
 /**
  * \brief           Retry an owned packet or fail its peer at the retry limit
  * \param[in,out]   ctx: Transport layer context
@@ -41,6 +72,10 @@ static xgl_error_t transport_retransmit_reliable_packet(
         return XGL_ERR_BUSY;
     }
 
+    if (!transport_tx_budget_available(ctx, peer)) {
+        return XGL_OK;
+    }
+
     xgl_packet_data_t packet_data = {.data_len = rel_packet->data_len,
                                      .data = rel_packet->data};
 
@@ -59,7 +94,7 @@ static xgl_error_t transport_retransmit_reliable_packet(
                            .extensions = rel_packet->extensions,
                            .extensions_len = rel_packet->extensions_len};
 
-    xgl_error_t err = xgl_packet_send(ctx->lower_layer, handle, &packet);
+    xgl_error_t err = transport_submit_packet(ctx, handle, &packet);
     if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY) {
         rel_packet->retry_pending = true;
         rel_packet->retry_started_ms = current_time_ms;
@@ -148,8 +183,8 @@ static xgl_error_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
                                                      xgl_handle_t handle,
                                                      uint32_t current_time_ms) {
     xgl_error_t first_error = XGL_OK;
-    for (xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
-         peer = peer->next) {
+    for (xgl_transport_peer_state_t* peer = transport_first_work_peer(ctx);
+         peer != NULL; peer = transport_next_work_peer(ctx, peer)) {
         xgl_error_t error = transport_process_retransmission_queue(
             ctx, peer, handle, current_time_ms);
         if (first_error == XGL_OK) {
@@ -203,12 +238,21 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #if XGL_FEATURE_OUT_OF_ORDER
     xgl_error_t transient_feedback_error = XGL_OK;
 #endif
-#if XGL_FEATURE_FRAGMENTATION || XGL_FEATURE_OUT_OF_ORDER
-    for (xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
-         peer = peer->next) {
+#if XGL_FEATURE_FRAGMENTATION || XGL_FEATURE_OUT_OF_ORDER ||                   \
+    XGL_FEATURE_ADVANCED_RUNTIME
+    for (xgl_transport_peer_state_t* peer = transport_first_work_peer(ctx);
+         peer != NULL; peer = transport_next_work_peer(ctx, peer)) {
         if (peer->failed) {
             continue;
         }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        if (transport_expire_tx(ctx, handle, peer)) {
+            if (first_error == XGL_OK) {
+                first_error = XGL_ERR_TIMEOUT;
+            }
+            continue;
+        }
+#endif
 #if XGL_FEATURE_FRAGMENTATION
         xgl_error_t error = transport_pump_tx_message(ctx, handle, peer);
         if (first_error == XGL_OK) {
@@ -332,6 +376,12 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
 #endif
     for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
          peer = peer->next) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        if (peer->tx_busy && ctx->tx_lifetime_ms != 0U) {
+            transport_take_timeout(now_ms, peer->tx_started_ms,
+                                   ctx->tx_lifetime_ms, &active, timeout_ms);
+        }
+#endif
         xgct_list_node_t* node;
         XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
             const xgl_reliable_packet_t* packet =
@@ -396,3 +446,40 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
 #endif
     return active;
 }
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+xgl_error_t xgl_transport_run_bounded(xgl_transport_ctx_t* ctx,
+                                      xgl_handle_t handle, uint32_t now_ms,
+                                      size_t tx_budget, bool* pending) {
+    if (ctx == NULL || pending == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *pending = false;
+    if (ctx->work != NULL) {
+        return XGL_ERR_BUSY;
+    }
+    xgl_transport_peer_state_t* first =
+        ctx->maintenance_cursor != NULL ? ctx->maintenance_cursor : ctx->peers;
+    for (xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
+         peer = peer->next) {
+        peer->work_blocked = false;
+    }
+    xgl_transport_work_t work = {tx_budget, first};
+    ctx->work = &work;
+    ctx->maintenance_cursor =
+        first != NULL && first->next != NULL ? first->next : ctx->peers;
+    xgl_error_t error = xgl_transport_run(ctx, handle, now_ms);
+    ctx->work = NULL;
+    /* Later terminal maintenance can release work blocked earlier this pass.
+     * Only surviving owners retain a reason for immediate budget continuation.
+     */
+    for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
+         peer = peer->next) {
+        if (peer->work_blocked) {
+            *pending = true;
+            break;
+        }
+    }
+    return error;
+}
+#endif

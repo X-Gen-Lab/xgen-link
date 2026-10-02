@@ -10,6 +10,7 @@
 #include <api/xgl_instance_internal.h>
 #include <mock_phy.h>
 #include <network/xgl_network.h>
+#include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
 #include <xgen/bytes/bytes.h>
 
@@ -131,6 +132,9 @@ struct Node {
     };
 
     xgl_config_t config = {};
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
+#endif
     std::vector<xgl_route_item_t> routes;
     xgl_handle_t handle = nullptr;
     std::vector<Delivery> deliveries;
@@ -224,14 +228,13 @@ class XglNetworkMultihopTest : public ::testing::Test {
         for (Node* node : {&a, &b, &c}) {
             node->config.route_table = node->routes.data();
             node->config.route_table_len = node->routes.size();
-            xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
             if (node != &b) {
                 node->config.auth_provider = &authentication.provider;
-                options.protect_installed_scopes = protect;
+                node->options.protect_installed_scopes = protect;
             }
-            ASSERT_EQ(
-                xgl_create_with_options(&node->config, &options, &node->handle),
-                XGL_OK);
+            ASSERT_EQ(xgl_create_with_options(&node->config, &node->options,
+                                              &node->handle),
+                      XGL_OK);
             ASSERT_EQ(xgl_init(node->handle), XGL_OK);
         }
         if (install) {
@@ -572,6 +575,37 @@ TEST_F(XglNetworkMultihopTest, DisabledScopeProtectionPreservesOptionalMode) {
                                     a_phy.frames.front().size(), nullptr),
               XGL_OK);
     EXPECT_FALSE(view.authenticated);
+}
+
+TEST_F(XglNetworkMultihopTest, InstalledScopeProtectsResetAndSelectiveAck) {
+    ASSERT_NO_FATAL_FAILURE(StartScoped());
+    ASSERT_EQ(transport_send_control(&a.handle->layers.transport_ctx, a.handle,
+                                     3U, XGL_TRANSPORT_CONTROL_RESET, 0U, 0U),
+              XGL_OK);
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, a_phy.frames.front().data(),
+                                    a_phy.frames.front().size(), nullptr),
+              XGL_OK);
+    EXPECT_EQ(view.header.packet_type, XGL_PACKET_TYPE_CONTROL);
+    EXPECT_EQ(view.data_type, XGL_TRANSPORT_CONTROL_RESET);
+    EXPECT_EQ(xgl_security_verify_frame(&c.handle->security, &view), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(a_phy.frames));
+
+#if XGL_FEATURE_OUT_OF_ORDER
+    xgl_transport_peer_state_t peer = {};
+    xgl_transport_rx_buffered_packet_t buffered = {};
+    buffered.packet.packet_number = 2U;
+    peer.rx_buffered = &buffered;
+    ASSERT_EQ(transport_send_sack(&c.handle->layers.transport_ctx, c.handle,
+                                  &peer, 1U, 0U, 0U, 0U),
+              XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(c_phy.frames));
+    ASSERT_EQ(xgl_wire_decode_frame(&view, c_phy.frames.front().data(),
+                                    c_phy.frames.front().size(), nullptr),
+              XGL_OK);
+    EXPECT_EQ(view.header.packet_type, XGL_PACKET_TYPE_ACK);
+    EXPECT_EQ(xgl_security_verify_frame(&a.handle->security, &view), XGL_OK);
+#endif
 }
 #endif
 

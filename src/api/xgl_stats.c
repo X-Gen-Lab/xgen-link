@@ -87,3 +87,18 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
     return XGL_ERR_UNSUPPORTED;
 #endif
 }
+
+xgl_error_t xgl_resources_get(xgl_handle_t handle,
+                              xgl_resource_snapshot_t* snapshot) {
+    if (handle == NULL || snapshot == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (!handle->initialized) {
+        return XGL_ERR_NOT_INITIALIZED;
+    }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    return xgl_transport_get_resources(&handle->layers.transport_ctx, snapshot);
+#else
+    return XGL_ERR_UNSUPPORTED;
+#endif
+}

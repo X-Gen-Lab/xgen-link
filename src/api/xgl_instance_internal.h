@@ -62,6 +62,9 @@ struct xgl_instance {
     bool initialized;           /**< Initialization flag */
     bool caller_owned;          /**< Instance resides inside caller workspace */
     uint32_t parser_timeout_ms; /**< Latest step policy; zero disables expiry */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    const xgl_instance_options_t* options; /**< Immutable borrowed policy */
+#endif
 
     /*-----------------------------------------------------------------------*/
     /* Memory Management                                                     */
@@ -111,6 +114,9 @@ xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
                                   size_t storage_size,
                                   const xgm_allocator_t* storage_allocator,
                                   xgl_handle_t* handle);
+
+xgl_error_t xgl_options_validate(const xgl_config_t* config,
+                                 const xgl_instance_options_t* options);
 
 #ifdef __cplusplus
 }

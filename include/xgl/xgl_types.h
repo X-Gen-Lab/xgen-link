@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <xgen/memory/allocator.h>
+#include <xgl/xgl_config.h>
 
 #include "xgl/xgl_error.h"
 
@@ -395,6 +396,127 @@ typedef struct {
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;            /**< User data for callbacks */
 } xgl_config_t;
+
+/** \brief           Exact identity and semantics of synchronously borrowed RX.
+ */
+typedef struct {
+    uint16_t source_id;     /**< Remote endpoint */
+    uint32_t connection_id; /**< Connection identity */
+    uint32_t session_epoch; /**< Connection generation */
+    uint8_t data_type;      /**< Application payload classification */
+    bool reliable;          /**< Protocol owns acceptance until delivery */
+} xgl_rx_info_t;
+
+/**
+ * \brief           Accept a payload with its complete connection identity
+ * \param[in]       handle: Serialized instance, never reenter from this call
+ * \param[in]       info: Borrowed receive metadata
+ * \param[in]       data: Borrowed payload valid only during this call
+ * \param[in]       length: Payload bytes
+ * \param[in]       user_data: Application context
+ * \return          XGL_OK when accepted; BUSY/NO_MEMORY retain reliable input
+ */
+typedef xgl_error_t (*xgl_rx_scoped_fn)(xgl_handle_t handle,
+                                        const xgl_rx_info_t* info,
+                                        const uint8_t* data, size_t length,
+                                        void* user_data);
+
+/** \brief           Observable scope transitions; ACK is not business
+ * completion. */
+typedef enum {
+    XGL_SCOPE_FAILED,    /**< Terminal failure or explicit cancellation */
+    XGL_SCOPE_TX_DRAINED /**< All accepted reliable TX has been acknowledged */
+} xgl_scope_event_t;
+
+/**
+ * \brief           Observe a scope transition synchronously without reentry
+ * \param[in]       handle: Serialized instance
+ * \param[in]       remote_id: Remote endpoint
+ * \param[in]       connection_id: Exact connection
+ * \param[in]       session_epoch: Exact generation
+ * \param[in]       event: Transition kind
+ * \param[in]       error: Terminal reason, or XGL_OK for drained TX
+ * \param[in]       user_data: Application context
+ */
+typedef void (*xgl_scope_event_fn)(xgl_handle_t handle, uint16_t remote_id,
+                                   uint32_t connection_id,
+                                   uint32_t session_epoch,
+                                   xgl_scope_event_t event, xgl_error_t error,
+                                   void* user_data);
+
+/**
+ * \brief           Versioned optional instance policy, borrowed until destroy
+ * \note            Initialize with XGL_INSTANCE_OPTIONS_INIT. Requires the
+ *                  advanced_runtime build capability. Zero capacities retain
+ *                  legacy storage. Scope callbacks cannot reenter the instance.
+ */
+typedef struct {
+    size_t size;              /**< Exact descriptor size */
+    uint32_t version;         /**< Descriptor version, currently one */
+    size_t config_size;       /**< Consumer xgl_config_t size */
+    uint32_t config_abi;      /**< Consumer configuration ABI */
+    uint32_t build_config_id; /**< Consumer compiled resource identity */
+    uint32_t
+        reassembly_timeout_ms; /**< Absolute partial-message limit; 0 = 5000 */
+    uint32_t
+        tx_lifetime_ms; /**< Reliable TX busy-period limit; 0 = unlimited */
+    size_t tx_message_slots; /**< Whole TX message slots; 0 = max_peers */
+    size_t
+        rx_message_slots; /**< Shared partial/complete RX slots; 0 = legacy */
+    bool protect_installed_scopes;       /**< Require authenticated RX/TX for
+                                            installed scopes */
+    xgl_rx_scoped_fn rx_scoped_callback; /**< Overrides legacy RX callbacks */
+    xgl_scope_event_fn
+        scope_event_callback; /**< Optional transition observer */
+    void* user_data;          /**< Borrowed callback context */
+} xgl_instance_options_t;
+
+/** \brief           Compatible C11/C++17 initializer for optional policy. */
+#define XGL_INSTANCE_OPTIONS_INIT                                              \
+    {sizeof(xgl_instance_options_t),                                           \
+     1U,                                                                       \
+     sizeof(xgl_config_t),                                                     \
+     XGL_CONFIG_ABI_VERSION,                                                   \
+     XGL_BUILD_CONFIG_ID,                                                      \
+     0U,                                                                       \
+     0U,                                                                       \
+     0U,                                                                       \
+     0U,                                                                       \
+     false,                                                                    \
+     NULL,                                                                     \
+     NULL,                                                                     \
+     NULL}
+
+/** \brief           Additional limits for one bounded step; zero stops that
+ * work. */
+typedef struct {
+    size_t parser_candidates; /**< Candidate checks per PHY; SIZE_MAX =
+                                 unlimited */
+    size_t tx_packets; /**< Maintenance TX attempts; SIZE_MAX = unlimited */
+} xgl_execution_limits_t;
+
+/** \brief           Bounded-step continuation, independent of the first error.
+ */
+typedef struct {
+    bool pending; /**< Executable local work remains because a limit was reached
+                   */
+} xgl_execution_result_t;
+
+/** \brief           Current owned resources; this is not reserved workspace
+ * size. */
+typedef struct {
+    size_t peer_count;          /**< Existing scopes */
+    size_t failed_peers;        /**< Terminal scopes requiring explicit close */
+    size_t tx_packets;          /**< Retained reliable records */
+    size_t tx_payload_bytes;    /**< Retained packet payload bytes */
+    size_t tx_message_bytes;    /**< Whole messages with unsent bytes */
+    size_t rx_buffered_packets; /**< Out-of-order retained packets */
+    size_t rx_buffered_bytes;   /**< Out-of-order payload bytes */
+    size_t reassembly_slots;    /**< Active partial messages */
+    size_t reassembly_bytes; /**< Charged partial and completed message bytes */
+    size_t pending_rx_messages; /**< Completed messages awaiting application
+                                   capacity */
+} xgl_resource_snapshot_t;
 
 /*---------------------------------------------------------------------------*/
 /* Statistics Structure                                                      */

@@ -135,6 +135,15 @@ xgl_error_t transport_pump_tx_message(xgl_transport_ctx_t* ctx,
     }
     while (peer->tx_message.data != NULL &&
            xgl_window_can_send_packet_number(&peer->tx_window)) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        if (ctx->work != NULL &&
+            transport_tx_packet_count(ctx) >= ctx->max_tx_packets) {
+            return XGL_OK;
+        }
+#endif
+        if (!transport_tx_budget_available(ctx, peer)) {
+            return XGL_OK;
+        }
         size_t remaining = peer->tx_message.data_len - peer->tx_message_offset;
         size_t length = remaining < peer->tx_fragment_payload_size
                             ? remaining
@@ -255,6 +264,9 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
 
     /* Both the complete message and its first frame now have local owners.
      * Failures after announcing this admission retain or fail owned work. */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    transport_note_tx_admission(ctx, peer);
+#endif
     ctx->next_message_id++;
     err = transport_send_packet_view(ctx, handle, peer, &peer->tx_message,
                                      owned_data, length, packet->packet_number,

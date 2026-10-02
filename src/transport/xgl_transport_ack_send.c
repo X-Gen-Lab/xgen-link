@@ -47,7 +47,7 @@ static xgl_error_t transport_emit_ack(const xgl_transport_ctx_t* ctx,
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
-    return xgl_packet_send(ctx->lower_layer, handle, &packet);
+    return transport_submit_packet(ctx, handle, &packet);
 }
 
 /* Parameter order follows the documented protocol fields and units. */

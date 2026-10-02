@@ -91,6 +91,10 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
     if (err != XGL_OK) {
         goto cleanup;
     }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    handle->security.protect_installed_scopes =
+        handle->options != NULL && handle->options->protect_installed_scopes;
+#endif
 #endif
 
     /* Initialize data link layer */
@@ -163,6 +167,25 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .max_tx_message_bytes = handle->config->features.max_tx_message_bytes,
         .memory = handle->memory,
     };
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (handle->options != NULL) {
+        transport_config.reassembly_timeout_ms =
+            handle->options->reassembly_timeout_ms;
+        transport_config.tx_lifetime_ms = handle->options->tx_lifetime_ms;
+        transport_config.rx_scoped_callback =
+            handle->options->rx_scoped_callback;
+        transport_config.scope_event_callback =
+            handle->options->scope_event_callback;
+        transport_config.extended_user_data = handle->options->user_data;
+#if XGL_FEATURE_AUTH
+        if (handle->options->protect_installed_scopes &&
+            handle->config->auth_provider != NULL) {
+            transport_config.auth_tag_len =
+                (uint8_t)handle->config->auth_provider->tag_len;
+        }
+#endif
+    }
+#endif
     err = xgl_transport_init(&handle->layers.transport_ctx, &transport_config);
     if (err != XGL_OK) {
         goto cleanup;

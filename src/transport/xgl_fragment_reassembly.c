@@ -53,6 +53,27 @@ fragment_find_reassembly_buffer(const xgl_fragment_manager_t* manager,
     return NULL;
 }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+bool fragment_expire_message(xgl_fragment_manager_t* manager,
+                             uint16_t source_id, uint32_t connection_id,
+                             uint32_t session_epoch, uint32_t message_id,
+                             uint32_t now_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    xgl_reassembly_buffer_t* buffer = fragment_find_reassembly_buffer(
+        manager, source_id, connection_id, session_epoch, message_id);
+    if (buffer == NULL || buffer->received_bytes == 0U ||
+        buffer->timeout_ms == 0U ||
+        now_ms - buffer->first_fragment_time < buffer->timeout_ms) {
+        return false;
+    }
+    xgct_list_remove(&manager->reassembly_list, &buffer->node);
+    fragment_free_reassembly_buffer(manager, buffer);
+    return true;
+}
+#endif
+
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 static xgl_error_t fragment_create_reassembly_buffer(

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <gtest/gtest.h>
+#include <random>
 #include <vector>
 
 namespace {
@@ -224,7 +225,6 @@ TEST_F(XglDatalinkResyncTest, TruncatedCrcRecoversTheFollowingFrame) {
     }
 }
 
-
 #if XGL_FEATURE_ADVANCED_RUNTIME
 TEST_F(XglDatalinkResyncTest, BoundedRecoveryMatchesEveryInputSplit) {
     auto bytes = CorruptOuter();
@@ -268,9 +268,9 @@ TEST_F(XglDatalinkResyncTest, ZeroBudgetRetainsInputUntilLegacyDrain) {
     size_t remaining = 0U;
     size_t consumed = 0U;
     bool pending = false;
-    ASSERT_EQ(xgl_datalink_consume_span_bounded(
-                  &context, &parser, bytes.data(), bytes.size(), 10U,
-                  &remaining, &consumed, &pending),
+    ASSERT_EQ(xgl_datalink_consume_span_bounded(&context, &parser, bytes.data(),
+                                                bytes.size(), 10U, &remaining,
+                                                &consumed, &pending),
               XGL_OK);
     EXPECT_EQ(consumed, bytes.size());
     EXPECT_TRUE(pending);
@@ -318,15 +318,15 @@ TEST_F(XglDatalinkResyncTest, BoundedCacheFullReportsExactConsumedPrefix) {
     size_t remaining = 0U;
     size_t consumed = 0U;
     bool pending = false;
-    ASSERT_EQ(xgl_datalink_consume_span_bounded(
-                  &context, &parser, bytes.data(), bytes.size(), 10U,
-                  &remaining, &consumed, &pending),
+    ASSERT_EQ(xgl_datalink_consume_span_bounded(&context, &parser, bytes.data(),
+                                                bytes.size(), 10U, &remaining,
+                                                &consumed, &pending),
               XGL_OK);
     ASSERT_EQ(consumed, 27U);
     EXPECT_TRUE(pending);
-    EXPECT_EQ(xgl_datalink_consume_span(
-                  &context, &parser, bytes.data() + consumed,
-                  bytes.size() - consumed, 20U),
+    EXPECT_EQ(xgl_datalink_consume_span(&context, &parser,
+                                        bytes.data() + consumed,
+                                        bytes.size() - consumed, 20U),
               XGL_OK);
     EXPECT_EQ(delivered, std::vector<std::vector<uint8_t>>({{0x11U}, {0x22U}}));
     EXPECT_FALSE(xgl_parser_has_pending(&parser));
@@ -337,20 +337,100 @@ TEST_F(XglDatalinkResyncTest, PausedRecoveryKeepsOriginalDeadline) {
     size_t remaining = 2U;
     size_t consumed = 0U;
     bool pending = false;
-    ASSERT_EQ(xgl_datalink_consume_span_bounded(
-                  &context, &parser, bytes.data(), bytes.size(), 100U,
-                  &remaining, &consumed, &pending),
+    ASSERT_EQ(xgl_datalink_consume_span_bounded(&context, &parser, bytes.data(),
+                                                bytes.size(), 100U, &remaining,
+                                                &consumed, &pending),
               XGL_OK);
     ASSERT_TRUE(pending);
     EXPECT_EQ(parser.timestamp, 100U);
     remaining = 1U;
-    EXPECT_EQ(xgl_datalink_consume_span_bounded(
-                  &context, &parser, nullptr, 0U, 500U, &remaining, &consumed,
-                  &pending),
+    EXPECT_EQ(xgl_datalink_consume_span_bounded(&context, &parser, nullptr, 0U,
+                                                500U, &remaining, &consumed,
+                                                &pending),
               XGL_OK);
     EXPECT_EQ(parser.timestamp, 100U);
     EXPECT_TRUE(xgl_parser_check_timeout(&parser, 600U, 500U));
 }
+
+TEST_F(XglDatalinkResyncTest, RandomChunksAndQuotasPreserveStreamDelivery) {
+    constexpr uint32_t seed = 5785420U;
+    RecordProperty("seed", seed);
+    std::mt19937 generator(seed);
+    auto bytes = CorruptOuter();
+    const auto nested_payload = Frame({0xD0U});
+    const auto next = Frame(nested_payload);
+    bytes.insert(bytes.end(), next.begin(), next.end());
+    bytes.insert(bytes.begin(), {0U, XGL_WIRE_MAGIC_0, 0U, 9U});
+    for (size_t trial = 0U; trial < 64U; ++trial) {
+        SCOPED_TRACE(trial);
+        xgl_parser_reset(&parser);
+        delivered.clear();
+        errors.clear();
+        statistics = {};
+        header_crc_errors = 0U;
+        frame_crc_errors = 0U;
+        size_t offset = 0U;
+        size_t guard = 0U;
+        do {
+            const size_t length =
+                std::min<size_t>(bytes.size() - offset, 1U + generator() % 17U);
+            size_t candidates = generator() % 4U;
+            size_t consumed = 0U;
+            bool pending = false;
+            ASSERT_EQ(xgl_datalink_consume_span_bounded(
+                          &context, &parser, bytes.data() + offset, length, 10U,
+                          &candidates, &consumed, &pending),
+                      XGL_OK);
+            ASSERT_LE(consumed, length);
+            offset += consumed;
+            ASSERT_LT(++guard, 2048U);
+        } while (offset < bytes.size() || xgl_parser_has_pending(&parser));
+        EXPECT_EQ(delivered, std::vector<std::vector<uint8_t>>(
+                                 {{0xB0U}, {0xC0U}, nested_payload}));
+        ExpectOneCrcFailure(3U);
+        EXPECT_EQ(parser.cache_len, 0U);
+    }
+}
+
+TEST_F(XglDatalinkResyncTest, RecoveryRestoresEarliestPartialAcrossPauses) {
+    const auto inner = Frame({0x55U});
+    auto outer = Frame(std::vector<uint8_t>(inner.begin(), inner.begin() + 10));
+    outer[outer.size() - 2U] = inner[10];
+    outer.back() = inner[11];
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, outer.data(), outer.size(), nullptr),
+              XGL_ERR_CRC_FAILED);
+    size_t candidates = 2U;
+    size_t consumed = 0U;
+    bool pending = false;
+    ASSERT_EQ(xgl_datalink_consume_span_bounded(&context, &parser, outer.data(),
+                                                outer.size(), 10U, &candidates,
+                                                &consumed, &pending),
+              XGL_OK);
+    ASSERT_TRUE(pending);
+    candidates = 1U;
+    ASSERT_EQ(xgl_datalink_consume_span_bounded(&context, &parser, nullptr, 0U,
+                                                20U, &candidates, &consumed,
+                                                &pending),
+              XGL_OK);
+    EXPECT_TRUE(pending);
+    candidates = 1U;
+    ASSERT_EQ(xgl_datalink_consume_span_bounded(&context, &parser, nullptr, 0U,
+                                                30U, &candidates, &consumed,
+                                                &pending),
+              XGL_OK);
+    EXPECT_FALSE(pending);
+    EXPECT_EQ(parser.cache_len, 12U);
+    EXPECT_EQ(parser.timestamp, 10U);
+    EXPECT_EQ(std::vector<uint8_t>(cache.begin(), cache.begin() + 12),
+              std::vector<uint8_t>(inner.begin(), inner.begin() + 12));
+    EXPECT_EQ(xgl_datalink_consume_span(&context, &parser, inner.data() + 12U,
+                                        inner.size() - 12U, 40U),
+              XGL_OK);
+    EXPECT_EQ(delivered, std::vector<std::vector<uint8_t>>({{0x55U}}));
+    ExpectOneCrcFailure(1U);
+}
+
 #endif
 
 }  // namespace

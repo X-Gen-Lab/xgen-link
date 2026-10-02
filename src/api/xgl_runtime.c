@@ -28,6 +28,12 @@ static inline bool parser_timeout(const xgl_instance_link_t* link,
                                   uint32_t now_ms, uint32_t timeout_ms,
                                   uint32_t* remaining) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (xgl_parser_has_pending(&link->parser)) {
+        *remaining = 0U;
+        return true;
+    }
+#endif
     if (timeout_ms == 0U || link->parser.state == XGL_PARSE_MAGIC ||
         link->parser.state == XGL_PARSE_COMPLETE) {
         return false;
@@ -109,6 +115,11 @@ bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
  */
 xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
                      const xgl_work_budget_t* budget) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    const xgl_execution_limits_t limits = {SIZE_MAX, SIZE_MAX};
+    xgl_execution_result_t result;
+    return xgl_step_bounded(handle, now_ms, budget, &limits, &result);
+#else
     if (handle == NULL || budget == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -146,4 +157,58 @@ xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
         first_error = error;
     }
     return first_error;
+#endif
+}
+
+xgl_error_t xgl_step_bounded(xgl_handle_t handle, uint32_t now_ms,
+                             const xgl_work_budget_t* budget,
+                             const xgl_execution_limits_t* limits,
+                             xgl_execution_result_t* result) {
+    if (result != NULL) {
+        result->pending = false;
+    }
+    if (handle == NULL || budget == NULL || limits == NULL || result == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    if (!handle->initialized) {
+        return XGL_ERR_NOT_INITIALIZED;
+    }
+    if (budget->receive_timeout_ms >= UINT32_C(0x80000000)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    handle->layers.transport_ctx.current_time_ms = now_ms;
+    handle->parser_timeout_ms = budget->receive_timeout_ms;
+    xgl_error_t first_error = XGL_OK;
+    for (size_t i = 0U; i < handle->link_count; ++i) {
+        xgl_instance_link_t* link = &handle->links[i];
+        bool due = budget->rx_bytes != 0U &&
+                   (!link->polled ||
+                    now_ms - link->last_poll_ms >= link->poll_interval_ms);
+        size_t remaining = limits->parser_candidates;
+        bool polled = false;
+        bool pending = false;
+        xgl_error_t error = xgl_datalink_poll_parser_bounded(
+            &handle->layers.datalink_ctx, &link->parser, link->phy, now_ms,
+            budget->receive_timeout_ms, due ? budget->rx_bytes : 0U, &remaining,
+            &polled, &pending);
+        if (polled) {
+            link->polled = true;
+            link->last_poll_ms = now_ms;
+        }
+        result->pending = result->pending || pending;
+        if (first_error == XGL_OK && error != XGL_OK) {
+            first_error = error;
+        }
+    }
+    bool pending = false;
+    xgl_error_t error =
+        xgl_transport_run_bounded(&handle->layers.transport_ctx, handle, now_ms,
+                                  limits->tx_packets, &pending);
+    result->pending = result->pending || pending;
+    return first_error != XGL_OK ? first_error : error;
+#else
+    (void)now_ms;
+    return XGL_ERR_UNSUPPORTED;
+#endif
 }

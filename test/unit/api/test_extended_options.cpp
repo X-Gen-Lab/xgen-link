@@ -49,11 +49,11 @@ class XglBoundedPollingTest : public ::testing::Test {
         input.resize(64U);
         xgl_frame_layout_t layout = {};
         ASSERT_EQ(xgl_frame_encode_into(input.data(), input.size(), &frame, 0U,
-                                         &layout),
+                                        &layout),
                   XGL_OK);
         size_t written = 0U;
         ASSERT_EQ(xgl_frame_finalize_crc(input.data(), input.size(), &layout,
-                                          &written),
+                                         &written),
                   XGL_OK);
         input.resize(written);
         phy.user_data = this;
@@ -78,8 +78,8 @@ class XglBoundedPollingTest : public ::testing::Test {
         config.route_table = &route;
         config.route_table_len = 1U;
         config.callback_user_data = this;
-        config.rx_callback = [](xgl_handle_t, uint16_t, uint8_t,
-                                const uint8_t*, size_t, void* user) {
+        config.rx_callback = [](xgl_handle_t, uint16_t, uint8_t, const uint8_t*,
+                                size_t, void* user) {
             ++static_cast<XglBoundedPollingTest*>(user)->deliveries;
         };
         xgl_test_use_host_allocator(&config);
@@ -132,7 +132,8 @@ TEST_F(XglBoundedPollingTest, DriverFailureStillConsumesThePhyPollInterval) {
     ASSERT_EQ(reads, 1U);
     EXPECT_FALSE(result.pending);
     phy_result = XGL_OK;
-    EXPECT_EQ(xgl_step_bounded(handle, 500U, &budget, &limits, &result), XGL_OK);
+    EXPECT_EQ(xgl_step_bounded(handle, 500U, &budget, &limits, &result),
+              XGL_OK);
     EXPECT_EQ(reads, 1U);
     EXPECT_EQ(xgl_step_bounded(handle, 1000U, &budget, &limits, &result),
               XGL_OK);

@@ -49,7 +49,7 @@ xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    return xgl_packet_send(ctx->lower_layer, handle, &packet);
+    return transport_submit_packet(ctx, handle, &packet);
 }
 
 /**

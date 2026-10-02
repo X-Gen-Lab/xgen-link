@@ -211,6 +211,51 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
 xgl_error_t xgl_datalink_get_tx_endpoint(xgl_datalink_ctx_t* ctx,
                                          xgl_frame_tx_endpoint_t* iface);
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/**
+ * \brief           Consume a byte span with resumable candidate validation
+ * \param[in,out]   ctx: Shared delivery and diagnostic context
+ * \param[in,out]   parser: Parser owning bounded persistent input storage
+ * \param[in]       bytes: Input span, or NULL for an empty span
+ * \param[in]       len: Available input bytes
+ * \param[in]       now_ms: Arrival time for newly retained input bytes
+ * \param[in,out]   candidates: Remaining validation checks for this link
+ * \param[out]      consumed: Bytes durably retained or processed from the span
+ * \param[out]      pending: True when local buffered work remains
+ * \return          First delivery error, or XGL_OK
+ * \note            Input must not overlap parser storage. The caller retains
+ *                  any unconsumed tail. Delivery is synchronous and its view
+ *                  cannot outlive the callback or reenter the instance.
+ *                  A check may process a whole CRC; its byte cost is not split.
+ */
+xgl_error_t xgl_datalink_consume_span_bounded(xgl_datalink_ctx_t* ctx,
+                                              xgl_parser_t* parser,
+                                              const uint8_t* bytes, size_t len,
+                                              uint32_t now_ms,
+                                              size_t* candidates,
+                                              size_t* consumed, bool* pending);
+
+/**
+ * \brief           Resume retained input and read at most one bounded PHY span
+ * \param[in,out]   ctx: Shared delivery and diagnostic context
+ * \param[in,out]   parser: Parser and persistent byte storage
+ * \param[in]       phy: Synchronous physical operations
+ * \param[in]       now_ms: Current monotonic time
+ * \param[in]       timeout_ms: Absolute candidate lifetime, or zero
+ * \param[in]       byte_budget: Maximum newly read bytes, zero skips the PHY
+ * \param[in,out]   candidates: Remaining validation checks for this link
+ * \param[out]      polled: True only when the PHY RX callback was invoked
+ * \param[out]      pending: True when local buffered work remains
+ * \return          First timeout, delivery or PHY error, or XGL_OK
+ * \note            A zero validation quota retains received bytes without
+ *                  validating them. No stack input tail survives the call.
+ */
+xgl_error_t xgl_datalink_poll_parser_bounded(
+    xgl_datalink_ctx_t* ctx, xgl_parser_t* parser, xgl_phy_ops_t* phy,
+    uint32_t now_ms, uint32_t timeout_ms, size_t byte_budget,
+    size_t* candidates, bool* polled, bool* pending);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -10,6 +10,10 @@
 #include <xgl/xgl_config.h>
 #include <xgl/xgl_error.h>
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+#include <string.h>
+#endif
+
 /** \brief           Report one decode failure consistently for both ingresses.
  */
 static void datalink_report_decode_error(xgl_datalink_ctx_t* ctx,
@@ -101,6 +105,120 @@ xgl_error_t xgl_datalink_expire_parser(xgl_datalink_ctx_t* ctx,
     return XGL_ERR_TIMEOUT;
 }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/* Span length and arrival time retain the synchronous ingress ordering. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t xgl_datalink_consume_span_bounded(xgl_datalink_ctx_t* ctx,
+                                              xgl_parser_t* parser,
+                                              const uint8_t* bytes, size_t len,
+                                              uint32_t now_ms,
+                                              size_t* candidates,
+                                              size_t* consumed, bool* pending) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    if (ctx == NULL || parser == NULL || candidates == NULL ||
+        consumed == NULL || pending == NULL || (bytes == NULL && len != 0U)) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *consumed = 0U;
+    *pending = false;
+    xgl_error_t first_error = XGL_OK;
+    for (;;) {
+        xgl_wire_frame_view_t view;
+        xgl_wire_decode_status_t status;
+        xgl_parse_result_t result =
+            xgl_parser_buffered_view(parser, candidates, &view, &status);
+        if (result == XGL_PARSE_RESULT_PENDING) {
+            *pending = true;
+            return first_error;
+        }
+        if (result == XGL_PARSE_RESULT_COMPLETE) {
+            xgl_error_t error = datalink_check_frame_size(ctx, view.frame_len);
+            if (error == XGL_OK) {
+                error = datalink_deliver_view(ctx, &view);
+            }
+            if (first_error == XGL_OK) {
+                first_error = error;
+            }
+            continue;
+        }
+        if (result == XGL_PARSE_RESULT_ERROR) {
+            datalink_report_decode_error(ctx, status);
+            continue;
+        }
+        if (*consumed == len) {
+            return first_error;
+        }
+        uint8_t* destination;
+        size_t available = xgl_parser_input_space(parser, &destination);
+        size_t append = len - *consumed;
+        if (append > available) {
+            append = available;
+        }
+        /* INCOMPLETE has consumed its prior batch and has room for more. */
+        if (append == 0U) {
+            return first_error == XGL_OK ? XGL_ERR_BUFFER_TOO_SMALL
+                                         : first_error;
+        }
+        memmove(destination, bytes + *consumed, append);
+        xgl_parser_commit_input(parser, append, now_ms);
+        *consumed += append;
+    }
+}
+
+/* Timeout and byte budget retain the existing PHY polling parameter order. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t xgl_datalink_poll_parser_bounded(
+    xgl_datalink_ctx_t* ctx, xgl_parser_t* parser, xgl_phy_ops_t* phy,
+    uint32_t now_ms, uint32_t timeout_ms, size_t byte_budget,
+    size_t* candidates, bool* polled, bool* pending) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    if (ctx == NULL || parser == NULL || phy == NULL || candidates == NULL ||
+        polled == NULL || pending == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *pending = false;
+    *polled = false;
+    if (phy->rx == NULL) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    xgl_error_t first_error =
+        xgl_datalink_expire_parser(ctx, parser, now_ms, timeout_ms);
+    size_t consumed;
+    xgl_error_t error = xgl_datalink_consume_span_bounded(
+        ctx, parser, NULL, 0U, now_ms, candidates, &consumed, pending);
+    if (first_error == XGL_OK) {
+        first_error = error;
+    }
+    if (*pending || byte_budget == 0U) {
+        return first_error;
+    }
+    uint8_t* destination;
+    size_t capacity = xgl_parser_input_space(parser, &destination);
+    if (capacity > byte_budget) {
+        capacity = byte_budget;
+    }
+    if (capacity > XGL_DATALINK_RX_CHUNK_SIZE) {
+        capacity = XGL_DATALINK_RX_CHUNK_SIZE;
+    }
+    if (capacity == 0U) {
+        return first_error;
+    }
+    size_t received = capacity;
+    *polled = true;
+    error = phy->rx(destination, &received, phy->user_data);
+    if (error != XGL_OK || received > capacity) {
+        if (first_error == XGL_OK) {
+            first_error = error != XGL_OK ? error : XGL_ERR_INVALID_PARAM;
+        }
+        return first_error;
+    }
+    xgl_parser_commit_input(parser, received, now_ms);
+    error = xgl_datalink_consume_span_bounded(ctx, parser, NULL, 0U, now_ms,
+                                              candidates, &consumed, pending);
+    return first_error == XGL_OK ? error : first_error;
+}
+#endif
+
 /* Span length and explicit time retain their documented parameter order. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
@@ -108,6 +226,14 @@ xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
                                       const uint8_t* bytes, size_t len,
                                       uint32_t current_time_ms) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    size_t candidates = SIZE_MAX;
+    size_t consumed;
+    bool pending;
+    return xgl_datalink_consume_span_bounded(ctx, parser, bytes, len,
+                                             current_time_ms, &candidates,
+                                             &consumed, &pending);
+#else
     if (ctx == NULL || parser == NULL || (bytes == NULL && len != 0U)) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -139,6 +265,7 @@ xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
             datalink_report_decode_error(ctx, status);
         }
     }
+#endif
 }
 
 /* Parameter order follows the documented protocol fields and units. */
@@ -158,6 +285,14 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
                                      uint32_t current_time_ms,
                                      uint32_t timeout_ms, size_t byte_budget) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    size_t candidates = SIZE_MAX;
+    bool polled;
+    bool pending;
+    return xgl_datalink_poll_parser_bounded(ctx, parser, phy, current_time_ms,
+                                            timeout_ms, byte_budget,
+                                            &candidates, &polled, &pending);
+#else
     if (ctx == NULL || parser == NULL || phy == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -188,6 +323,7 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
     err = xgl_datalink_consume_span(ctx, parser, rx_buffer, rx_len,
                                     current_time_ms);
     return first_error == XGL_OK ? err : first_error;
+#endif
 }
 
 /**

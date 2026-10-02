@@ -35,6 +35,14 @@ void xgl_parser_reset(xgl_parser_t* parser) {
     parser->expected_header_len = 0U;
     parser->expected_payload_len = 0U;
     parser->expected_auth_tag_len = 0U;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    parser->input_offset = 0U;
+    parser->input_end = 0U;
+    parser->recovery_offset = 0U;
+    parser->recovery_partial = 0U;
+    parser->input_timestamp = 0U;
+    parser->recovery_active = false;
+#endif
 }
 
 /** \brief           Find a magic pair or a final byte that may start one. */
@@ -169,9 +177,183 @@ static void parser_retain_suffix(xgl_parser_t* parser, size_t offset) {
     memmove(parser->cache, parser->cache + offset, parser->cache_len);
 }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+/** \brief           Reset framing without discarding an unread input tail. */
+static void parser_reset_candidate(xgl_parser_t* parser) {
+    const size_t input_offset = parser->input_offset;
+    const size_t input_end = parser->input_end;
+    const uint32_t input_timestamp = parser->input_timestamp;
+    xgl_parser_reset(parser);
+    parser->input_offset = input_offset;
+    parser->input_end = input_end;
+    parser->input_timestamp = input_timestamp;
+}
+
+/** \brief           Continue recovery without moving unexamined candidates. */
+static xgl_parse_result_t
+parser_advance_bounded(xgl_parser_t* parser, size_t* candidates,
+                       xgl_wire_frame_view_t* view,
+                       xgl_wire_decode_status_t* status) {
+    if (status != NULL) {
+        *status = XGL_WIRE_DECODE_INVALID;
+    }
+    if (parser == NULL || candidates == NULL || view == NULL) {
+        return XGL_PARSE_RESULT_ERROR;
+    }
+    if (!parser->recovery_active) {
+        if (parser->state == XGL_PARSE_COMPLETE) {
+            parser->recovery_offset = parser_frame_len(parser);
+        } else if (parser->state == XGL_PARSE_RECOVER) {
+            parser->recovery_offset = 1U;
+        } else {
+            return XGL_PARSE_RESULT_INCOMPLETE;
+        }
+        parser->recovery_partial = parser->cache_len;
+        parser->recovery_active = true;
+    }
+    for (;;) {
+        const size_t offset =
+            parser_find_magic(parser, parser->recovery_offset);
+        parser->recovery_offset = offset;
+        if (offset == parser->cache_len) {
+            break;
+        }
+        if (*candidates == 0U) {
+            parser->state = XGL_PARSE_RECOVER;
+            return XGL_PARSE_RESULT_PENDING;
+        }
+        --*candidates;
+        parser->state = XGL_PARSE_HEADER;
+        xgl_parse_result_t result =
+            parser_inspect(parser, parser->cache + offset,
+                           parser->cache_len - offset, view, status);
+        if (result == XGL_PARSE_RESULT_COMPLETE) {
+            parser->recovery_active = false;
+            parser_retain_suffix(parser, offset);
+            view->frame_buf = parser->cache;
+            view->payload = parser->cache + parser->expected_header_len;
+            view->extensions = view->extensions_len > 0U
+                                   ? parser->cache + XGL_WIRE_BASE_HEADER_SIZE
+                                   : NULL;
+            return result;
+        }
+        if (result == XGL_PARSE_RESULT_INCOMPLETE &&
+            parser->recovery_partial == parser->cache_len) {
+            parser->recovery_partial = offset;
+        }
+        parser->recovery_offset = offset + 1U;
+        if (status != NULL) {
+            *status = XGL_WIRE_DECODE_INVALID;
+        }
+    }
+    if (parser->recovery_partial < parser->cache_len) {
+        if (*candidates == 0U) {
+            parser->state = XGL_PARSE_RECOVER;
+            return XGL_PARSE_RESULT_PENDING;
+        }
+        --*candidates;
+        parser_retain_suffix(parser, parser->recovery_partial);
+        parser->recovery_active = false;
+        parser->state = XGL_PARSE_HEADER;
+        return parser_inspect(parser, parser->cache, parser->cache_len, view,
+                              status);
+    }
+    parser_reset_candidate(parser);
+    return XGL_PARSE_RESULT_INCOMPLETE;
+}
+
+bool xgl_parser_has_pending(const xgl_parser_t* parser) {
+    return parser != NULL &&
+           (parser->input_offset < parser->input_end ||
+            parser->recovery_active || parser->state == XGL_PARSE_RECOVER ||
+            (parser->state == XGL_PARSE_COMPLETE &&
+             parser->cache_len > parser_frame_len(parser)));
+}
+
+/** \brief           Determine whether the next buffered byte triggers a check.
+ */
+static bool parser_next_byte_checks(const xgl_parser_t* parser) {
+    const size_t available = parser->cache_len + 1U;
+    if (parser->state == XGL_PARSE_HEADER) {
+        return available >= XGL_WIRE_BASE_HEADER_SIZE;
+    }
+    if (parser->state == XGL_PARSE_EXTENSIONS) {
+        return available >= parser->expected_header_len;
+    }
+    if (parser->state == XGL_PARSE_PAYLOAD || parser->state == XGL_PARSE_CRC) {
+        return available >= parser_frame_len(parser);
+    }
+    return false;
+}
+
+xgl_parse_result_t xgl_parser_buffered_view(xgl_parser_t* parser,
+                                            size_t* candidates,
+                                            xgl_wire_frame_view_t* view,
+                                            xgl_wire_decode_status_t* status) {
+    if (status != NULL) {
+        *status = XGL_WIRE_DECODE_INVALID;
+    }
+    if (parser == NULL || candidates == NULL || view == NULL) {
+        return XGL_PARSE_RESULT_ERROR;
+    }
+    xgl_parse_result_t result =
+        parser_advance_bounded(parser, candidates, view, status);
+    if (result != XGL_PARSE_RESULT_INCOMPLETE) {
+        return result;
+    }
+    while (parser->input_offset < parser->input_end) {
+        if (parser_next_byte_checks(parser)) {
+            if (*candidates == 0U) {
+                return XGL_PARSE_RESULT_PENDING;
+            }
+            --*candidates;
+        }
+        const size_t next = parser->input_offset + 1U;
+        const size_t end = parser->input_end;
+        const uint32_t timestamp = parser->input_timestamp;
+        const uint8_t byte = parser->cache[parser->input_offset];
+        result =
+            xgl_parser_feed_byte_view(parser, byte, timestamp, view, status);
+        /* Legacy magic rejection resets framing; retain the input batch. */
+        parser->input_offset = next;
+        parser->input_end = end;
+        parser->input_timestamp = timestamp;
+        if (result != XGL_PARSE_RESULT_INCOMPLETE) {
+            return result;
+        }
+    }
+    return XGL_PARSE_RESULT_INCOMPLETE;
+}
+
+size_t xgl_parser_input_space(xgl_parser_t* parser, uint8_t** buffer) {
+    const size_t unread = parser->input_end - parser->input_offset;
+    if (unread != 0U) {
+        memmove(parser->cache + parser->cache_len,
+                parser->cache + parser->input_offset, unread);
+    }
+    parser->input_offset = parser->cache_len;
+    parser->input_end = parser->cache_len + unread;
+    *buffer = parser->cache + parser->input_end;
+    return parser->cache_size - parser->input_end;
+}
+
+/* Count and arrival time follow the bounded input contract. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+void xgl_parser_commit_input(xgl_parser_t* parser, size_t length,
+                             uint32_t now_ms) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    parser->input_end += length;
+    parser->input_timestamp = now_ms;
+}
+#endif
+
 xgl_parse_result_t xgl_parser_advance_view(xgl_parser_t* parser,
                                            xgl_wire_frame_view_t* view,
                                            xgl_wire_decode_status_t* status) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    size_t candidates = SIZE_MAX;
+    return parser_advance_bounded(parser, &candidates, view, status);
+#else
     if (status != NULL) {
         *status = XGL_WIRE_DECODE_INVALID;
     }
@@ -220,6 +402,7 @@ xgl_parse_result_t xgl_parser_advance_view(xgl_parser_t* parser,
     }
     xgl_parser_reset(parser);
     return XGL_PARSE_RESULT_INCOMPLETE;
+#endif
 }
 
 /* Parameter order follows the documented protocol fields and units. */
