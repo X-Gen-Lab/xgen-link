@@ -89,6 +89,35 @@ class FootprintBudget(unittest.TestCase):
                 result, _ = self.run_policy(report)
                 self.assertNotEqual(result.returncode, 0)
 
+    def test_rejects_missing_or_mismatched_optional_runtime_identity(self):
+        for field in ("advanced_runtime", "advanced_api_probe"):
+            with self.subTest(field=field):
+                self.policy["configuration"][field] = True
+                for actual in (None, False, "ON", 1):
+                    report = copy.deepcopy(self.report)
+                    if actual is not None:
+                        report[field] = actual
+                    result, _ = self.run_policy(report)
+                    self.assertNotEqual(result.returncode, 0,
+                                        f"{field} accepted {actual!r}")
+                self.policy["configuration"].pop(field)
+
+    def test_accepts_matching_optional_runtime_identity(self):
+        for enabled in (False, True):
+            for field in ("advanced_runtime", "advanced_api_probe"):
+                self.policy["configuration"][field] = enabled
+                self.report[field] = enabled
+            result, _ = self.run_policy()
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_rejects_invalid_optional_runtime_policy_types(self):
+        for field in ("advanced_runtime", "advanced_api_probe"):
+            with self.subTest(field=field):
+                self.policy["configuration"][field] = "ON"
+                result, _ = self.run_policy()
+                self.assertNotEqual(result.returncode, 0)
+                self.policy["configuration"].pop(field)
+
 
 if __name__ == "__main__":
     unittest.main()
