@@ -236,6 +236,33 @@ TEST(XglConfigConsistency, OptionalInvalidProviderIsRejectedBeforeAllocation) {
     }
 }
 
+TEST(XglConfigConsistency, OptionalProviderDoesNotImposeAuthenticationBudget) {
+    auto provider = fixed_tag_provider();
+    auto config = bounded_config();
+    config.auth_provider = &provider;
+    config.protocol.max_frame_size = 64U;
+    config.memory.rx_buffer_size = 64U;
+    ConnectedPhy port;
+    auto phy = connected_phy(&port);
+    xgl_route_item_t route = {2U, &phy, 64U, 100U, 0U};
+    config.route_table = &route;
+    config.route_table_len = 1U;
+    ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
+    ScopedInstance instance;
+    instance.handle = xgl_create(&config);
+    ASSERT_NE(instance.handle, nullptr);
+    ASSERT_EQ(xgl_init(instance.handle), XGL_OK);
+
+    const uint8_t byte = 0xA5U;
+    xgl_tx_data_t tx = {};
+    tx.target_id = 2U;
+    tx.data = &byte;
+    tx.data_len = 1U;
+    EXPECT_EQ(xgl_send_at(instance.handle, &tx, 0U), XGL_OK);
+    ASSERT_EQ(port.transmitted.size(), 1U);
+    EXPECT_LE(port.transmitted.front(), 64U);
+}
+
 TEST(XglConfigConsistency,
      MandatoryAuthenticationRejectsFrame64BeforeAllocation) {
     auto provider = fixed_tag_provider();
@@ -268,20 +295,55 @@ TEST(XglConfigConsistency,
     }
 }
 
-TEST(XglConfigConsistency, MandatoryAuthenticationChecksEachRouteBudget) {
+TEST(XglConfigConsistency, SmallRouteKeepsForwardingAndChecksActualSendBudget) {
     auto provider = fixed_tag_provider();
-    MandatoryFrames measured;
-    ASSERT_TRUE(measure_mandatory_frames(provider.tag_len, &measured));
     auto config = bounded_config();
     config.auth_required = true;
     config.auth_provider = &provider;
     ConnectedPhy port;
     auto phy = connected_phy(&port);
-    xgl_route_item_t route = {
-        2U, &phy, static_cast<uint16_t>(measured.maximum() - 1U), 100U, 0U};
-    config.route_table = &route;
-    config.route_table_len = 1U;
-    expect_rejected_before_allocation(config);
+    xgl_route_item_t routes[] = {{2U, &phy, 64U, 100U, 0U},
+                                 {3U, &phy, 128U, 100U, 0U}};
+    config.route_table = routes;
+    config.route_table_len = 2U;
+    ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
+    ScopedInstance instance;
+    instance.handle = xgl_create(&config);
+    ASSERT_NE(instance.handle, nullptr);
+    ASSERT_EQ(xgl_init(instance.handle), XGL_OK);
+    const auto session = test_session_config(2U);
+    ASSERT_EQ(xgl_install_security_session(instance.handle, &session), XGL_OK);
+
+    const uint8_t byte = 0xA5U;
+    xgl_tx_data_t tx = {};
+    tx.target_id = 2U;
+    tx.data = &byte;
+    tx.data_len = 1U;
+    EXPECT_EQ(xgl_send_at(instance.handle, &tx, 0U), XGL_ERR_INVALID_PARAM);
+    EXPECT_TRUE(port.transmitted.empty());
+
+#if XGL_FEATURE_FORWARDING
+    xgl_frame_params_t params = {};
+    params.source_id = 3U;
+    params.target_id = 2U;
+    params.packet_type = XGL_PACKET_TYPE_DATA;
+    params.payload = &byte;
+    params.payload_len = 1U;
+    params.ttl = 8U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    uint8_t serialized[128] = {};
+    size_t length = 0U;
+    ASSERT_EQ(
+        xgl_frame_serialize(serialized, sizeof(serialized), &frame, &length),
+        XGL_OK);
+    ASSERT_LE(length, routes[0].max_frame_size);
+    port.incoming.assign(serialized, serialized + length);
+    const xgl_work_budget_t budget = {128U, 100U};
+    ASSERT_EQ(xgl_step(instance.handle, 0U, &budget), XGL_OK);
+    ASSERT_EQ(port.transmitted.size(), 1U);
+    EXPECT_EQ(port.transmitted.front(), length);
+#endif
 }
 
 TEST(XglConfigConsistency,
