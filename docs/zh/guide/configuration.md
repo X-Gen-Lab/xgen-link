@@ -2,6 +2,8 @@
 
 先选择与编译 profile 匹配的预设，补充应用参数，再调用 `xgl_config_validate()` 和 `xgl_memory_requirements()`，最后准备存储。预设只是初始容量组合，不代表已测量的 MCU RAM 占用。
 
+`xgl_config_get_default()` 在未编译分片能力时使用 Boot 预设；其余 profile 使用 Medium 模板，并将 `protocol.window_size` 限制为已编译的窗口容量。具名预设和 `XGL_CONFIG_PRESET_*` 宏保留各自的固定模板，不会自动缩小窗口或其他容量。例如，窗口容量为一的构建可以使用默认配置，但 Tiny 的窗口模板仍为二，需要显式调整后再校验。
+
 ## 生命周期和身份
 
 实例借用不可变的 `xgl_config_t`，直到 `xgl_destroy()`。其路由数组、PHY 描述符、分配器服务、认证 provider、名称和回调上下文也必须持续有效。创建后不得修改配置，也不能让配置与 workspace 重叠。
@@ -39,11 +41,17 @@
 
 启用的容量必须显式给出；零不表示无限制。peer 和 TX 包容量必须非零。窗口大于一时，乱序容量必须非零。启用分片时，消息长度、重组槽数和两个消息字节预算必须非零。关闭的可选资源可以为零。全局 TX 预算可以小于 `max_peers * window_size`，此时更早出现背压。
 
+启用分片时，`features.max_message_size` 必须不超过 wire 消息长度字段的 `UINT32_MAX`，且不能超过 `features.max_reassembly_bytes`；不符合时，配置校验与工作区测量直接拒绝。关闭分片时，此消息长度字段不参与校验、存储预留或初始化限制。
+
 字节预算限制接纳量；workspace 预留固定最大尺寸槽位以避免碎片。因此只调小字节预算不一定减少预留 RAM。参见[资源模型](resource-model.md)。
 
 ## 认证
 
-启用认证能力的 profile 在 `auth_required` 为 true 时，要求应用提供 `auth_provider`，包括同步 sign/verify 回调以及 `1..XGL_AUTH_TAG_MAX_LEN` 的 tag 长度。发送认证流量前，用 `xgl_install_security_session()` 安装可信的双向参数。
+启用认证能力的 profile 要求所有非空 `auth_provider` 都包含同步 sign/verify 回调以及 `1..XGL_AUTH_TAG_MAX_LEN` 的 tag 长度，即使 `auth_required` 为 false。`auth_required` 为 true 时还要求 provider 非空。无效 provider 在配置校验和工作区测量阶段被拒绝，创建不会先分配工作区。发送认证流量前，用 `xgl_install_security_session()` 安装可信的双向参数。
+
+`auth_required` 为 true 时，`protocol.max_frame_size` 必须支持本机基本认证收发能力。校验复用 wire 编码与帧测量，检查一个普通 `ACK_RANGE` 的完整认证帧；它覆盖零 epoch 的基本 HELLO 和最小 DATA 所需空间。32 字节 tag 对应的当前基础门槛为 88 字节，64 字节协议上限会被前置拒绝。
+
+此门槛不包含可选的 `SESSION`、应用 `DATA_TYPE` 或 `FRAGMENT` 扩展，也不保证任意元数据组合都能发送。单条路由可以具有更小的 MTU，用于转发或其他能容纳的帧；本机发送和转发仍逐帧检查真实长度。例如，协议上限为 128、路由 MTU 为 64、tag 为 32 的配置可以初始化并转发短帧，但不能通过该路由发送本机认证 DATA。`auth_required` 控制本机认证收发，不为非本地转发帧增加端点认证。
 
 认证不要求 libc 分配器，静态 workspace 同样支持。密钥、前缀、epoch 和重启后的新鲜性由应用负责。普通报文不能建立可信会话。关闭会话后保留 nonce 域的占用记录。
 

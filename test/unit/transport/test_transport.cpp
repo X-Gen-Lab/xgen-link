@@ -775,6 +775,7 @@ TEST_F(TransportRegressionTest,
        MessageLimitCannotExceedWireLengthRepresentation) {
 #if SIZE_MAX > UINT32_MAX
     auto config = make_transport_config(&lower, &stats, &retries);
+    config.enable_fragmentation = true;
     config.max_message_size = static_cast<size_t>(UINT32_MAX) + 1U;
     EXPECT_EQ(xgl_transport_init(&ctx, &config), XGL_ERR_INVALID_PARAM);
 #endif
@@ -3016,7 +3017,11 @@ TEST_F(TransportRegressionTest,
     ASSERT_EQ(Ack(0, 1), XGL_OK);
     ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
     ASSERT_TRUE(xgl_transport_next_timeout(&ctx, 150, &delay));
+#if XGL_FEATURE_ADAPTIVE_RTO
     EXPECT_EQ(delay, 150U);
+#else
+    EXPECT_EQ(delay, 450U);
+#endif
     ctx.current_time_ms = 200;
     ASSERT_EQ(Ack(1, 1), XGL_OK);
     tx.timeout_ms = 700;

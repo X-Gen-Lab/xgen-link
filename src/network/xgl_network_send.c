@@ -316,8 +316,8 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet) {
  * \param[in]       tx_data: Borrowed caller buffer and send parameters
  * \return          XGL_OK when lengths and offsets are valid
  */
-static xgl_error_t
-validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
+xgl_error_t
+xgl_network_validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
     if (tx_data == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -345,6 +345,10 @@ validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
         return XGL_ERR_INVALID_PARAM;
     }
 
+    if (tx_data->reliable) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+
     return XGL_OK;
 }
 
@@ -362,12 +366,9 @@ xgl_network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     if (ctx == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    xgl_error_t error = validate_tx_data_zerocopy(request);
+    xgl_error_t error = xgl_network_validate_tx_data_zerocopy(request);
     if (error != XGL_OK) {
         return error;
-    }
-    if (request->reliable) {
-        return XGL_ERR_INVALID_PARAM;
     }
     if (attempted != NULL) {
         *attempted = true;

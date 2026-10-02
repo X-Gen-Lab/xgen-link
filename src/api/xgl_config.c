@@ -7,6 +7,11 @@
 #include <network/xgl_network.h>
 #include <xgl/xgl.h>
 
+#if XGL_FEATURE_AUTH
+#include <wire/xgl_frame.h>
+#include <wire/xgl_wire.h>
+#endif
+
 #include <string.h>
 #include <xgen/memory/allocator.h>
 
@@ -149,6 +154,44 @@ void xgl_config_get_preset_production(xgl_config_t* config) {
 /* Configuration Validation                                                  */
 /*---------------------------------------------------------------------------*/
 
+#if XGL_FEATURE_AUTH
+/**
+ * \brief           Measure the largest mandatory authenticated base frame
+ * \param[in]       tag_len: Validated fixed authentication trailer size
+ * \param[out]      frame_size: Required bytes for one ordinary ACK_RANGE
+ * \return          True when the wire encoder accepts the base frame
+ * \note            The base ACK exceeds HELLO and one-byte DATA overhead.
+ *                  Optional SESSION, DATA_TYPE and FRAGMENT extensions are
+ *                  measured separately for each actual transmission.
+ */
+static bool config_measure_required_auth_frame(size_t tag_len,
+                                               size_t* frame_size) {
+    uint8_t ack_value[32];
+    size_t ack_value_len = 0U;
+    const xgl_wire_ack_range_t range = {.gap = 0U, .length = 1U};
+    if (xgl_wire_encode_ack_range_ext_value(ack_value, sizeof(ack_value), 0U,
+                                            0U, &range, 1U,
+                                            &ack_value_len) != XGL_OK) {
+        return false;
+    }
+
+    uint8_t ack_ext[32];
+    size_t ack_ext_len = 0U;
+    if (xgl_wire_encode_ext(ack_ext, sizeof(ack_ext), XGL_WIRE_EXT_ACK_RANGE,
+                            ack_value, ack_value_len, &ack_ext_len) != XGL_OK) {
+        return false;
+    }
+
+    xgl_frame_layout_t layout;
+    if (xgl_frame_measure_lengths(0U, ack_ext_len, tag_len, &layout) !=
+        XGL_OK) {
+        return false;
+    }
+    *frame_size = layout.frame_len;
+    return true;
+}
+#endif
+
 /**
  * \brief           Validate configuration parameters
  * \details         Checks all configuration parameters for validity
@@ -191,6 +234,12 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
              config->features.max_reassembly_bytes)) {
         return XGL_ERR_INVALID_PARAM;
     }
+#if SIZE_MAX > UINT32_MAX
+    if (config->features.enable_fragmentation &&
+        config->features.max_message_size > UINT32_MAX) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#endif
 
     /* Validate protocol parameters */
     if (config->protocol.ack_timeout_ms < XGL_MIN_ACK_TIMEOUT_MS ||
@@ -242,18 +291,23 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
 #endif
 
-    if (config->auth_required) {
-        if (config->auth_provider == NULL ||
-            config->auth_provider->sign == NULL ||
-            config->auth_provider->verify == NULL) {
-            return XGL_ERR_INVALID_PARAM;
-        }
-
-        if (config->auth_provider->tag_len == 0U ||
-            config->auth_provider->tag_len > XGL_AUTH_TAG_MAX_LEN) {
-            return XGL_ERR_INVALID_PARAM;
-        }
+#if XGL_FEATURE_AUTH
+    size_t required_auth_frame_size = 0U;
+    if ((config->auth_required && config->auth_provider == NULL) ||
+        (config->auth_provider != NULL &&
+         (config->auth_provider->sign == NULL ||
+          config->auth_provider->verify == NULL ||
+          config->auth_provider->tag_len == 0U ||
+          config->auth_provider->tag_len > XGL_AUTH_TAG_MAX_LEN))) {
+        return XGL_ERR_INVALID_PARAM;
     }
+    if (config->auth_required &&
+        (!config_measure_required_auth_frame(config->auth_provider->tag_len,
+                                             &required_auth_frame_size) ||
+         config->protocol.max_frame_size < required_auth_frame_size)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+#endif
 
     /* Validate RX buffer is large enough for the configured full frame.
      * max_frame_size includes header, payload, and CRC16.

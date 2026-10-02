@@ -8,6 +8,7 @@
 
 #include <xgl/xgl.h>
 
+#include <algorithm>
 #include <gtest/gtest.h>
 #include <xgen/memory/allocator.h>
 
@@ -64,7 +65,8 @@ TEST_F(XglConfigTest, GetDefaultConfig) {
     EXPECT_EQ(config.memory.rx_buffer_size, 544);
     EXPECT_EQ(config.protocol.ack_timeout_ms, 1000);
     EXPECT_EQ(config.protocol.max_retry_count, 5);
-    EXPECT_EQ(config.protocol.window_size, 8);
+    EXPECT_EQ(config.protocol.window_size,
+              std::min(8U, static_cast<unsigned>(XGL_BUILD_WINDOW_CAPACITY)));
     EXPECT_EQ(config.protocol.max_frame_size, 512);
     EXPECT_TRUE(config.features.enable_fragmentation);
 }
@@ -124,6 +126,7 @@ TEST_F(XglConfigTest, GetPresetLarge) {
 
 TEST_F(XglConfigTest, GetPresetProductionRequiresAuthentication) {
     xgl_config_get_preset_production(&config);
+    config.protocol.window_size = 1U;
 
     EXPECT_STREQ(config.name, "production");
     EXPECT_TRUE(config.auth_required);
@@ -440,6 +443,7 @@ TEST(XglConfigResourceTest,
      RejectsMessageLimitAboveGlobalReassemblyBudgetBeforePlanning) {
     xgl_config_t config;
     xgl_config_get_preset_small(&config);
+    config.protocol.window_size = 1U;
     config.features.enable_fragmentation = true;
     config.features.max_message_size = 512U;
     config.features.max_reassembly_bytes = 256U;

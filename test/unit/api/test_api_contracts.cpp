@@ -71,6 +71,16 @@ TEST_F(XglApiContractsTest, CreationReturnsConfigurationAndAbiErrors) {
                                             XGL_BUILD_CONFIG_ID, &output),
               XGL_ERR_INVALID_VERSION);
     EXPECT_EQ(output, nullptr);
+    EXPECT_EQ(xgl_create_with_error_checked(&config, sizeof(config),
+                                            XGL_CONFIG_ABI_VERSION + 1U,
+                                            XGL_BUILD_CONFIG_ID, &output),
+              XGL_ERR_INVALID_VERSION);
+    EXPECT_EQ(output, nullptr);
+    EXPECT_EQ(xgl_create_with_error_checked(&config, sizeof(config),
+                                            XGL_CONFIG_ABI_VERSION,
+                                            XGL_BUILD_CONFIG_ID + 1U, &output),
+              XGL_ERR_INVALID_VERSION);
+    EXPECT_EQ(output, nullptr);
     EXPECT_EQ(xgl_create_with_error(&config, nullptr), XGL_ERR_NULL_POINTER);
 }
 
@@ -92,6 +102,11 @@ TEST_F(XglApiContractsTest, CreationReportsBackendFailureAndReservesOnly) {
     EXPECT_EQ(handle, nullptr);
     EXPECT_EQ(backend.calls, 1U);
     EXPECT_EQ(backend.frees, 0U);
+
+    const xgm_allocator_t invalid = {};
+    config.memory.allocator = &invalid;
+    EXPECT_EQ(xgl_create_with_error(&config, &handle), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(handle, nullptr);
 
     config.memory.allocator = xgm_allocator_libc();
     ASSERT_EQ(xgl_create_with_error(&config, &handle), XGL_OK);
@@ -143,13 +158,15 @@ TEST_F(XglApiContractsTest, ZeroRxQueryKeepsReliableMaintenanceAcrossWrap) {
     request.reliable = true;
     request.timeout_ms = 10U;
     ASSERT_EQ(xgl_send_at(handle, &request, UINT32_MAX - 4U), XGL_OK);
+    const size_t submitted_writes = writes;
+    ASSERT_GT(submitted_writes, 0U);
     const xgl_work_budget_t budget = {0U, 0U};
     uint32_t delay = 0U;
     ASSERT_TRUE(xgl_next_timeout_for_work(handle, 3U, &budget, &delay));
     EXPECT_EQ(delay, 2U);
     ASSERT_TRUE(xgl_next_timeout_for_work(handle, 5U, &budget, &delay));
     EXPECT_EQ(delay, 0U);
-    EXPECT_EQ(writes, 1U);
+    EXPECT_EQ(writes, submitted_writes);
     EXPECT_EQ(reads, 0U);
 }
 

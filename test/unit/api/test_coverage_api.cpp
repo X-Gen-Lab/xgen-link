@@ -80,6 +80,8 @@ struct AllocationObserver {
     const xgm_allocator_t* backing;
     xgm_allocator_t service = {};
     std::vector<void*> live;
+    size_t attempts = 0;
+    size_t fail_at = 0;
     size_t allocations = 0;
     size_t releases = 0;
     size_t duplicate_releases = 0;
@@ -89,6 +91,11 @@ struct AllocationObserver {
         service.ctx = this;
         service.alloc = [](void* context, size_t size) -> void* {
             auto& observer = *static_cast<AllocationObserver*>(context);
+            ++observer.attempts;
+            if (observer.fail_at != 0U &&
+                observer.attempts == observer.fail_at) {
+                return nullptr;
+            }
             void* result = xgm_alloc(observer.backing, size);
             if (result != nullptr) {
                 observer.live.push_back(result);
@@ -230,7 +237,10 @@ TEST(XglCoverageApi,
         }
         xgl_memory_requirements_t required = {};
         required.size = 123;
-        ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
+        const auto validation = resource >= 2 && SIZE_MAX > UINT32_MAX
+                                    ? XGL_ERR_INVALID_PARAM
+                                    : XGL_OK;
+        ASSERT_EQ(xgl_config_validate(&config), validation);
         EXPECT_EQ(xgl_memory_requirements(&config, &required),
                   XGL_ERR_INVALID_PARAM);
         EXPECT_EQ(required.size, 123U);
@@ -364,9 +374,6 @@ TEST(XglCoverageApi, ReplayRejectsAnotherConnectionWithoutConsumingSequence) {
 TEST(XglCoverageApi, FailedInitializationReleasesEachAllocationOnlyOnce) {
     AllocationObserver workspace(xgm_allocator_libc());
     auto config = coverage_config();
-    auto provider = coverage_provider();
-    provider.sign = nullptr;
-    config.auth_provider = &provider;
     CoveragePhy state;
     auto phy = coverage_phy(&state);
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
@@ -377,10 +384,12 @@ TEST(XglCoverageApi, FailedInitializationReleasesEachAllocationOnlyOnce) {
     xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
 
-    /* Observe the actual workspace allocator without changing its results. */
+    /* Fail after initialization has acquired live route and link storage. */
     AllocationObserver initialization(handle->allocator);
+    initialization.fail_at = 5U;
     handle->allocator = &initialization.service;
-    EXPECT_EQ(xgl_init(handle), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_init(handle), XGL_ERR_NO_MEMORY);
+    EXPECT_EQ(initialization.attempts, initialization.fail_at);
     EXPECT_FALSE(handle->initialized);
     EXPECT_GT(initialization.allocations, 0U);
     EXPECT_EQ(initialization.releases, initialization.allocations);

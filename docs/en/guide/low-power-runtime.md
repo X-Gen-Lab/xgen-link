@@ -16,6 +16,8 @@ Each due link reads its PHY only once per step, also bounded by the compiled `XG
 
 `xgl_next_timeout(handle, now_ms, &delay_ms)` returns true when a deadline exists. A zero delay means work is due now. False leaves the output unchanged; handle that case separately instead of sleeping an uninitialized value.
 
+This compatible entry always includes PHY polling. If the next step has zero `rx_bytes`, use `xgl_next_timeout_for_work(handle, now_ms, &budget, &delay_ms)` to exclude polling work that cannot execute. Transport deadlines remain active, and partial-frame expiry uses the supplied `receive_timeout_ms`. The query does not read a PHY, run transport, change the latest step policy or restart a partial-frame timer. The timeout must be below `2^31`; invalid input returns false and preserves output. No protocol deadline with RX disabled is a valid result; an application event must wake the owner again.
+
 ## Main-Loop Integration
 
 Conceptual application loop:
@@ -27,7 +29,8 @@ for (;;) {
     xgl_error_t result = xgl_step(handle, now, &budget);
     app_handle_step_result(result);
     uint32_t delay;
-    bool timed = xgl_next_timeout(handle, board_monotonic_ms(), &delay);
+    bool timed = xgl_next_timeout_for_work(
+        handle, board_monotonic_ms(), &budget, &delay);
     app_wait_for_rx_or_timeout(timed, timed ? delay : 0U);
 }
 ```

@@ -40,7 +40,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     }
 
 #if SIZE_MAX > UINT32_MAX
-    if (config->max_message_size > UINT32_MAX) {
+    if (config->enable_fragmentation && config->max_message_size > UINT32_MAX) {
         return XGL_ERR_INVALID_PARAM;
     }
 #endif

@@ -210,14 +210,20 @@ cleanup:
  * \details         The immutable configuration is borrowed until destruction.
  *                  Protocol initialization is deferred to xgl_init().
  */
-xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
-                                uint32_t abi_version,
-                                uint32_t build_config_id) {
+xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
+                                          size_t config_size,
+                                          uint32_t abi_version,
+                                          uint32_t build_config_id,
+                                          xgl_handle_t* handle) {
+    if (handle == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *handle = NULL;
     xgl_memory_requirements_t requirements;
     xgl_error_t err = xgl_memory_requirements_checked(
         config, config_size, abi_version, build_config_id, &requirements);
     if (err != XGL_OK) {
-        return NULL;
+        return err;
     }
 
     const xgm_allocator_t* allocator = config->memory.allocator;
@@ -227,20 +233,31 @@ xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
     }
 #endif
     if (!xgm_allocator_is_valid(allocator)) {
-        return NULL;
+        return XGL_ERR_INVALID_PARAM;
     }
 
     void* storage = xgm_alloc(allocator, requirements.size);
     if (storage == NULL) {
-        return NULL;
+        return XGL_ERR_NO_MEMORY;
     }
-    xgl_handle_t handle;
     err = xgl_workspace_prepare(config, storage, requirements.size, allocator,
-                                &handle);
+                                handle);
     if (err != XGL_OK) {
         xgm_free(allocator, storage);
-        return NULL;
+        return err;
     }
+    return XGL_OK;
+}
+
+/**
+ * \brief           Preserve the legacy pointer-only reservation result
+ */
+xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
+                                uint32_t abi_version,
+                                uint32_t build_config_id) {
+    xgl_handle_t handle;
+    (void)xgl_create_with_error_checked(config, config_size, abi_version,
+                                        build_config_id, &handle);
     return handle;
 }
 

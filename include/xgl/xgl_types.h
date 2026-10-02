@@ -471,14 +471,14 @@ typedef struct {
     const uint8_t* data; /**< Data buffer */
     size_t data_len;     /**< Data length */
     bool reliable;       /**< Enable reliable transmission */
-    uint8_t priority;    /**< Priority level (0-7) */
-    uint32_t timeout_ms; /**< ACK timeout in ms (0 = default/RTT-derived) */
+    uint8_t priority; /**< Wire priority (0-7); no local priority scheduling */
+    uint32_t timeout_ms; /**< Initial packet ACK timeout in ms; 0 selects
+                            RTT/config. Not a whole-message deadline. */
     uint32_t
         connection_id; /**< Connection scope for peer state (0 = default) */
     uint32_t session_epoch; /**< Session epoch for replay/peer/fragment
                                isolation (0 = default) */
-    uint8_t compression_id; /**< Compression codec id (0 = none); maps to codec
-                               registry */
+    uint8_t compression_id; /**< Reserved; must be zero until implemented */
 } xgl_tx_data_t;
 
 /**
@@ -491,11 +491,11 @@ typedef struct {
     size_t data_len;    /**< Actual data length */
 
     /* Transmission parameters */
-    uint16_t target_id;  /**< Target node ID */
-    uint8_t data_type;   /**< Application payload class encoded as DATA_TYPE_EXT
-                            when non-zero */
-    bool reliable;       /**< Must be false for synchronous caller-buffer TX */
-    uint8_t priority;    /**< Priority level (0-7) */
+    uint16_t target_id; /**< Target node ID */
+    uint8_t data_type;  /**< Application payload class encoded as DATA_TYPE_EXT
+                           when non-zero */
+    bool reliable;      /**< Must be false for synchronous caller-buffer TX */
+    uint8_t priority; /**< Wire priority (0-7); no local priority scheduling */
     uint32_t timeout_ms; /**< Ignored; no ACK/retry state is retained */
 } xgl_tx_data_zerocopy_t;
 

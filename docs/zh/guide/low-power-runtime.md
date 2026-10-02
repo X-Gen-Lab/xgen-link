@@ -16,6 +16,8 @@ ACK/SACK 接收负责校验反馈并记录可执行工作。DATA 重传和后续
 
 `xgl_next_timeout(handle, now_ms, &delay_ms)` 在存在截止事件时返回 true。延迟为零表示立即有工作；false 不修改输出，必须单独处理，不能按未初始化的值睡眠。
 
+这个兼容入口始终包含 PHY 轮询。如果下一次 step 的 `rx_bytes` 为零，可改用 `xgl_next_timeout_for_work(handle, now_ms, &budget, &delay_ms)`：排除不能执行的 PHY 轮询截止时间，仍保留 transport 截止时间，并按传入的 `receive_timeout_ms` 计算半帧超时。查询不读取 PHY、不运行 transport、不修改最近 step 的策略，也不重启半帧计时。预算超时不得达到 `2^31`；无效输入返回 false 并保持输出。禁用 RX 后没有协议截止事件也是合法结果，需要应用事件再次唤醒。
+
 ## 主循环集成
 
 应用循环示意：
@@ -27,7 +29,8 @@ for (;;) {
     xgl_error_t result = xgl_step(handle, now, &budget);
     app_handle_step_result(result);
     uint32_t delay;
-    bool timed = xgl_next_timeout(handle, board_monotonic_ms(), &delay);
+    bool timed = xgl_next_timeout_for_work(
+        handle, board_monotonic_ms(), &budget, &delay);
     app_wait_for_rx_or_timeout(timed, timed ? delay : 0U);
 }
 ```

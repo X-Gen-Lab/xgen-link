@@ -28,6 +28,32 @@ transport_effective_max_frame_size(const xgl_transport_ctx_t* ctx,
     return max_frame_size;
 }
 
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t transport_check_data_tx_policy(const xgl_transport_ctx_t* ctx,
+                                           uint16_t target_id,
+                                           uint32_t connection_id,
+                                           uint32_t session_epoch,
+                                           size_t data_len) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+#if XGL_FEATURE_FRAGMENTATION
+    if (ctx->enable_fragmentation && data_len > ctx->max_message_size) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+#else
+    (void)data_len;
+#endif
+    for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
+         peer = peer->next) {
+        if (peer->peer_id == target_id &&
+            peer->connection_id == connection_id &&
+            peer->session_epoch == session_epoch && peer->failed) {
+            return XGL_ERR_ACK_TIMEOUT;
+        }
+    }
+    return XGL_OK;
+}
+
 xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
                                       const xgl_tx_data_t* tx_data,
                                       xgl_transport_send_plan_t* plan) {
@@ -327,6 +353,15 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                 ctx->callback_user_data);
         }
         return err;
+    }
+
+    if (!tx_data->reliable) {
+        err = transport_check_data_tx_policy(
+            ctx, tx_data->target_id, tx_data->connection_id,
+            tx_data->session_epoch, tx_data->data_len);
+        if (err != XGL_OK) {
+            return err;
+        }
     }
 
     /* Validate the complete frame budget before reserving a scope or HELLO. */

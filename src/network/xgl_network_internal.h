@@ -13,6 +13,10 @@ xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
                                          xgl_handle_t handle,
                                          xgl_packet_t* packet);
 
+/** \brief           Validate caller storage before DATA admission policy. */
+xgl_error_t
+xgl_network_validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data);
+
 /**
  * \brief           Submit caller storage and distinguish request validation
  * \param[in,out]   ctx: Network policy and counters

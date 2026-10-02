@@ -104,6 +104,22 @@ void transport_destroy_peers(xgl_transport_ctx_t* ctx);
 uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
                                       uint32_t current_time_ms);
 void transport_count_send_error(xgl_transport_ctx_t* ctx);
+
+/**
+ * \brief           Check message size and exact terminal scope without mutation
+ * \param[in]       ctx: Transport state and configured message limit
+ * \param[in]       target_id: Remote DATA destination
+ * \param[in]       connection_id: Exact connection identity
+ * \param[in]       session_epoch: Exact session epoch
+ * \param[in]       data_len: Application message length
+ * \return          XGL_OK or a message-size or terminal-scope error
+ */
+xgl_error_t transport_check_data_tx_policy(const xgl_transport_ctx_t* ctx,
+                                           uint16_t target_id,
+                                           uint32_t connection_id,
+                                           uint32_t session_epoch,
+                                           size_t data_len);
+
 void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                          xgl_transport_peer_state_t* peer, xgl_error_t error);
 #if XGL_FEATURE_FRAGMENTATION

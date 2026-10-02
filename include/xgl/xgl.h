@@ -72,6 +72,36 @@ xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
                                 uint32_t abi_version, uint32_t build_config_id);
 
 /**
+ * \brief           Reserve an instance and return the exact failure reason
+ * \param[in]       config: Immutable configuration borrowed until destruction
+ * \param[in]       config_size: Size of the consumer configuration structure
+ * \param[in]       abi_version: Consumer configuration ABI version
+ * \param[in]       build_config_id: Consumer compiled profile identifier
+ * \param[out]      handle: Reserved instance; cleared on every failure
+ * \return          XGL_OK or a configuration, ABI, backend or allocation error
+ * \note            Successful reservation still requires xgl_init().
+ */
+xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
+                                          size_t config_size,
+                                          uint32_t abi_version,
+                                          uint32_t build_config_id,
+                                          xgl_handle_t* handle);
+
+/**
+ * \brief           Reserve an instance with consumer ABI checks and errors
+ * \param[in]       config: Immutable configuration borrowed until destruction
+ * \param[out]      handle: Reserved instance; cleared on every failure
+ * \return          XGL_OK or a configuration, ABI, backend or allocation error
+ * \note            Call xgl_init() before using the reserved instance.
+ */
+static inline xgl_error_t xgl_create_with_error(const xgl_config_t* config,
+                                                xgl_handle_t* handle) {
+    return xgl_create_with_error_checked(config, sizeof(xgl_config_t),
+                                         XGL_CONFIG_ABI_VERSION,
+                                         XGL_BUILD_CONFIG_ID, handle);
+}
+
+/**
  * \brief           Create a new protocol instance
  * \param[in]       config: Configuration structure
  * \return          Instance handle on success, NULL on failure
@@ -334,7 +364,8 @@ xgl_error_t xgl_send_zerocopy_at(xgl_handle_t handle,
  * \param[in]       request: Scope and send metadata; buffer, buffer_size and
  *                  data_offset are ignored, data_len must be nonzero
  * \param[out]      layout: Exact headroom and frame size, cleared on failure
- * \return          XGL_OK or an argument, route, MTU or security-scope error
+ * \return          XGL_OK or an argument, message-limit, route, MTU, security
+ *                  or terminal-scope error
  * \note            Does not call the provider or PHY, reserve storage or
  * consume a security sequence. An authenticated scope must already be
  *                  installed. The eventual send revalidates current state.
@@ -383,8 +414,28 @@ xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
  * \param[in]       now_ms: Current monotonic time
  * \param[out]      delay_ms: Relative delay; zero means work is already due
  * \return          True if a deadline exists; false leaves delay_ms unchanged
+ * \note            Always includes PHY polling and the most recent step's
+ *                  parser policy. Use xgl_next_timeout_for_work() when the
+ *                  next step's work budget differs.
  */
 bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms, uint32_t* delay_ms);
+
+/**
+ * \brief           Query deadlines for a proposed step without changing state
+ * \param[in]       handle: Initialized instance, serialized by the caller
+ * \param[in]       now_ms: Same monotonic millisecond clock used by xgl_step()
+ * \param[in]       budget: Proposed per-link RX budget and parser timeout
+ * \param[out]      delay_ms: Relative delay; unchanged when no deadline exists
+ * \return          True if a deadline exists; false for invalid input or none
+ * \note            Zero rx_bytes excludes PHY polling deadlines. Parser expiry
+ *                  uses this budget's receive_timeout_ms, without changing the
+ *                  last step policy or restarting a partial frame. Transport
+ *                  deadlines remain active. A timeout of 2^31 or more is
+ * invalid.
+ */
+bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
+                               const xgl_work_budget_t* budget,
+                               uint32_t* delay_ms);
 
 /**
  * \brief           Install an explicitly trusted directional security session

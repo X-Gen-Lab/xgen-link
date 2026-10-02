@@ -15,6 +15,7 @@ namespace {
 
 struct StatisticsPort {
     std::vector<uint8_t> incoming;
+    std::vector<uint8_t> accepted;
     StatisticsPort* remote = nullptr;
 };
 
@@ -34,6 +35,16 @@ xgl_error_t statistics_rx(uint8_t* data, size_t* size, void* context) {
     return XGL_OK;
 }
 
+xgl_error_t statistics_accept(xgl_handle_t, uint16_t source_id, uint8_t,
+                              const uint8_t* data, size_t size, void* context) {
+    if (source_id != 1U || data == nullptr || size != 1U) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    auto& port = *static_cast<StatisticsPort*>(context);
+    port.accepted.push_back(data[0]);
+    return XGL_OK;
+}
+
 }  // namespace
 
 TEST(XglStatisticsBehavior,
@@ -48,11 +59,15 @@ TEST(XglStatisticsBehavior,
     xgl_config_t sender_config, receiver_config;
     xgl_config_get_preset_tiny(&sender_config);
     xgl_config_get_preset_tiny(&receiver_config);
+    sender_config.protocol.window_size = 1U;
+    receiver_config.protocol.window_size = 1U;
     sender_config.source_id = 1U;
     receiver_config.source_id = 2U;
     sender_config.route_table = &first_route;
     receiver_config.route_table = &second_route;
     sender_config.route_table_len = receiver_config.route_table_len = 1U;
+    receiver_config.rx_accept_callback = statistics_accept;
+    receiver_config.callback_user_data = &second;
     xgl_test_use_host_allocator(&sender_config);
     xgl_test_use_host_allocator(&receiver_config);
     xgl_handle_t sender = xgl_create(&sender_config);
@@ -83,11 +98,21 @@ TEST(XglStatisticsBehavior,
     };
     round_trip(100U, 150U);
     round_trip(200U, 300U);
+    ASSERT_EQ(second.accepted.size(), 2U);
+    EXPECT_EQ(second.accepted[0], payload);
+    EXPECT_EQ(second.accepted[1], payload);
     xgl_statistics_t stats{};
     ASSERT_EQ(xgl_stats_get(sender, &stats), XGL_OK);
+#if XGL_FEATURE_ADAPTIVE_RTO
     EXPECT_EQ(stats.avg_rtt_ms, 75U);
     EXPECT_EQ(stats.min_rtt_ms, 50U);
     EXPECT_EQ(stats.max_rtt_ms, 100U);
+#else
+    EXPECT_EQ(stats.avg_rtt_ms, 0U);
+    EXPECT_EQ(stats.min_rtt_ms, UINT32_MAX);
+    EXPECT_EQ(stats.max_rtt_ms, 0U);
+#endif
+    EXPECT_EQ(stats.transport.tx_packets, 2U);
     xgl_memory_requirements_t memory{};
     ASSERT_EQ(xgl_memory_requirements(&sender_config, &memory), XGL_OK);
     EXPECT_EQ(stats.memory_used, memory.size);
@@ -99,11 +124,24 @@ TEST(XglStatisticsBehavior,
     EXPECT_EQ(stats.min_rtt_ms, UINT32_MAX);
     EXPECT_EQ(stats.max_rtt_ms, 0U);
     EXPECT_EQ(stats.memory_used, memory.size);
+    EXPECT_EQ(stats.memory_peak, memory.size);
+    EXPECT_EQ(stats.datalink.tx_packets, 0U);
+    EXPECT_EQ(stats.network.tx_packets, 0U);
+    EXPECT_EQ(stats.transport.tx_packets, 0U);
     round_trip(400U, 440U);
+    ASSERT_EQ(second.accepted.size(), 3U);
+    EXPECT_EQ(second.accepted[2], payload);
     ASSERT_EQ(xgl_stats_get(sender, &stats), XGL_OK);
+#if XGL_FEATURE_ADAPTIVE_RTO
     EXPECT_EQ(stats.avg_rtt_ms, 40U);
     EXPECT_EQ(stats.min_rtt_ms, 40U);
     EXPECT_EQ(stats.max_rtt_ms, 40U);
+#else
+    EXPECT_EQ(stats.avg_rtt_ms, 0U);
+    EXPECT_EQ(stats.min_rtt_ms, UINT32_MAX);
+    EXPECT_EQ(stats.max_rtt_ms, 0U);
+#endif
+    EXPECT_EQ(stats.transport.tx_packets, 1U);
     xgl_destroy(receiver);
     xgl_destroy(sender);
 }

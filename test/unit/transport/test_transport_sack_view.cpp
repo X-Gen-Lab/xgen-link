@@ -95,7 +95,12 @@ class XglTransportSackViewTest : public ::testing::Test {
         EXPECT_EQ(xgl_reliable_get_count(&context.peers->reliable_queue), 3U);
         EXPECT_EQ(context.peers->tx_window.send_base_packet_number, 0U);
         EXPECT_EQ(context.peers->tx_window.next_packet_number, 3U);
+#if XGL_FEATURE_ADAPTIVE_RTO
         EXPECT_FALSE(xgl_rtt_is_initialized(&context.peers->rtt_est));
+#endif
+#if XGL_FEATURE_STATISTICS
+        EXPECT_EQ(context.rtt_sample_count, 0U);
+#endif
         EXPECT_FALSE(context.peers->failed);
         EXPECT_EQ(sends, sends_before_ack);
         EXPECT_EQ(retries, 0U);

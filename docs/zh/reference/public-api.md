@@ -6,6 +6,8 @@
 
 `xgl_memory_requirements()` 测量精确存储需求。`xgl_init_static()` 初始化对齐的调用者存储。`xgl_create()` 通过 `config.memory.allocator`（`xgm_allocator_t`）预留同一布局，随后需要调用 `xgl_init()`。只有 Full 可以选择可选的 xgen-memory libc 后端。`xgl_destroy()` 释放动态预留的 workspace，或结束对静态存储的使用。
 
+需要诊断创建失败时使用 `xgl_create_with_error(&config, &handle)`：返回配置、ABI、后端或分配错误；分配失败为 `XGL_ERR_NO_MEMORY`，失败时清空 handle。成功仍只预留 workspace，需要调用 `xgl_init()`。原 `xgl_create()` 的指针返回形式保持兼容，复用同一实现。跨编译边界可使用对应的 `_checked` 入口显式传入消费者配置大小、ABI 和构建身份。
+
 `xgl_memory_report()` 返回同一份需求及按资源类别划分的字节明细，不分配、不修改实例。类别包含对齐填充，合计为精确 workspace 大小。接纳字节预算可能小于池的实际预留，见[资源模型](../guide/resource-model.md)。
 
 配置及其引用的 PHY、provider、回调对象借用到销毁。实例存活期间必须保持地址稳定且不可变。同一实例的操作由调用者串行化；回调不得重入实例。
@@ -17,6 +19,8 @@
 原零拷贝请求始终使用零 connection/epoch。`xgl_send_zerocopy_scoped_at()` 接受独立且兼容的显式 scope 请求；`xgl_send_zerocopy_layout()` 查询精确头部空间和总容量，不分配、不发送、不消耗认证状态。准备与生命周期规则见[发送 API](../guide/send-api.md)。
 
 `xgl_step(handle, now_ms, &budget)` 轮询到期链路并执行 transport 维护。`budget.rx_bytes` 是每条链路的字节上限，不是频率。`xgl_next_timeout(handle, now_ms, &delay)` 返回是否存在相对截止时间。所有调用使用同一按模 2^32 回绕的单调毫秒时钟；经过的时间间隔必须小于 2^31。
+
+`xgl_next_timeout_for_work(handle, now_ms, &budget, &delay)` 按下一次 step 的预算查询截止时间。RX 字节为零时排除 PHY 轮询，仍包括 transport 和该预算启用的半帧超时；查询不改变实例或最近 step 的超时策略。旧查询仍包含所有 PHY 轮询。两种查询返回 false 均不修改输出，详见[低功耗运行时](../guide/low-power-runtime.md)。
 
 ## 会话与诊断
 

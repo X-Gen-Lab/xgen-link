@@ -104,7 +104,7 @@ class TransportResourceConfig(unittest.TestCase):
                     'if(MSVC)\n  target_compile_options(api_tests PRIVATE /permissive-)\n'
                     'else()\n  target_compile_options(api_tests PRIVATE -pedantic-errors)\nendif()\n'
                     'enable_testing()\ninclude(GoogleTest)\n'
-                    'gtest_discover_tests(api_tests PROPERTIES LABELS "xgl;unit" TIMEOUT 30)\n',
+                    'gtest_discover_tests(api_tests PROPERTIES LABELS "xgl\\\\;unit" TIMEOUT 30)\n',
                     encoding="utf-8")
                 binary = self.configure(name, profile, capacity=capacity,
                                         adaptive=adaptive, entry=source)

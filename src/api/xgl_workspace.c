@@ -13,6 +13,9 @@
 
 #include "xgl_workspace_internal.h"
 
+_Static_assert(offsetof(xgl_workspace_t, instance) == 0U,
+               "The instance handle must equal the owned workspace address");
+
 /**
  * \brief           Validated partition sizes shared by both creation paths
  */

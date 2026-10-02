@@ -11,8 +11,8 @@
 /**
  * \brief           Query the next relative link or transport deadline
  */
-bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
-                      uint32_t* delay_ms) {
+static bool next_timeout(xgl_handle_t handle, uint32_t now_ms, bool poll_links,
+                         uint32_t parser_timeout_ms, uint32_t* delay_ms) {
     if (handle == NULL || !handle->initialized || delay_ms == NULL) {
         return false;
     }
@@ -21,24 +21,26 @@ bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
                                             now_ms, &next);
     for (size_t i = 0; i < handle->link_count; ++i) {
         const xgl_instance_link_t* link = &handle->links[i];
-        const uint32_t elapsed = now_ms - link->last_poll_ms;
-        uint32_t remaining =
-            (!link->polled || elapsed >= link->poll_interval_ms)
-                ? 0U
-                : link->poll_interval_ms - elapsed;
-        if (!found || remaining < next) {
-            next = remaining;
-            found = true;
+        if (poll_links) {
+            const uint32_t elapsed = now_ms - link->last_poll_ms;
+            const uint32_t remaining =
+                (!link->polled || elapsed >= link->poll_interval_ms)
+                    ? 0U
+                    : link->poll_interval_ms - elapsed;
+            if (!found || remaining < next) {
+                next = remaining;
+                found = true;
+            }
         }
-        if (handle->parser_timeout_ms != 0U &&
-            link->parser.state != XGL_PARSE_MAGIC &&
+        if (parser_timeout_ms != 0U && link->parser.state != XGL_PARSE_MAGIC &&
             link->parser.state != XGL_PARSE_COMPLETE) {
             const uint32_t parser_elapsed = now_ms - link->parser.timestamp;
-            remaining = parser_elapsed >= handle->parser_timeout_ms
-                            ? 0U
-                            : handle->parser_timeout_ms - parser_elapsed;
-            if (remaining < next) {
+            const uint32_t remaining = parser_elapsed >= parser_timeout_ms
+                                           ? 0U
+                                           : parser_timeout_ms - parser_elapsed;
+            if (!found || remaining < next) {
                 next = remaining;
+                found = true;
             }
         }
     }
@@ -46,6 +48,29 @@ bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
         *delay_ms = next;
     }
     return found;
+}
+
+/**
+ * \brief           Include every link using the most recent step policy
+ */
+bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
+                      uint32_t* delay_ms) {
+    return next_timeout(handle, now_ms, true,
+                        handle != NULL ? handle->parser_timeout_ms : 0U,
+                        delay_ms);
+}
+
+/**
+ * \brief           Apply a proposed work policy only to the deadline query
+ */
+bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
+                               const xgl_work_budget_t* budget,
+                               uint32_t* delay_ms) {
+    if (budget == NULL || budget->receive_timeout_ms >= UINT32_C(0x80000000)) {
+        return false;
+    }
+    return next_timeout(handle, now_ms, budget->rx_bytes != 0U,
+                        budget->receive_timeout_ms, delay_ms);
 }
 
 /**

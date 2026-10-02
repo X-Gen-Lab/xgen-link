@@ -6,6 +6,8 @@ Use `<xgl/xgl.h>`. Installed headers include the generated profile and ABI const
 
 `xgl_memory_requirements()` measures exact storage. `xgl_init_static()` initializes aligned caller storage. `xgl_create()` reserves the same layout through `config.memory.allocator` (`xgm_allocator_t`), then requires `xgl_init()`. Only Full may select the optional xgen-memory libc backend. `xgl_destroy()` frees a dynamically reserved workspace, or ends use of static storage.
 
+Use `xgl_create_with_error(&config, &handle)` to diagnose reservation failures: it returns configuration, ABI, backend or allocation errors. Allocation failure returns `XGL_ERR_NO_MEMORY`; every failure clears the handle. Success still only reserves storage and requires `xgl_init()`. The original pointer-returning `xgl_create()` remains compatible and uses the same implementation. The corresponding `_checked` entry accepts the consumer configuration size, ABI and build identity explicitly across compilation boundaries.
+
 `xgl_memory_report()` returns the same requirements with a breakdown by resource category, without allocating or changing an instance. Category bytes include padding and sum to the exact workspace size. Admission byte limits can be smaller than reserved pool storage; see [Resource Model](../guide/resource-model.md).
 
 The configuration and referenced PHY/provider/callback objects are borrowed until destruction. Keep their addresses stable and do not modify them while the instance exists. All operations on an instance are serialized by the caller; callbacks must not reenter it.
@@ -17,6 +19,8 @@ The configuration and referenced PHY/provider/callback objects are borrowed unti
 The legacy zero-copy request always uses connection/epoch zero. `xgl_send_zerocopy_scoped_at()` accepts a separate compatible request with an explicit scope. `xgl_send_zerocopy_layout()` measures exact headroom and total storage without allocating, transmitting or consuming authentication state. See [Send API](../guide/send-api.md) for preparation and lifetime rules.
 
 `xgl_step(handle, now_ms, &budget)` polls due links and runs transport maintenance. `budget.rx_bytes` is the limit per link, not a frequency. `xgl_next_timeout(handle, now_ms, &delay)` returns whether a relative deadline exists. All calls share one monotonic modulo-2^32 millisecond clock; elapsed intervals must stay below 2^31.
+
+`xgl_next_timeout_for_work(handle, now_ms, &budget, &delay)` queries deadlines for the proposed next step. Zero RX bytes excludes PHY polling, while transport and partial-frame expiry enabled by that budget remain active. The query changes neither the instance nor the latest step's timeout policy. The legacy query still includes all PHY polling. Both queries leave output unchanged when returning false; see [Low-Power Runtime](../guide/low-power-runtime.md).
 
 ## Sessions and diagnostics
 
