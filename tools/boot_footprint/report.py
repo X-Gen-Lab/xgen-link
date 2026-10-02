@@ -229,7 +229,7 @@ def report_elf(args):
         "sections": sections,
         "forbidden_heap_symbols": forbidden,
         "unresolved_symbols": unresolved.splitlines() if unresolved else [],
-        "largest_linked_function_stack_bytes": stack[0]["bytes"] if stack else None,
+        "largest_linked_function_stack_bytes": stack[0]["bytes"] if not stack_errors else None,
         "largest_linked_stack_frames": stack[:20],
         "stack_evidence_errors": stack_errors,
         "limits": {
