@@ -445,6 +445,8 @@ bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
  * \note            The application must prevent key/nonce-domain reuse across
  *                  restarts using persistent state or fresh trusted keys.
  *                  Ordinary received frames cannot install sessions.
+ *                  Installation does not revoke previously admitted data.
+ *                  Use a new trusted scope for a business trust transition.
  */
 xgl_error_t
 xgl_install_security_session(xgl_handle_t handle,

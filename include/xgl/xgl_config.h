@@ -9,8 +9,7 @@
 
 #include <xgl/xgl_build_config.h>
 
-/** \brief           Compiled temporary PHY read capacity on the caller's stack.
- */
+/** \brief           Compiled byte limit for one synchronous PHY read. */
 #ifndef XGL_DATALINK_RX_CHUNK_SIZE
 #define XGL_DATALINK_RX_CHUNK_SIZE XGL_BUILD_RX_CHUNK_SIZE
 #elif XGL_DATALINK_RX_CHUNK_SIZE != XGL_BUILD_RX_CHUNK_SIZE
