@@ -88,6 +88,26 @@
       "forbidden": [],
       "limits": {},
       "choices": {}
+    },
+    {
+      "module": "xgen-containers",
+      "abi": "1",
+      "features": [
+        "hash"
+      ],
+      "forbidden": [],
+      "limits": {},
+      "choices": {},
+      "when": {
+        "any_features": [],
+        "choices": {
+          "profile": [
+            "embedded-lite",
+            "embedded",
+            "full"
+          ]
+        }
+      }
     }
   ]
 }
