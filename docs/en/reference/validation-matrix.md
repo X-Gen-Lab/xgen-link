@@ -15,15 +15,21 @@
 | Static workspace, backpressure, wraparound, storage reuse | `tools/static_workspace_smoke.c` |
 | One backend reservation and no runtime backend allocations | `test/unit/api/test_footprint.cpp`, memory properties |
 | Public installed C consumer, ABI/profile rejection | SDK consumer CTest and instance tests |
+| Exact creation errors, pure work-budget deadlines and clock wraparound | `test/unit/api/test_api_contracts.cpp` |
+| Authentication preflight, base ACK capacity and smaller transit routes | `test/unit/api/test_config_consistency.cpp` |
+| Message limits, terminal scope rejection and pure layout across send APIs | `test/unit/api/test_send_policy.cpp` |
 | ACK size overflow, failed-init release, PHY failure and recovery | `test/unit/wire/test_coverage_wire.cpp`, `test/unit/api/test_coverage_api.cpp`, `test/integration/test_coverage_delivery.cpp` |
 | RTT observations, workspace reservations and streaming CRC classification | `test/unit/api/test_stats.cpp`, `test/unit/datalink/test_datalink.cpp` |
 | Boot error contracts with statistics and detailed diagnostics disabled | Conditional checks in `tools/static_workspace_smoke.c` |
 | Boot/Lite reliable delivery, capacity rejection, parsing, and multi-window fragmentation | Capability-selected cases in `test/unit/api/test_bounded_profile.cpp` |
 | Boot 32-byte logical-TX extension limit and independent raw-wire boundary | `test/unit/network/test_boot_network.cpp` |
 | Multi-configuration publication/installation, exported capabilities, and budget rejection | `test/cmake/test_profile_builds.py`, `test/cmake/test_footprint_budget.py` |
+| Four resource-configured API sets, installed fixed-RTO tests and complete labels | `test/cmake/test_transport_resource_config.py` |
 | Independent C11/C++17 public/private header compilation, discovery and seed replay | `test/cmake/HeaderContracts.cmake`, classification and runner contracts |
 
 ## Build coverage
+
+The latest API stage passed 808 checks each for local GNU Full/Embedded and MSVC Full, 188 for Boot, and 279 for Lite. Full protocol sets contain 801/805 cases with adaptive/fixed RTO; four resource configurations execute 196 selected API cases, and seven build/install contracts pass. All 510 historical names remain. See repository-root `design/validation/api-refinement.md` for environments, source identities and quality evidence; the capacity-one API selection does not qualify all private transport tests.
 
 The local Full matrix includes protocol regressions and four host examples. Boot, Embedded Lite, and Embedded build separately as C11 without protocol libc fallback and check static-workspace and installed-package consumers. Explicitly enabled GoogleTest runs capability-selected Boot/Lite tests and complete historical Embedded regression. Independent foundation packages own their behavior, minimal-consumption, installation, and quality matrices; the protocol validates their joint integration. Source core tests are a migration baseline and do not qualify the new providers.
 
@@ -38,6 +44,8 @@ Production dependency contracts now contain 11 cases, classification has an inde
 [Remote CI](https://github.com/X-Gen-Lab/xgen-link/actions/runs/36807629994) passed on clean revision `1b0ce7e`: 561 checks each on Windows/MSVC, Linux and macOS, 560 with ASan/UBSan, and 2/3 for CI Boot/Embedded. Production coverage is 3671/4010 lines (91.5%), 249/250 functions (99.6%) and 2314/2865 branches (80.8%). Cppcheck, Clang-Tidy, strict documentation, installed consumption and release validation passed. All eight artifacts match their GitHub SHA256 digests and report the same clean source identity.
 
 ## Resource and product limits
+
+The latest API stage uses 16,348/12,964 B Flash without/with LTO for the default configuration, and 16,116/12,788 B for small (window one, one bucket, fixed RTO). Small MTU128/64 workspaces use 1,040/848 B; RAM with a 1 KiB stack reservation uses 2,128/1,936 B. All four small and both default non-LTO budgets pass; default LTO retains the preceding 164 B excess without relaxed limits. Older figures below retain their historical scope and do not replace current reports.
 
 The Cortex-M0 probe records a real linked ELF, map, target-ABI workspace formula and stack-use files. Its results are reproducible from `tools/boot_footprint/README.md`. Native execution separately checks the layout formula against actual workspace initialization.
 

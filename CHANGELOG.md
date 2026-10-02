@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Error-returning checked instance reservation and side-effect-free deadline queries for a proposed work budget, preserving the legacy creation and timeout APIs.
 - Public send/configuration consistency regressions and a four-combination API matrix for single-window and fixed-RTO builds.
-
 - Explicit reliable-index bucket, compiled-window and adaptive-RTO selection, with exported target/header/runtime identity checks and fixed-RTO installed-consumer tests.
 - Separate small-transport Cortex-M0 budgets bound to their actual compiled capabilities; keep the original default budgets and report their failures independently.
 - Bounded RX chunk selection through CMake, with installed-header consistency and target-derived footprint budget identity.
@@ -34,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Validate optional authentication providers and mandatory local authenticated frame capacity before allocation; retain smaller transit routes and per-frame MTU checks.
 - Ignore inactive fragmentation limits, retain capability-aware historical tests, and validate installed fixed-RTO CTest labels.
 - Reuse exact peer lookup and scope admission without adding instance state; retain unchanged Cortex-M0 small-profile resource ceilings.
-
+- Share deadline calculations while compiling the legacy query without work-budget dispatch.
 - Validate complete ACK ranges before merging them with ordered outstanding records; process SACK against owned records and reuse known records during ACK removal and TX rollback.
 - Keep RX declarations in a dedicated private header, reuse decoded fragment metadata and the out-of-order insertion position without adding permanent caches.
 - Footprint format 6 records resolved transport capacity, buckets, adaptive RTO and resource identity; budget policies reject another compiled combination.

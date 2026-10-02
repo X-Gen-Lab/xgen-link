@@ -1,8 +1,20 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-02。当前阶段为 transport 事实归属、预准入与显式资源裁剪。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，当前决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
+更新日期：2026-10-02。当前阶段为公开 API 契约完善。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，资源决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
 
-## 当前：Transport 事实归属、预准入与显式资源裁剪
+## 当前：公开 API 契约完善
+
+普通、零拷贝和布局查询统一拒绝已终止的精确 scope，并一致检查启用分片后的消息上限。纯布局查询失败清空输出，不触发发送统计、PHY、认证 provider 或序列分配。认证 provider 的有效性和全局基本 ACK 容量在创建前验证；较小转发路由保持合法，不因全局认证能力被统一抬高最小 MTU。
+
+新增 `xgl_create_with_error` 返回实际创建错误，旧创建接口兼容保留；新增 `xgl_next_timeout_for_work` 按拟议工作预算查询期限，不修改实例策略。零 RX 预算排除轮询但保留 parser/transport 期限；旧查询继续使用最近一次 step 策略。公开结构 ABI、wire v3 和实例常驻存储不增加，回调作用域、数据借用及超时含义已同步到双语文档。
+
+最新 Windows GNU Full/Embedded、MSVC Full 各 **808/808**，Boot **188/188**，Lite **279/279**；Full 自适应/固定 RTO 协议矩阵 **801/801、805/805**，四组资源配置的公开 API **196/196**，构建/安装契约 **7/7**。保留全部 510 个历史名称，安装包 C11 消费者实际调用新增 API 并通过。详细平台、静态检查与源码身份见[API 验证记录](design/validation/api-refinement.md)。
+
+Linux Full **808/808**、ASan/UBSan **807/807**；生产行/函数/分支覆盖率为 **93.797%/100%/83.895%**。Cppcheck、Clang-Tidy 各检查 43 个生产翻译单元通过；格式、文本、严格 API 和双语站点文档通过。最后仅增加三行局部诊断注释，前后可执行逻辑及分阶段源码摘要已有记录。
+
+默认普通/LTO Flash 为 **16,348/12,964 B**；本轮新增的普通镜像超限已消除，默认 LTO 仍保留前一阶段的 **164 B** 超限。small 的显式窗口 1、桶 1、固定 RTO 为 **16,116/12,788 B**，四个既有 small 预算通过，工作区与 RAM 不增加。所有报告来自明确配置的最终 ELF；8 KiB Flash 目标仍未达到。本轮仅本地提交，未推送、执行远端 CI 或进行板级验收。
+
+## 历史：Transport 事实归属、预准入与显式资源裁剪
 
 分片按消息保存已接纳可靠属性，混用在 ACK/SACK 之前拒绝；非可靠超时只释放该消息，不终止同 scope 的可靠历史。过期对象先从活动队列摘出再清理所属 scope，防止回调清理破坏遍历。
 

@@ -15,15 +15,21 @@
 | 静态工作区、背压、回绕、存储复用 | `tools/static_workspace_smoke.c` |
 | 一次后端预留、运行期不调用后端分配 | `test/unit/api/test_footprint.cpp`、memory 性质测试 |
 | 公开安装包 C 消费者、ABI/profile 拒绝 | SDK 消费者 CTest 及 instance 测试 |
+| 精确创建错误、纯预算期限查询与时间回绕 | `test/unit/api/test_api_contracts.cpp` |
+| 认证配置预检、基本 ACK 容量及较小转发路由 | `test/unit/api/test_config_consistency.cpp` |
+| 所有发送入口的消息上限、终止 scope 拒绝及布局无副作用 | `test/unit/api/test_send_policy.cpp` |
 | ACK 长度溢出、初始化失败释放、PHY 错误与恢复 | `test/unit/wire/test_coverage_wire.cpp`、`test/unit/api/test_coverage_api.cpp`、`test/integration/test_coverage_delivery.cpp` |
 | RTT 观察、workspace 预留量、流式 CRC 分类 | `test/unit/api/test_stats.cpp`、`test/unit/datalink/test_datalink.cpp` |
 | Boot 关闭统计和详细诊断时保留错误契约 | `tools/static_workspace_smoke.c` 的条件分支 |
 | Boot/Lite 可靠交付、容量拒绝、parser 和跨窗口分片 | `test/unit/api/test_bounded_profile.cpp` 的按能力测试 |
 | Boot 逻辑 TX 32 字节扩展上限与 raw wire 独立边界 | `test/unit/network/test_boot_network.cpp` |
 | 多配置发布/安装、导出能力与预算拒绝 | `test/cmake/test_profile_builds.py`、`test/cmake/test_footprint_budget.py` |
+| 四组资源配置 API、固定 RTO 安装测试及标签完整性 | `test/cmake/test_transport_resource_config.py` |
 | 公开/私有头文件独立 C11/C++17 编译、逐例发现、种子回放 | `test/cmake/HeaderContracts.cmake`、分类与 runner 契约测试 |
 
 ## 构建覆盖
+
+最新 API 阶段本地 GNU Full/Embedded、MSVC Full 各通过 808 项，Boot 188 项、Lite 279 项；Full 自适应/固定 RTO 的协议集合分别为 801/805 项，四组资源配置执行指定 API 共 196 项，构建/安装契约 7 项。全部历史 510 名保留。各环境、源码身份及质量证据见根目录 `design/validation/api-refinement.md`；容量为 1 的 API 集合不代表全部私有 transport 测试。
 
 本地 Full 矩阵包括协议回归及四个主机示例。Boot、Embedded Lite 和 Embedded 分别以关闭协议 libc fallback 的 C11 构建，执行静态工作区及安装包消费者测试；显式开启 GoogleTest 后，Boot/Lite 按能力测试，Embedded 执行完整历史回归。独立基础包拥有各自的行为、最小消费、安装和质量矩阵；协议负责五包集成。来源 core 的测试只记录为迁移基线，不代替新提供者验收。
 
@@ -38,6 +44,8 @@
 干净提交 `1b0ce7e` 的[远端 CI](https://github.com/X-Gen-Lab/xgen-link/actions/runs/36807629994)全部通过：Windows/MSVC、Linux、macOS 各 561 项，ASan/UBSan 560 项，CI Boot/Embedded 分别 2/3 项。生产覆盖率为行 3671/4010（91.5%）、函数 249/250（99.6%）、分支 2314/2865（80.8%）；Cppcheck、Clang-Tidy、严格文档、安装消费与发布验证均通过。八份 artifacts 的 GitHub SHA256 已核对，报告源码身份一致且干净。
 
 ## 资源与产品边界
+
+最新 API 阶段的默认普通/LTO Flash 为 16,348/12,964 B；small（窗口 1、桶 1、固定 RTO）为 16,116/12,788 B。MTU128/64 的 small 工作区为 1,040/848 B，含 1 KiB 预留栈 RAM 为 2,128/1,936 B。四项 small 和两项默认普通预算通过，默认 LTO 保留此前 164 B 超限，门槛未放宽。以下旧阶段数字保留其历史口径，不代替当前报告。
 
 Cortex-M0 探针记录真实链接的 ELF、map、目标 ABI 工作区公式及栈使用文件，可按 `tools/boot_footprint/README.md` 复现。原生运行另行比较布局公式并执行真实初始化。
 
