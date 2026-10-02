@@ -258,3 +258,46 @@ TEST_F(XglDatalinkSpanTest, PollRetainsTimeoutWhileConsumingFreshInput) {
     ASSERT_EQ(errors.size(), 1U);
     EXPECT_EQ(errors[0], XGL_ERR_TIMEOUT);
 }
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+TEST_F(XglDatalinkSpanTest, BoundedPollKeepsTailAndLegacyZeroRxDrains) {
+    driver_bytes = frame(0x11U);
+    const auto second = frame(0x22U);
+    driver_bytes.insert(driver_bytes.end(), second.begin(), second.end());
+    size_t remaining = 1U;
+    bool pending = false;
+    ASSERT_EQ(xgl_datalink_poll_parser_bounded(
+                  &context, &parser, &phy, 10U, 1000U, 128U, &remaining,
+                  &pending),
+              XGL_OK);
+    EXPECT_TRUE(pending);
+    EXPECT_EQ(reads, 1U);
+    EXPECT_EQ(driver_cursor, driver_bytes.size());
+    remaining = 0U;
+    EXPECT_EQ(xgl_datalink_poll_parser_bounded(
+                  &context, &parser, &phy, 20U, 1000U, 128U, &remaining,
+                  &pending),
+              XGL_OK);
+    EXPECT_EQ(reads, 1U);
+    EXPECT_TRUE(pending);
+    EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 30U, 1000U, 0U),
+              XGL_OK);
+    EXPECT_EQ(reads, 1U);
+    EXPECT_EQ(delivered, std::vector<std::vector<uint8_t>>({{0x11U}, {0x22U}}));
+    EXPECT_FALSE(xgl_parser_has_pending(&parser));
+}
+
+TEST_F(XglDatalinkSpanTest, BoundedPollNeverRequestsMoreThanCacheFreeSpace) {
+    ASSERT_EQ(xgl_parser_init(&parser, cache.data(), 33U), XGL_OK);
+    driver_bytes = frame(0x11U);
+    ASSERT_EQ(driver_bytes.size(), 34U);
+    size_t remaining = 1U;
+    bool pending = false;
+    EXPECT_EQ(xgl_datalink_poll_parser_bounded(
+                  &context, &parser, &phy, 10U, 1000U, 128U, &remaining,
+                  &pending),
+              XGL_OK);
+    EXPECT_LE(driver_cursor, 33U);
+    EXPECT_TRUE(delivered.empty());
+}
+#endif
