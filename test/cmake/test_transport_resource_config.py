@@ -44,7 +44,7 @@ class TransportResourceConfig(unittest.TestCase):
         return result
 
     def configure(self, name, profile="full", *, buckets="AUTO", capacity="AUTO",
-                  adaptive="ON", heap=None, chunk="AUTO", entry=None, succeeds=True):
+                  adaptive="ON", advanced="OFF", heap=None, chunk="AUTO", entry=None, succeeds=True):
         binary = self.root / name
         command = ["cmake", "-S", entry or ARGS.link_source / "dev", "-B", binary, "-G", "Ninja",
                    f"-DXGL_PROFILE={profile}", "-DCMAKE_BUILD_TYPE=Debug",
@@ -56,6 +56,7 @@ class TransportResourceConfig(unittest.TestCase):
                    f"-DXGL_RELIABLE_INDEX_BUCKETS={buckets}",
                    f"-DXGL_TRANSPORT_WINDOW_CAPACITY={capacity}",
                    f"-DXGL_ENABLE_ADAPTIVE_RTO={adaptive}",
+                   f"-DXGL_ENABLE_ADVANCED_RUNTIME={advanced}",
                    f"-DXGL_DATALINK_RX_CHUNK_SIZE={chunk}"]
         if heap is not None:
             command.append(f"-DXGL_ALLOW_FALLBACK_MALLOC={heap}")
@@ -184,7 +185,7 @@ class TransportResourceConfig(unittest.TestCase):
     def test_configuration_rejects_unsupported_capacities(self):
         for option, values in (("buckets", ("0", "3", "64", "invalid")),
                                ("capacity", ("0", "2", "256", "invalid")),
-                               ("adaptive", ("invalid",))):
+                               ("adaptive", ("invalid",)), ("advanced", ("invalid",))):
             for value in values:
                 with self.subTest(option=option, value=value):
                     rejected = self.configure(f"invalid-{option}-{value}",
@@ -219,7 +220,7 @@ class TransportResourceConfig(unittest.TestCase):
 
     def test_custom_identity_distinguishes_every_layout_option(self):
         combinations = ({}, {"buckets": "2"}, {"capacity": "8"}, {"adaptive": "OFF"},
-                        {"chunk": "32"}, {"heap": "OFF"})
+                        {"chunk": "32"}, {"heap": "OFF"}, {"advanced": "ON"})
         ids = []
         for index, options in enumerate(combinations):
             binary = self.configure(f"identity-{index}", **options)
@@ -238,7 +239,8 @@ class TransportResourceConfig(unittest.TestCase):
                    definitions="XGL_RELIABLE_BUCKET_COUNT=2 XGL_BUILD_WINDOW_CAPACITY=8 XGL_FEATURE_ADAPTIVE_RTO=0")
         for definition in ("XGL_RELIABLE_BUCKET_COUNT=32", "XGL_BUILD_WINDOW_CAPACITY=128",
                            "XGL_FEATURE_ADAPTIVE_RTO=1", "XGL_EXPECTED_RESOURCE_CONFIG_ID=0",
-                           "XGL_RESOURCE_CONFIG_ID=0", "XGL_BUILD_CONFIG_ID=303"):
+                           "XGL_RESOURCE_CONFIG_ID=0", "XGL_BUILD_CONFIG_ID=303",
+                           "XGL_FEATURE_ADVANCED_RUNTIME=1"):
             with self.subTest(definition=definition):
                 self.probe("override-" + definition.split("=")[0], binary,
                            '#include <xgl/xgl_build_config.h>\nint main(void) { return 0; }\n',
