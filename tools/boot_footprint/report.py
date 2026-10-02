@@ -20,11 +20,12 @@ def source_identity(root):
         capture_output=True, text=True, check=False)
     digest = hashlib.sha256()
     files = []
-    for name in ("src", "include", "cmake", "ports", "tools/boot_footprint"):
+    for name in ("src", "include", "cmake", "ports", "dev", "tools/boot_footprint"):
         directory = root / name
         if directory.exists():
             files.extend(path for path in directory.rglob("*") if path.is_file()
-                         and path.suffix in (".c", ".h", ".cmake", ".in", ".ld", ".S", ".py"))
+                         and (path.name == "CMakeLists.txt" or path.suffix in (
+                             ".c", ".h", ".cmake", ".in", ".ld", ".S", ".py")))
     files.append(root / "CMakeLists.txt")
     for path in sorted(set(files)):
         digest.update(path.relative_to(root).as_posix().encode("utf-8"))
@@ -163,18 +164,25 @@ def report_elf(args):
     }))
     unresolved = run([args.nm, "--undefined-only", elf]).strip()
     stack = []
+    stack_errors = []
     for path in Path(args.build).rglob("*.su"):
         if "xgl_boot_layout.dir" in str(path):
             continue
         for line in path.read_text(encoding="utf-8").splitlines():
             fields = line.split("\t")
-            if len(fields) != 3 or not fields[1].isdigit():
-                continue
             function = fields[0].rsplit(":", 1)[-1]
             if function not in symbols:
                 continue
+            if len(fields) != 3 or not fields[1].isdigit():
+                stack_errors.append(f"Malformed linked stack record: {path}: {line}")
+                continue
+            if fields[2] not in ("static", "dynamic,bounded"):
+                stack_errors.append(f"No finite stack bound: {path}: {line}")
+                continue
             stack.append({"function": function, "bytes": int(fields[1]),
                           "kind": fields[2], "location": fields[0]})
+    if not stack:
+        stack_errors.append("No finite stack records for linked functions")
     stack.sort(key=lambda value: value["bytes"], reverse=True)
     reserved_stack = sections.get(".stack", 0)
     layout = json.loads(Path(args.layout).read_text(encoding="utf-8"))
@@ -223,6 +231,7 @@ def report_elf(args):
         "unresolved_symbols": unresolved.splitlines() if unresolved else [],
         "largest_linked_function_stack_bytes": stack[0]["bytes"] if stack else None,
         "largest_linked_stack_frames": stack[:20],
+        "stack_evidence_errors": stack_errors,
         "limits": {
             "generic_flash_64k_pass": text_bytes + data_bytes <= 65536,
             "generic_ram_8k_pass": data_bytes + bss_bytes <= 8192,
@@ -249,10 +258,11 @@ def report_elf(args):
     print(f"Boot ELF: Flash {result['flash_bytes']} B; static RAM {result['static_ram_bytes']} B; "
           f"workspace {result['workspace_bytes']} B; reserved stack {reserved_stack} B")
     print(f"Largest linked function stack: {result['largest_linked_function_stack_bytes']} B")
-    if forbidden or unresolved or not (
+    if forbidden or unresolved or stack_errors or not (
             result["limits"]["generic_flash_64k_pass"]
             and result["limits"]["generic_ram_8k_pass"]):
-        print("ELF audit failed: heap, unresolved symbols, or MCU capacity exceeded",
+        print("ELF audit failed: heap, unresolved symbols, incomplete stack evidence, "
+              "or MCU capacity exceeded",
               file=sys.stderr)
         return 1
     return 0
