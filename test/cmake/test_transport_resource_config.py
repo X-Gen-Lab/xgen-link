@@ -6,9 +6,11 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 
 PACKAGES = ("status", "bytes", "crc", "memory", "containers")
+API_CASE_PATTERN = r"^(XglConfigTest|XglConfigResourceTest|XglStatsTest|XglStatisticsBehavior)\."
 ARGS = None
 
 
@@ -42,9 +44,9 @@ class TransportResourceConfig(unittest.TestCase):
         return result
 
     def configure(self, name, profile="full", *, buckets="AUTO", capacity="AUTO",
-                  adaptive="ON", heap=None, chunk="AUTO", succeeds=True):
+                  adaptive="ON", heap=None, chunk="AUTO", entry=None, succeeds=True):
         binary = self.root / name
-        command = ["cmake", "-S", ARGS.link_source / "dev", "-B", binary, "-G", "Ninja",
+        command = ["cmake", "-S", entry or ARGS.link_source / "dev", "-B", binary, "-G", "Ninja",
                    f"-DXGL_PROFILE={profile}", "-DCMAKE_BUILD_TYPE=Debug",
                    "-DXGL_BUILD_TESTS=OFF", "-DXGL_BUILD_EXAMPLES=OFF",
                    "-DXGL_BUILD_DOCS=OFF", "-DXGL_BUILD_FOOTPRINT_REPORT=OFF",
@@ -59,11 +61,81 @@ class TransportResourceConfig(unittest.TestCase):
             command.append(f"-DXGL_ALLOW_FALLBACK_MALLOC={heap}")
         if ARGS.c_compiler:
             command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")
+        if entry is not None:
+            command.append(f"-DGTest_DIR={ARGS.gtest_dir.as_posix()}")
+            if ARGS.cxx_compiler:
+                command.append(f"-DCMAKE_CXX_COMPILER={ARGS.cxx_compiler}")
         for package in PACKAGES:
             command.append(f"-DXGL_DEV_{package.upper()}_SOURCE_DIR="
                            f"{getattr(ARGS, package + '_source').as_posix()}")
         self.execute(*command, succeeds=succeeds)
         return binary
+
+    def test_public_api_preserves_cases_across_default_and_compact_resources(self):
+        baseline = None
+        combinations = (("full", "AUTO", "ON"), ("full", "AUTO", "OFF"),
+                        ("full", "1", "OFF"), ("embedded", "1", "OFF"))
+        for profile, capacity, adaptive in combinations:
+            with self.subTest(profile=profile, capacity=capacity, adaptive=adaptive):
+                name = f"api-{profile}-{capacity.lower()}-{adaptive.lower()}"
+                source = self.root / (name + "-source")
+                source.mkdir()
+                sources = ("test/support/test_main.cpp", "test/unit/api/test_config.cpp",
+                           "test/unit/api/test_stats.cpp")
+                (source / "CMakeLists.txt").write_text(
+                    'cmake_minimum_required(VERSION 3.24)\nproject(resource_api_contract C CXX)\n'
+                    'set(CMAKE_C_STANDARD 11)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n'
+                    'set(CMAKE_C_EXTENSIONS OFF)\nset(CMAKE_CXX_STANDARD 17)\n'
+                    'set(CMAKE_CXX_STANDARD_REQUIRED ON)\nset(CMAKE_CXX_EXTENSIONS OFF)\n'
+                    f'add_subdirectory("{(ARGS.link_source / "dev").as_posix()}" production)\n'
+                    'find_package(GTest 1.16.0 EXACT CONFIG REQUIRED)\n'
+                    'if(TARGET xgm::libc_allocator)\n  set(host_allocator xgm::libc_allocator)\nelse()\n'
+                    f'  add_library(api_host_allocator STATIC "{(ARGS.memory_source / "src/libc_allocator.c").as_posix()}")\n'
+                    '  target_link_libraries(api_host_allocator PRIVATE xgm::allocator)\n'
+                    '  set(host_allocator api_host_allocator)\nendif()\n'
+                    'add_executable(api_tests\n' +
+                    ''.join(f'    "{(ARGS.link_source / path).as_posix()}"\n' for path in sources) + ')\n'
+                    'target_include_directories(api_tests PRIVATE\n' +
+                    ''.join(f'    "{(ARGS.link_source / path).as_posix()}"\n'
+                            for path in ("src", "test", "test/support")) + ')\n'
+                    'target_link_libraries(api_tests PRIVATE xgl ${host_allocator} GTest::gtest GTest::gmock\n'
+                    '    xgs::status xgb::bytes xgcrc::crc16 xgm::allocator xgm::pool\n'
+                    '    xgm::size_class xgct::list xgct::bitset xgct::hash)\n'
+                    'if(MSVC)\n  target_compile_options(api_tests PRIVATE /permissive-)\n'
+                    'else()\n  target_compile_options(api_tests PRIVATE -pedantic-errors)\nendif()\n'
+                    'enable_testing()\ninclude(GoogleTest)\n'
+                    'gtest_discover_tests(api_tests PROPERTIES LABELS "xgl;unit" TIMEOUT 30)\n',
+                    encoding="utf-8")
+                binary = self.configure(name, profile, capacity=capacity,
+                                        adaptive=adaptive, entry=source)
+                self.execute("cmake", "--build", binary, "--target", "api_tests",
+                             "--parallel", "4")
+                discovered = self.execute("ctest", "--test-dir", binary,
+                                          "--show-only=json-v1", "-R", API_CASE_PATTERN)
+                listing = json.loads(discovered.stdout)
+                (self.root / (name + "-discovery.json")).write_text(
+                    json.dumps(listing, indent=2) + "\n", encoding="utf-8")
+                names = {case["name"] for case in listing["tests"]}
+                self.assertGreaterEqual(len(names), 49, "Public API cases must not disappear")
+                if baseline is None:
+                    baseline = names
+                else:
+                    self.assertEqual(names, baseline, "Resource options cannot rename API cases")
+                for case in listing["tests"]:
+                    labels = next(item["value"] for item in case["properties"]
+                                  if item["name"] == "LABELS")
+                    self.assertEqual(set(labels), {"xgl", "unit"})
+                junit = self.root / (name + "-results.xml")
+                self.execute("ctest", "--test-dir", binary, "--no-tests=error",
+                             "--output-on-failure", "-R", API_CASE_PATTERN,
+                             "--output-junit", junit)
+                cases = ET.parse(junit).getroot().findall(".//testcase")
+                self.assertEqual(len(cases), len(names), "Every discovered API case must run")
+                self.assertEqual({case.attrib["name"] for case in cases}, names)
+                for case in cases:
+                    self.assertIsNone(case.find("failure"))
+                    self.assertIsNone(case.find("error"))
+                    self.assertIsNone(case.find("skipped"))
 
     def header(self, binary):
         return binary / "link/generated/xgl/xgl_build_config.h"
