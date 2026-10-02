@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Opt-in `advanced_runtime` build capability with versioned options, independent message slots, scoped receive/event callbacks and allocation-free resource snapshots, without changing the existing configuration ABI.
+- Resumable parser candidate budgets, rotating transport maintenance submission budgets, absolute reassembly and reliable-scope busy-period limits, with explicit pending and callback ownership contracts.
+- Installed-scope authentication policy shared by TX, RX and zero-copy layout; closed scopes retain downgrade protection.
+- Explicit host-test presets that reject empty test sets, pure C11 installed API consumers, and separately identified legacy/advanced Cortex-M0 probes.
 - Error-returning checked instance reservation and side-effect-free deadline queries for a proposed work budget, preserving the legacy creation and timeout APIs.
 - Public send/configuration consistency regressions and a four-combination API matrix for single-window and fixed-RTO builds.
 - Explicit reliable-index bucket, compiled-window and adaptive-RTO selection, with exported target/header/runtime identity checks and fixed-RTO installed-consumer tests.
@@ -29,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Clear reliable indexes once before bulk release, keeping owned-record and target-isolation behavior while avoiding collision-chain quadratic teardown.
+- Distinguish enabled advanced capability from the API path exercised by a footprint probe; original Boot budgets explicitly reject advanced images without relaxing their limits.
 - Bulk-load prevalidated routes, merge PHY frequencies before conversion, and reduce ACK/SACK and deadline arithmetic while preserving admission and retry semantics. All eight existing Boot budgets now pass without capability or limit changes.
 - Run route contracts in every profile and cover overlapping reloads, high-frequency polling, cross-byte SACKs and acknowledgement overflow boundaries.
 - Apply terminal-scope DATA admission to ordinary and caller-buffer sends and layout queries; enforce the active per-message limit across all public send paths.

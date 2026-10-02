@@ -54,7 +54,7 @@
 | `bugprone-easily-swappable-parameters` | 源码中 `NOLINTBEGIN/END` 包围的单个函数签名 | 时间值、字节数、节点/连接/会话标识及 wire 字段具有相同 C 整数类型。保留现有调用顺序和明确参数名；签名之外不抑制该检查。API 契约、wire 向量、ACK/重传、会话隔离与边界测试验证字段语义；变更参数或引入新调用点时重新审阅。 |
 | `bugprone-casting-through-void` | 已归属协议队列的 `XGCT_LIST_ENTRY` 调用行 | 共享容器宏通过字节偏移恢复实际嵌入节点的拥有对象，内部 `void*` 转换不改变对象。调用必须来自对应类型的有效队列遍历；该例外不能用于任意地址、错误成员或已释放对象。队列移除、重传释放和分片清理测试验证生命周期。 |
 | `clang-analyzer-optin.performance.Padding` | `xgl_transport_peer_state_t` | 保留已测量的 profile 布局，64 位主机给出的最佳字段顺序不直接决定 MCU 布局。完整镜像和工作区测量继续约束资源；任何未来字段重排须独立验证所有 profile 的尺寸和布局。其他结构体仍执行 padding 检查。 |
-| `clang-analyzer-core.DivideZero` | `xgl_workspace_prepare` 检查存储对齐的单个取模表达式 | `make_plan` 仅在 `xgm_size_class_measure` 成功后返回；提供者契约保证输出 `_Alignof(xgm_max_align_t)`，恒大于零。分析器未跨编译单元推导这个输出值。静态工作区的有效、未对齐、容量不足和 ABI 拒绝测试继续执行；更换 measure 提供者或契约时删除并重新评估该例外。 |
+| `clang-analyzer-core.DivideZero` | `prepare_storage` 检查存储对齐的单个取模表达式 | `make_plan` 仅在 `xgm_size_class_measure` 成功后返回；提供者契约保证输出 `_Alignof(xgm_max_align_t)`，恒大于零。分析器未跨编译单元推导这个输出值。静态工作区的有效、未对齐、容量不足和 ABI 拒绝测试继续执行；更换 measure 提供者或契约时删除并重新评估该例外。 |
 
 `fragment_free_reassembly_buffer` 是私有清理函数：非空 buffer 必须对应有效的拥有者 manager。其调用来自先验证 manager 的同步维护遍历；实现不再在计数语句中保留一个与后续释放前提不一致的冗余空检查。没有将非法内部调用伪装成公共支持行为，也没有新增空指针分析豁免。
 

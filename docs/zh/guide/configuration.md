@@ -17,10 +17,12 @@
 | `target_id` | 目标节点 |
 | `phy` | 借用的同步 TX、非阻塞 RX 回调 |
 | `max_frame_size` | 此路由允许的完整序列化帧上限 |
-| `read_freq_hz` | 链路轮询频率 |
-| `metric` | 路由选择度量 |
+| `read_freq_hz` | owner 调度时的读取频率提示，不创建定时器或任务 |
+| `metric` | 保留的度量字段，当前不参与路径选择 |
 
 路由容量在初始化时固定。共享同一 PHY 描述符的路由共享 parser/link；不同 PHY 描述符拥有独立 RX 状态。
+
+实际轮询还受 step 调用频率、字节预算及回调时长约束。同一 PHY 使用共享路由中的最高频率提示；协议不能保证调度器未提供的吞吐量。
 
 临时 PHY 读取块通过 CMake 的 `XGL_DATALINK_RX_CHUNK_SIZE` 选择：AUTO 默认 Boot 为 32，其余为 128，也支持显式 16/32/64/128，例如 `-DXGL_DATALINK_RX_CHUNK_SIZE=64`。它限制每次读取的栈缓冲，不改变 MTU 或持久 RX 空间。实际值写入生成的配置头；不得给已安装库的消费方注入冲突宏。吞吐与超时的配合见 [Datalink](../protocol/datalink.md)。
 
@@ -44,6 +46,8 @@
 启用分片时，`features.max_message_size` 必须不超过 wire 消息长度字段的 `UINT32_MAX`，且不能超过 `features.max_reassembly_bytes`；不符合时，配置校验与工作区测量直接拒绝。关闭分片时，此消息长度字段不参与校验、存储预留或初始化限制。
 
 字节预算限制接纳量；workspace 预留固定最大尺寸槽位以避免碎片。因此只调小字节预算不一定减少预留 RAM。参见[资源模型](resource-model.md)。
+
+显式编译 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 后，可通过独立版本化描述符减少完整消息槽、设置绝对期限和接收 scope 回调，见[扩展运行选项](advanced-options.md)。默认 OFF 保留旧配置 ABI；安装消费可要求 `advanced_runtime` 能力。
 
 ## 认证
 

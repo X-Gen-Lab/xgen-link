@@ -1,8 +1,20 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-02。当前阶段为默认 Boot 资源预算收敛。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，资源决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
+更新日期：2026-10-02。当前阶段为可选有界运行、scope 与交付完善。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，资源决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
 
-## 当前：默认 Boot 资源预算收敛
+## 当前：可选有界运行、scope 与交付完善
+
+按 [ADR 0013](design/adr/0013-optional-bounded-runtime.md) 完成实施。新增版本化 options、独立消息槽、带 scope 的接收与事件回调、当前资源快照、绝对期限及有界 step；显式安装安全 scope 的策略覆盖双向数据、控制帧和发送布局。`XGL_ENABLE_ADVANCED_RUNTIME` 在所有 profile 默认 OFF，保留 wire v3、现有 `xgl_config_t` ABI 和默认 Boot 布局。使用说明见[扩展选项](docs/zh/guide/advanced-options.md)及[有界运行](docs/zh/guide/bounded-runtime.md)。
+
+Parser 在原 cache 中保存恢复游标与未处理输入，预算暂停不刷新候选期限、不消耗尚未发生的 PHY 轮询。Transport 按实际维护提交计数并轮换 peer，终止清理不残留 pending；迟到 ACK 或最终片段不能绕过绝对到期。可靠全量清理改为一次清桶再线性释放，默认镜像同步获益。受限主机测试预设拒绝空测试，安装后的纯 C11 消费者覆盖新旧入口与能力关闭行为。
+
+生产输入最终冻结为 `2e14f47`。Windows GNU Full/Boot/Lite/Embedded 的 OFF/ON 八组全部通过，Full 与 Embedded 各 **820/861**、Boot **222/244**、Lite **317/351**；MSVC Full ON **861/861**。详细 TDD、Linux 质量结果、构建输入身份及曾失败的阶段均见[本轮验证](design/validation/system-refinement.md)。CI 已增加 ON/OFF 矩阵；本轮只报告本地执行，未推送或进行远端 CI、板级验收。
+
+Linux Full ON **861/861**、ASan/UBSan **860/860**；生产行/函数/分支覆盖率为 **93.908%/100%/83.961%**。Clang-Tidy 和 Cppcheck 各检查 43 个生产单元通过，历史测试名称与可回放种子保留。MSVC 旧目录的增量依赖异常经 UTF-8 环境重新配置及真实头文件重编译实验验证修复，失败阶段没有删除。
+
+默认普通/LTO Flash 为 **16,060/12,752 B**，small 为 **15,828/12,580 B**，八组原预算全部通过。默认 MTU128 workspace **1,072 B**，含 1 KiB 栈预留 RAM **2,160 B**；MTU64 为 **880/1,968 B**。扩展 Boot MTU128/LTO 的真实新 API 探针为 **14,424 B Flash / 1,128 B workspace / 2,224 B RAM 含预留栈**，独立记录。工作次数预算不等于 WCET，预留栈不等于板上峰值；8 KiB Flash 目标仍未达到。
+
+## 历史：默认 Boot 资源预算收敛
 
 `bf40b81` 保留当前基线的 12,964 B / 12,800 B 资源 RED；`7c7887a` 完成等价优化。路由整表校验后批量复制并重建索引，同 PHY 仅换算一次最大频率；ACK/SACK 使用受保护的差值校验，SACK 按字节定位最高置位；两种重传计时统一归并 deadline。没有修改默认能力、wire v3、公开 ABI、基础依赖、探针或预算。
 

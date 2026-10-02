@@ -39,6 +39,10 @@ Application → API → Transport → Network → Datalink → synchronous PHY�
 
 Boot 默认每次 PHY 读取最多 32 字节，其余 profile 为 128；可用 CMake `XGL_DATALINK_RX_CHUNK_SIZE` 显式选择 16/32/64/128。工作预算是上限，应用应持续驱动 step 直到完成交付。最新接收契约和 Cortex-M0 资源见 [Datalink 优化](docs/zh/reference/datalink-optimization.md)。
 
+可选 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 提供版本化 options、独立消息槽、scope 接收与事件回调、资源快照、绝对期限和有界执行入口。所有 profile 默认 OFF；安装消费可要求 `COMPONENTS advanced_runtime`。参见[扩展运行选项](docs/zh/guide/advanced-options.md)与[有界接收与运行](docs/zh/guide/bounded-runtime.md)。工作次数预算不等于 CPU 周期上限；默认 Boot 与扩展调用图分别量测。
+
+Optional advanced runtime supports versioned options, independent message slots, scoped observation, resource snapshots and bounded stepping. It defaults to OFF for all profiles; see [advanced options](docs/en/guide/advanced-options.md) and [bounded runtime](docs/en/guide/bounded-runtime.md).
+
 ## Validation / 验证
 
 先显式安装 [tools/quality.json](tools/quality.json) 固定提交的 xgen-quality 包、其要求的原生分析器，以及 `docs/requirements.txt` 中的文档依赖。下面使用原生 GNU 和已安装的基础包；源码开发从 [dev 入口](dev/README.md) 配置，并使用对应的 `build/dev-ci` 目录。

@@ -17,10 +17,12 @@ Set a nonzero `source_id` other than `XGL_BROADCAST_ID`. Routes determine reacha
 | `target_id` | Destination node |
 | `phy` | Borrowed synchronous TX and nonblocking RX callbacks |
 | `max_frame_size` | Complete serialized frame limit for this route |
-| `read_freq_hz` | Link polling frequency |
-| `metric` | Route selection metric |
+| `read_freq_hz` | Owner-driven read frequency hint; creates no timer or task |
+| `metric` | Reserved metric; not currently used for path selection |
 
 Routes have fixed capacity established at initialization. Routes sharing the same PHY descriptor share a parser/link; distinct PHY descriptors have independent RX state.
+
+Actual polling also depends on step frequency, byte limits and callback duration. A shared PHY uses the highest frequency hint among its routes; the protocol cannot guarantee throughput that the scheduler does not provide.
 
 Select the temporary PHY read chunk through CMake `XGL_DATALINK_RX_CHUNK_SIZE`: AUTO defaults to 32 for Boot and 128 elsewhere, with explicit 16/32/64/128 also supported, for example `-DXGL_DATALINK_RX_CHUNK_SIZE=64`. It bounds the per-read stack buffer without changing MTU or persistent RX storage. The generated header records the actual value; consumers of an installed library cannot inject a conflicting macro. See [Datalink](../protocol/datalink.md) for throughput and timeout considerations.
 
@@ -44,6 +46,8 @@ Enabled capacities are explicit; zero does not mean unlimited. Peer and TX packe
 With fragmentation enabled, `features.max_message_size` must fit the wire message-length field's `UINT32_MAX` and must not exceed `features.max_reassembly_bytes`; configuration validation and workspace measurement reject violations directly. With fragmentation disabled, this message-length field does not affect validation, storage reservations, or initialization limits.
 
 Byte budgets restrict admission; the workspace reserves fixed maximum-size slots to avoid fragmentation. Lowering a byte budget alone does not necessarily reduce reserved RAM. See [Resource Model](resource-model.md).
+
+With explicit `XGL_ENABLE_ADVANCED_RUNTIME=ON`, a separate versioned descriptor can reduce whole-message slots and configure absolute deadlines and scoped receive callbacks; see [advanced runtime options](advanced-options.md). Default OFF retains the existing configuration ABI. Installed consumers can require the `advanced_runtime` capability.
 
 ## Authentication
 

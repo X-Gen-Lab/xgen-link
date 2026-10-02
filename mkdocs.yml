@@ -88,6 +88,8 @@ nav:
           - Send API: zh/guide/send-api.md
           - Zero-Copy: zh/guide/zero-copy.md
           - 低功耗运行时: zh/guide/low-power-runtime.md
+          - 扩展运行选项: zh/guide/advanced-options.md
+          - 有界接收与运行: zh/guide/bounded-runtime.md
           - 移植: zh/guide/porting.md
           - 线程安全: zh/guide/thread-safety.md
           - 诊断与调试: zh/guide/troubleshooting.md
@@ -140,6 +142,8 @@ nav:
           - Send API: en/guide/send-api.md
           - Zero-Copy: en/guide/zero-copy.md
           - Low-Power Runtime: en/guide/low-power-runtime.md
+          - Advanced Runtime Options: en/guide/advanced-options.md
+          - Bounded Receive and Runtime: en/guide/bounded-runtime.md
           - Porting: en/guide/porting.md
           - Thread Safety: en/guide/thread-safety.md
           - Troubleshooting: en/guide/troubleshooting.md
