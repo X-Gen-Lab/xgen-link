@@ -70,6 +70,12 @@ class FootprintReport(unittest.TestCase):
         self.assertNotEqual(self.run_report(
             "probe.c:1:1:main\t8\tstatic\nprobe.c:2:1:worker\tunknown\tstatic\n"), 0)
 
+    def test_partial_stack_evidence_does_not_publish_a_numeric_maximum(self):
+        self.run_report(
+            "probe.c:1:1:main\t8\tstatic\nprobe.c:2:1:worker\t16\tdynamic\n")
+        result = json.loads(self.output.read_text(encoding="utf-8"))
+        self.assertIsNone(result["largest_linked_function_stack_bytes"])
+
     def test_static_and_bounded_dynamic_stack_have_a_finite_report(self):
         self.assertEqual(self.run_report(
             "probe.c:1:1:main\t0\tstatic\nprobe.c:2:1:worker\t24\tdynamic,bounded\n"), 0)
