@@ -11,8 +11,21 @@
     "include/xgl/xgl_error.h",
     "include/xgl/xgl_types.h"
   ],
-  "production_directories": ["src"],
+  "production_directories": [
+    "src"
+  ],
   "scope": {
-    "directories": ["include", "src", "test", "examples", "tools", "cmake", "dev", "docs", ".github"]
+    "directories": [
+      "include",
+      "src",
+      "test",
+      "examples",
+      "tools",
+      "cmake",
+      "dev",
+      "docs",
+      ".github",
+      "xgen"
+    ]
   }
 }
