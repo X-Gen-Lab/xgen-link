@@ -310,6 +310,10 @@ class TransportResourceConfig(unittest.TestCase):
             "XglTransportFixedRtoTest.AcknowledgmentDoesNotReplaceConfiguredDefault",
             "XglTransportFixedRtoTest.RequestOverrideRemainsEffectiveAfterFeedback",
             "XglTransportFixedRtoTest.SuccessfulRetryRetainsExponentialBackoff"})
+        for case in listing["tests"]:
+            properties = {item["name"]: item["value"] for item in case["properties"]}
+            self.assertEqual(set(properties.get("LABELS", [])),
+                             {"xgl", "unit", "transport", "fixed-rto"})
         self.execute("ctest", "--test-dir", build, "--no-tests=error", "--output-on-failure",
                      "--output-junit", self.root / "fixed-rto-green.xml")
         rejected = self.execute(*command, "-B", self.root / "sdk-conflict",
