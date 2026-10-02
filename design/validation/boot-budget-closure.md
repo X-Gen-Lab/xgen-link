@@ -42,7 +42,23 @@
 
 八组报告、ELF 和 map 保存在 `out/boot-budget/{default,small}-{128,64}-{off,on}/`，汇总为 `arm-summary.json`。普通 Flash 上限仍为 16,384 B，LTO 仍为 12,800 B；默认 LTO 余量为 20 B。依赖、consumer 探针、优化参数及预算均未调整。
 
-最终逻辑的 Windows GNU Full/Embedded 各 817/817、Boot 222/222、Lite 314/314 通过；包括安装消费和能力支持的示例。对应日志及 JUnit 为 `out/boot-budget/{full,embedded,boot,embedded-lite}-{build.log,test.log,results.xml}`。后续跨编译器与静态质量证据另行记录。
+最终逻辑提交为 `7c7887a`。Windows GNU Full/Embedded 各 817/817、Boot 222/222、Lite 314/314 通过；包括安装消费和能力支持的示例。对应日志及 JUnit 为 `out/boot-budget/{full,embedded,boot,embedded-lite}-{build.log,test.log,results.xml}`。
+
+## 最终质量与来源
+
+| 检查 | 实际结果 | 本轮证据（相对 `out/boot-budget/`） |
+| --- | --- | --- |
+| MSVC Full | 817/817，保留 510 个历史名称，无跳过/重复 | `msvc-summary.json`、`msvc-results.xml` |
+| Full 固定 RTO 协议 | 814/814，无失败/跳过/重复 | `fixed-rto/summary.json` |
+| Linux GNU 11.4 Full | 817/817，原有 808 项全部保留，新增九项 | `linux/evidence/full-test/` |
+| Linux ASan/UBSan | 816/816，泄漏检查开启，原有 807 项全部保留 | `linux/evidence/asan-test/` |
+| 生产覆盖率 | 行 4140/4414（93.792%）、函数 310/310（100%）、分支 2751/3272（84.077%） | `linux/evidence/full-coverage/` |
+| 静态分析 | Cppcheck 2.21.0、Clang-Tidy 19.1.0 各 43 个生产翻译单元通过 | `quality-cppcheck.json`、`linux/evidence/tidy/` |
+| 格式与文档 | 固定 formatter、文本、严格 Doxygen、双语 MkDocs 全部通过 | `format.log`、`text.log`、`docs.log`、`mkdocs.log` |
+
+Sanitizer 配置仅不注册安装消费者 smoke，该消费者由普通 Full 实际执行；没有跳过协议测试。性质测试种子为 `5785420`。独立只读复审确认差值检查、倒序位图扫描、deadline 循环层级、路由重叠与 PHY 频率归约保持原有行为，未新增诊断抑制。
+
+Linux 汇总为 `linux/verification-summary.json`，编译输入清单 SHA-256 为 `d37f7fd73c1a3fb35323bb11052d849001a62fcba3b223d00000efdc045a95bd`，构建前后及门禁后完全一致。执行期间将同一冻结工作区提交为 `7c7887a`，报告分别保留开始时的 `bf40b81` 加工作区修改和结束时的提交身份，不将 Git 提交变化当成源码变化，也不把本地验证标为远端 CI。
 
 ## 验证边界
 

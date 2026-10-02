@@ -29,7 +29,9 @@
 
 ## Build coverage
 
-The latest API stage passed 808 checks each for local GNU Full/Embedded and MSVC Full, 188 for Boot, and 279 for Lite. Full protocol sets contain 801/805 cases with adaptive/fixed RTO; four resource configurations execute 196 selected API cases, and seven build/install contracts pass. All 510 historical names remain. See repository-root `design/validation/api-refinement.md` for environments, source identities and quality evidence; the capacity-one API selection does not qualify all private transport tests.
+The latest Boot budget closure passed 817 checks each for GNU Full/Embedded and MSVC Full, 222 for Boot, 314 for Lite, and 814 Full fixed-RTO protocol cases. Thirty route cases now run in every profile, with added owned-array reload, overlap, high-frequency polling and ACK/SACK boundaries. Exact source identities and quality results are in repository-root `design/validation/boot-budget-closure.md`.
+
+The preceding API stage passed 808 checks each for local GNU Full/Embedded and MSVC Full, 188 for Boot, and 279 for Lite. Full protocol sets contain 801/805 cases with adaptive/fixed RTO; four resource configurations execute 196 selected API cases, and seven build/install contracts pass. All 510 historical names remain. See repository-root `design/validation/api-refinement.md` for environments, source identities and quality evidence; the capacity-one API selection does not qualify all private transport tests.
 
 The local Full matrix includes protocol regressions and four host examples. Boot, Embedded Lite, and Embedded build separately as C11 without protocol libc fallback and check static-workspace and installed-package consumers. Explicitly enabled GoogleTest runs capability-selected Boot/Lite tests and complete historical Embedded regression. Independent foundation packages own their behavior, minimal-consumption, installation, and quality matrices; the protocol validates their joint integration. Source core tests are a migration baseline and do not qualify the new providers.
 
@@ -45,7 +47,7 @@ Production dependency contracts now contain 11 cases, classification has an inde
 
 ## Resource and product limits
 
-The latest API stage uses 16,348/12,964 B Flash without/with LTO for the default configuration, and 16,116/12,788 B for small (window one, one bucket, fixed RTO). Small MTU128/64 workspaces use 1,040/848 B; RAM with a 1 KiB stack reservation uses 2,128/1,936 B. All four small and both default non-LTO budgets pass; default LTO retains the preceding 164 B excess without relaxed limits. Older figures below retain their historical scope and do not replace current reports.
+Current Flash without/with LTO is **16,100/12,780 B** for the default configuration and **15,868/12,612 B** for small (window one, one bucket, fixed RTO). Small MTU128/64 workspaces use 1,040/848 B; RAM with a 1 KiB stack reservation uses 2,128/1,936 B. Default values are 1,072/880 B and 2,160/1,968 B respectively. All eight budgets pass, closing the previous default LTO excess without relaxed limits or increased RAM/function stack. Older figures below retain their historical scope and do not replace current reports.
 
 The Cortex-M0 probe records a real linked ELF, map, target-ABI workspace formula and stack-use files. Its results are reproducible from `tools/boot_footprint/README.md`. Native execution separately checks the layout formula against actual workspace initialization.
 

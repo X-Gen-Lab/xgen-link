@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bulk-load prevalidated routes, merge PHY frequencies before conversion, and reduce ACK/SACK and deadline arithmetic while preserving admission and retry semantics. All eight existing Boot budgets now pass without capability or limit changes.
+- Run route contracts in every profile and cover overlapping reloads, high-frequency polling, cross-byte SACKs and acknowledgement overflow boundaries.
 - Apply terminal-scope DATA admission to ordinary and caller-buffer sends and layout queries; enforce the active per-message limit across all public send paths.
 - Validate optional authentication providers and mandatory local authenticated frame capacity before allocation; retain smaller transit routes and per-frame MTU checks.
 - Ignore inactive fragmentation limits, retain capability-aware historical tests, and validate installed fixed-RTO CTest labels.

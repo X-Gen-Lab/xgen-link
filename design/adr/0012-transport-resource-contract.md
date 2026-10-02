@@ -1,6 +1,6 @@
 # ADR 0012：传输事实、发送预准入与编译资源契约
 
-- 状态：已实施；默认 Boot LTO 的既有 Flash 预算仍未通过
+- 状态：已实施；默认 Boot LTO 预算在后续等价优化中通过
 - 日期：2026-10-02
 - 范围：transport、配置身份、安装消费与资源探针
 - 前置：[ADR 0011](0011-transport-admission-recovery.md)
@@ -37,4 +37,4 @@ wire v3、公开配置结构和发送 API 保持。消息属性混用现在提�
 
 真实 RED/GREEN、双端集成、各 profile、固定 RTO 安装消费、编译身份拒绝、最终 ELF 和调用栈证据见[实施验证](../validation/transport-resource-refinement.md)。默认和 small 的功能选择分别报告，不能直接把不同选择的 Flash 差值称为同功能优化。
 
-默认 LTO Flash 超出既有 12,800 B 门槛；small LTO 仅有 12 B 余量。8 KiB Flash 的更小 Boot 目标仍未达到。1 KiB 预留栈不是完整调用链峰值，真实板卡、驱动回调、ISR、DMA、密码 provider 和断电恢复仍由产品验收。
+本决策首次实施时，默认 LTO Flash 超出既有 12,800 B 门槛，small LTO 仅有 12 B 余量。后续[预算收敛](../validation/boot-budget-closure.md)在默认能力及预算不变的条件下将默认/small LTO 降至 12,780/12,612 B，八组原预算全部通过。8 KiB Flash 的更小 Boot 目标仍未达到。1 KiB 预留栈不是完整调用链峰值，真实板卡、驱动回调、ISR、DMA、密码 provider 和断电恢复仍由产品验收。

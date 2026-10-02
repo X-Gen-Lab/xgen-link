@@ -127,4 +127,4 @@ Transport 优化后的布局格式为 5。MTU128/64 工作区为 1,064/872 B，�
 
 small 独立构建明确追加 `-DXGL_TRANSPORT_WINDOW_CAPACITY=1 -DXGL_RELIABLE_INDEX_BUCKETS=1 -DXGL_ENABLE_ADAPTIVE_RTO=OFF`，资源身份为 1025，使用 `budget-small-mtu128.json`、`budget-small-mtu64.json` 及各自 `-lto` 文件。不要在同一目录切换组合，也不能使用 small 报告满足默认预算。
 
-2026-10-02 默认非 LTO/LTO Flash 为 16,336/12,964 B，后者超原 12,800 B 门槛 164 B；small 为 16,100/12,788 B，LTO 仅余 12 B。默认 MTU128/64 workspace 为 1,072/880 B，small 为 1,040/848 B。完整报告与不含调用者的栈路径见[资源优化验证](../../design/validation/transport-resource-refinement.md)。不同能力组合的差值不能称为同功能优化；1 KiB 栈预留和主机通过仍不代替板级验收。
+2026-10-02 最终等价优化后，默认非 LTO/LTO Flash 为 **16,100/12,780 B**，small 为 **15,868/12,612 B**，八组原预算全部通过；默认 LTO 余量为 20 B。默认 MTU128/64 workspace 为 1,072/880 B，small 为 1,040/848 B，RAM 和单函数栈均未增加。完整 RED/GREEN 与同配置对比见[预算收敛验证](../../design/validation/boot-budget-closure.md)；前期超限及栈路径保留在[资源优化验证](../../design/validation/transport-resource-refinement.md)。不同能力组合的差值不能称为同功能优化；1 KiB 栈预留和主机通过仍不代替板级验收。

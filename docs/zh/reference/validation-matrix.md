@@ -29,7 +29,9 @@
 
 ## 构建覆盖
 
-最新 API 阶段本地 GNU Full/Embedded、MSVC Full 各通过 808 项，Boot 188 项、Lite 279 项；Full 自适应/固定 RTO 的协议集合分别为 801/805 项，四组资源配置执行指定 API 共 196 项，构建/安装契约 7 项。全部历史 510 名保留。各环境、源码身份及质量证据见根目录 `design/validation/api-refinement.md`；容量为 1 的 API 集合不代表全部私有 transport 测试。
+最新 Boot 预算收敛阶段，GNU Full/Embedded、MSVC Full 各 817 项，Boot 222 项、Lite 314 项，Full 固定 RTO 协议 814 项。路由的 30 项常规测试覆盖所有 profile，新增自有数组重载、重叠复制、高频轮询和 ACK/SACK 边界。精确源码和质量结果见根目录 `design/validation/boot-budget-closure.md`。
+
+此前 API 阶段本地 GNU Full/Embedded、MSVC Full 各通过 808 项，Boot 188 项、Lite 279 项；Full 自适应/固定 RTO 的协议集合分别为 801/805 项，四组资源配置执行指定 API 共 196 项，构建/安装契约 7 项。全部历史 510 名保留。各环境、源码身份及质量证据见根目录 `design/validation/api-refinement.md`；容量为 1 的 API 集合不代表全部私有 transport 测试。
 
 本地 Full 矩阵包括协议回归及四个主机示例。Boot、Embedded Lite 和 Embedded 分别以关闭协议 libc fallback 的 C11 构建，执行静态工作区及安装包消费者测试；显式开启 GoogleTest 后，Boot/Lite 按能力测试，Embedded 执行完整历史回归。独立基础包拥有各自的行为、最小消费、安装和质量矩阵；协议负责五包集成。来源 core 的测试只记录为迁移基线，不代替新提供者验收。
 
@@ -45,7 +47,7 @@
 
 ## 资源与产品边界
 
-最新 API 阶段的默认普通/LTO Flash 为 16,348/12,964 B；small（窗口 1、桶 1、固定 RTO）为 16,116/12,788 B。MTU128/64 的 small 工作区为 1,040/848 B，含 1 KiB 预留栈 RAM 为 2,128/1,936 B。四项 small 和两项默认普通预算通过，默认 LTO 保留此前 164 B 超限，门槛未放宽。以下旧阶段数字保留其历史口径，不代替当前报告。
+当前默认普通/LTO Flash 为 **16,100/12,780 B**；small（窗口 1、桶 1、固定 RTO）为 **15,868/12,612 B**。MTU128/64 的 small 工作区为 1,040/848 B，含 1 KiB 预留栈 RAM 为 2,128/1,936 B；默认分别为 1,072/880 B 和 2,160/1,968 B。八项预算全部通过，默认 LTO 的原有超限已消除，门槛未放宽，RAM 与单函数栈不增加。以下旧阶段数字保留其历史口径，不代替当前报告。
 
 Cortex-M0 探针记录真实链接的 ELF、map、目标 ABI 工作区公式及栈使用文件，可按 `tools/boot_footprint/README.md` 复现。原生运行另行比较布局公式并执行真实初始化。
 

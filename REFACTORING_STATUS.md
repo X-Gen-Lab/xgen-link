@@ -1,8 +1,18 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-02。当前阶段为公开 API 契约完善。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，资源决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
+更新日期：2026-10-02。当前阶段为默认 Boot 资源预算收敛。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，资源决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
 
-## 当前：公开 API 契约完善
+## 当前：默认 Boot 资源预算收敛
+
+`bf40b81` 保留当前基线的 12,964 B / 12,800 B 资源 RED；`7c7887a` 完成等价优化。路由整表校验后批量复制并重建索引，同 PHY 仅换算一次最大频率；ACK/SACK 使用受保护的差值校验，SACK 按字节定位最高置位；两种重传计时统一归并 deadline。没有修改默认能力、wire v3、公开 ABI、基础依赖、探针或预算。
+
+默认普通/LTO Flash 为 **16,100/12,780 B**，比本轮前减少 **248/184 B**，默认 LTO 的既有超限已消除；small 为 **15,868/12,612 B**。默认和 small 的 MTU128/64 × 普通/LTO 八组原预算全部通过，工作区、RAM 和最大单函数栈不增加。默认 LTO 余量为 20 B，8 KiB Flash 目标仍未达到。
+
+新增九项等价契约，并将 30 项路由测试纳入所有 profile 常规集合。Windows GNU Full/Embedded、MSVC Full 各 **817/817**，Boot **222/222**、Lite **314/314**，Full 固定 RTO 协议 **814/814**。完整质量、源码身份和最终 ELF 证据见[本轮验证](design/validation/boot-budget-closure.md)；本地通过与远端 CI、板级验收分别记录。
+
+Linux Full **817/817**、ASan/UBSan **816/816**；生产行/函数/分支覆盖率 **93.792%/100%/84.077%**。Cppcheck、Clang-Tidy 各 43 个生产翻译单元及格式、文本、严格双语文档通过。验证全程编译输入摘要一致；本轮未推送或执行板级验收。
+
+## 历史：公开 API 契约完善
 
 普通、零拷贝和布局查询统一拒绝已终止的精确 scope，并一致检查启用分片后的消息上限。纯布局查询失败清空输出，不触发发送统计、PHY、认证 provider 或序列分配。认证 provider 的有效性和全局基本 ACK 容量在创建前验证；较小转发路由保持合法，不因全局认证能力被统一抬高最小 MTU。
 
