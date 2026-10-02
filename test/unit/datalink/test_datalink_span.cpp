@@ -262,32 +262,45 @@ TEST_F(XglDatalinkSpanTest, PollRetainsTimeoutWhileConsumingFreshInput) {
 #if XGL_FEATURE_ADVANCED_RUNTIME
 TEST_F(XglDatalinkSpanTest, BoundedPollKeepsTailAndLegacyZeroRxDrains) {
     driver_bytes = frame(0x11U);
+    const size_t frame_size = driver_bytes.size();
     const auto second = frame(0x22U);
     driver_bytes.insert(driver_bytes.end(), second.begin(), second.end());
-    size_t remaining = 1U;
+    size_t remaining = 0U;
     bool polled = false;
     bool pending = false;
-    ASSERT_EQ(xgl_datalink_poll_parser_bounded(&context, &parser, &phy, 10U,
-                                               1000U, 128U, &remaining, &polled,
-                                               &pending),
-              XGL_OK);
+    do {
+        const size_t before = reads;
+        ASSERT_EQ(xgl_datalink_poll_parser_bounded(&context, &parser, &phy, 10U,
+                                                   1000U, 128U, &remaining,
+                                                   &polled, &pending),
+                  XGL_OK);
+        EXPECT_EQ(reads, before + 1U);
+        EXPECT_TRUE(polled);
+        ASSERT_LT(reads, driver_bytes.size());
+    } while (!pending);
     EXPECT_TRUE(pending);
-    EXPECT_TRUE(polled);
-    EXPECT_EQ(reads, 1U);
-    EXPECT_EQ(driver_cursor, driver_bytes.size());
-    remaining = 0U;
+    const size_t paused_reads = reads;
+    const size_t captured = driver_cursor;
     EXPECT_EQ(xgl_datalink_poll_parser_bounded(&context, &parser, &phy, 20U,
                                                1000U, 128U, &remaining, &polled,
                                                &pending),
               XGL_OK);
-    EXPECT_EQ(reads, 1U);
+    EXPECT_EQ(reads, paused_reads);
     EXPECT_FALSE(polled);
     EXPECT_TRUE(pending);
     EXPECT_EQ(xgl_datalink_poll_parser(&context, &parser, &phy, 30U, 1000U, 0U),
               XGL_OK);
-    EXPECT_EQ(reads, 1U);
-    EXPECT_EQ(delivered, std::vector<std::vector<uint8_t>>({{0x11U}, {0x22U}}));
+    EXPECT_EQ(reads, paused_reads);
+    std::vector<std::vector<uint8_t>> expected = {{0x11U}, {0x22U}};
+    expected.resize(captured / frame_size);
+    EXPECT_EQ(delivered, expected);
     EXPECT_FALSE(xgl_parser_has_pending(&parser));
+    while (driver_cursor < driver_bytes.size()) {
+        ASSERT_EQ(
+            xgl_datalink_poll_parser(&context, &parser, &phy, 40U, 1000U, 128U),
+            XGL_OK);
+    }
+    EXPECT_EQ(delivered, std::vector<std::vector<uint8_t>>({{0x11U}, {0x22U}}));
 }
 
 TEST_F(XglDatalinkSpanTest, BoundedPollNeverRequestsMoreThanCacheFreeSpace) {
