@@ -77,5 +77,8 @@ if __name__ == "__main__":
     parser.add_argument("--work-dir", type=Path, required=True)
     for package in PACKAGES:
         parser.add_argument(f"--{package}-source", type=Path, required=True)
-    ARGS = parser.parse_args()
-    unittest.main(argv=[__file__])
+    ARGS, remaining = parser.parse_known_args()
+    for name, value in vars(ARGS).items():
+        if isinstance(value, Path):
+            setattr(ARGS, name, value.resolve())
+    unittest.main(argv=[__file__, *remaining])

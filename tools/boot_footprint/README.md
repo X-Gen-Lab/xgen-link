@@ -1,5 +1,24 @@
 # Cortex-M0 Boot 资源测量
 
+## 可选扩展 API 探针
+
+默认 `XGL_FOOTPRINT_ADVANCED_API=OFF` 保留原有静态创建、发送、步进和超时查询调用路径。仅设置 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 会改变编译能力及部分私有布局，但链接器仍可能删除未调用的扩展 API，不能将该 ELF 的尺寸当作扩展接口的完整占用。
+
+需要测量扩展 API 时，在独立构建目录同时指定 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON -DXGL_FOOTPRINT_ADVANCED_API=ON`，其余五个依赖路径、工具链、MTU/RX 和 LTO 参数按下文显式提供。该模式改用 `xgl_memory_report_with_options()`、`xgl_init_static_with_options()`、`xgl_step_bounded()` 和 `xgl_resources_get()`，保留可靠发送、超时查询和销毁。options 使用默认值，步进限制为一个候选及一次维护发送；它没有覆盖所有选项组合，也不包含 Boot 裁掉的认证、分片和乱序实现。
+
+报告的 `build_parameters` 记录两个选项，顶层 `advanced_runtime` 和 `advanced_api_probe` 分别标明编译能力和实际探针调用路径。现有八份默认/small 预算明确要求两者均为 `false`，阈值和历史基线不变；扩展探针报告需由产品另定预算，不能套用普通探针通过结论。预算格式允许显式布尔字段，缺失、类型不符或组合不符都会失败。所有结果仍只是交叉编译的最终 ELF，没有完成板上运行、驱动、时序或调用链栈验证。
+
+使用固定 ARM 工具链验证两种调用路径及最终符号：
+
+```sh
+python test/cmake/test_footprint_advanced.py --link-source . --work-dir out/advanced-probe-contracts \
+  --status-source /path/to/xgen-status --bytes-source /path/to/xgen-bytes \
+  --crc-source /path/to/xgen-crc --memory-source /path/to/xgen-memory \
+  --containers-source /path/to/xgen-containers
+```
+
+## 通用测量方法
+
 这个独立消费者将真实的静态初始化、可靠发送、接收轮询、重传计时、超时查询和销毁路径链接成 ELF。它使用通用 64 KiB Flash / 8 KiB RAM 布局，不提供板级时钟、中断、UART、Flash 驱动或看门狗初始化，不能直接当成可烧录的 Bootloader。
 
 需要 CMake、Ninja、Python 3 和 `arm-none-eabi-gcc` 工具链均可在 PATH 中找到。先显式准备 status、bytes、CRC、memory、containers 五个独立源码仓库；此诊断工程通过 `dev/Dependencies.cmake` 的 `xgl_dev_provide_components()` 装配目标，再消费正式 link 模块。没有默认 `external` 子模块，也不搜索固定兄弟目录；不能用 Host 安装的静态库替代 ARM 目标库。准备边界见[构建与测试](../../docs/zh/getting-started/build-and-test.md)。从 xgen-link 根目录运行，并将示例路径替换为实际位置：

@@ -11,6 +11,7 @@ endif()
 get_filename_component(XGL_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
 option(XGL_FOOTPRINT_LTO "Optimize protocol and foundation libraries across translation units" OFF)
+option(XGL_FOOTPRINT_ADVANCED_API "Measure explicitly exercised advanced runtime APIs" OFF)
 if(XGL_FOOTPRINT_LTO)
     include(CheckIPOSupported)
     function(xgl_footprint_check_ipo)
@@ -59,6 +60,9 @@ endforeach()
 include("${XGL_SOURCE_ROOT}/dev/Dependencies.cmake")
 xgl_dev_provide_components()
 add_subdirectory("${XGL_SOURCE_ROOT}" xgen-link)
+if(XGL_FOOTPRINT_ADVANCED_API AND NOT XGL_ENABLE_ADVANCED_RUNTIME)
+    message(FATAL_ERROR "XGL_FOOTPRINT_ADVANCED_API requires XGL_ENABLE_ADVANCED_RUNTIME=ON")
+endif()
 
 # The diagnostic object measures private target types without compiling or
 # linking another copy of the protocol implementation.
@@ -96,6 +100,7 @@ target_include_directories(xgl_boot_probe PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(xgl_boot_probe PRIVATE xgl::xgl)
 target_compile_options(xgl_boot_probe PRIVATE -Wall -Wextra -Werror -Wpedantic)
 target_compile_definitions(xgl_boot_probe PRIVATE
+    XGL_FOOTPRINT_ADVANCED_API=$<BOOL:${XGL_FOOTPRINT_ADVANCED_API}>
     XGL_FOOTPRINT_FRAME_SIZE=${XGL_FOOTPRINT_FRAME_SIZE}U
     XGL_FOOTPRINT_RX_SIZE=${XGL_FOOTPRINT_RX_SIZE}U)
 target_link_options(xgl_boot_probe PRIVATE

@@ -3,6 +3,8 @@
   "compiler_version": "15.2.1",
   "configuration": {
     "profile": "boot",
+    "advanced_runtime": false,
+    "advanced_api_probe": false,
     "frame_bytes": 64,
     "rx_bytes": 64,
     "lto": true,

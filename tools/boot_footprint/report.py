@@ -48,6 +48,7 @@ def cache_values(build):
         if key.startswith(("CMAKE_C_FLAGS", "CMAKE_EXE_LINKER_FLAGS")) or key in (
             "CMAKE_BUILD_TYPE", "CMAKE_TOOLCHAIN_FILE", "XGL_PROFILE",
             "XGL_FOOTPRINT_FRAME_SIZE", "XGL_FOOTPRINT_RX_SIZE", "XGL_FOOTPRINT_LTO",
+            "XGL_ENABLE_ADVANCED_RUNTIME", "XGL_FOOTPRINT_ADVANCED_API",
             "XGL_DATALINK_RX_CHUNK_SIZE",
             "XGL_RELIABLE_INDEX_BUCKETS", "XGL_TRANSPORT_WINDOW_CAPACITY",
             "XGL_ENABLE_ADAPTIVE_RTO", "XGL_ALLOW_FALLBACK_MALLOC",
@@ -55,6 +56,13 @@ def cache_values(build):
                 key.startswith(("XGL_", "xgen_")) and key.endswith("_SOURCE_DIR")):
             result[key] = value
     return result
+
+
+def cache_enabled(configuration, name):
+    """Interpret a CMake BOOL cache entry without confusing nonempty OFF with ON."""
+    value = configuration.get(name, "OFF").upper()
+    return value not in ("", "0", "OFF", "NO", "FALSE", "N", "IGNORE", "NOTFOUND") and (
+        not value.endswith("-NOTFOUND"))
 
 
 def write_json(path, value):
@@ -171,17 +179,23 @@ def report_elf(args):
     reserved_stack = sections.get(".stack", 0)
     layout = json.loads(Path(args.layout).read_text(encoding="utf-8"))
     configuration = cache_values(args.build)
+    advanced_runtime = cache_enabled(configuration, "XGL_ENABLE_ADVANCED_RUNTIME")
+    advanced_api = cache_enabled(configuration, "XGL_FOOTPRINT_ADVANCED_API")
     optimization = json.loads(
         (Path(args.build) / "footprint-optimization.json").read_text(encoding="utf-8"))
     result = {
         "elf": elf,
         "configuration": (f"Cortex-M0, GCC {args.configuration}, boot, no heap, "
                           f"one peer, window 1, MTU {layout['frame_bytes']}, "
-                          f"{'LTO' if optimization['enabled'] else 'no LTO'}"),
+                          f"{'LTO' if optimization['enabled'] else 'no LTO'}, "
+                          f"advanced runtime {'ON' if advanced_runtime else 'OFF'}, "
+                          f"{'advanced' if advanced_api else 'legacy'} API probe"),
         "frame_bytes": layout["frame_bytes"],
         "rx_bytes": layout["rx_bytes"],
         "rx_chunk_bytes": layout["rx_chunk_bytes"],
         "lto": optimization["enabled"],
+        "advanced_runtime": advanced_runtime,
+        "advanced_api_probe": advanced_api,
         "optimization": optimization,
         "compiler": run([args.compiler, "--version"]).splitlines()[0],
         "build_parameters": configuration,
@@ -222,6 +236,13 @@ def report_elf(args):
             "Reserved stack is a linker reservation, not measured stack consumption."
         ),
     }
+    result["qualification"] += (
+        " Advanced API probe exercises options-aware measurement/static initialization, "
+        "bounded step and resource snapshots. Other optional paths and target execution "
+        "are not covered by this linked call graph."
+        if advanced_api else
+        " Legacy API probe only; enabling advanced runtime does not measure all extended APIs."
+    )
     write_json(args.output, result)
     Path(args.output).with_suffix(".txt").write_text(
         size_output + "\n" + json.dumps(result, indent=2) + "\n", encoding="utf-8")

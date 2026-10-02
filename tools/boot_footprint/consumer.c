@@ -20,6 +20,11 @@ typedef struct {
     uint32_t transmitted_checksum;
     uint32_t accepted_messages;
     uint32_t next_timeout_ms;
+#if XGL_FOOTPRINT_ADVANCED_API
+    xgl_error_t resources;
+    size_t retained_packets;
+    bool pending;
+#endif
 } footprint_observations_t;
 
 volatile footprint_observations_t xgl_boot_observations;
@@ -87,7 +92,15 @@ static void probe_main(void) {
         .route_table_len = XGL_FOOTPRINT_ROUTES,
         .rx_accept_callback = probe_accept};
     xgl_memory_requirements_t requirements;
+#if XGL_FOOTPRINT_ADVANCED_API
+    static const xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
+    xgl_memory_report_t report = {0};
+    xgl_error_t error =
+        xgl_memory_report_with_options(&config, &options, &report);
+    requirements = report.requirements;
+#else
     xgl_error_t error = xgl_memory_requirements(&config, &requirements);
+#endif
     xgl_boot_observations.initialization = error;
     if (error != XGL_OK) {
         return;
@@ -98,7 +111,12 @@ static void probe_main(void) {
         return;
     }
     xgl_handle_t handle = NULL;
+#if XGL_FOOTPRINT_ADVANCED_API
+    error = xgl_init_static_with_options(&config, &options, workspace,
+                                         sizeof(workspace), &handle);
+#else
     error = xgl_init_static(&config, workspace, sizeof(workspace), &handle);
+#endif
     xgl_boot_observations.initialization = error;
     if (error != XGL_OK) {
         return;
@@ -111,7 +129,18 @@ static void probe_main(void) {
     tx.reliable = true;
     xgl_boot_observations.send = xgl_send_at(handle, &tx, 0U);
     const xgl_work_budget_t budget = {XGL_FOOTPRINT_FRAME_SIZE, 0U};
+#if XGL_FOOTPRINT_ADVANCED_API
+    const xgl_execution_limits_t limits = {1U, 1U};
+    xgl_execution_result_t result = {0};
+    xgl_boot_observations.step =
+        xgl_step_bounded(handle, 2000U, &budget, &limits, &result);
+    xgl_boot_observations.pending = result.pending;
+    xgl_resource_snapshot_t snapshot = {0};
+    xgl_boot_observations.resources = xgl_resources_get(handle, &snapshot);
+    xgl_boot_observations.retained_packets = snapshot.tx_packets;
+#else
     xgl_boot_observations.step = xgl_step(handle, 2000U, &budget);
+#endif
     uint32_t delay = 0U;
     if (xgl_next_timeout(handle, 2000U, &delay)) {
         xgl_boot_observations.next_timeout_ms = delay;
