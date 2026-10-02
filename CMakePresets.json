@@ -144,6 +144,33 @@
         "XGL_ALLOW_FALLBACK_MALLOC": "OFF",
         "XGM_BUILD_LIBC_ALLOCATOR": "OFF"
       }
+    },
+    {
+      "name": "boot-host-test",
+      "displayName": "boot host regression",
+      "description": "Native GoogleTest regression; requires a matching host compiler and GoogleTest installation",
+      "inherits": "boot",
+      "cacheVariables": {
+        "XGL_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "embedded-lite-host-test",
+      "displayName": "embedded-lite host regression",
+      "description": "Native GoogleTest regression; requires a matching host compiler and GoogleTest installation",
+      "inherits": "embedded-lite",
+      "cacheVariables": {
+        "XGL_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "embedded-host-test",
+      "displayName": "embedded host regression",
+      "description": "Native GoogleTest regression; requires a matching host compiler and GoogleTest installation",
+      "inherits": "embedded",
+      "cacheVariables": {
+        "XGL_BUILD_TESTS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -200,6 +227,18 @@
     {
       "name": "embedded",
       "configurePreset": "embedded"
+    },
+    {
+      "name": "boot-host-test",
+      "configurePreset": "boot-host-test"
+    },
+    {
+      "name": "embedded-lite-host-test",
+      "configurePreset": "embedded-lite-host-test"
+    },
+    {
+      "name": "embedded-host-test",
+      "configurePreset": "embedded-host-test"
     }
   ],
   "testPresets": [
@@ -210,6 +249,9 @@
       "description": "Run all tests",
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
       }
     },
     {
@@ -219,6 +261,9 @@
       "description": "Run all tests from the GCC test build",
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
       }
     },
     {
@@ -228,6 +273,9 @@
       "description": "Run tests with AddressSanitizer",
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
       }
     },
     {
@@ -235,19 +283,74 @@
       "configurePreset": "boot",
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
       }
     },
     {
       "name": "embedded-lite",
       "configurePreset": "embedded-lite",
-      "output": {"outputOnFailure": true},
-      "execution": {"noTestsAction": "error"}
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
     },
     {
       "name": "embedded",
       "configurePreset": "embedded",
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "boot-host-test",
+      "configurePreset": "boot-host-test",
+      "filter": {
+        "include": {
+          "label": "^xgl$"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "embedded-lite-host-test",
+      "configurePreset": "embedded-lite-host-test",
+      "filter": {
+        "include": {
+          "label": "^xgl$"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "embedded-host-test",
+      "configurePreset": "embedded-host-test",
+      "filter": {
+        "include": {
+          "label": "^xgl$"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
       }
     }
   ]
