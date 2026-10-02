@@ -84,6 +84,32 @@ xgl_error_t xgl_security_init(xgl_security_ctx_t* ctx, uint16_t local_id,
                               bool auth_required,
                               const xgl_auth_provider_t* provider);
 
+/**
+ * \brief           Query authentication policy without changing trusted state
+ * \param[in]       ctx: Security context, or NULL for no authentication policy
+ * \param[in]       remote_id: Remote endpoint identifier
+ * \param[in]       connection_id: Connection identity
+ * \param[in]       session_epoch: Exact trusted epoch
+ * \return          True for global protection or an explicitly protected scope
+ * \note            Closed associations retain protection against plaintext.
+ */
+#if XGL_FEATURE_ADVANCED_RUNTIME
+bool xgl_security_scope_requires_auth(const xgl_security_ctx_t* ctx,
+                                      uint16_t remote_id,
+                                      uint32_t connection_id,
+                                      uint32_t session_epoch);
+#else
+static inline bool
+xgl_security_scope_requires_auth(const xgl_security_ctx_t* ctx,
+                                 uint16_t remote_id, uint32_t connection_id,
+                                 uint32_t session_epoch) {
+    (void)remote_id;
+    (void)connection_id;
+    (void)session_epoch;
+    return ctx != NULL && ctx->auth_required;
+}
+#endif
+
 /** \brief           Check an installed TX scope without consuming a sequence.
  */
 xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,

@@ -122,26 +122,48 @@ bool xgl_replay_window_accept(xgl_replay_window_t* window, uint16_t source_id,
 /**
  * \brief           Find an explicitly installed association, including
  * tombstones
- * \param[in,out]   ctx: Security context
+ * \param[in]       ctx: Security context
  * \param[in]       remote_id: Remote endpoint
  * \param[in]       connection_id: Connection identity
  * \param[in]       epoch: Trusted epoch
- * \return          Matching slot or NULL
+ * \return          Matching index or XGL_SECURITY_SESSION_CAPACITY
  */
+static size_t security_find_index(const xgl_security_ctx_t* ctx,
+                                  uint16_t remote_id, uint32_t connection_id,
+                                  uint32_t epoch) {
+    for (size_t i = 0; i < XGL_SECURITY_SESSION_CAPACITY; ++i) {
+        const xgl_security_session_t* session = &ctx->sessions[i];
+        if (session->used && session->config.remote_id == remote_id &&
+            session->config.connection_id == connection_id &&
+            session->config.session_epoch == epoch) {
+            return i;
+        }
+    }
+    return XGL_SECURITY_SESSION_CAPACITY;
+}
+
+/** \brief           Find mutable state for an exact installed association. */
 static xgl_security_session_t* security_find(xgl_security_ctx_t* ctx,
                                              uint16_t remote_id,
                                              uint32_t connection_id,
                                              uint32_t epoch) {
-    for (size_t i = 0; i < XGL_SECURITY_SESSION_CAPACITY; ++i) {
-        xgl_security_session_t* session = &ctx->sessions[i];
-        if (session->used && session->config.remote_id == remote_id &&
-            session->config.connection_id == connection_id &&
-            session->config.session_epoch == epoch) {
-            return session;
-        }
-    }
-    return NULL;
+    const size_t index =
+        security_find_index(ctx, remote_id, connection_id, epoch);
+    return index < XGL_SECURITY_SESSION_CAPACITY ? &ctx->sessions[index] : NULL;
 }
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+bool xgl_security_scope_requires_auth(const xgl_security_ctx_t* ctx,
+                                      uint16_t remote_id,
+                                      uint32_t connection_id,
+                                      uint32_t session_epoch) {
+    return ctx != NULL &&
+           (ctx->auth_required ||
+            (ctx->protect_installed_scopes &&
+             security_find_index(ctx, remote_id, connection_id, session_epoch) <
+                 XGL_SECURITY_SESSION_CAPACITY));
+}
+#endif
 
 xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,
                                         uint16_t remote_id,
@@ -447,7 +469,11 @@ xgl_error_t xgl_security_verify_frame(xgl_security_ctx_t* ctx,
         return XGL_ERR_BUSY;
     }
     if (!view->authenticated) {
-        return ctx->auth_required ? XGL_ERR_INVALID_FRAME : XGL_OK;
+        return xgl_security_scope_requires_auth(ctx, view->header.source_id,
+                                                view->header.connection_id,
+                                                view->session_epoch)
+                   ? XGL_ERR_INVALID_FRAME
+                   : XGL_OK;
     }
     if (view->header.target_id != ctx->local_id) {
         return XGL_ERR_INVALID_FRAME;

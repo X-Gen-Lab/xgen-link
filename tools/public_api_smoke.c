@@ -1,6 +1,6 @@
 /**
  * \file            public_api_smoke.c
- * \brief           Installed C11 creation errors and work-budget deadlines
+ * \brief           Installed C11 creation, deadlines and optional runtime APIs
  * \author          X-Gen Lab
  */
 
@@ -62,6 +62,72 @@ static xgl_error_t smoke_receive(uint8_t* data, size_t* length, void* context) {
     ++state->reads;
     *length = 0U;
     return XGL_OK;
+}
+
+/** \brief           Check optional APIs through the installed capability ID. */
+static int smoke_optional_runtime(const xgl_config_t* config,
+                                  smoke_state_t* state) {
+    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
+    xgl_handle_t handle = NULL;
+    options.build_config_id ^= 1U;
+    if (xgl_create_with_options(config, &options, &handle) !=
+            XGL_ERR_INVALID_VERSION ||
+        handle != NULL || state->allocations != 2U) {
+        return 12;
+    }
+    options.build_config_id ^= 1U;
+    xgl_memory_report_t report = {0};
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (xgl_memory_report_with_options(config, &options, &report) != XGL_OK ||
+        report.requirements.size == 0U ||
+        report.requirements.size > sizeof(state->storage)) {
+        return 13;
+    }
+    if (xgl_create_with_options(config, &options, &handle) != XGL_OK ||
+        handle == NULL || state->allocations != 3U ||
+        xgl_init(handle) != XGL_OK) {
+        return 14;
+    }
+    xgl_resource_snapshot_t snapshot = {0};
+    xgl_execution_result_t result = {true};
+    const xgl_execution_limits_t limits = {0U, 0U};
+    const xgl_work_budget_t disabled = {0U, 100U};
+    if (xgl_resources_get(handle, &snapshot) != XGL_OK ||
+        snapshot.peer_count != 0U || snapshot.tx_packets != 0U ||
+        snapshot.reassembly_slots != 0U ||
+        xgl_step_bounded(handle, 20U, &disabled, &limits, &result) != XGL_OK ||
+        result.pending || state->reads != 1U) {
+        return 15;
+    }
+    xgl_destroy(handle);
+    if (state->allocated || state->invalid_release || state->releases != 2U) {
+        return 16;
+    }
+    handle = NULL;
+    if (xgl_init_static_with_options(config, &options, state->storage,
+                                     report.requirements.size,
+                                     &handle) != XGL_OK ||
+        handle == NULL || state->allocations != 3U) {
+        return 17;
+    }
+    const xgl_work_budget_t enabled = {128U, 100U};
+    if (xgl_step_bounded(handle, 30U, &enabled, &limits, &result) != XGL_OK ||
+        result.pending || state->reads != 2U) {
+        return 18;
+    }
+    xgl_destroy(handle);
+    return state->allocated || state->invalid_release || state->releases != 2U
+               ? 19
+               : 0;
+#else
+    return xgl_memory_report_with_options(config, &options, &report) !=
+                       XGL_ERR_UNSUPPORTED ||
+                   xgl_create_with_options(config, &options, &handle) !=
+                       XGL_ERR_UNSUPPORTED ||
+                   handle != NULL || state->allocations != 2U
+               ? 20
+               : 0;
+#endif
 }
 
 /** \brief           Exercise only public installed headers and exported APIs.
@@ -136,8 +202,9 @@ int main(void) {
     }
 
     xgl_destroy(handle);
-    return state.allocated || state.invalid_release ||
-                   state.allocations != 2U || state.releases != 1U
-               ? 11
-               : 0;
+    if (state.allocated || state.invalid_release || state.allocations != 2U ||
+        state.releases != 1U) {
+        return 11;
+    }
+    return smoke_optional_runtime(&config, &state);
 }

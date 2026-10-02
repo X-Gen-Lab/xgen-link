@@ -179,6 +179,14 @@ static xgl_error_t network_build_tx_frame(xgl_network_ctx_t* ctx,
         .priority = packet->priority,
         .ttl = XGL_DEFAULT_TTL};
 
+#if XGL_FEATURE_AUTH && XGL_FEATURE_ADVANCED_RUNTIME
+    if (xgl_security_scope_requires_auth(ctx->security, packet->target_id,
+                                         packet->connection_id,
+                                         packet->session_epoch)) {
+        params.flags |= XGL_WIRE_FLAG_AUTHENTICATED;
+    }
+#endif
+
     err = xgl_frame_build(frame, &params);
     if (err != XGL_OK) {
         network_count_tx_error(ctx);
@@ -435,7 +443,9 @@ xgl_network_zerocopy_layout(xgl_network_ctx_t* ctx,
 #if XGL_FEATURE_AUTH
     xgl_security_ctx_t* security = ctx->security;
     xgl_error_t error = xgl_security_frame_tag_len(
-        security != NULL && security->auth_required,
+        xgl_security_scope_requires_auth(security, data->target_id,
+                                         request->connection_id,
+                                         request->session_epoch),
         security != NULL ? security->provider : NULL, 0U, &tag_len);
     if (error != XGL_OK) {
         return error;
