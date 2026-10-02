@@ -89,16 +89,15 @@ static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Find an exact node, connection and epoch owner
- * \param[in,out]   ctx: Transport context
+ * \param[in]       ctx: Transport context; lookup does not change ownership
  * \param[in]       peer_id: Remote endpoint
  * \param[in]       connection_id: Connection identity, including zero
  * \param[in]       session_epoch: Session epoch, including zero
  * \return          Matching owner, or NULL
  */
-xgl_transport_peer_state_t* transport_find_peer_scope(xgl_transport_ctx_t* ctx,
-                                                      uint16_t peer_id,
-                                                      uint32_t connection_id,
-                                                      uint32_t session_epoch) {
+xgl_transport_peer_state_t*
+transport_find_peer_scope(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
+                          uint32_t connection_id, uint32_t session_epoch) {
     if (ctx == NULL) {
         return NULL;
     }

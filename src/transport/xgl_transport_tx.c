@@ -43,15 +43,9 @@ xgl_error_t transport_check_data_tx_policy(const xgl_transport_ctx_t* ctx,
 #else
     (void)data_len;
 #endif
-    for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
-         peer = peer->next) {
-        if (peer->peer_id == target_id &&
-            peer->connection_id == connection_id &&
-            peer->session_epoch == session_epoch && peer->failed) {
-            return XGL_ERR_ACK_TIMEOUT;
-        }
-    }
-    return XGL_OK;
+    const xgl_transport_peer_state_t* peer =
+        transport_find_peer_scope(ctx, target_id, connection_id, session_epoch);
+    return peer != NULL && peer->failed ? XGL_ERR_ACK_TIMEOUT : XGL_OK;
 }
 
 xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
@@ -220,28 +214,31 @@ xgl_error_t transport_send_packet_view(
 }
 
 /**
- * \brief           Validate a reliable owner before any external submission
+ * \brief           Check scope state and reserve reliable submission ownership
  * \param[in,out]   ctx: Transport context
  * \param[in]       tx_data: Borrowed application request
- * \param[out]      peer: Exact reliable owner, or NULL for unreliable traffic
+ * \param[out]      peer: Exact owner on success; NULL for unreliable traffic
  * \param[out]      created: Whether this request reserved the peer
  * \return          XGL_OK or admission error
  */
 static xgl_error_t transport_prepare_reliable_send(
     xgl_transport_ctx_t* ctx, const xgl_tx_data_t* tx_data,
     xgl_transport_peer_state_t** peer, bool* created) {
-    *peer = NULL;
+    *peer = transport_find_peer_scope(ctx, tx_data->target_id,
+                                      tx_data->connection_id,
+                                      tx_data->session_epoch);
     *created = false;
 
+    if (*peer != NULL && (*peer)->failed) {
+        return XGL_ERR_ACK_TIMEOUT;
+    }
     if (!tx_data->reliable) {
+        *peer = NULL;
         return XGL_OK;
     }
 
     const bool has_capacity =
         transport_tx_packet_count(ctx) < ctx->max_tx_packets;
-    *peer = transport_find_peer_scope(ctx, tx_data->target_id,
-                                      tx_data->connection_id,
-                                      tx_data->session_epoch);
     if (*peer == NULL) {
         if (!has_capacity) {
             return XGL_ERR_WINDOW_FULL;
@@ -255,9 +252,6 @@ static xgl_error_t transport_prepare_reliable_send(
         return XGL_ERR_NO_MEMORY;
     }
 
-    if ((*peer)->failed) {
-        return XGL_ERR_ACK_TIMEOUT;
-    }
 #if XGL_FEATURE_FRAGMENTATION
     if ((*peer)->tx_message.data != NULL) {
         return XGL_ERR_BUSY;
@@ -353,15 +347,6 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                 ctx->callback_user_data);
         }
         return err;
-    }
-
-    if (!tx_data->reliable) {
-        err = transport_check_data_tx_policy(
-            ctx, tx_data->target_id, tx_data->connection_id,
-            tx_data->session_epoch, tx_data->data_len);
-        if (err != XGL_OK) {
-            return err;
-        }
     }
 
     /* Validate the complete frame budget before reserving a scope or HELLO. */

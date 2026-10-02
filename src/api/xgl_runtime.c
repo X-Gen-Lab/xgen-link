@@ -11,11 +11,14 @@
 /**
  * \brief           Query the next relative link or transport deadline
  */
-static bool next_timeout(xgl_handle_t handle, uint32_t now_ms, bool poll_links,
-                         uint32_t parser_timeout_ms, uint32_t* delay_ms) {
+static bool next_timeout(xgl_handle_t handle, uint32_t now_ms,
+                         const xgl_work_budget_t* budget, uint32_t* delay_ms) {
     if (handle == NULL || !handle->initialized || delay_ms == NULL) {
         return false;
     }
+    const bool poll_links = budget == NULL || budget->rx_bytes != 0U;
+    const uint32_t parser_timeout_ms =
+        budget != NULL ? budget->receive_timeout_ms : handle->parser_timeout_ms;
     uint32_t next = 0U;
     bool found = xgl_transport_next_timeout(&handle->layers.transport_ctx,
                                             now_ms, &next);
@@ -55,9 +58,7 @@ static bool next_timeout(xgl_handle_t handle, uint32_t now_ms, bool poll_links,
  */
 bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
                       uint32_t* delay_ms) {
-    return next_timeout(handle, now_ms, true,
-                        handle != NULL ? handle->parser_timeout_ms : 0U,
-                        delay_ms);
+    return next_timeout(handle, now_ms, NULL, delay_ms);
 }
 
 /**
@@ -69,8 +70,7 @@ bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
     if (budget == NULL || budget->receive_timeout_ms >= UINT32_C(0x80000000)) {
         return false;
     }
-    return next_timeout(handle, now_ms, budget->rx_bytes != 0U,
-                        budget->receive_timeout_ms, delay_ms);
+    return next_timeout(handle, now_ms, budget, delay_ms);
 }
 
 /**

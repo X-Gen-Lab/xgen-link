@@ -74,10 +74,9 @@ static inline size_t transport_tx_packet_count(const xgl_transport_ctx_t* ctx) {
     return count;
 }
 
-xgl_transport_peer_state_t* transport_find_peer_scope(xgl_transport_ctx_t* ctx,
-                                                      uint16_t peer_id,
-                                                      uint32_t connection_id,
-                                                      uint32_t session_epoch);
+xgl_transport_peer_state_t*
+transport_find_peer_scope(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
+                          uint32_t connection_id, uint32_t session_epoch);
 xgl_transport_peer_state_t*
 transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
                                    uint32_t connection_id,

@@ -288,7 +288,7 @@ class TransportResourceConfig(unittest.TestCase):
             'if(MSVC)\n  target_compile_options(fixed_rto PRIVATE /permissive-)\n'
             'else()\n  target_compile_options(fixed_rto PRIVATE -pedantic-errors)\nendif()\n'
             'enable_testing()\ninclude(GoogleTest)\n'
-            'gtest_discover_tests(fixed_rto TEST_LIST fixed_rto_cases PROPERTIES LABELS "xgl;unit;transport;fixed-rto")\n',
+            'gtest_discover_tests(fixed_rto TEST_LIST fixed_rto_cases PROPERTIES LABELS "xgl\\\\;unit\\\\;transport\\\\;fixed-rto")\n',
             encoding="utf-8")
         command = ["cmake", "-S", source, "-G", "Ninja",
                    f"-DCMAKE_PREFIX_PATH={prefix.as_posix()}",

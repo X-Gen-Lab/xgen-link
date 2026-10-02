@@ -170,6 +170,23 @@ TEST_F(XglApiContractsTest, ZeroRxQueryKeepsReliableMaintenanceAcrossWrap) {
     EXPECT_EQ(reads, 0U);
 }
 
+TEST_F(XglApiContractsTest, ProposedParserDeadlineSurvivesClockWrap) {
+    Initialize();
+    partial = true;
+    const xgl_work_budget_t active = {1U, 100U};
+    ASSERT_EQ(xgl_step(handle, UINT32_MAX - 4U, &active), XGL_OK);
+    const xgl_work_budget_t proposed = {0U, 10U};
+    uint32_t delay = 0U;
+    ASSERT_TRUE(xgl_next_timeout_for_work(handle, 3U, &proposed, &delay));
+    EXPECT_EQ(delay, 2U);
+    ASSERT_TRUE(xgl_next_timeout_for_work(handle, 5U, &proposed, &delay));
+    EXPECT_EQ(delay, 0U);
+    ASSERT_TRUE(xgl_next_timeout(handle, 5U, &delay));
+    EXPECT_EQ(delay, 90U);
+    EXPECT_EQ(xgl_step(handle, 5U, &proposed), XGL_ERR_TIMEOUT);
+    EXPECT_EQ(reads, 1U);
+}
+
 TEST_F(XglApiContractsTest,
        BudgetQueryRejectsInvalidInputsWithoutOutputWrites) {
     const xgl_work_budget_t budget = {1U, 10U};

@@ -7,7 +7,9 @@
 #include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
+#if XGL_FEATURE_AUTH
 #include "test_security_helpers.h"
+#endif
 #include "transport/xgl_transport.h"
 #include "wire/xgl_frame.h"
 #include "wire/xgl_wire.h"
