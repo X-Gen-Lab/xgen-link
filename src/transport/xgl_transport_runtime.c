@@ -448,9 +448,13 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
 }
 
 #if XGL_FEATURE_ADVANCED_RUNTIME
+/* Current time precedes the per-step submission count. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+/** \brief           Advance maintenance with an explicit submission quota. */
 xgl_error_t xgl_transport_run_bounded(xgl_transport_ctx_t* ctx,
                                       xgl_handle_t handle, uint32_t now_ms,
                                       size_t tx_budget, bool* pending) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
     if (ctx == NULL || pending == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
