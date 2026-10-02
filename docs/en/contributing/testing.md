@@ -44,6 +44,8 @@ Boot/Lite enable capability-selected production tests with `XGL_BUILD_TESTS=ON` 
 
 `test/cmake/test_profile_builds.py` exercises real Boot/Lite regression, package capability rejection, and Debug/Release publication and SDK consumption in one multi-configuration build. `test/cmake/test_footprint_budget.py` verifies rejection of growth, wrong configurations, missing measurements, and heap symbols. Its fixtures validate the checker only; resource conclusions require actual ARM ELF measurements.
 
+`test/cmake/test_footprint_report.py` verifies that report generation rejects missing, malformed or unbounded stack records for linked functions, and that the source digest includes probe and explicit development assembly build files. Incomplete evidence cannot publish a numeric maximum; legitimate zero-stack functions remain valid. This does not establish full call-chain usage, nested ISR usage or the stack cost of assembly/runtime-library functions without records.
+
 ## Property replay
 
 Seed precedence is `--xgl_property_seed=N`, then `XGL_PROPERTY_SEED`, then the fixed default `5785420`. Invalid or out-of-range unsigned values are rejected. Each test derives its own stable stream, so filtering does not change its input. JUnit records both the base seed and test stream. Failures print a replay command:

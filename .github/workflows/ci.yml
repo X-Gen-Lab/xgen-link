@@ -221,6 +221,7 @@ jobs:
           python test/cmake/test_delivery_presets.py --work-dir out/reports/delivery-presets
           python test/cmake/test_footprint_budget.py
           python test/cmake/test_footprint_storage.py
+          python test/cmake/test_footprint_report.py
       - name: Validate real source and package consumers
         run: |
           python test/cmake/dependency_contracts.py \

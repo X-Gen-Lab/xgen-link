@@ -148,8 +148,14 @@ small 独立构建明确追加 `-DXGL_TRANSPORT_WINDOW_CAPACITY=1 -DXGL_RELIABLE
 
 2026-10-02 最终等价优化后，默认非 LTO/LTO Flash 为 **16,100/12,780 B**，small 为 **15,868/12,612 B**，八组原预算全部通过；默认 LTO 余量为 20 B。默认 MTU128/64 workspace 为 1,072/880 B，small 为 1,040/848 B，RAM 和单函数栈均未增加。完整 RED/GREEN 与同配置对比见[预算收敛验证](../../design/validation/boot-budget-closure.md)；前期超限及栈路径保留在[资源优化验证](../../design/validation/transport-resource-refinement.md)。不同能力组合的差值不能称为同功能优化；1 KiB 栈预留和主机通过仍不代替板级验收。
 
-## 当前：可选有界运行与批量清理优化
+## 可选有界运行与批量清理优化
 
 `2e14f47` 冻结后默认普通/LTO 为 **16,060/12,752 B**，small 为 **15,828/12,580 B**；八组原预算通过，workspace 与栈指标保持。默认 LTO 余量为 48 B。
 
 MTU128/LTO 的扩展宏 ON、旧入口探针为 **13,988 B Flash / 1,128 B workspace / 2,216 B RAM 含预留栈**；实际扩展 API 探针为 **14,424 / 1,128 / 2,224 B**。这两个模式分别记录，不用默认预算评价它们，也不代表所有扩展选项组合。完整源码、十份 ELF 和验证边界见[本轮记录](../../design/validation/system-refinement.md)。
+
+## 当前：运行边界与资源证据完善
+
+`bb02a75` 后八组默认 ELF 的已分配文件段与上一轮逐字节一致，原预算全部通过。扩展 Boot MTU128/LTO 的旧入口/真实新 API 探针为 **14,052/14,496 B Flash**，分别增加 64/72 B；workspace **1,128 B**、含 1 KiB 预留栈 RAM **2,216/2,224 B** 及最大单函数栈 **216 B** 均保持。详见[运行边界验证](../../design/validation/runtime-boundaries.md)。
+
+报告生成步骤拒绝缺失、损坏或无有限上界的已链接函数栈记录；错误写入 `stack_evidence_errors`，同时返回失败并将最大栈值设为 `null`，防止部分证据通过后续预算检查。源码摘要覆盖 `dev/` 装配及嵌套 `CMakeLists.txt`；摘要范围变化不等于固件体积变化。该检查仍不覆盖无 `.su` 记录的汇编/运行库函数，也不替代调用链和板级栈测量。

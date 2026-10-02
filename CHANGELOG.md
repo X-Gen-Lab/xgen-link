@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Arbitrate bounded retries and message tails by peer, enforce busy-period expiry before incoming DATA delivery, and preserve admitted out-of-order fragment deadlines across ordering and clock wrap.
+- Reject incomplete or unbounded linked-function stack evidence at report generation, with invalid numeric maxima withheld; include development assembly and nested CMake files in the probe source digest.
 - Clear reliable indexes once before bulk release, keeping owned-record and target-isolation behavior while avoiding collision-chain quadratic teardown.
 - Distinguish enabled advanced capability from the API path exercised by a footprint probe; original Boot budgets explicitly reject advanced images without relaxing their limits.
 - Bulk-load prevalidated routes, merge PHY frequencies before conversion, and reduce ACK/SACK and deadline arithmetic while preserving admission and retry semantics. All eight existing Boot budgets now pass without capability or limit changes.

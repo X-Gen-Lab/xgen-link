@@ -31,6 +31,8 @@ Configuration, options, routes, PHY, provider and callback contexts remain valid
 
 Nonzero intervals must be below `2^31` ms. The TX busy period starts when the first reliable work is admitted and includes the full retained message and final unacknowledged packet. Further sends, BUSY, retries and partial ACKs do not extend it. Expiry clears work owned by that scope and reports a timeout. Continuous producers must allow a sufficient busy-period limit or stop admission at explicit transaction boundaries.
 
+A scope with an expired TX busy period terminates before new DATA delivery; receiving before maintenance cannot extend its lifetime. Reassembly time starts at the first admitted fragment, including a cached and SACKed out-of-order fragment. Filling an earlier packet gap, entering reassembly, duplicates and later fragments do not restart it. Expired reliable fragments fail their scope; unreliable expiry releases only the corresponding message.
+
 Protocol drain does not prove remote motor execution, Flash persistence or business success. Use a request ID and application response where business confirmation is required. Closing a peer is a local lifecycle operation; remote notification, reset and retry policy belong to the application.
 
 A scoped receive callback can return BUSY. A completed message retains its connection/epoch until the owner retries after capacity returns. The application needs a wakeup mechanism; protocol timers cannot detect changing application capacity. All callbacks are synchronous and must not reenter or destroy the instance.
@@ -50,6 +52,8 @@ Snapshots describe active content; `xgl_memory_report_with_options()` describes 
 Profiles with authentication support can set `protect_installed_scopes=true`. It requires a valid provider and a protocol MTU that fits a basic authenticated frame. Install trusted parameters for the exact `(remote_id, connection_id, epoch)` before sending. HELLO, DATA, ACK, SACK, RESET, retries and zero-copy layouts then share this authentication policy.
 
 Closing the scope does not downgrade it to plaintext. Other uninstalled scopes can remain plaintext when global `auth_required=false`; this is neither negotiation nor dynamic trust establishment. Global required mode still protects all local traffic. TX capacity conservatively reserves the tag, so plaintext scopes in mixed mode may also use smaller payloads.
+
+Installation does not revoke previously admitted data; earlier cached plaintext may still be delivered afterward. Use a new epoch/scope and install before receiving when establishing a new trust boundary, and explicitly dispose of old-scope data. See the [security lifecycle](../protocol/security.md).
 
 Closing a security session retains its nonce-domain record; repeated installation and closure cannot reclaim slots indefinitely. The product owns key rotation, epoch and reboot freshness, the real cryptographic provider and its validation. Authentication does not imply payload encryption.
 

@@ -44,6 +44,8 @@ Boot/Lite 通过 `XGL_BUILD_TESTS=ON` 开启按能力选择的生产实现测试
 
 构建契约由 `test/cmake/test_profile_builds.py` 验证：真实 Boot/Lite 回归、安装能力拒绝、同目录 Debug/Release 发布和 SDK 消费。`test/cmake/test_footprint_budget.py` 验证预算工具拒绝增长、错误配置、缺失测量和堆符号；其夹具仅验证检查器，资源结论仍来自实际 ARM ELF。
 
+`test/cmake/test_footprint_report.py` 验证报告生成步骤拒绝缺失、损坏或无有限上界的已链接函数栈记录，并验证源码摘要覆盖探针及显式开发装配的构建文件。记录不完整时不发布数字最大值；合法的零栈函数仍可接受。该检查不能证明完整调用链、ISR 嵌套或没有记录的汇编/运行库函数的栈开销。
+
 ## 性质测试回放
 
 种子优先级为命令行 `--xgl_property_seed=N`、环境变量 `XGL_PROPERTY_SEED`、固定默认值 `5785420`。无效或超出无符号整数范围的输入必须报错。每个测试使用稳定的独立随机流，过滤执行不改变其随机输入。JUnit 记录基础种子与测试流，失败时输出可复制的回放命令：

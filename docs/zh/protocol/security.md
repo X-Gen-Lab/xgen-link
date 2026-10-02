@@ -6,7 +6,9 @@ embedded、full profile 编译认证能力，Boot 和 embedded-lite 不包含认
 
 广播 ID `0xFFFF` 在安装关联及认证序列化、签名之前都会被拒绝。拒绝不占用安全槽、不消耗安全序号，也不调用 provider 或 PHY。策略允许时仍可使用明文广播。
 
-应用显式安装 `(remote_id, connection_id, session_epoch)`，同时给出方向性的 TX/RX 密钥、nonce 前缀、TX 初始序号和 RX 最小序号。收到 HELLO、SESSION 元数据或通过 CRC 都不会安装信任。认证帧的关联未知、已关闭或不匹配时直接拒绝。明文帧由 `auth_required` 控制：该策略为 false 时，关闭关联不会禁止明文流量。
+应用显式安装 `(remote_id, connection_id, session_epoch)`，同时给出方向性的 TX/RX 密钥、nonce 前缀、TX 初始序号和 RX 最小序号。收到 HELLO、SESSION 元数据或通过 CRC 都不会安装信任。认证帧的关联未知、已关闭或不匹配时直接拒绝。全局 `auth_required` 要求所有本地流量认证；扩展选项 `protect_installed_scopes` 要求已安装或已关闭的精确 scope 认证。两者均关闭时，关闭关联不会禁止明文流量。
+
+安装策略作用于后续帧，不撤销或重新认证安装前已经接纳的乱序片段、重组和待交付数据。这些数据仍可能在安装后交付。业务需要切换信任边界时，应使用新的可信 epoch/scope，在接收该 scope 流量之前完成安装，并显式处置旧 scope 的已接纳数据。安装不是清空 transport 队列或重建业务会话的替代操作。
 
 关闭安全会话后保留关闭记录。安装时立即预留各方向的 `(key_id, nonce_prefix)` 域。同一安全上下文中，重新安装相同 scope 或复用已预留的域都会被拒绝；关闭槽不会作为全新的安全槽循环使用。容量由构建限制：embedded 为四个，full 为十六个。库比较 key ID，不比较 provider 的实际密钥。应用必须防止不同 ID 映射到同一实际密钥后复用 prefix。跨进程或 MCU 重启需要新的可信密钥或持久化的新鲜度状态；清空 RAM 后继续使用固定密钥和前缀会复用 nonce。
 

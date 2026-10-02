@@ -20,6 +20,8 @@ The complete-message copy is released once all fragments have entered owned reli
 
 Incomplete reassembly slots, all retained reassembly bytes and pending complete messages are bounded explicitly. After the last fragment, application BUSY keeps the complete message under the peer's ownership; later `xgl_step` calls retry delivery. Application capacity recovery must drive another step. An ACKed incomplete reliable message cannot expire silently: expiry fails its scope before storage is released.
 
+With advanced runtime enabled, the absolute reassembly deadline also covers SACKed out-of-order fragments and starts at the earliest admitted fragment of that message. Entering ordered reassembly does not restart it, and a zero TX quota does not stop expiry cleanup. This message deadline does not independently expire ordinary unfragmented out-of-order packets. See [advanced runtime options](../guide/advanced-options.md).
+
 During maintenance, BUSY and NO_MEMORY preserve the pending complete message and its byte reservation without returning a terminal error. A later hard application error releases the owned message, fails the exact scope and is returned by maintenance; the failure callback occurs once. Already-accepted fragments remain part of that scope's numbering history. Failed ACK submission never rolls this ownership or history back.
 
 Unreliable fragmentation submits fragments synchronously without the reliable whole-message retry contract. A later submission error can leave earlier fragments already transmitted. Applications requiring recovery should use reliable messages or an application-level block protocol.

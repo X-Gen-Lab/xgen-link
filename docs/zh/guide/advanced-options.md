@@ -31,6 +31,8 @@ xgl_error_t error = xgl_memory_report_with_options(&config, &options, &report);
 
 非零期限必须小于 `2^31` ms。TX 忙期在第一份可靠工作接纳时开始，覆盖完整消息副本及最后一个待 ACK 包；后续发送、BUSY、重试和部分 ACK 均不延长。到期会清理该 scope 拥有的工作并报告超时。持续发送的业务应选择足够的忙期上限，或以显式事务边界停止接纳新工作。
 
+TX 忙期到期的 scope 在新 DATA 交付前终止，不能依靠接收阶段先于维护阶段来延长存活。重组期限从第一片实际接纳时开始，包括已缓存并 SACK 的乱序片段；补齐前面的包、转入重组、重复片和后续片均不刷新期限。到期的可靠片段使所属 scope 失败，非可靠片段只释放对应消息。
+
 发送排空是协议确认，不能作为远端电机执行、Flash 落盘或业务事务成功的证明。需要业务确认时应另加请求 ID 和业务响应。关闭 peer 是本地生命周期操作；同步通知、远端复位和重试策略由应用决定。
 
 scoped 接收回调可返回 BUSY；完整重组消息保留原 connection/epoch，容量恢复后由 owner 再调度。应用需要唤醒机制，不能仅依赖协议计时器等待容量改变。所有回调同步执行，禁止重入同一实例或在回调中销毁实例。
@@ -50,6 +52,8 @@ scoped 接收回调可返回 BUSY；完整重组消息保留原 connection/epoch
 有认证能力的 profile 可设 `protect_installed_scopes=true`。它要求合法 provider 和可容纳基本认证帧的协议 MTU。先为 exact `(remote_id, connection_id, epoch)` 安装可信安全会话，再发送数据；该 scope 的 HELLO、DATA、ACK、SACK、RESET、重传及零拷贝布局均采用认证策略。
 
 关闭后的 scope 不回退为明文。其他未安装 scope 在全局 `auth_required=false` 时仍可使用明文；这不是自动协商或动态信任建立。全局 required 继续强制所有本地收发认证。发送容量保守预留 tag，混合模式下明文 scope 也可能使用较小 payload。
+
+安装不撤销之前已经接纳的数据；先前缓存的明文仍可在安装后交付。需要新的信任边界时，使用新 epoch/scope 并先安装后接收，显式处置旧 scope 的数据。详见[安全生命周期](../protocol/security.md)。
 
 关闭安全会话保留 nonce 域记录；不能无限安装并关闭会话来回收槽。产品负责密钥轮换、epoch、重启新鲜性、真实密码实现及其验证。认证不等于 payload 加密。
 

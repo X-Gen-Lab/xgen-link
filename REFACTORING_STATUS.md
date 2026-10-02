@@ -1,8 +1,20 @@
 # 独立组件与协议重构实施记录
 
-更新日期：2026-10-02。当前阶段为可选有界运行、scope 与交付完善。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，资源决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
+更新日期：2026-10-02。当前阶段为运行边界与资源证据完善。各阶段证据分别记录；历史结果不代表当前提交已经重跑。原阶段对应[历史实施计划](REFACTORING_PLAN.md)，依赖决策见 [ADR 0001](design/adr/0001-core-dependency.md)，结构决策见 [ADR 0005](design/adr/0005-protocol-structure.md)，资源决策见 [ADR 0012](design/adr/0012-transport-resource-contract.md)。
 
-## 当前：可选有界运行、scope 与交付完善
+## 当前：运行边界与资源证据完善
+
+在 `40cc70c` 上复审并修复三处传输边界：到期 TX 忙期在新 DATA 交付前终止；有界维护按 peer 分配重传与消息尾部的机会；已 SACK 的乱序首片立即开始重组期限，转入顺序重组与时钟回绕不刷新期限。5 个新增回归均有真实 RED/GREEN，生产修复为 `42592d3`，编译输入冻结于 `bb02a75`。原配置 ABI、wire v3 与默认关闭能力保持。
+
+ELF 报告生成步骤拒绝缺失、损坏或无有限上界的栈记录，部分证据不发布数字最大值；输入摘要补齐开发装配及嵌套构建文件。9 项新工具回归、旧预算 8 项及布局 6 项通过，新增检查接入 CI。API 与安全复审没有新增可复现缺陷；认证安装不撤销已接纳明文的生命周期边界已补齐公开注释与双语文档。
+
+Windows GNU 四 profile × 扩展开关八组全部通过：Full/Embedded 各 **820/866**，Boot **225/248**，Lite **317/356**；MSVC Full ON **866/866**。Boot 本轮额外启用并运行三个示例，协议与辅助计数分开。完整输入摘要、独立 parser 2,500 组扰动审查、API 221 项筛选和最终跨平台结果见[运行边界验证](design/validation/runtime-boundaries.md)。
+
+Linux Full ON **866/866**、ASan/UBSan **865/865**；生产行/函数/分支覆盖率为 **93.877%/100%/83.943%**。Clang-Tidy、Cppcheck 各 43 个生产单元，以及格式、文本、pre-commit、严格 API 与双语文档检查通过。编译输入在最终验证前后保持一致，全部历史用例和性质测试种子保留。
+
+八组默认 ARM ELF 与上一轮相同配置的已分配文件段逐字节一致，原预算全部通过：default 普通/LTO Flash **16,060/12,752 B**，small **15,828/12,580 B**。扩展 Boot MTU128/LTO 的旧入口/真实新 API 探针为 **14,052/14,496 B**，增加 **64/72 B**；workspace **1,128 B** 和含 1 KiB 预留栈 RAM **2,216/2,224 B** 保持。未放宽预算，8 KiB Flash 目标仍未达到，未推送或上板验收。
+
+## 历史：可选有界运行、scope 与交付完善
 
 按 [ADR 0013](design/adr/0013-optional-bounded-runtime.md) 完成实施。新增版本化 options、独立消息槽、带 scope 的接收与事件回调、当前资源快照、绝对期限及有界 step；显式安装安全 scope 的策略覆盖双向数据、控制帧和发送布局。`XGL_ENABLE_ADVANCED_RUNTIME` 在所有 profile 默认 OFF，保留 wire v3、现有 `xgl_config_t` ABI 和默认 Boot 布局。使用说明见[扩展选项](docs/zh/guide/advanced-options.md)及[有界运行](docs/zh/guide/bounded-runtime.md)。
 

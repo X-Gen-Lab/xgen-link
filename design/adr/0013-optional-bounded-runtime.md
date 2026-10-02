@@ -22,6 +22,8 @@
 8. `protect_installed_scopes` 只使用显式安装的安全 scope：同一 exact scope 的 TX、RX 和布局一致要求认证；关闭后保留占用记录并禁止明文降级。未安装 scope 在全局可选模式下仍可用明文；全局 `auth_required` 语义保持。收到 HELLO 或数据不建立信任。
 9. reliable 全量清理一次清空索引桶后释放拥有记录，避免逐条删索引在碰撞情况下形成二次遍历；单包删除和目标隔离保持。
 
+后续边界修复按同一契约实施：有界轮转按 peer 分配重传与消息尾部的机会；到期忙期先于新 DATA 交付终止；重组首时刻包含已 SACK 的乱序缓存，缓存转移和时钟回绕不重启期限。安全安装只影响后续帧，不撤销之前接纳的数据。实证见[运行边界验证](../validation/runtime-boundaries.md)。
+
 ## 边界和验收
 
 关闭扩展时不增加 parser/peer/instance 常驻字段，默认 Boot ELF 继续使用原预算。开启时单独量测，不能用默认探针代替扩展调用图；裸 MCU、DMA、RTOS 唤醒、真实密码 provider 和完整产品 Boot 由产品验收。
