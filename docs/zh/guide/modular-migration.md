@@ -20,15 +20,15 @@ SDK 3 明确移除了通用工具兼容层和隐式平台运行时。消费者�
 
 正式模块作为产品子目录时默认关闭示例、smoke 和发布辅助；dev 装配显式启用开发检查。旧构建缓存可能保存已移除的路径和辅助开关，应使用新的构建目录。
 
-安装入口按包判断预提供集合：所需 targets 全部存在时直接复用并执行相同兼容检查，不因旧安装 metadata 拒绝完整的兼容集合；只提供一部分时仍加载该包，由提供者精确身份检查拒绝跨版本拼接。
+安装入口按包判断预提供集合：所需 targets 全部存在时直接复用并执行相同兼容检查，不因旧安装 metadata 拒绝完整的兼容集合；只提供一部分时仍加载该包，由提供者检查拒绝不兼容的包版本、ABI 或 target 类型。这些检查不比较 Git 提交；源码来源另由产品固定。
 
-同一包的全部 targets 必须使用同一版本，源码与安装入口共用该检查；例如 memory 的 allocator 0.1.0 与 pool 0.1.1 不能混用。不同包可分别选择其兼容范围内的版本。
+同一包的全部 targets 必须使用同一版本，源码与安装入口共用该检查；例如 memory 的 allocator 0.1.0 与 pool 0.1.1 不能混用。完整组合还必须满足各提供者的传递依赖约束。例如当前 xgen-memory 0.1.0 安装包精确要求 xgen-status 0.1.0，link 接受更宽的范围不会放宽该要求。产品固定并验证最终依赖图。
 
 旧 core 聚合包、`XGL_CORE_SOURCE_DIR` 和 `xgc::*` 不再是消费入口。公开 allocator 改为 `<xgen/memory/allocator.h>` 中的 `xgm_allocator_t`；内部容器、字节和 CRC 分别使用 `xgct_`、`xgb_`、`xgcrc_`。不提供旧前缀或 xgl 工具别名。`xgl_error_t` 保留协议错误域，通用状态由 `xgs_status_t` 提供。status strings、CRC8、arena、tracking、ring_buffer 不因协议消费自动引入；协议 PHY 仍为同步契约。
 
 ## 编译 Profile
 
-通过 CMake 选择 `XGL_PROFILE=boot|embedded|full`。生成的 profile 头文件、ABI/build 标识必须与链接库一致。运行时可以关闭编译能力，不能恢复已被所选 profile 裁掉的能力。
+通过 CMake 选择 `XGL_PROFILE=boot|embedded-lite|embedded|full`。生成的 profile 头文件、ABI/build 标识必须与链接库一致。运行时可以关闭编译能力，不能恢复已被所选 profile 裁掉的能力。
 
 Boot 在编译时去掉可选字段和代码。压缩/加密 registry、内部 mutex、全局时钟和旧 layer-vtable 分发都不再作为 SDK 扩展点。
 

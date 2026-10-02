@@ -4,7 +4,7 @@
 
 ## 生命周期与所有权
 
-`xgl_memory_requirements()` 测量精确存储需求。`xgl_init_static()` 初始化对齐的调用者存储。`xgl_create()` 通过 `config.memory.allocator`（`xgm_allocator_t`）预留同一布局，随后需要调用 `xgl_init()`。只有 Full 可以选择可选的 xgen-memory libc 后端。`xgl_destroy()` 释放动态预留的 workspace，或结束对静态存储的使用。
+`xgl_memory_requirements()` 测量精确存储需求。`xgl_init_static()` 初始化对齐的调用者存储。`xgl_create()` 通过 `config.memory.allocator`（`xgm_allocator_t`）预留同一布局，随后需要调用 `xgl_init()`。Libc fallback 默认为 Full 开启、Embedded/Lite 关闭；Embedded/Lite 可在重新构建 SDK 时显式启用，Boot 禁止 fallback。调用者显式提供的 allocator 可以使用静态存储或堆，因此仅关闭协议 fallback 不等于产品整体无堆。`xgl_destroy()` 释放动态预留的 workspace，或结束对静态存储的使用。
 
 需要诊断创建失败时使用 `xgl_create_with_error(&config, &handle)`：返回配置、ABI、后端或分配错误；分配失败为 `XGL_ERR_NO_MEMORY`，失败时清空 handle。成功仍只预留 workspace，需要调用 `xgl_init()`。原 `xgl_create()` 的指针返回形式保持兼容，复用同一实现。跨编译边界可使用对应的 `_checked` 入口显式传入消费者配置大小、ABI 和构建身份。
 

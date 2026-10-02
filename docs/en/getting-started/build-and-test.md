@@ -60,6 +60,17 @@ All three disable protocol libc fallback and default to checking a static lifecy
 
 For source development use the corresponding dev preset, supplying all five source-path environment variables or explicit `-D` arguments, for example `cmake -S dev --preset boot -DXGL_BUILD_TESTS=ON`. Keep profiles in separate directories; do not reuse Full caches or generated headers. The development harness adds the libc allocator target needed by host tests, but the Boot protocol does not link it.
 
+For explicitly requested native GoogleTest regression, use the host-test presets:
+
+```sh
+cmake --preset boot-host-test -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
+cmake --build --preset boot-host-test
+ctest --preset boot-host-test
+```
+
+Use `embedded-lite-host-test` or `embedded-host-test` for the other bounded profiles. These presets enable GoogleTest and select protocol tests by the `xgl` label; the original profile presets remain production/smoke builds. The same names exist under `dev/`, with the five explicit source paths. All test presets reject an empty selection. The shared quality runner in the release commands additionally validates discovery, labels and execution of every selected smoke and example.
+
 ## Compiled resource options
 
 The product selects the following resource combination when compiling the protocol library. The production root and `dev` harness accept the same options. They determine actual object layout and behavior; consumer macros cannot resize an installed library.

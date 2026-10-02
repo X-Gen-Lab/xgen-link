@@ -60,6 +60,17 @@ ctest --preset embedded
 
 源码开发时使用对应 dev 预设，提供五个路径环境变量或显式 `-D` 参数，例如 `cmake -S dev --preset boot -DXGL_BUILD_TESTS=ON`。各 profile 使用独立目录；不复用 Full 的缓存或生成头。开发入口会为主机测试补齐测试使用的 libc allocator target，但 Boot 协议仍不链接它。
 
+需要明确执行原生主机 GoogleTest 回归时，使用 host-test 预设：
+
+```sh
+cmake --preset boot-host-test -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk \
+  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
+cmake --build --preset boot-host-test
+ctest --preset boot-host-test
+```
+
+其余受限 profile 使用 `embedded-lite-host-test` 或 `embedded-host-test`。这些预设开启 GoogleTest，并按 `xgl` 标签选择协议测试；原 profile 预设保留生产/smoke 构建用途。`dev/` 提供同名预设，仍需五个显式源码路径。所有 test 预设拒绝空测试集合。发布命令中的共享质量 runner 还会核对测试发现、标签以及所选 smoke 和示例的实际执行。
+
 ## 编译资源选项
 
 产品在编译协议库时选择以下资源组合，正式根工程和 `dev` 装配接受相同选项。这些选项确定实际对象布局和行为，消费者不能通过自己的宏定义改变已安装库。

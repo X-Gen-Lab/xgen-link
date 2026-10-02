@@ -35,23 +35,31 @@ For source development, provide five paths as described in the repository's `dev
 ## Configuration matrix
 
 ```sh
-cmake --preset boot -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk -DXGL_BUILD_TESTS=ON
-cmake --build --preset boot
-python tools/quality.py test --build-dir build/boot --config MinSizeRel
-cmake --preset embedded-lite -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk -DXGL_BUILD_TESTS=ON
-cmake --build --preset embedded-lite
-python tools/quality.py test --build-dir build/embedded-lite --config MinSizeRel
-cmake --preset embedded -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk -DXGL_BUILD_TESTS=ON
-cmake --build --preset embedded
-python tools/quality.py test --build-dir build/embedded --config MinSizeRel
+cmake --preset boot-host-test -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
+cmake --build --preset boot-host-test
+python tools/quality.py test --build-dir build/boot-host-test --config MinSizeRel
+cmake --preset embedded-lite-host-test -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
+cmake --build --preset embedded-lite-host-test
+python tools/quality.py test --build-dir build/embedded-lite-host-test --config MinSizeRel
+cmake --preset embedded-host-test -DCMAKE_PREFIX_PATH=/path/to/foundation-sdk
+cmake --build --preset embedded-host-test
+python tools/quality.py test --build-dir build/embedded-host-test --config MinSizeRel
 ```
 
 These native host configurations require compatible GoogleTest/GoogleMock 1.16.0, supplied through `GTest_ROOT` or `GTest_DIR`, plus the foundation capabilities used by tests. Boot/Lite/Embedded build separately without protocol libc fallback. Boot/Lite validate their available capabilities, while Embedded runs complete regression. Scripts in `test/cmake` check source reuse, installation consumption, capability/dependency rejection, Debug/Release publication, C++17, discovery, and replay. CI includes these fixed checks.
 
 Preserve environment-specific reports for native Host, ASan/UBSan, bounded profiles, package consumption, and coverage. [GitHub CI](github-ci.md) describes jobs and fixed preparation. Release evidence identifies source/dependency commits, tools, configurations, and results. A remote pass requires an actual run for the target commit.
 
+## Source baseline and installed API evidence
+
+A release baseline records the protocol and five foundation source commits, package versions/ABIs, toolchain, compiled profile/resource identity, configuration and report hashes. The product also records its board adapters and authentication provider. `dev/dependencies.json` pins link development inputs; it does not replace the product's dependency selection. Until a matching published source reference and actual remote checks exist, describe workspace results as a local release candidate, not a published SDK baseline.
+
+The installed C11 smoke builds two consumers using only `<xgl/xgl.h>` and `xgl::xgl`: the static lifecycle/backpressure exchange and an explicit-storage consumer covering `xgl_create_with_error()`, configuration-size/ABI/build-identity rejection, allocation failure, and `xgl_next_timeout_for_work()`. The latter verifies that queries do not poll the PHY and that disabling RX excludes its polling deadline. GoogleTest and private headers are not consumer dependencies. The existing host SDK smoke job executes both programs.
+
 ## Product acceptance
 
 Run the Cortex-M0 final-ELF footprint probe separately, then integrate the board. Account for full-image Flash, static RAM, stack, PHY buffers, and the real Boot partition. Verify Flash erase/program timing and power-loss recovery. Authentication requires a production provider and persistent freshness or fresh trusted keys. Report host simulation, SDK consumption, and ELF linkage within their respective scope; see [validation matrix](validation-matrix.md) for board acceptance.
 
 CI uses locked Arm GNU 15.2.rel1/GCC 15.2.1 to build MTU/RX 128 and 64 separately, enforce each resource policy, and report Flash, workspace, static RAM, reserved stack, and largest single-function stack deltas. Heap symbols, unresolved symbols, wrong configurations, and missing measurements fail. Limits qualify only the fixed probe, not board timing or summed call-chain stack. New workflow checks require a remote result for the current commit before being reported as CI passes.
+
+The Boot ELF probe links a fixed generic consumer; it does not measure every public API combination. Its PHY is a stub, and its startup is not a board BSP. Without target hardware, retain Flash/RAM/link results while leaving cumulative call-chain stack, ISR nesting, driver/DMA timing, Flash power-loss behavior and production cryptography acceptance open. A fixed reserved stack and passing host tests do not complete these gates.

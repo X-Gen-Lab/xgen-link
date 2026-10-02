@@ -85,10 +85,16 @@ find_package(xgl CONFIG REQUIRED)
 
 add_executable(xgl_consumer main.c)
 target_link_libraries(xgl_consumer PRIVATE xgl::xgl)
+add_executable(xgl_public_api_consumer public_api.c)
+target_link_libraries(xgl_public_api_consumer PRIVATE xgl::xgl)
+set_target_properties(xgl_consumer xgl_public_api_consumer PROPERTIES
+    C_STANDARD 11 C_STANDARD_REQUIRED YES C_EXTENSIONS NO)
 ]=])
 
 configure_file("${CMAKE_CURRENT_LIST_DIR}/../tools/static_workspace_smoke.c"
     "${consumer_src}/main.c" COPYONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/../tools/public_api_smoke.c"
+    "${consumer_src}/public_api.c" COPYONLY)
 
 execute_process(
     COMMAND ${consumer_configure_args}
@@ -108,12 +114,14 @@ if(NOT build_result EQUAL 0)
     message(FATAL_ERROR "xgl consumer build failed with exit code ${build_result}")
 endif()
 
-if(CMAKE_HOST_WIN32)
-    set(consumer_executable "${consumer_build}/xgl_consumer.exe")
-else()
-    set(consumer_executable "${consumer_build}/xgl_consumer")
-endif()
-execute_process(COMMAND "${consumer_executable}" RESULT_VARIABLE run_result)
-if(NOT run_result EQUAL 0)
-    message(FATAL_ERROR "Installed SDK lifecycle test failed: ${run_result}")
-endif()
+foreach(consumer IN ITEMS xgl_consumer xgl_public_api_consumer)
+    if(CMAKE_HOST_WIN32)
+        set(consumer_executable "${consumer_build}/${consumer}.exe")
+    else()
+        set(consumer_executable "${consumer_build}/${consumer}")
+    endif()
+    execute_process(COMMAND "${consumer_executable}" RESULT_VARIABLE run_result)
+    if(NOT run_result EQUAL 0)
+        message(FATAL_ERROR "Installed SDK ${consumer} failed: ${run_result}")
+    endif()
+endforeach()

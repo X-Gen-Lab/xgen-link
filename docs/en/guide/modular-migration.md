@@ -20,15 +20,15 @@ The old production `XGL_{STATUS,BYTES,CRC,MEMORY,CONTAINERS}_SOURCE_DIR` argumen
 
 Examples, smoke tests, and release helpers default to disabled when the production module is consumed as a subdirectory; dev explicitly enables development checks. Use a new build directory because old caches can retain removed source paths and helper options.
 
-The installed entry point checks the provided set per package. A complete set is reused and checked against the same compatibility requirements without consulting older installed metadata. A partial set still loads the package, whose exact identity checks reject combinations of different package revisions.
+The installed entry point checks the provided set per package. A complete set is reused and checked against the same compatibility requirements without consulting older installed metadata. A partial set still loads the package, whose checks reject incompatible package versions, ABI values, or target types. These checks do not compare Git commits; the product must pin source origins separately.
 
-All targets from one package must use the same version, checked by both source and installed entry points. For example, memory allocator 0.1.0 cannot be combined with pool 0.1.1. Different packages can independently select versions within their respective compatibility ranges.
+All targets from one package must use the same version, checked by both source and installed entry points. For example, memory allocator 0.1.0 cannot be combined with pool 0.1.1. The complete combination must also satisfy every provider's transitive dependency requirements. For example, the current xgen-memory 0.1.0 installed package requires xgen-status 0.1.0 exactly; the broader range accepted by link does not relax that requirement. The product fixes and validates the resulting dependency graph.
 
 The old core aggregate, `XGL_CORE_SOURCE_DIR`, and `xgc::*` are no longer consumption paths. The public allocator is now `xgm_allocator_t` from `<xgen/memory/allocator.h>`; internal containers, bytes, and CRC use `xgct_`, `xgb_`, and `xgcrc_`. No old-prefix or xgl utility aliases are provided. `xgl_error_t` remains the protocol error domain; generic statuses use `xgs_status_t`. Protocol consumption does not automatically include status strings, CRC8, arena, tracking, or ring_buffer. The protocol PHY contract remains synchronous.
 
 ## Compiled Profiles
 
-Select `XGL_PROFILE=boot|embedded|full` through CMake. Generated profile headers and ABI/build identifiers must match the linked binary. Runtime configuration can disable compiled features, but cannot add features absent from the selected profile.
+Select `XGL_PROFILE=boot|embedded-lite|embedded|full` through CMake. Generated profile headers and ABI/build identifiers must match the linked binary. Runtime configuration can disable compiled features, but cannot add features absent from the selected profile.
 
 Boot removes optional fields and code at compile time. Compression/encryption registries, internal mutexes, global clocks, and legacy layer-vtable dispatch are not SDK extension points.
 

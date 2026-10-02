@@ -4,7 +4,7 @@ Use `<xgl/xgl.h>`. Installed headers include the generated profile and ABI const
 
 ## Lifecycle and ownership
 
-`xgl_memory_requirements()` measures exact storage. `xgl_init_static()` initializes aligned caller storage. `xgl_create()` reserves the same layout through `config.memory.allocator` (`xgm_allocator_t`), then requires `xgl_init()`. Only Full may select the optional xgen-memory libc backend. `xgl_destroy()` frees a dynamically reserved workspace, or ends use of static storage.
+`xgl_memory_requirements()` measures exact storage. `xgl_init_static()` initializes aligned caller storage. `xgl_create()` reserves the same layout through `config.memory.allocator` (`xgm_allocator_t`), then requires `xgl_init()`. Libc fallback defaults to enabled for Full and disabled for Embedded/Lite; Embedded/Lite can opt in when rebuilding the SDK. Boot forbids fallback. An explicitly supplied allocator remains the caller's responsibility and may use storage or a heap, so the absence of protocol fallback alone does not prove a product is heap-free. `xgl_destroy()` frees a dynamically reserved workspace, or ends use of static storage.
 
 Use `xgl_create_with_error(&config, &handle)` to diagnose reservation failures: it returns configuration, ABI, backend or allocation errors. Allocation failure returns `XGL_ERR_NO_MEMORY`; every failure clears the handle. Success still only reserves storage and requires `xgl_init()`. The original pointer-returning `xgl_create()` remains compatible and uses the same implementation. The corresponding `_checked` entry accepts the consumer configuration size, ABI and build identity explicitly across compilation boundaries.
 

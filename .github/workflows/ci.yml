@@ -216,6 +216,7 @@ jobs:
         run: |
           python -m unittest discover -s dev/tests -v
           python test/cmake/test_discovery_policy.py
+          python test/cmake/test_delivery_presets.py --work-dir out/reports/delivery-presets
           python test/cmake/test_footprint_budget.py
           python test/cmake/test_footprint_storage.py
       - name: Validate real source and package consumers
@@ -257,6 +258,7 @@ jobs:
             out/reports/profile-contracts
             out/reports/rx-chunk-contracts
             out/reports/transport-resource-contracts
+            out/reports/delivery-presets
           if-no-files-found: error
 
   arm-footprint:
