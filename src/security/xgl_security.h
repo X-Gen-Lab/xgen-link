@@ -63,6 +63,9 @@ typedef struct {
 typedef struct {
     uint16_t local_id;
     bool auth_required;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    bool protect_installed_scopes;
+#endif
     const xgl_auth_provider_t* provider;
     xgl_security_session_t sessions[XGL_SECURITY_SESSION_CAPACITY];
     uint8_t aad_scratch[UINT8_MAX];

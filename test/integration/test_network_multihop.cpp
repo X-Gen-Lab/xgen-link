@@ -218,6 +218,44 @@ class XglNetworkMultihopTest : public ::testing::Test {
         }
     }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    void StartScoped(bool protect = true, bool install = true,
+                     uint32_t connection = 0U, uint32_t epoch = 0U) {
+        for (Node* node : {&a, &b, &c}) {
+            node->config.route_table = node->routes.data();
+            node->config.route_table_len = node->routes.size();
+            xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
+            if (node != &b) {
+                node->config.auth_provider = &authentication.provider;
+                options.protect_installed_scopes = protect;
+            }
+            ASSERT_EQ(
+                xgl_create_with_options(&node->config, &options, &node->handle),
+                XGL_OK);
+            ASSERT_EQ(xgl_init(node->handle), XGL_OK);
+        }
+        if (install) {
+            const auto tx = test_session_config(3U, connection, epoch);
+            const auto rx =
+                test_session_config(1U, connection, epoch, 7U, true);
+            ASSERT_EQ(xgl_install_security_session(a.handle, &tx), XGL_OK);
+            ASSERT_EQ(xgl_install_security_session(c.handle, &rx), XGL_OK);
+        }
+    }
+
+    void ExpectAuthenticated(const std::vector<Bytes>& frames) {
+        ASSERT_FALSE(frames.empty());
+        for (const Bytes& bytes : frames) {
+            xgl_wire_frame_view_t view = {};
+            ASSERT_EQ(xgl_wire_decode_frame(&view, bytes.data(), bytes.size(),
+                                            nullptr),
+                      XGL_OK);
+            EXPECT_TRUE(view.authenticated);
+            EXPECT_EQ(view.auth_tag_len, authentication.provider.tag_len);
+        }
+    }
+#endif
+
     xgl_error_t Send(Node& source, uint16_t target, uint32_t now,
                      bool reliable = true, const Bytes* data = nullptr) {
         const Bytes& bytes = data != nullptr ? *data : payload;
@@ -413,5 +451,128 @@ TEST_F(XglNetworkMultihopTest, BroadcastIsLocalDeliveryWithoutFlooding) {
     EXPECT_EQ(b_to_c.attempts, 0U);
     EXPECT_TRUE(c.deliveries.empty());
 }
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+TEST_F(XglNetworkMultihopTest,
+       InstalledScopeProtectsHelloDataRetryAndReverseAcknowledgment) {
+    ASSERT_NO_FATAL_FAILURE(StartScoped());
+    ASSERT_FALSE(a.config.auth_required);
+    ASSERT_FALSE(c.config.auth_required);
+    ASSERT_EQ(Send(a, 3U, 0U), XGL_OK);
+    ASSERT_EQ(xgl_step(a.handle, 100U, &budget), XGL_OK);
+    ASSERT_EQ(a_phy.frames.size(), 3U);
+    ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(a_phy.frames));
+    ASSERT_NO_FATAL_FAILURE(DeliverAndAcknowledge(101U));
+    ASSERT_EQ(c.deliveries.size(), 1U);
+    ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(c_phy.frames));
+    EXPECT_GT(authentication.verified_by_target[3], 0U);
+    EXPECT_GT(authentication.verified_by_target[1], 0U);
+    EXPECT_EQ(authentication.verified_by_target[2], 0U);
+
+    ASSERT_EQ(Send(c, 1U, 140U), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(DeliverAndAcknowledge(141U));
+    ASSERT_EQ(a.deliveries.size(), 1U);
+    EXPECT_EQ(a.deliveries.front().payload, payload);
+    ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(a_phy.frames));
+    ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(c_phy.frames));
+}
+
+TEST_F(XglNetworkMultihopTest,
+       InstalledScopeProtectsInplaceLayoutWithoutAuthenticatingOtherScopes) {
+    ASSERT_NO_FATAL_FAILURE(StartScoped(true, true, 11U, 9U));
+    xgl_tx_zerocopy_request_t request = {};
+    request.connection_id = 11U;
+    request.session_epoch = 9U;
+    request.data.target_id = 3U;
+    request.data.data_len = payload.size();
+    xgl_tx_frame_layout_t protected_layout = {};
+    ASSERT_EQ(xgl_send_zerocopy_layout(a.handle, &request, &protected_layout),
+              XGL_OK);
+    EXPECT_TRUE(authentication.signed_inputs.empty());
+    EXPECT_TRUE(a_phy.frames.empty());
+
+    xgl_tx_frame_layout_t plain_layout = {};
+    request.session_epoch = 10U;
+    ASSERT_EQ(xgl_send_zerocopy_layout(a.handle, &request, &plain_layout),
+              XGL_OK);
+    EXPECT_EQ(protected_layout.payload_offset - plain_layout.payload_offset,
+              XGL_SECURITY_EXT_SIZE);
+    EXPECT_EQ(protected_layout.frame_size - plain_layout.frame_size,
+              XGL_SECURITY_EXT_SIZE + authentication.provider.tag_len);
+
+    request.session_epoch = 9U;
+    Bytes storage(protected_layout.frame_size);
+    std::copy(payload.begin(), payload.end(),
+              storage.begin() + protected_layout.payload_offset);
+    request.data.buffer = storage.data();
+    request.data.buffer_size = storage.size();
+    request.data.data_offset = protected_layout.payload_offset;
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(a.handle, &request, 0U), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(a_phy.frames));
+    ASSERT_NO_FATAL_FAILURE(DeliverAndAcknowledge(1U));
+    ASSERT_EQ(c.deliveries.size(), 1U);
+    EXPECT_EQ(c.deliveries.front().payload, payload);
+
+    ASSERT_EQ(xgl_close_security_session(a.handle, 3U, 11U, 9U), XGL_OK);
+    EXPECT_EQ(xgl_send_zerocopy_layout(a.handle, &request, &protected_layout),
+              XGL_ERR_NOT_FOUND);
+    EXPECT_EQ(protected_layout.frame_size, 0U);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(a.handle, &request, 40U),
+              XGL_ERR_NOT_FOUND);
+    EXPECT_EQ(a_phy.frames.size(), 1U);
+}
+
+TEST_F(XglNetworkMultihopTest, InstalledScopeRejectsPlaintextAfterClose) {
+    ASSERT_NO_FATAL_FAILURE(StartScoped());
+    xgl_frame_params_t params = {};
+    params.source_id = 1U;
+    params.target_id = 3U;
+    params.packet_type = XGL_PACKET_TYPE_DATA;
+    params.payload = payload.data();
+    params.payload_len = payload.size();
+    params.ttl = 8U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    uint8_t bytes[128] = {};
+    size_t length = 0U;
+    ASSERT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &length),
+              XGL_OK);
+    EXPECT_EQ(xgl_network_receive(&c.handle->layers.network_ctx, c.handle,
+                                  bytes, length),
+              XGL_ERR_INVALID_FRAME);
+    EXPECT_TRUE(c.deliveries.empty());
+    ASSERT_EQ(xgl_close_security_session(c.handle, 1U, 0U, 0U), XGL_OK);
+    EXPECT_EQ(xgl_network_receive(&c.handle->layers.network_ctx, c.handle,
+                                  bytes, length),
+              XGL_ERR_INVALID_FRAME);
+    EXPECT_TRUE(c.deliveries.empty());
+    EXPECT_EQ(Send(c, 1U, 0U, false), XGL_ERR_NOT_FOUND);
+    EXPECT_TRUE(c_phy.frames.empty());
+
+    /* An uninstalled connection remains outside this exact scope. */
+    params.connection_id = 12U;
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    ASSERT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &length),
+              XGL_OK);
+    EXPECT_EQ(xgl_network_receive(&c.handle->layers.network_ctx, c.handle,
+                                  bytes, length),
+              XGL_OK);
+    EXPECT_EQ(c.deliveries.size(), 1U);
+}
+
+TEST_F(XglNetworkMultihopTest, DisabledScopeProtectionPreservesOptionalMode) {
+    ASSERT_NO_FATAL_FAILURE(StartScoped(false));
+    ASSERT_EQ(Send(a, 3U, 0U, false), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(DeliverAndAcknowledge(1U));
+    ASSERT_EQ(c.deliveries.size(), 1U);
+    EXPECT_TRUE(authentication.signed_inputs.empty());
+    EXPECT_EQ(authentication.verified_by_target[3], 0U);
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, a_phy.frames.front().data(),
+                                    a_phy.frames.front().size(), nullptr),
+              XGL_OK);
+    EXPECT_FALSE(view.authenticated);
+}
+#endif
 
 }  // namespace

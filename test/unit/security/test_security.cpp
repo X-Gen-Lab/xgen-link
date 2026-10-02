@@ -218,6 +218,48 @@ TEST_F(XglSecuritySessionTest, RefusesUninstalledSendAndReceiveSessions) {
     EXPECT_EQ(Verify(), XGL_OK);
 }
 
+#if XGL_FEATURE_ADVANCED_RUNTIME
+TEST_F(XglSecuritySessionTest,
+       ProtectedScopeRejectsPlaintextBeforeAndAfterClosure) {
+    receiver.auth_required = false;
+    receiver.protect_installed_scopes = true;
+    ASSERT_EQ(xgl_security_session_install(&receiver, &rx_config), XGL_OK);
+    ASSERT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &length),
+              XGL_OK);
+    EXPECT_EQ(Verify(), XGL_ERR_INVALID_FRAME);
+    ASSERT_EQ(xgl_security_session_close(&receiver, 1U, 11U, 9U), XGL_OK);
+    EXPECT_EQ(Verify(), XGL_ERR_INVALID_FRAME);
+    EXPECT_EQ(spy.verify_calls, 0U);
+
+    xgl_wire_frame_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_frame(&view, bytes, length, nullptr), XGL_OK);
+    ++view.session_epoch;
+    EXPECT_EQ(xgl_security_verify_frame(&receiver, &view), XGL_OK);
+    --view.session_epoch;
+    ++view.header.connection_id;
+    EXPECT_EQ(xgl_security_verify_frame(&receiver, &view), XGL_OK);
+    --view.header.connection_id;
+    ++view.header.source_id;
+    EXPECT_EQ(xgl_security_verify_frame(&receiver, &view), XGL_OK);
+}
+
+TEST_F(XglSecuritySessionTest,
+       ReceivingUntrustedAuthenticationDoesNotInstallProtectedScope) {
+    receiver.auth_required = false;
+    receiver.protect_installed_scopes = true;
+    ASSERT_EQ(xgl_security_session_install(&sender, &tx_config), XGL_OK);
+    ASSERT_EQ(Sign(), XGL_OK);
+    EXPECT_EQ(Verify(), XGL_ERR_INVALID_FRAME);
+    for (const auto& session : receiver.sessions) {
+        EXPECT_FALSE(session.used);
+    }
+    ASSERT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &length),
+              XGL_OK);
+    EXPECT_EQ(Verify(), XGL_OK);
+    EXPECT_EQ(spy.verify_calls, 0U);
+}
+#endif
+
 TEST_F(XglSecuritySessionTest, ProducesFixedNonceAndCanonicalAadVector) {
     tx_config.tx_initial_seq = UINT64_C(0x0102030405060708);
     rx_config.rx_min_seq = tx_config.tx_initial_seq;
