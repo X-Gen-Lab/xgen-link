@@ -90,6 +90,7 @@ endif()
 # SACK wire views and bounded transport admission apply to every profile.
 list(APPEND TEST_SOURCES
     unit/api/test_api_contracts.cpp
+    unit/api/test_extended_options.cpp
     unit/api/test_config_consistency.cpp
     unit/api/test_send_policy.cpp
     unit/datalink/test_datalink_span.cpp
