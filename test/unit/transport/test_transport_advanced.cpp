@@ -7,6 +7,7 @@
 #include <wire/xgl_wire.h>
 #include <xgen/memory/libc_allocator.h>
 
+#include <algorithm>
 #include <array>
 #include <gtest/gtest.h>
 #include <vector>
@@ -19,6 +20,7 @@ class XglTransportAdvancedTest : public ::testing::Test {
     xgl_layer_stats_t stats = {};
     xgl_packet_tx_endpoint_t lower = {};
     std::vector<uint16_t> targets;
+    std::vector<uint32_t> submitted_numbers;
     std::vector<xgl_scope_event_t> events;
     std::vector<xgl_error_t> errors;
     std::vector<xgl_rx_info_t> received;
@@ -33,6 +35,7 @@ class XglTransportAdvancedTest : public ::testing::Test {
         self.submit_attempts++;
         if (packet->packet_type == XGL_PACKET_TYPE_DATA) {
             self.targets.push_back(packet->target_id);
+            self.submitted_numbers.push_back(packet->packet_number);
             return self.submit_result;
         }
         return XGL_OK;
@@ -511,4 +514,71 @@ TEST_F(XglTransportAdvancedTest,
     EXPECT_EQ(ctx.peers->rx_buffered_count, 0U);
 }
 #endif
+
+TEST_F(XglTransportAdvancedTest,
+       ExpiredBusyPeriodRejectsIncomingDataBeforeDelivery) {
+    Init(250U);
+    ASSERT_EQ(Send(), XGL_OK);
+    ctx.current_time_ms = 250U;
+    const uint8_t payload = 0x55U;
+    xgl_packet_data_t data = {1U, &payload};
+    xgl_packet_t packet = {};
+    packet.source_id = 2U;
+    packet.target_id = 1U;
+    packet.connection_id = 11U;
+    packet.session_epoch = 22U;
+    packet.packet_type = XGL_PACKET_TYPE_DATA;
+    packet.reliable = XGL_RELIABILITY_ACK_ELICITING;
+    packet.data = &data;
+    const size_t before = submit_attempts;
+    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_ERR_TIMEOUT);
+    EXPECT_TRUE(received.empty());
+    EXPECT_EQ(submit_attempts, before);
+    EXPECT_TRUE(ctx.peers->failed);
+    EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 0U);
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(errors[0], XGL_ERR_TIMEOUT);
+}
+
+#if XGL_FEATURE_FRAGMENTATION
+TEST_F(XglTransportAdvancedTest, RotationServicesRetriesAlongsideMessageTails) {
+    Init();
+    ASSERT_EQ(Send(2U, 128U), XGL_OK);
+    ASSERT_EQ(Send(3U), XGL_OK);
+    ASSERT_EQ(Ack(2U, 0U), XGL_OK);
+    targets.clear();
+    submitted_numbers.clear();
+    bool pending = false;
+    for (size_t round = 0U; round < 2U; ++round) {
+        ASSERT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 100U, 1U, &pending),
+                  XGL_OK);
+        ASSERT_EQ(targets.size(), round + 1U);
+        if (targets.back() == 2U) {
+            ASSERT_EQ(Ack(2U, submitted_numbers.back()), XGL_OK);
+        }
+    }
+    // Each due peer must receive a turn despite a continuously ready message
+    // tail.
+    EXPECT_NE(std::find(targets.begin(), targets.end(), 3U), targets.end());
+}
+
+#if XGL_FEATURE_OUT_OF_ORDER && XGL_BUILD_WINDOW_CAPACITY >= 2
+TEST_F(XglTransportAdvancedTest,
+       CachedFirstFragmentStartsAbsoluteReassemblyDeadline) {
+    Init(0U, 250U, 2U);
+    ASSERT_EQ(Fragment(1U, 2U), XGL_OK);
+    ASSERT_EQ(ctx.peers->rx_buffered_count, 1U);
+    uint32_t timeout = 0U;
+    EXPECT_TRUE(xgl_transport_next_timeout(&ctx, 0U, &timeout));
+    EXPECT_EQ(timeout, 250U);
+    bool pending = false;
+    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 250U, 0U, &pending),
+              XGL_ERR_TIMEOUT);
+    EXPECT_TRUE(ctx.peers->failed);
+    EXPECT_EQ(ctx.peers->rx_buffered_count, 0U);
+    EXPECT_TRUE(received.empty());
+}
+#endif
+#endif
+
 #endif
