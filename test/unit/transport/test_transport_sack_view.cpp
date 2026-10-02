@@ -47,17 +47,21 @@ class XglTransportSackViewTest : public ::testing::Test {
         ASSERT_EQ(xgl_transport_init(&context, &config), XGL_OK);
         initialized = true;
 
+        SendPackets(3U);
+        ASSERT_NE(context.peers, nullptr);
+        sends_before_ack = sends;
+    }
+
+    void SendPackets(unsigned count) {
         const uint8_t payload = 0x42;
         xgl_tx_data_t data = {};
         data.target_id = 2U;
         data.data = &payload;
         data.data_len = 1U;
         data.reliable = true;
-        for (unsigned i = 0U; i < 3U; ++i) {
+        for (unsigned i = 0U; i < count; ++i) {
             ASSERT_EQ(xgl_transport_send(&context, nullptr, &data), XGL_OK);
         }
-        ASSERT_NE(context.peers, nullptr);
-        sends_before_ack = sends;
     }
 
     void TearDown() override {
@@ -66,17 +70,26 @@ class XglTransportSackViewTest : public ::testing::Test {
         }
     }
 
-    xgl_error_t Receive(const uint8_t* bitmap, size_t length) {
-        std::array<uint8_t, 80> value = {}, extensions = {};
-        size_t value_size = 0U, extensions_size = 0U;
+    xgl_error_t Receive(const uint8_t* bitmap, size_t length,
+                        uint32_t base_packet = 0U) {
+        std::array<uint8_t, 80> value = {};
+        size_t value_size = 0U;
         xgl_error_t error = xgl_wire_encode_sack_ext_value(
-            value.data(), value.size(), 0U, bitmap, length, &value_size);
+            value.data(), value.size(), base_packet, bitmap, length,
+            &value_size);
         if (error != XGL_OK) {
             return error;
         }
-        error = xgl_wire_encode_ext(extensions.data(), extensions.size(),
-                                    XGL_WIRE_EXT_SACK, value.data(), value_size,
-                                    &extensions_size);
+        return ReceiveExtension(XGL_WIRE_EXT_SACK, value.data(), value_size);
+    }
+
+    xgl_error_t ReceiveExtension(uint8_t type, const uint8_t* value,
+                                 size_t value_size) {
+        std::array<uint8_t, 80> extensions = {};
+        size_t extensions_size = 0U;
+        xgl_error_t error =
+            xgl_wire_encode_ext(extensions.data(), extensions.size(), type,
+                                value, value_size, &extensions_size);
         if (error != XGL_OK) {
             return error;
         }
@@ -102,6 +115,15 @@ class XglTransportSackViewTest : public ::testing::Test {
         EXPECT_EQ(context.rtt_sample_count, 0U);
 #endif
         EXPECT_FALSE(context.peers->failed);
+        for (uint32_t packet_number = 0U; packet_number < 3U; ++packet_number) {
+            const xgl_reliable_packet_t* packet =
+                xgl_reliable_find_packet_number(&context.peers->reliable_queue,
+                                                packet_number, 2U);
+            ASSERT_NE(packet, nullptr);
+            EXPECT_FALSE(packet->fast_retry_pending);
+            EXPECT_FALSE(packet->retry_pending);
+            EXPECT_EQ(packet->retry_count, 0U);
+        }
         EXPECT_EQ(sends, sends_before_ack);
         EXPECT_EQ(retries, 0U);
     }
@@ -136,5 +158,52 @@ TEST_F(XglTransportSackViewTest, FutureBitRejectsTheWholeBorrowedBitmap) {
     bitmap[0] = 0x07;
     bitmap.back() = 0x80;
     EXPECT_EQ(Receive(bitmap.data(), bitmap.size()), XGL_ERR_SEQUENCE_ERROR);
+    ExpectUnchanged();
+}
+
+TEST_F(XglTransportSackViewTest,
+       CrossByteAcknowledgementsIgnoreTrailingZeroBytes) {
+    const uint8_t acknowledged = 0x07;
+    for (uint32_t base_packet : {0U, 3U}) {
+        ASSERT_EQ(Receive(&acknowledged, 1U, base_packet), XGL_OK);
+        SendPackets(3U);
+    }
+    ASSERT_EQ(context.peers->tx_window.send_base_packet_number, 6U);
+    ASSERT_EQ(context.peers->tx_window.next_packet_number, 9U);
+    const unsigned before_ack = sends;
+
+    const std::array<uint8_t, 8> bitmap = {0xc0, 0x01};
+    ASSERT_EQ(Receive(bitmap.data(), bitmap.size()), XGL_OK);
+    EXPECT_EQ(xgl_reliable_get_count(&context.peers->reliable_queue), 0U);
+    EXPECT_EQ(context.peers->tx_window.send_base_packet_number, 9U);
+    EXPECT_EQ(sends, before_ack);
+    EXPECT_EQ(retries, 0U);
+}
+
+TEST_F(XglTransportSackViewTest, CrossByteFutureBitCannotPartiallyAcknowledge) {
+    const std::array<uint8_t, 4> bitmap = {0x07, 0x01};
+    EXPECT_EQ(Receive(bitmap.data(), bitmap.size()), XGL_ERR_SEQUENCE_ERROR);
+    ExpectUnchanged();
+}
+
+TEST_F(XglTransportSackViewTest, BaseNearPacketNumberLimitCannotWrapRange) {
+    const uint8_t bitmap = 0x07;
+    EXPECT_EQ(Receive(&bitmap, 1U, UINT32_MAX - 1U), XGL_ERR_SEQUENCE_ERROR);
+    ExpectUnchanged();
+    EXPECT_EQ(Receive(&bitmap, 1U, UINT32_MAX), XGL_ERR_SEQUENCE_ERROR);
+    ExpectUnchanged();
+}
+
+TEST_F(XglTransportSackViewTest, ZeroLengthAckRangeCannotPartiallyAcknowledge) {
+    const std::array<xgl_wire_ack_range_t, 2> ranges = {{{0U, 1U}, {0U, 0U}}};
+    std::array<uint8_t, 32> value = {};
+    size_t value_size = 0U;
+    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(value.data(), value.size(),
+                                                  2U, 0U, ranges.data(),
+                                                  ranges.size(), &value_size),
+              XGL_OK);
+    EXPECT_EQ(
+        ReceiveExtension(XGL_WIRE_EXT_ACK_RANGE, value.data(), value_size),
+        XGL_ERR_INVALID_FRAME);
     ExpectUnchanged();
 }

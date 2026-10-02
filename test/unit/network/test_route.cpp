@@ -1,4 +1,3 @@
-#include <xgen/memory/libc_allocator.h>
 /**
  * \file            test_route.cpp
  * \brief           Route table unit tests
@@ -6,6 +5,7 @@
  */
 
 #include <network/xgl_route.h>
+#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl_error.h>
 
 #include <cstdlib>
@@ -51,6 +51,18 @@ class XglRouteTest : public ::testing::Test {
 
     void TearDown() override {
         xgl_route_table_destroy(&route_table);
+    }
+
+    void ExpectRoute(const xgl_route_item_t& expected) {
+        SCOPED_TRACE(expected.target_id);
+        const auto* route =
+            xgl_route_table_lookup(&route_table, expected.target_id);
+        ASSERT_NE(route, nullptr);
+        EXPECT_EQ(route->target_id, expected.target_id);
+        EXPECT_EQ(route->phy, expected.phy);
+        EXPECT_EQ(route->max_frame_size, expected.max_frame_size);
+        EXPECT_EQ(route->read_freq_hz, expected.read_freq_hz);
+        EXPECT_EQ(route->metric, expected.metric);
     }
 
     static constexpr uint8_t TARGET_ID_1 = 1;
@@ -358,6 +370,90 @@ TEST_F(XglRouteTest, LoadRoutesReplacesExisting) {
     EXPECT_NE(xgl_route_table_lookup(&route_table, TARGET_ID_3), nullptr);
 }
 
+TEST_F(XglRouteTest, LoadOwnStorageRetainsFieldsAndMutableRoutes) {
+    xgl_phy_ops_t alternate_phy = phy_ops;
+    const xgl_route_item_t routes[] = {{1U, &phy_ops, 128U, 10U, 1U},
+                                       {17U, &alternate_phy, 256U, 20U, 2U},
+                                       {UINT16_MAX, &phy_ops, 512U, 30U, 3U}};
+    ASSERT_EQ(xgl_route_table_load(&route_table, routes, 3U), XGL_OK);
+    const auto* storage = route_table.routes;
+
+    ASSERT_EQ(xgl_route_table_load(&route_table, storage, 3U), XGL_OK);
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 3U);
+    for (const auto& route : routes) {
+        ExpectRoute(route);
+    }
+
+    ASSERT_EQ(xgl_route_table_remove(&route_table, 17U), XGL_OK);
+    EXPECT_EQ(xgl_route_table_lookup(&route_table, 17U), nullptr);
+    ExpectRoute(routes[0]);
+    ExpectRoute(routes[2]);
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, 17U, &alternate_phy, 64U, 40U, 4U),
+        XGL_OK);
+    ExpectRoute({17U, &alternate_phy, 64U, 40U, 4U});
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 3U);
+}
+
+TEST_F(XglRouteTest, LoadOwnSuffixCompactsFieldsAndRebuildsLookup) {
+    xgl_phy_ops_t alternate_phy = phy_ops;
+    const xgl_route_item_t routes[] = {{1U, &phy_ops, 64U, 10U, 1U},
+                                       {17U, &alternate_phy, 128U, 20U, 2U},
+                                       {33U, &phy_ops, 256U, 30U, 3U},
+                                       {49U, &alternate_phy, 512U, 40U, 4U}};
+    ASSERT_EQ(xgl_route_table_load(&route_table, routes, 4U), XGL_OK);
+    const auto* storage = route_table.routes;
+
+    ASSERT_EQ(xgl_route_table_load(&route_table, storage + 1U, 3U), XGL_OK);
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 3U);
+    EXPECT_EQ(xgl_route_table_lookup(&route_table, 1U), nullptr);
+    for (size_t i = 1U; i < 4U; ++i) {
+        ExpectRoute(routes[i]);
+    }
+
+    ASSERT_EQ(xgl_route_table_remove(&route_table, 33U), XGL_OK);
+    EXPECT_EQ(xgl_route_table_lookup(&route_table, 33U), nullptr);
+    ExpectRoute(routes[1]);
+    ExpectRoute(routes[3]);
+    ASSERT_EQ(xgl_route_table_add(&route_table, 65U, &phy_ops, 1024U, 50U, 5U),
+              XGL_OK);
+    ExpectRoute({65U, &phy_ops, 1024U, 50U, 5U});
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 3U);
+}
+
+TEST_F(XglRouteTest, LoadNullEmptySetClearsRoutesAndRetainsStorage) {
+    ASSERT_EQ(xgl_route_table_add(&route_table, 17U, &phy_ops, 128U, 10U, 1U),
+              XGL_OK);
+    const auto* storage = route_table.routes;
+
+    ASSERT_EQ(xgl_route_table_load(&route_table, nullptr, 0U), XGL_OK);
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 0U);
+    EXPECT_EQ(xgl_route_table_lookup(&route_table, 17U), nullptr);
+
+    ASSERT_EQ(xgl_route_table_add(&route_table, 33U, &phy_ops, 256U, 20U, 2U),
+              XGL_OK);
+    ExpectRoute({33U, &phy_ops, 256U, 20U, 2U});
+    EXPECT_EQ(route_table.routes, storage);
+    EXPECT_EQ(route_table.route_count, 1U);
+}
+
+TEST_F(XglRouteTest, LoadNullEmptySetIntoZeroCapacityTable) {
+    xgl_route_table_destroy(&route_table);
+    ASSERT_EQ(xgl_route_table_init(&route_table, 0U, xgm_allocator_libc()),
+              XGL_OK);
+
+    EXPECT_EQ(xgl_route_table_load(&route_table, nullptr, 0U), XGL_OK);
+    EXPECT_EQ(route_table.routes, nullptr);
+    EXPECT_EQ(route_table.route_capacity, 0U);
+    EXPECT_EQ(route_table.route_count, 0U);
+    EXPECT_EQ(xgl_route_table_lookup(&route_table, 1U), nullptr);
+}
+
 /*---------------------------------------------------------------------------*/
 /* Utility Function Tests                                                    */
 /*---------------------------------------------------------------------------*/
@@ -428,7 +524,8 @@ TEST_F(XglRouteTest, InitializationFailureReleasesEveryPartialReservation) {
             std::free(memory);
         }
     };
-    for (size_t failure = 1U; failure <= 3U; ++failure) {
+    constexpr size_t reservations = XGL_FEATURE_ROUTE_INDEX ? 3U : 1U;
+    for (size_t failure = 1U; failure <= reservations; ++failure) {
         SCOPED_TRACE(failure);
         state = {};
         state.fail_at = failure;

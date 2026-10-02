@@ -339,18 +339,23 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
                  */
                 /* NOLINTNEXTLINE(bugprone-casting-through-void) */
                 XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            uint32_t start;
+            uint32_t interval;
             if (packet->retry_pending) {
-                transport_take_timeout(now_ms, packet->retry_started_ms,
-                                       transport_retry_delay_ms(ctx), &active,
-                                       timeout_ms);
+                start = packet->retry_started_ms;
+                interval = transport_retry_delay_ms(ctx);
             } else if (packet->fast_retry_pending) {
                 active = true;
                 *timeout_ms = 0U;
+                continue;
             } else if (packet->sent && packet->timeout_ms > 0) {
-                transport_take_timeout(now_ms, packet->send_timestamp,
-                                       (uint32_t)packet->timeout_ms, &active,
-                                       timeout_ms);
+                start = packet->send_timestamp;
+                interval = (uint32_t)packet->timeout_ms;
+            } else {
+                continue;
             }
+            transport_take_timeout(now_ms, start, interval, &active,
+                                   timeout_ms);
         }
 #if XGL_FEATURE_FRAGMENTATION
         if (peer->tx_message.data != NULL && peer->tx_message_retry_pending) {

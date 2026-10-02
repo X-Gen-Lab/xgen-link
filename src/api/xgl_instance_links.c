@@ -26,23 +26,23 @@ static bool link_config_first_phy(const xgl_config_t* config, size_t index) {
  */
 static uint32_t link_config_interval(const xgl_config_t* config,
                                      size_t first_route) {
-    uint32_t interval = UINT32_MAX;
+    uint32_t frequency = 1U;
     const xgl_phy_ops_t* phy = config->route_table[first_route].phy;
     for (size_t i = first_route; i < config->route_table_len; ++i) {
         const xgl_route_item_t* route = &config->route_table[i];
         if (route->phy != phy) {
             continue;
         }
-        uint32_t candidate =
-            route->read_freq_hz != 0U ? 1000U / route->read_freq_hz : 0U;
-        if (route->read_freq_hz != 0U && candidate == 0U) {
-            candidate = 1U;
+        if (route->read_freq_hz == 0U) {
+            return 0U;
         }
-        if (candidate < interval) {
-            interval = candidate;
+        if (route->read_freq_hz > frequency) {
+            frequency = route->read_freq_hz;
         }
     }
-    return interval;
+    /* The largest positive frequency gives the shortest polling interval. */
+    uint32_t interval = 1000U / frequency;
+    return interval != 0U ? interval : 1U;
 }
 
 /**

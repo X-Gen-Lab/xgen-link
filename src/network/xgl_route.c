@@ -208,13 +208,21 @@ xgl_error_t xgl_route_table_load(xgl_route_table_t* table,
         }
     }
     xgl_route_table_clear(table);
+    if (count != 0U) {
+        /* Loading an owned subrange is valid; preserve overlapping storage. */
+        memmove(table->routes, routes, count * sizeof(*routes));
+    }
+#if XGL_FEATURE_ROUTE_INDEX
     for (size_t i = 0U; i < count; ++i) {
-        xgl_error_t error = xgl_route_table_add(
-            table, routes[i].target_id, routes[i].phy, routes[i].max_frame_size,
-            routes[i].read_freq_hz, routes[i].metric);
-        if (error != XGL_OK) {
-            return error;
+        xgct_hash_node_init(&table->nodes[i]);
+        if (xgct_hash_insert(&table->index, &table->nodes[i],
+                             table->routes[i].target_id,
+                             &table->routes[i]) != XGS_OK) {
+            xgl_route_table_clear(table);
+            return XGL_ERR_INVALID_PARAM;
         }
     }
+#endif
+    table->route_count = count;
     return XGL_OK;
 }

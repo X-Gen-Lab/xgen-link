@@ -61,7 +61,7 @@ static xgl_error_t ack_ranges_next(ack_ranges_t* cursor, uint32_t* low,
         }
         *high -= gap + 1U;
     }
-    if ((uint64_t)length > (uint64_t)*high + 1U) {
+    if (length - 1U > *high) {
         return XGL_ERR_INVALID_FRAME;
     }
     *low = *high - (length - 1U);
@@ -203,18 +203,25 @@ static xgl_error_t transport_process_sack_value(
         return XGL_ERR_INVALID_FRAME;
     }
 
+    size_t remaining = view.bitmap_len;
+    while (remaining > 0U && view.bitmap[remaining - 1U] == 0U) {
+        --remaining;
+    }
+    const bool has_set = remaining != 0U;
     size_t highest_set = 0U;
-    bool has_set = false;
-    for (size_t i = 0; i < view.bitmap_len * 8U; ++i) {
-        if (transport_sack_bit_is_set(view.bitmap, i)) {
-            highest_set = i;
-            has_set = true;
+    if (has_set) {
+        highest_set = (remaining - 1U) * 8U;
+        uint8_t byte = view.bitmap[remaining - 1U];
+        while (byte > 1U) {
+            byte >>= 1U;
+            highest_set++;
         }
     }
     /* Validate the complete claimed range before acknowledgements or retries.
      */
-    if ((uint64_t)view.base_packet + (has_set ? highest_set : 0U) >=
-        peer->tx_window.next_packet_number) {
+    if (view.base_packet >= peer->tx_window.next_packet_number ||
+        (has_set && highest_set >= peer->tx_window.next_packet_number -
+                                       view.base_packet)) {
         return XGL_ERR_SEQUENCE_ERROR;
     }
     if (!has_set) {

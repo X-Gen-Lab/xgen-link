@@ -42,7 +42,6 @@ set(TEST_SOURCES
     unit/datalink/test_datalink.cpp
 
     # Network tests
-    unit/network/test_route.cpp
     unit/network/test_network.cpp
 
     # Transport tests
@@ -108,6 +107,7 @@ list(APPEND TEST_SOURCES
     unit/transport/test_timeout_control.cpp
     unit/datalink/test_parser_recovery.cpp
     unit/datalink/test_parser_resync.cpp
+    unit/network/test_route.cpp
     unit/network/test_network_contracts.cpp
     integration/test_network_routes_contracts.cpp
     integration/test_transport_admission.cpp

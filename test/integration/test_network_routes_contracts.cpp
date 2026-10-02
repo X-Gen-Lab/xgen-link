@@ -288,6 +288,46 @@ TEST(XglNetworkRoutesContract, SharedPhyPlanUsesFastestFrequencyInEitherOrder) {
         EXPECT_EQ(second_state.reads, 2U);
     }
 }
+
+TEST(XglNetworkRoutesContract, SharedPhyHighFrequencyHasOneMillisecondMinimum) {
+    for (uint32_t frequency : {1001U, UINT32_MAX}) {
+        SCOPED_TRACE(frequency);
+        for (bool fast_first : {false, true}) {
+            SCOPED_TRACE(fast_first);
+            RoutePhy first_state, second_state;
+            xgl_phy_ops_t first = {route_tx, route_rx, &first_state};
+            xgl_phy_ops_t second = {route_tx, route_rx, &second_state};
+            xgl_route_item_t routes[] = {
+                {2U, &first, 128U, fast_first ? frequency : 100U, 1U},
+                {3U, &second, 128U, 50U, 1U},
+                {4U, &first, 128U, fast_first ? 100U : frequency, 0U}};
+            auto config = route_config(routes, 3U);
+            Instance instance(xgl_create(&config), &xgl_destroy);
+            ASSERT_NE(instance, nullptr);
+            ASSERT_EQ(xgl_init(instance.get()), XGL_OK);
+            ASSERT_EQ(instance->link_count, 2U);
+            EXPECT_EQ(instance->links[0].phy, &first);
+            EXPECT_EQ(instance->links[0].poll_interval_ms, 1U);
+            EXPECT_EQ(instance->links[1].phy, &second);
+            EXPECT_EQ(instance->links[1].poll_interval_ms, 20U);
+
+            const xgl_work_budget_t budget = {64U, 1000U};
+            EXPECT_EQ(xgl_step(instance.get(), 0U, &budget), XGL_OK);
+            EXPECT_EQ(xgl_step(instance.get(), 0U, &budget), XGL_OK);
+            EXPECT_EQ(first_state.reads, 1U);
+            EXPECT_EQ(second_state.reads, 1U);
+            EXPECT_EQ(xgl_step(instance.get(), 1U, &budget), XGL_OK);
+            EXPECT_EQ(first_state.reads, 2U);
+            EXPECT_EQ(second_state.reads, 1U);
+            EXPECT_EQ(xgl_step(instance.get(), 19U, &budget), XGL_OK);
+            EXPECT_EQ(first_state.reads, 3U);
+            EXPECT_EQ(second_state.reads, 1U);
+            EXPECT_EQ(xgl_step(instance.get(), 20U, &budget), XGL_OK);
+            EXPECT_EQ(first_state.reads, 4U);
+            EXPECT_EQ(second_state.reads, 2U);
+        }
+    }
+}
 #endif
 
 }  // namespace
