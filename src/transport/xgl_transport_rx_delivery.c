@@ -147,6 +147,68 @@ xgl_error_t transport_validate_rx_fragment_scope(
 }
 
 #if XGL_FEATURE_ADVANCED_RUNTIME
+#if XGL_FEATURE_OUT_OF_ORDER
+bool transport_expire_rx_buffered_fragments(xgl_transport_ctx_t* ctx,
+                                            xgl_handle_t handle,
+                                            xgl_transport_peer_state_t* peer) {
+    if (peer == NULL || ctx->fragment_mgr == NULL) {
+        return false;
+    }
+    const uint32_t timeout_ms = ctx->fragment_mgr->reassembly_timeout_ms;
+    if (timeout_ms == 0U) {
+        return false;
+    }
+    for (const xgl_transport_rx_buffered_packet_t* buffered = peer->rx_buffered;
+         buffered != NULL; buffered = buffered->next) {
+        if (buffered->packet.fragment &&
+            transport_now(ctx) - buffered->received_at_ms >= timeout_ms) {
+            /* SACK has transferred responsibility even before in-order drain.
+             */
+            transport_fail_peer(ctx, handle, peer, XGL_ERR_TIMEOUT);
+#if XGL_FEATURE_STATISTICS
+            if (ctx->stats != NULL) {
+                ctx->stats->rx_dropped++;
+            }
+#endif
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * \brief           Preserve the oldest admission of this cached message
+ * \param[in]       ctx: Transport clock and fragment validation limits
+ * \param[in]       peer: Owner of cached reliable fragments
+ * \param[in]       fragment: Message entering active reassembly
+ * \param[out]      first_ms: Earliest admission, or now when no fragment exists
+ * \return          XGL_OK or an invalid owned fragment error
+ */
+static xgl_error_t transport_rx_fragment_first_time(
+    const xgl_transport_ctx_t* ctx, const xgl_transport_peer_state_t* peer,
+    const transport_rx_fragment_t* fragment, uint32_t* first_ms) {
+    const uint32_t now_ms = transport_now(ctx);
+    *first_ms = now_ms;
+    for (const xgl_transport_rx_buffered_packet_t* buffered = peer->rx_buffered;
+         buffered != NULL; buffered = buffered->next) {
+        if (!buffered->packet.fragment) {
+            continue;
+        }
+        transport_rx_fragment_t owned_fragment;
+        xgl_error_t error = transport_decode_rx_fragment(ctx, &buffered->packet,
+                                                         &owned_fragment);
+        if (error != XGL_OK) {
+            return error;
+        }
+        if (owned_fragment.message_id == fragment->message_id &&
+            now_ms - buffered->received_at_ms > now_ms - *first_ms) {
+            *first_ms = buffered->received_at_ms;
+        }
+    }
+    return XGL_OK;
+}
+#endif
+
 bool transport_expire_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                   xgl_transport_peer_state_t* peer,
                                   const xgl_packet_t* packet,
@@ -237,13 +299,20 @@ transport_deliver_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_TIMEOUT;
     }
 #endif
+    uint32_t first_ms = transport_now(ctx);
+#if XGL_FEATURE_ADVANCED_RUNTIME && XGL_FEATURE_OUT_OF_ORDER
+    xgl_error_t admission_error =
+        transport_rx_fragment_first_time(ctx, peer, fragment, &first_ms);
+    if (admission_error != XGL_OK) {
+        return admission_error;
+    }
+#endif
     xgl_fragment_message_t complete = {0};
     xgl_error_t err = xgl_fragment_process_ext_scoped(
         ctx->fragment_mgr, packet->source_id, packet->connection_id,
         packet->session_epoch, packet->data_type, fragment->message_id,
         fragment->offset, fragment->message_len, data, data_len,
-        packet->reliable == XGL_RELIABILITY_ACK_ELICITING, &complete,
-        transport_now(ctx));
+        packet->reliable == XGL_RELIABILITY_ACK_ELICITING, &complete, first_ms);
     if (err == XGL_ERR_BUSY) {
         return XGL_OK;
     }

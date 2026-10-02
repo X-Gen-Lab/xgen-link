@@ -101,6 +101,9 @@ transport_copy_rx_buffered_packet(const xgl_transport_ctx_t* ctx,
     buffered->packet.data = &buffered->packet_data;
     buffered->packet.extensions =
         extensions_len != 0U ? buffered->storage + payload_len : NULL;
+#if XGL_FEATURE_ADVANCED_RUNTIME && XGL_FEATURE_FRAGMENTATION
+    buffered->received_at_ms = ctx->current_time_ms;
+#endif
 
     return XGL_OK;
 }

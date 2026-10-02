@@ -234,6 +234,16 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     if (rx_peer != NULL && rx_peer->failed) {
         return XGL_ERR_ACK_TIMEOUT;
     }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (rx_peer != NULL && transport_expire_tx(ctx, handle, rx_peer)) {
+        return XGL_ERR_TIMEOUT;
+    }
+#if XGL_FEATURE_FRAGMENTATION && XGL_FEATURE_OUT_OF_ORDER
+    if (transport_expire_rx_buffered_fragments(ctx, handle, rx_peer)) {
+        return XGL_ERR_TIMEOUT;
+    }
+#endif
+#endif
 #if XGL_FEATURE_FRAGMENTATION
     if (packet->fragment) {
         err = transport_validate_rx_fragment_scope(ctx, rx_peer, packet,

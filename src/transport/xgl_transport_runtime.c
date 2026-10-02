@@ -252,6 +252,25 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
             }
             continue;
         }
+#if XGL_FEATURE_FRAGMENTATION && XGL_FEATURE_OUT_OF_ORDER
+        if (transport_expire_rx_buffered_fragments(ctx, handle, peer)) {
+            if (first_error == XGL_OK) {
+                first_error = XGL_ERR_TIMEOUT;
+            }
+            continue;
+        }
+#endif
+        if (ctx->work != NULL) {
+            /* Rotation must arbitrate all TX work, not only message tails. */
+            xgl_error_t retry_error = transport_process_retransmission_queue(
+                ctx, peer, handle, current_time_ms);
+            if (first_error == XGL_OK) {
+                first_error = retry_error;
+            }
+            if (peer->failed) {
+                continue;
+            }
+        }
 #endif
 #if XGL_FEATURE_FRAGMENTATION
         xgl_error_t error = transport_pump_tx_message(ctx, handle, peer);
@@ -290,11 +309,17 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
 #endif
 
-    xgl_error_t retry_error =
-        transport_process_retransmissions(ctx, handle, current_time_ms);
-    if (first_error == XGL_OK) {
-        first_error = retry_error;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (ctx->work == NULL) {
+#endif
+        xgl_error_t retry_error =
+            transport_process_retransmissions(ctx, handle, current_time_ms);
+        if (first_error == XGL_OK) {
+            first_error = retry_error;
+        }
+#if XGL_FEATURE_ADVANCED_RUNTIME
     }
+#endif
 
 #if XGL_FEATURE_FRAGMENTATION
     if (ctx->fragment_mgr) {
@@ -381,6 +406,21 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
             transport_take_timeout(now_ms, peer->tx_started_ms,
                                    ctx->tx_lifetime_ms, &active, timeout_ms);
         }
+#if XGL_FEATURE_FRAGMENTATION && XGL_FEATURE_OUT_OF_ORDER
+        if (ctx->fragment_mgr != NULL &&
+            ctx->fragment_mgr->reassembly_timeout_ms != 0U) {
+            for (const xgl_transport_rx_buffered_packet_t* buffered =
+                     peer->rx_buffered;
+                 buffered != NULL; buffered = buffered->next) {
+                if (buffered->packet.fragment) {
+                    transport_take_timeout(
+                        now_ms, buffered->received_at_ms,
+                        ctx->fragment_mgr->reassembly_timeout_ms, &active,
+                        timeout_ms);
+                }
+            }
+        }
+#endif
 #endif
         xgct_list_node_t* node;
         XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {

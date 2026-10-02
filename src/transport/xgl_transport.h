@@ -52,6 +52,10 @@ typedef struct xgl_transport_rx_buffered_packet_s {
     xgl_packet_t packet;           /**< Cached packet metadata */
     xgl_packet_data_t packet_data; /**< Cached packet data view */
     uint8_t* storage; /**< Owned contiguous payload and TLV bytes */
+#if XGL_FEATURE_ADVANCED_RUNTIME && XGL_FEATURE_FRAGMENTATION
+    uint32_t
+        received_at_ms; /**< First admission, retained across RX ordering */
+#endif
 } xgl_transport_rx_buffered_packet_t;
 #endif
 

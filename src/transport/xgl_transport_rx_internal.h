@@ -75,6 +75,18 @@ bool transport_expire_rx_fragment(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                   xgl_transport_peer_state_t* peer,
                                   const xgl_packet_t* packet,
                                   const transport_rx_fragment_t* fragment);
+#if XGL_FEATURE_OUT_OF_ORDER
+/**
+ * \brief           Expire reliable fragments already owned through SACK
+ * \param[in,out]   ctx: Transport owner
+ * \param[in]       handle: Instance used by synchronous error callbacks
+ * \param[in,out]   peer: Existing scope, or NULL when no state exists
+ * \return          true if a cached fragment expired and its scope failed
+ */
+bool transport_expire_rx_buffered_fragments(xgl_transport_ctx_t* ctx,
+                                            xgl_handle_t handle,
+                                            xgl_transport_peer_state_t* peer);
+#endif
 #endif
 
 void transport_clear_pending_message(xgl_transport_ctx_t* ctx,
