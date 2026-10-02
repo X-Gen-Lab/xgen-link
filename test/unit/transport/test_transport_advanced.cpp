@@ -90,13 +90,14 @@ class XglTransportAdvancedTest : public ::testing::Test {
             xgl_transport_destroy(&ctx);
     }
 
-    xgl_error_t Send(uint16_t target = 2U, size_t length = 1U) {
+    xgl_error_t Send(uint16_t target = 2U, size_t length = 1U,
+                     bool reliable = true) {
         const std::array<uint8_t, 128> payload = {};
         xgl_tx_data_t data = {};
         data.target_id = target;
         data.connection_id = 11U;
         data.session_epoch = 22U;
-        data.reliable = true;
+        data.reliable = reliable;
         data.data = payload.data();
         data.data_len = length;
         return xgl_transport_send(&ctx, nullptr, &data);
@@ -262,6 +263,40 @@ TEST_F(XglTransportAdvancedTest,
     EXPECT_TRUE(ctx.peers->failed);
 }
 
+TEST_F(XglTransportAdvancedTest,
+       UnreliableFragmentsNeverStartReliableBusyPeriod) {
+    Init(250U);
+    ASSERT_EQ(Send(2U, 128U, false), XGL_OK);
+    EXPECT_EQ(ctx.peers, nullptr);
+    EXPECT_EQ(ctx.tx_message_bytes, 0U);
+    bool pending = true;
+    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 1000U, 0U, &pending),
+              XGL_OK);
+    EXPECT_FALSE(pending);
+    EXPECT_TRUE(events.empty());
+}
+
+
+TEST_F(XglTransportAdvancedTest, ExpiringScopeClearsObsoleteBudgetContinuation) {
+    Init(0U, 100U);
+    ASSERT_EQ(Fragment(0U, 0U), XGL_OK);
+    submit_result = XGL_ERR_BUSY;
+    const std::array<uint8_t, 40> payload = {};
+    xgl_tx_data_t tx = {};
+    tx.target_id = 2U;
+    tx.connection_id = 42U;
+    tx.session_epoch = 77U;
+    tx.reliable = true;
+    tx.data = payload.data();
+    tx.data_len = payload.size();
+    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
+    bool pending = true;
+    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 100U, 0U, &pending), XGL_ERR_TIMEOUT);
+    EXPECT_TRUE(ctx.peers->failed);
+    EXPECT_EQ(ctx.tx_message_bytes, 0U);
+    EXPECT_FALSE(pending);
+}
+
 TEST_F(XglTransportAdvancedTest, ReassemblyUsesConfiguredAbsoluteDeadline) {
     Init(0U, 12000U);
     ASSERT_EQ(Fragment(0U, 0U, 6U), XGL_OK);
@@ -282,8 +317,8 @@ TEST_F(XglTransportAdvancedTest, ReassemblyUsesConfiguredAbsoluteDeadline) {
     EXPECT_EQ(events[0], XGL_SCOPE_FAILED);
 }
 
-
-TEST_F(XglTransportAdvancedTest, LateReliableFinalFragmentCannotCompleteExpiredMessage) {
+TEST_F(XglTransportAdvancedTest,
+       LateReliableFinalFragmentCannotCompleteExpiredMessage) {
     Init(0U, 250U);
     ASSERT_EQ(Fragment(0U, 0U), XGL_OK);
     ctx.current_time_ms = 250U;
@@ -296,7 +331,8 @@ TEST_F(XglTransportAdvancedTest, LateReliableFinalFragmentCannotCompleteExpiredM
     EXPECT_EQ(errors[0], XGL_ERR_TIMEOUT);
 }
 
-TEST_F(XglTransportAdvancedTest, LateUnreliableFinalFragmentExpiresOnlyItsMessage) {
+TEST_F(XglTransportAdvancedTest,
+       LateUnreliableFinalFragmentExpiresOnlyItsMessage) {
     Init(0U, 250U);
     ASSERT_EQ(Fragment(0U, 0U, 4U, false), XGL_OK);
     ctx.current_time_ms = 250U;
