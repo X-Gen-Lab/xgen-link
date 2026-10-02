@@ -107,12 +107,13 @@ class XglTransportAdvancedTest : public ::testing::Test {
     }
 #if XGL_FEATURE_FRAGMENTATION
     xgl_error_t Fragment(uint32_t packet_number, uint32_t offset,
-                         uint32_t length = 4U, bool reliable = true) {
+                         uint32_t length = 4U, bool reliable = true,
+                         uint32_t message_id = 7U, uint16_t source_id = 2U) {
         const uint8_t payload[] = {0x11U, 0x22U};
         std::array<uint8_t, 32> value = {}, extension = {};
         size_t value_len = 0U, extension_len = 0U;
-        if (xgl_wire_encode_fragment_ext_value(value.data(), value.size(), 7U,
-                                               offset, length,
+        if (xgl_wire_encode_fragment_ext_value(value.data(), value.size(),
+                                               message_id, offset, length,
                                                &value_len) != XGL_OK)
             return XGL_ERR_INVALID_FRAME;
         if (xgl_wire_encode_ext(extension.data(), extension.size(),
@@ -121,7 +122,7 @@ class XglTransportAdvancedTest : public ::testing::Test {
             return XGL_ERR_INVALID_FRAME;
         xgl_packet_data_t data = {sizeof(payload), payload};
         xgl_packet_t packet = {};
-        packet.source_id = 2U;
+        packet.source_id = source_id;
         packet.target_id = 1U;
         packet.connection_id = 42U;
         packet.session_epoch = 77U;
@@ -578,6 +579,53 @@ TEST_F(XglTransportAdvancedTest,
     EXPECT_EQ(ctx.peers->rx_buffered_count, 0U);
     EXPECT_TRUE(received.empty());
 }
+
+#if XGL_BUILD_WINDOW_CAPACITY >= 4
+TEST_F(XglTransportAdvancedTest,
+       CachedFragmentDeadlineSurvivesDrainAndClockWrap) {
+    Init(0U, 250U, 4U);
+    ctx.current_time_ms = UINT32_MAX - 99U;
+    ASSERT_EQ(Fragment(2U, 4U, 8U), XGL_OK);
+    ctx.current_time_ms = 0U;
+    ASSERT_EQ(Fragment(1U, 2U, 8U), XGL_OK);
+    ctx.current_time_ms = 100U;
+    ASSERT_EQ(Fragment(0U, 0U, 8U), XGL_OK);
+    EXPECT_EQ(ctx.peers->rx_buffered_count, 0U);
+    uint32_t timeout = 0U;
+    EXPECT_TRUE(xgl_transport_next_timeout(&ctx, 100U, &timeout));
+    EXPECT_EQ(timeout, 50U);
+    ctx.current_time_ms = 150U;
+    EXPECT_EQ(Fragment(3U, 6U, 8U), XGL_ERR_TIMEOUT);
+    EXPECT_TRUE(received.empty());
+    EXPECT_TRUE(ctx.peers->failed);
+    EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 0U);
+}
+
+TEST_F(XglTransportAdvancedTest,
+       CachedMessageDeadlinesDoNotRenewOrCrossScopes) {
+    Init(0U, 250U, 4U);
+    ASSERT_EQ(Fragment(1U, 2U, 6U, true, 7U, 2U), XGL_OK);
+    ctx.current_time_ms = 100U;
+    ASSERT_EQ(Fragment(2U, 2U, 6U, true, 8U, 2U), XGL_OK);
+    ASSERT_EQ(Fragment(1U, 2U, 6U, true, 7U, 3U), XGL_OK);
+    bool pending = false;
+    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 250U, 0U, &pending),
+              XGL_ERR_TIMEOUT);
+    auto* old_scope = transport_find_peer_scope(&ctx, 2U, 42U, 77U);
+    auto* young_scope = transport_find_peer_scope(&ctx, 3U, 42U, 77U);
+    ASSERT_NE(old_scope, nullptr);
+    ASSERT_NE(young_scope, nullptr);
+    EXPECT_TRUE(old_scope->failed);
+    EXPECT_EQ(old_scope->rx_buffered_count, 0U);
+    EXPECT_FALSE(young_scope->failed);
+    EXPECT_EQ(young_scope->rx_buffered_count, 1U);
+    EXPECT_EQ(events.size(), 1U);
+    EXPECT_EQ(xgl_transport_run_bounded(&ctx, nullptr, 350U, 0U, &pending),
+              XGL_ERR_TIMEOUT);
+    EXPECT_TRUE(young_scope->failed);
+    EXPECT_EQ(events.size(), 2U);
+}
+#endif
 #endif
 #endif
 
