@@ -106,3 +106,35 @@ RESET and CLOSE clear only the matching peer, connection, and session. They do n
 ## Observability
 
 Reliability should surface retransmit, ACK timeout, window-full, and drop counters through statistics. Production debugging should first inspect route MTU, auth/replay rejects, and reliable queue peak usage.
+
+## RTT Estimation
+
+### Algorithm Parameters
+
+The estimator tracks smoothed RTT and RTT variation to derive a retransmission timeout, bounded by configured limits.
+
+### Update Rules
+
+Measure unambiguous acknowledgment samples rather than using a retransmitted packet as a clean RTT sample.
+
+### Evidence
+
+See `test/test_rtt.cpp` and `test/test_reliable.cpp`.
+
+## Sliding Window
+
+### Structure
+
+The sender tracks the available in-flight capacity per peer state.
+
+### Operation
+
+Sending consumes capacity and acknowledgments release it. When capacity is exhausted, the caller must handle backpressure rather than assume the packet was queued.
+
+### Relationship to the Reliable Queue
+
+The window limits the number of in-flight packets; the reliable queue retains the entries and retry deadlines.
+
+### Evidence
+
+See `test/test_window.cpp` and `test/test_reliable.cpp`.

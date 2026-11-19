@@ -47,14 +47,23 @@ XGL has three configuration mechanisms: Kconfig (compile-time), `xgl_config.h` (
 | `XGL_DEFAULT_MAX_RETRY` | int | 3 | 0-10 | Max retry count |
 | `XGL_DEFAULT_WINDOW_SIZE` | int | 4 | 1-16 | Sliding window size |
 
-### Compression & Encryption
+### Compression
 
 | Config | Type | Default | Description |
 | --- | --- | --- | --- |
 | `XGL_ENABLE_COMPRESSION` | bool | n | Enable compression |
 | `XGL_COMPRESSION_RLE` / `LZ77` / `ZLIB` | choice | RLE | Compression algorithm |
+
+### Encryption
+
+| Config | Type | Default | Description |
+| --- | --- | --- | --- |
 | `XGL_ENABLE_ENCRYPTION` | bool | n | Enable encryption |
 | `XGL_ENCRYPTION_AES128` / `CHACHA20` | choice | AES128 | Encryption algorithm |
+
+### Platform Configuration
+
+Select the appropriate target platform configuration for POSIX, FreeRTOS, Windows, or bare-metal ports.
 
 ### Resource Constraints
 

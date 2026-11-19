@@ -133,9 +133,17 @@ All operations acquire the lock, delegate to the underlying mempool, then releas
 1. **Dynamic** (`xgl_tiered_pool_init`): Internally allocates buffers via the allocator; sets `owns_buffers=true`.
 2. **Static** (`xgl_tiered_pool_init_static`): User provides pre-allocated buffers for no-heap scenarios; sets `owns_buffers=false`.
 
+### Release Strategy
+
+Return blocks through the owning allocator or pool; the pool needs to recover the correct tier on release.
+
 ## Packet Pool
 
 `xgl_packet_pool_t` manages a pre-allocated pool of `xgl_packet_t` objects used throughout the protocol stack.
+
+### Packet Structure
+
+A pooled packet carries its payload storage and metadata, including the reference count used to manage its lifetime.
 
 ### Reference Counting
 
@@ -147,7 +155,9 @@ All operations acquire the lock, delegate to the underlying mempool, then releas
 
 Reference counting allows multiple packets to share the same payload (e.g., reliable retransmission), avoiding unnecessary memory copies.
 
-## No-Heap Profile
+## Memory Budgeting
+
+### No-Heap Profile
 
 Strict no-heap builds require all memory to be pre-allocated during the initialization phase:
 
@@ -158,6 +168,10 @@ Strict no-heap builds require all memory to be pre-allocated during the initiali
 5. **Fragment Manager**: `max_reassembly_buffers × sizeof(xgl_reassembly_buffer_t)` bytes.
 
 See [Config Presets](../reference/config-presets.md) for specific resource values across 5 presets.
+
+### Resource Presets
+
+Start with the closest preset and verify it with the target's largest frame, configured window, and worst-case concurrent reassemblies.
 
 ## Evidence
 

@@ -124,7 +124,7 @@ jobs:
         run: cmake --preset asan
 
       - name: Build
-        run: cmake --build build/asan --target xgl_tests
+        run: cmake --build --preset asan --parallel
 
       - name: Test
         run: ctest --preset asan
@@ -152,7 +152,7 @@ jobs:
         run: cmake --preset gcc-test-threadsafe
 
       - name: Build
-        run: cmake --build build/gcc-test-threadsafe --target xgl_tests
+        run: cmake --build --preset gcc-test-threadsafe --parallel
 
       - name: Test
         run: ctest --preset gcc-test-threadsafe

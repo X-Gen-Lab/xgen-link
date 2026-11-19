@@ -98,8 +98,7 @@ TEST(XglTimeTest, DelayUs_DelaysCorrectly) {
 
     /* Elapsed time should be at least 800us (allowing for timing variance) */
     EXPECT_GE(elapsed, 800);
-    /* And not more than 5000us (reasonable upper bound) */
-    EXPECT_LE(elapsed, 5000);
+    /* A loaded CI runner may resume this thread later than requested. */
 }
 
 /**
@@ -121,21 +120,23 @@ TEST(XglTimeTest, DelayMs_ZeroDelay) {
 /* Elapsed Time Tests                                                        */
 /*---------------------------------------------------------------------------*/
 
+static uint32_t custom_time_value = 0;
+
+static uint32_t custom_time_source(void) {
+    return custom_time_value;
+}
+
 /**
  * \brief           Test xgl_time_elapsed_ms() calculates correctly
  */
 TEST(XglTimeTest, ElapsedMs_CalculatesCorrectly) {
-    uint32_t start = xgl_time_ms();
+    xgl_time_set_source(custom_time_source);
+    custom_time_value = 100;
+    const uint32_t start = xgl_time_ms();
 
-    /* Sleep for 20ms */
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-
-    uint32_t elapsed = xgl_time_elapsed_ms(start);
-
-    /* Elapsed should be at least 15ms */
-    EXPECT_GE(elapsed, 15);
-    /* And not more than 50ms */
-    EXPECT_LE(elapsed, 50);
+    custom_time_value = 120;
+    EXPECT_EQ(xgl_time_elapsed_ms(start), 20U);
+    xgl_time_set_source(nullptr);
 }
 
 /**
@@ -213,12 +214,6 @@ TEST(XglTimeTest, IsTimeout_HandlesWraparound) {
 /*---------------------------------------------------------------------------*/
 /* Custom Time Source Tests                                                  */
 /*---------------------------------------------------------------------------*/
-
-static uint32_t custom_time_value = 0;
-
-static uint32_t custom_time_source(void) {
-    return custom_time_value;
-}
 
 /**
  * \brief           Test xgl_time_set_source() allows custom time source

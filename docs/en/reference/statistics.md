@@ -44,10 +44,14 @@ Each `xgl_layer_stats_t` contains:
 
 ```c
 xgl_statistics_t stats;
-xgl_get_statistics(instance, &stats);
+xgl_stats_get(instance, &stats);
 ```
 
-### Per-Phase Memory Statistics
+### Layer Statistics Pointers
+
+Layers update their own counters; applications should use the public statistics snapshot rather than retain an internal pointer.
+
+## Per-Phase Memory Statistics
 
 The tracking allocator provides per-phase memory allocation statistics: INIT, TX, RX, RELIABLE, FRAGMENT.
 
