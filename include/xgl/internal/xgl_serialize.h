@@ -14,6 +14,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 
 /*---------------------------------------------------------------------------*/
 /* Endianness Detection                                                      */
@@ -103,7 +104,7 @@ uint32_t xgl_deserialize_u32_le(const uint8_t* buffer);
 /* Alignment-Safe Accessor Macros                                           */
 /*---------------------------------------------------------------------------*/
 
-#if XGL_STRICT_ALIGNMENT
+#if XGL_STRICT_ALIGNMENT || !XGL_IS_LITTLE_ENDIAN
 
 /**
  * \brief           Read uint16_t from potentially unaligned buffer (safe)
@@ -135,33 +136,32 @@ uint32_t xgl_deserialize_u32_le(const uint8_t* buffer);
 
 #else
 
-/**
- * \brief           Read uint16_t from buffer (direct access on platforms supporting unaligned access)
- * \param[in]       ptr: Pointer to buffer
- * \return          Value read from buffer
- */
-#define XGL_READ_U16(ptr) (*(const uint16_t*)(ptr))
+/* On little-endian hosts, fixed-size memcpy permits native loads/stores
+ * without requiring pointer alignment or violating aliasing rules. */
+static inline uint16_t xgl_read_u16_unaligned(const void* ptr) {
+    uint16_t value;
+    memcpy(&value, ptr, sizeof(value));
+    return value;
+}
 
-/**
- * \brief           Write uint16_t to buffer (direct access on platforms supporting unaligned access)
- * \param[out]      ptr: Pointer to buffer
- * \param[in]       val: Value to write
- */
-#define XGL_WRITE_U16(ptr, val) (*(uint16_t*)(ptr) = (val))
+static inline void xgl_write_u16_unaligned(void* ptr, uint16_t value) {
+    memcpy(ptr, &value, sizeof(value));
+}
 
-/**
- * \brief           Read uint32_t from buffer (direct access on platforms supporting unaligned access)
- * \param[in]       ptr: Pointer to buffer
- * \return          Value read from buffer
- */
-#define XGL_READ_U32(ptr) (*(const uint32_t*)(ptr))
+static inline uint32_t xgl_read_u32_unaligned(const void* ptr) {
+    uint32_t value;
+    memcpy(&value, ptr, sizeof(value));
+    return value;
+}
 
-/**
- * \brief           Write uint32_t to buffer (direct access on platforms supporting unaligned access)
- * \param[out]      ptr: Pointer to buffer
- * \param[in]       val: Value to write
- */
-#define XGL_WRITE_U32(ptr, val) (*(uint32_t*)(ptr) = (val))
+static inline void xgl_write_u32_unaligned(void* ptr, uint32_t value) {
+    memcpy(ptr, &value, sizeof(value));
+}
+
+#define XGL_READ_U16(ptr) xgl_read_u16_unaligned(ptr)
+#define XGL_WRITE_U16(ptr, val) xgl_write_u16_unaligned(ptr, val)
+#define XGL_READ_U32(ptr) xgl_read_u32_unaligned(ptr)
+#define XGL_WRITE_U32(ptr, val) xgl_write_u32_unaligned(ptr, val)
 
 #endif
 

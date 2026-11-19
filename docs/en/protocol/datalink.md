@@ -35,6 +35,10 @@ The parser converts byte streams from PHY into complete frames through 4 states:
 3. **PAYLOAD**: Receiving `payload_len` bytes of payload data.
 4. **CRC**: Verifying the frame CRC16.
 
+### Parser States
+
+State is retained across PHY reads so split headers and payloads can be completed on later calls.
+
 ### Timeout
 
 - Default: `XGL_PARSER_TIMEOUT_MS = 1000` ms
@@ -81,6 +85,10 @@ The parser converts byte streams from PHY into complete frames through 4 states:
 - 64-bit bitmap per slot (`XGL_DATALINK_REPLAY_WINDOW_SIZE = 64`)
 - Slots keyed by `(source_id, connection_id, session_epoch)`
 
+### Slot Allocation Policy
+
+The replay-window implementation assigns slots by peer/session identity. Treat slot count as a finite capacity when sizing authenticated connections.
+
 ### Three-State Determination
 
 | State | Condition | Behavior |
@@ -90,7 +98,7 @@ The parser converts byte streams from PHY into complete frames through 4 states:
 | DUPLICATE | packet_number within window and bitmap bit is 1 | Drop, count |
 | OUT_OF_WINDOW | packet_number outside window range | Drop |
 
-### Capacity
+**Capacity**
 
 16 slots × 64 bits = supports up to 16 concurrent authenticated connections, each tracking 64 in-flight packets. Sufficient for typical MCU deployments.
 

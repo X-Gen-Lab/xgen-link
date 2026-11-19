@@ -36,11 +36,7 @@ uint16_t xgl_deserialize_u16_le(const uint8_t* buffer) {
     }
 
     /* Byte-wise deserialization (alignment-safe) */
-    uint16_t value = 0;
-    value |= (uint16_t)buffer[0];           /* LSB */
-    value |= (uint16_t)buffer[1] << 8;      /* MSB */
-
-    return value;
+    return (uint16_t)((uint32_t)buffer[0] | ((uint32_t)buffer[1] << 8));
 }
 
 /*---------------------------------------------------------------------------*/

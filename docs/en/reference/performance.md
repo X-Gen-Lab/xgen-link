@@ -49,6 +49,16 @@ Conditions: ARM Cortex-M4 @ 160MHz, `XGL_THREAD_SAFE=n`.
 - Reliable single-frame: ~5,000 frames/sec (window=8, RTT=2ms)
 - Fragmented transfer: limited by reassembly buffers and timeout
 
+## Memory Pool Efficiency
+
+### Tiered Pool Allocation Distribution
+
+Inspect per-tier usage under representative payload sizes to identify pressure and wasted block capacity. A tier mix that works for short telemetry may not suit fragmented transfers.
+
+### Peak Packet Pool Usage
+
+Measure the peak with the intended window and concurrent transfers; average occupancy alone does not show whether bursts exhaust the pool.
+
 ## Resource Presets
 
 | Profile | TX Pool | RX Buffer | Window | Max Retry | Target |

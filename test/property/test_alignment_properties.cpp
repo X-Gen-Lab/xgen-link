@@ -199,7 +199,7 @@ TEST(XglAlignmentProperties, AlignmentDetection) {
 #if XGL_STRICT_ALIGNMENT
     std::cout << "Running in STRICT ALIGNMENT mode (byte-wise access)" << std::endl;
 #else
-    std::cout << "Running in RELAXED ALIGNMENT mode (direct access)" << std::endl;
+    std::cout << "Running in RELAXED ALIGNMENT mode (alignment-safe access)" << std::endl;
 #endif
 }
 

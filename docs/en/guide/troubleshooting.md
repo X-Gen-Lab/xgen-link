@@ -53,6 +53,10 @@ void my_error_callback(xgl_error_t error, const char* message, void* user_data) 
 
 Enable via Kconfig: `XGL_ENABLE_LOGGING=y`, `XGL_LOG_LEVEL_DEBUG=y`.
 
+### Platform Information
+
+When reporting a target issue, include the detected compiler, OS, architecture, alignment and endianness so the port can be reproduced.
+
 ## Troubleshooting Flow
 
 1. Check error callbacks for reported errors.
@@ -78,6 +82,18 @@ Enable via Kconfig: `XGL_ENABLE_LOGGING=y`, `XGL_LOG_LEVEL_DEBUG=y`.
 - **High latency**: Check RTT estimator, retransmission rate, window utilization.
 - **Low throughput**: Check sliding window size, MTU, PHY speed.
 - **Memory issues**: Use tracking allocator, check packet pool peak usage.
+
+### High Latency
+
+Check the polling period, PHY buffering, and retransmission timing before changing a timeout.
+
+### Low Throughput
+
+Compare actual link utilization with retry counts and window-full events to distinguish link saturation from protocol backpressure.
+
+### Memory Problems
+
+Compare buffer and pool high-water marks with configured capacity. Reproduce the peak with the intended frame sizes and number of concurrent peers.
 
 ## Evidence
 

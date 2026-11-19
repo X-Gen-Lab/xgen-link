@@ -12,6 +12,7 @@ set(consumer_build "${XGL_SMOKE_DIR}/consumer-build")
 set(consumer_configure_args
     "${CMAKE_COMMAND}" -S "${consumer_src}" -B "${consumer_build}" -G Ninja
     "-DCMAKE_PREFIX_PATH=${install_prefix}"
+    "-DCMAKE_EXE_LINKER_FLAGS=${XGL_CONSUMER_LINKER_FLAGS}"
 )
 
 if(DEFINED XGL_C_COMPILER AND NOT XGL_C_COMPILER STREQUAL "")

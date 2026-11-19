@@ -113,16 +113,7 @@
 
 ### CI 集成
 
-```yaml
-# .github/workflows/ci.yml
-- name: Interoperability Tests
-  run: |
-    # 构建不同平台版本
-    cmake --preset arm-gcc
-    cmake --preset x86-gcc
-    # 运行交叉测试
-    ./test/xgl_interop_test --platform1=arm --platform2=x86
-```
+当前 CI 在 Linux、macOS、Windows 上运行 GCC 宿主机冒烟测试，在 Ubuntu 上运行发布门禁和 sanitizer 检查。这些检查不能代替目标板与独立协议实现之间的互操作验证。
 
 ### 测试报告
 

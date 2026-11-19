@@ -102,6 +102,10 @@ Reliable sending follows strict transactional semantics:
 
 ## Receive Path
 
+### Call Chain
+
+The transport receive path decodes control and data frames from the network layer, looks up peer state, then passes deliverable data to the application callback.
+
 ### Receive State Table
 
 | Condition | Behavior |
@@ -116,6 +120,14 @@ Reliable sending follows strict transactional semantics:
 Out-of-order packets are buffered by packet number. Only contiguous payload starting from `rx_next_packet_number` is delivered to the application callback. Out-of-order packets are cached in the `rx_buffered` linked list.
 
 ## Reliable Queue
+
+### Data Structure
+
+The reliable queue holds in-flight frames and retransmission deadlines; its index is used for packet lookup.
+
+### Reliable Packet
+
+A pending entry retains the packet identity and state needed to process acknowledgments, retry on timeout, and release resources.
 
 ### 32-Bucket Hash Index
 
@@ -146,7 +158,23 @@ Clamped to `[XGL_MIN_RTO_MS (100ms), XGL_MAX_RTO_MS (5000ms)]`.
 - **SACK**: Sent when out-of-order packets (gaps) are detected; describes received packets to trigger fast retransmission.
 - Both retain the original `connection_id`, `session_epoch`, and `session_id` from the received reliable packet.
 
+### ACK Generation
+
+The receiver reports its contiguous receive progress through ACK ranges.
+
+### SACK Generation
+
+When packets arrive beyond a gap, selective acknowledgments allow the sender to distinguish buffered packets from missing ones.
+
+### Reserved ACK/SACK Fields
+
+Follow the wire extension definitions for reserved fields rather than assigning them implementation-specific meaning.
+
 ## Fragmentation
+
+### Fragmentation Decision
+
+Check the route MTU and account for the base header, TLVs, optional authentication trailer and CRC before determining the maximum fragment payload.
 
 ### Reassembly Buffer
 

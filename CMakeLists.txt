@@ -276,6 +276,7 @@ if(XGL_BUILD_SDK_CONSUMER_SMOKE)
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
             -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
+            "-DXGL_CONSUMER_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
         DEPENDS xgl
         COMMENT "Validating installed xgl CMake package with a consumer project"
@@ -296,6 +297,7 @@ if(XGL_BUILD_TESTS)
                 -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
                 -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest
                 -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
+                "-DXGL_CONSUMER_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
         )
         set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES TIMEOUT 60)

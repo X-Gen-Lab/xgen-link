@@ -85,6 +85,10 @@ Runtime verification via `xgl_is_little_endian()` reads a `uint32_t` to confirm 
 | `XGL_WEAK` | `__attribute__((weak))` | `__declspec(selectany)` | Weak symbol |
 | `XGL_NORETURN` | `__attribute__((noreturn))` | `__declspec(noreturn)` | Non-returning function |
 
+## Memory Barriers
+
+Use the platform abstraction's barriers where ordering is needed; they do not replace a mutex or establish ownership of a shared buffer.
+
 ## Mutex Three-State
 
 | State | Condition | Implementation | Overhead |
@@ -94,6 +98,10 @@ Runtime verification via `xgl_is_little_endian()` reads a `uint32_t` to confirm 
 | Windows | Windows + `XGL_THREAD_SAFE` | `CRITICAL_SECTION` | Low |
 | FreeRTOS | FreeRTOS + `XGL_THREAD_SAFE` | `SemaphoreHandle_t` | Medium |
 | Bare-Metal | No OS + `XGL_THREAD_SAFE` | No-op (single-core assumption) | Zero |
+
+### Mutex API
+
+Callers initialize and destroy mutexes through the platform abstraction and use its lock/unlock operations for critical sections.
 
 ### Mutex Guard (RAII)
 
@@ -117,7 +125,7 @@ xgl_mutex_guard_unlock(&guard);
 | `xgl_time_provider_default()` | System time (POSIX/Windows) |
 | `xgl_time_provider_mock()` | Simulated time, manually advanced |
 
-### Mock Time
+**Mock Time**
 
 ```c
 xgl_mock_time_t mock;

@@ -90,13 +90,6 @@ frame crc16
 - 认证要求开启时，未认证帧不会交付上层。
 - 当帧通过 AUTHENTICATED/SECURITY_EXT 声明自己已认证时，即使实例未强制所有帧认证，也必须验签成功后才能交付。
 
-## 设计约束
-
-- 不允许把 public struct 直接作为 wire layout。
-- 所有 multi-byte 字段都是 little-endian。
-- parser 必须能处理任意分片输入和连续多帧输入。
-- 错误帧丢弃后必须继续寻找下一组 magic，不阻塞后续数据。
-
 ## CRC16 算法参数
 
 XGL 使用 CRC16 校验帧完整性。具体算法参数：
@@ -124,3 +117,10 @@ XGL 使用 CRC16 校验帧完整性。具体算法参数：
 | TX frame 构建 | frame_crc16 | `src/wire/xgl_frame.c` |
 | RX frame 验证 | frame_crc16 重算比较 | `src/wire/xgl_parser.c`, `test/test_crc.cpp` |
 | TTL 转发重写 | header_crc16 重算 | `src/network/xgl_network_receive.c` |
+
+## 设计约束
+
+- 不允许把 public struct 直接作为 wire layout。
+- 所有 multi-byte 字段都是 little-endian。
+- parser 必须能处理任意分片输入和连续多帧输入。
+- 错误帧丢弃后必须继续寻找下一组 magic，不阻塞后续数据。

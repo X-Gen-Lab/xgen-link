@@ -36,6 +36,10 @@ Key factors:
 | `MAX_RETRY` | 3-5 | Increase for poor link quality |
 | `REASSEMBLY_TIMEOUT_MS` | 5000 | Fragment reassembly timeout |
 
+### Memory Pools
+
+Tune pool sizes using peak occupancy under representative bursts and fragmentation; avoid shrinking based only on idle or average use.
+
 ## Code-Level Optimization
 
 ### Reduce Copies
@@ -54,6 +58,16 @@ Key factors:
 
 1. Increase MTU to reduce frame count.
 2. Enable hardware CRC (if supported).
+
+## Quantitative Benchmarks
+
+### Latency Benchmark
+
+Record the target, payload, link rate, and timing boundaries, then report percentile measurements instead of treating example timings as guarantees.
+
+### Throughput Benchmark
+
+Measure delivered payload bytes per second separately from raw PHY line rate. Record the loss rate, ACK behavior and window size for reliable transfers.
 
 ## Monitoring Recommendations
 

@@ -95,6 +95,16 @@ Public API stability:
 2. Deprecated APIs marked as `deprecated`.
 3. Major version changes clean up deprecated APIs.
 
+## Automated Validation
+
+### CI Integration
+
+The existing CI workflow runs host GCC smoke tests on Linux, macOS, and Windows and runs release validation and sanitizer smoke tests on Ubuntu. This does not replace testing on the target board or against an independently implemented peer.
+
+### Test Reports
+
+Record the commit, compiler and target, configuration preset, and per-test outcome. Include any interoperability scenarios that still require manual checks.
+
 ## Known Limitations
 
 | Limitation | Description | Impact |

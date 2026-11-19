@@ -249,10 +249,7 @@ cleanup_network:
     memset(&handle->layers.network_ctx, 0, sizeof(handle->layers.network_ctx));
 
 cleanup_datalink:
-    /* Datalink context stores rx_cache pointer after successful init */
-    if (handle->layers.datalink_ctx.rx_cache != NULL) {
-        handle->layers.datalink_ctx.rx_cache = NULL;
-    }
+    /* The backing RX buffer is freed by cleanup_rx_buffer below. */
     memset(&handle->layers.datalink_ctx, 0, sizeof(handle->layers.datalink_ctx));
 
 cleanup_rx_buffer:

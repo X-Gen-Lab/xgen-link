@@ -111,6 +111,15 @@ Encryption is reserved. Do not treat `enable_encryption` as an available product
 
 XGL does not persist keys or define key derivation. Production applications implement key storage, rotation, key id mapping, and hardware security module integration inside the auth provider.
 
+## Traceability
+
+| Rule | Source | Tests |
+| --- | --- | --- |
+| Auth provider validation and tag length bounds | `src/api/xgl_config.c` | `test/test_config.cpp` |
+| SECURITY_EXT encoding and auth trailer placement | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_wire_ext.c` | `test/test_wire.cpp`, `test/test_frame.cpp` |
+| Canonical AAD with TTL/header CRC zeroed | `src/wire/xgl_wire.c` | `test/test_datalink.cpp`, `test/test_network.cpp` |
+| Datalink auth verification and replay classification | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | `test/test_datalink.cpp`, `test/test_security.cpp` |
+
 ## Replay Window Algorithm
 
 ### Data Structure
@@ -137,6 +146,10 @@ Datalink layer maintains 16 replay window slots (`XGL_DATALINK_REPLAY_WINDOW_COU
 ### Sliding Update
 
 When `packet_number > base + window_size`, bitmap is right-shifted by `packet_number - base` bits and base is updated.
+
+### Clock Rollback Handling
+
+Use a monotonic time source for replay-window timing; review the rollback handling in the replay-window implementation when adapting the platform clock.
 
 ### Capacity Decision
 
@@ -175,6 +188,10 @@ When `packet_number > base + window_size`, bitmap is right-shifted by `packet_nu
 | Oversized frames | Parser cache size limit |
 | Slow connections | Parser timeout (1000 ms) resets state |
 
+### Key Boundary
+
+Key provisioning and rotation are the application's responsibility; provider callbacks are the integration boundary between keys and the protocol stack.
+
 ### Known Limitations
 
 | Limitation | Description |
@@ -191,12 +208,3 @@ When `packet_number > base + window_size`, bitmap is right-shifted by `packet_nu
 3. Rotate authentication keys periodically
 4. Monitor `rx_auth_failures` and `rx_replay_duplicates` counters
 5. In security-sensitive scenarios, consider implementing end-to-end encryption at the application layer
-
-## Traceability
-
-| Rule | Source | Tests |
-| --- | --- | --- |
-| Auth provider validation and tag length bounds | `src/api/xgl_config.c` | `test/test_config.cpp` |
-| SECURITY_EXT encoding and auth trailer placement | `src/wire/xgl_frame_auth.c`, `src/wire/xgl_wire_ext.c` | `test/test_wire.cpp`, `test/test_frame.cpp` |
-| Canonical AAD with TTL/header CRC zeroed | `src/wire/xgl_wire.c` | `test/test_datalink.cpp`, `test/test_network.cpp` |
-| Datalink auth verification and replay classification | `src/datalink/xgl_datalink_receive.c`, `src/security/xgl_security.c` | `test/test_datalink.cpp`, `test/test_security.cpp` |

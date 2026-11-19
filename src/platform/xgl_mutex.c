@@ -4,6 +4,12 @@
  * \author          X-Gen Lab
  */
 
+/* POSIX mutex attributes must be visible with strict C11 builds. */
+#if defined(XGL_THREAD_SAFE) && !defined(_POSIX_C_SOURCE) && \
+    (defined(__unix__) || defined(__unix) || defined(__linux__) || defined(__APPLE__))
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "xgl/internal/xgl_mutex.h"
 
 /*---------------------------------------------------------------------------*/
