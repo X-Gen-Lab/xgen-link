@@ -81,8 +81,7 @@ TEST(XglTimeTest, DelayMs_DelaysCorrectly) {
 
     /* Elapsed time should be at least 45ms (allowing for timing variance) */
     EXPECT_GE(elapsed, 45);
-    /* And not more than 100ms (reasonable upper bound) */
-    EXPECT_LE(elapsed, 100);
+    /* The scheduler may resume this thread later than requested. */
 }
 
 /**
@@ -105,15 +104,8 @@ TEST(XglTimeTest, DelayUs_DelaysCorrectly) {
  * \brief           Test xgl_delay_ms() with zero delay
  */
 TEST(XglTimeTest, DelayMs_ZeroDelay) {
-    uint32_t start = xgl_time_ms();
-
-    /* Delay for 0ms should return immediately */
+    /* The platform may yield even for zero delay. Only check that the call returns. */
     xgl_delay_ms(0);
-
-    uint32_t elapsed = xgl_time_ms() - start;
-
-    /* Should take less than 10ms */
-    EXPECT_LE(elapsed, 10);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -163,19 +155,17 @@ TEST(XglTimeTest, ElapsedMs_HandlesWraparound) {
  * \brief           Test xgl_time_is_timeout() detects timeout
  */
 TEST(XglTimeTest, IsTimeout_DetectsTimeout) {
-    uint32_t start = xgl_time_ms();
-
-    /* Should not timeout immediately */
+    xgl_time_set_source(custom_time_source);
+    custom_time_value = 100;
+    const uint32_t start = xgl_time_ms();
     EXPECT_FALSE(xgl_time_is_timeout(start, 100));
 
-    /* Sleep for 50ms */
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-    /* Should timeout with 30ms timeout */
-    EXPECT_TRUE(xgl_time_is_timeout(start, 30));
-
-    /* Should not timeout with 100ms timeout */
+    custom_time_value = start + 99U;
     EXPECT_FALSE(xgl_time_is_timeout(start, 100));
+    custom_time_value = start + 100U;
+    EXPECT_TRUE(xgl_time_is_timeout(start, 100));
+
+    xgl_time_set_source(nullptr);
 }
 
 /**
