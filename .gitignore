@@ -1,5 +1,6 @@
 # Build directories
 build/
+!/test/contracts/build/
 build-*/
 build_*/
 _build/

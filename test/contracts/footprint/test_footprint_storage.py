@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def load_tool(name):

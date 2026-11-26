@@ -1,25 +1,15 @@
 # Build the same site from the repository or a documentation-only build.
 cmake_minimum_required(VERSION 3.24)
+get_filename_component(XGL_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+include("${XGL_SOURCE_DIRECTORY}/cmake/XglVersion.cmake")
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(xgl_documentation LANGUAGES NONE)
+    project(xgl_documentation VERSION "${XGL_VERSION}" LANGUAGES NONE)
 endif()
 
 find_package(Doxygen REQUIRED)
 find_program(XGL_MKDOCS_EXE NAMES mkdocs mkdocs.exe REQUIRED)
 
-get_filename_component(XGL_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
-set(XGL_DOC_VERSION "${PROJECT_VERSION}")
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    set(XGL_PROJECT_FILE "${XGL_SOURCE_DIRECTORY}/CMakeLists.txt")
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${XGL_PROJECT_FILE}")
-    file(STRINGS "${XGL_PROJECT_FILE}" XGL_VERSION_LINE
-        REGEX "^[ \t]+VERSION[ \t]+[0-9]+\\.[0-9]+\\.[0-9]+" LIMIT_COUNT 1)
-    string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" XGL_DOC_VERSION "${XGL_VERSION_LINE}")
-    if(XGL_DOC_VERSION STREQUAL "")
-        message(FATAL_ERROR "The xgl project does not declare a documentation version")
-    endif()
-endif()
-
+set(XGL_DOC_VERSION "${XGL_VERSION}")
 set(XGL_DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/doxygen)
 set(XGL_DOCS_SITE_DIR ${CMAKE_CURRENT_BINARY_DIR}/site)
 set(XGL_DOXYFILE ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)

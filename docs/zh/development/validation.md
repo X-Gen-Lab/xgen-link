@@ -12,7 +12,7 @@
 | 分片预算、重叠、超时、消息大于窗口 | `test/unit/transport/test_fragment.cpp`、memory 性质测试 |
 | 显式可信会话、nonce/AAD、防重放、关闭槽 | `test/unit/security/test_security.cpp` |
 | 静态认证丢 ACK 恢复、应用只交付一次 | `test/unit/api/test_send.cpp` |
-| 静态工作区、背压、回绕、存储复用 | `tools/static_workspace_smoke.c` |
+| 静态工作区、背压、回绕、存储复用 | `test/smoke/static_workspace_smoke.c` |
 | 一次后端预留、运行期不调用后端分配 | `test/unit/api/test_footprint.cpp`、memory 性质测试 |
 | 公开安装包 C 消费者、ABI/profile 拒绝 | SDK 消费者 CTest 及 instance 测试 |
 | 精确创建错误、纯预算期限查询与时间回绕 | `test/unit/api/test_api_contracts.cpp` |
@@ -20,11 +20,11 @@
 | 所有发送入口的消息上限、终止 scope 拒绝及布局无副作用 | `test/unit/api/test_send_policy.cpp` |
 | ACK 长度溢出、初始化失败释放、PHY 错误与恢复 | `test/unit/wire/test_coverage_wire.cpp`、`test/unit/api/test_coverage_api.cpp`、`test/integration/test_coverage_delivery.cpp` |
 | RTT 观察、workspace 预留量、流式 CRC 分类 | `test/unit/api/test_stats.cpp`、`test/unit/datalink/test_datalink.cpp` |
-| Boot 关闭统计和详细诊断时保留错误契约 | `tools/static_workspace_smoke.c` 的条件分支 |
+| Boot 关闭统计和详细诊断时保留错误契约 | `test/smoke/static_workspace_smoke.c` 的条件分支 |
 | Boot/Lite 可靠交付、容量拒绝、parser 和跨窗口分片 | `test/unit/api/test_bounded_profile.cpp` 的按能力测试 |
 | Boot 逻辑 TX 32 字节扩展上限与 raw wire 独立边界 | `test/unit/network/test_boot_network.cpp` |
-| 多配置发布/安装、导出能力与预算拒绝 | `test/cmake/test_profile_builds.py`、`test/cmake/test_footprint_budget.py` |
-| 四组资源配置 API、固定 RTO 安装测试及标签完整性 | `test/cmake/test_transport_resource_config.py` |
+| 多配置发布/安装、导出能力与预算拒绝 | `test/contracts/build/test_profile_builds.py`、`test/contracts/footprint/test_footprint_budget.py` |
+| 四组资源配置 API、固定 RTO 安装测试及标签完整性 | `test/contracts/build/test_transport_resource_config.py` |
 | 公开/私有头文件独立 C11/C++17 编译、逐例发现、种子回放 | `test/cmake/HeaderContracts.cmake`、分类与 runner 契约测试 |
 
 ## 构建和安装

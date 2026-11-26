@@ -1,4 +1,6 @@
 # Export only the public protocol SDK; private headers stay with their owners.
+include(CMakePackageConfigHelpers)
+
 install(TARGETS xgl
     EXPORT xglTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -26,7 +28,7 @@ install(EXPORT xglTargets
 )
 
 configure_package_config_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/xglConfig.cmake.in
+    ${CMAKE_CURRENT_LIST_DIR}/templates/xglConfig.cmake.in
     ${CMAKE_CURRENT_BINARY_DIR}/xglConfig.cmake
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/xgl
 )

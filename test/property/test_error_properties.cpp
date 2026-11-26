@@ -14,8 +14,6 @@
 #include <string>
 #include <vector>
 
-#include "../mocks/mock_allocator.h"
-#include "../mocks/mock_phy.h"
 #include "property_framework.h"
 
 using ::testing::_;

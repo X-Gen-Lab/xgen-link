@@ -77,8 +77,11 @@ class FootprintLto(unittest.TestCase):
         self.assertEqual("-flto" in link, enabled)
         if ARGS.build_dir is None:
             self.execute("cmake", "--build", binary, "--parallel", "4")
-        self.assertTrue((binary / "xgl_boot_probe.elf").is_file())
-        report = json.loads((binary / "boot-footprint.json").read_text())
+        elf = binary / "xgl_boot_probe.elf"
+        self.assertTrue(elf.is_file())
+        report_json = binary / "boot-footprint.json"
+        report_text = binary / "boot-footprint.txt"
+        report = json.loads(report_json.read_text())
         self.assertIs(report["lto"], enabled)
         self.assertIs(report["optimization"]["library_ipo"], enabled)
         self.assertIs(report["optimization"]["layout_ipo"], False)
@@ -88,6 +91,13 @@ class FootprintLto(unittest.TestCase):
         self.assertEqual(report["forbidden_heap_symbols"], [])
         self.assertEqual(report["unresolved_symbols"], [])
         self.assertGreater(report["flash_bytes"], 0)
+        if ARGS.build_dir is None:
+            elf_mtime = elf.stat().st_mtime_ns
+            for path in (report_json, report_text):
+                path.unlink()
+                self.execute("cmake", "--build", binary, "--target", "xgl_boot_probe")
+                self.assertTrue(path.is_file())
+                self.assertEqual(elf.stat().st_mtime_ns, elf_mtime)
 
     def test_default_keeps_every_object_and_link_without_lto(self):
         self.verify_build(False)

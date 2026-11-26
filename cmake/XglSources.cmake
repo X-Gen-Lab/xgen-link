@@ -24,11 +24,16 @@ set(XGL_SOURCES
     src/wire/xgl_wire_ext.c
     src/wire/xgl_wire.c
     src/wire/xgl_frame.c
+)
 
-    # Security
-    src/security/xgl_security_frame.c
-    src/security/xgl_security.c
+if(XGL_FEATURE_AUTH)
+    list(APPEND XGL_SOURCES
+        src/security/xgl_security_frame.c
+        src/security/xgl_security.c
+    )
+endif()
 
+list(APPEND XGL_SOURCES
     # Protocol error domain
     src/api/xgl_error.c
 
@@ -44,11 +49,18 @@ set(XGL_SOURCES
     src/network/xgl_network_receive.c
     src/network/xgl_network_forward.c
     src/network/xgl_network.c
+)
 
+if(XGL_FEATURE_FRAGMENTATION)
+    list(APPEND XGL_SOURCES
+        src/transport/xgl_fragment.c
+        src/transport/xgl_fragment_range.c
+        src/transport/xgl_fragment_reassembly.c
+    )
+endif()
+
+list(APPEND XGL_SOURCES
     # Transport Layer
-    src/transport/xgl_fragment.c
-    src/transport/xgl_fragment_range.c
-    src/transport/xgl_fragment_reassembly.c
     src/transport/xgl_reliable.c
     src/transport/xgl_rtt.c
     src/transport/xgl_transport.c
@@ -58,24 +70,22 @@ set(XGL_SOURCES
     src/transport/xgl_transport_peer.c
     src/transport/xgl_transport_runtime.c
     src/transport/xgl_transport_rx.c
-    src/transport/xgl_transport_rx_buffer.c
-    src/transport/xgl_transport_rx_delivery.c
-    src/transport/xgl_transport_tx.c
-    src/transport/xgl_transport_tx_message.c
-    src/transport/xgl_window.c
 )
 
-if(XGL_FEATURE_ROUTE_INDEX)
-    list(APPEND XGL_SOURCES src/network/xgl_route_index.c)
+if(XGL_FEATURE_OUT_OF_ORDER)
+    list(APPEND XGL_SOURCES src/transport/xgl_transport_rx_buffer.c)
 endif()
 
-if(NOT XGL_FEATURE_AUTH)
-    list(REMOVE_ITEM XGL_SOURCES src/security/xgl_security.c src/security/xgl_security_frame.c)
+list(APPEND XGL_SOURCES
+    src/transport/xgl_transport_rx_delivery.c
+    src/transport/xgl_transport_tx.c
+)
+
+if(XGL_FEATURE_FRAGMENTATION)
+    list(APPEND XGL_SOURCES src/transport/xgl_transport_tx_message.c)
 endif()
-if(NOT XGL_FEATURE_FRAGMENTATION)
-    list(FILTER XGL_SOURCES EXCLUDE REGEX "src/transport/xgl_fragment.*\\.c$")
-    list(REMOVE_ITEM XGL_SOURCES src/transport/xgl_transport_tx_message.c)
-endif()
-if(NOT XGL_FEATURE_OUT_OF_ORDER)
-    list(REMOVE_ITEM XGL_SOURCES src/transport/xgl_transport_rx_buffer.c)
+
+list(APPEND XGL_SOURCES src/transport/xgl_window.c)
+if(XGL_FEATURE_ROUTE_INDEX)
+    list(APPEND XGL_SOURCES src/network/xgl_route_index.c)
 endif()

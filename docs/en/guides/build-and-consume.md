@@ -8,7 +8,7 @@ cmake --build build/production
 cmake --install build/production --prefix "$PWD/build/sdk"
 ```
 
-Check the installed `include/xgl` directory, static library and `xglConfig.cmake`. Use the generated header and library from the same build. Use separate build directories and install prefixes when changing compiler, target ABI or profile. With multi-configuration generators, use the same `--config` for build and install.
+Inspect the install prefix for the public headers, the static library and `xglConfig.cmake`. Use the generated header and library from the same build. Use separate build directories and prefixes for different compilers, target ABIs, profiles or resource selections. With a multi-config generator, use the same `--config` for build and install. Install Debug and Release into separate prefixes.
 
 ## CMake consumption
 

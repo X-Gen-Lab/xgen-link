@@ -11,6 +11,9 @@ import unittest
 import xml.etree.ElementTree as ET
 
 
+BASELINE = Path(__file__).resolve().parents[2] / "cmake" / "baseline_tests.txt"
+
+
 class RunnerContracts(unittest.TestCase):
     """Keep actual CTest registration and executable behavior observable."""
 
@@ -42,7 +45,7 @@ class RunnerContracts(unittest.TestCase):
             self.assertTrue({"unit", "integration"}.intersection(labels), case["name"])
             labels_seen.update(labels)
         self.assertTrue({"unit", "integration", "property"}.issubset(labels_seen))
-        baseline = Path(__file__).with_name("baseline_tests.txt").read_text().splitlines()
+        baseline = BASELINE.read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(baseline), 510)
         self.assertFalse(set(baseline) - {case["name"] for case in cases})
 

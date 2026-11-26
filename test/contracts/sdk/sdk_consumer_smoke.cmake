@@ -51,37 +51,13 @@ endif()
 get_filename_component(sdk_config_dir "${sdk_configs}" DIRECTORY)
 list(APPEND consumer_configure_args "-Dxgl_DIR=${sdk_config_dir}")
 
-file(WRITE "${consumer_src}/CMakeLists.txt" [=[
-cmake_minimum_required(VERSION 3.21)
-project(xgl_consumer_smoke C)
-
-find_package(xgl CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)
-include("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake")
-xgl_verify_sdk_prefix("${XGL_SDK_PREFIX}")
-get_target_property(sdk_includes xgl::xgl INTERFACE_INCLUDE_DIRECTORIES)
-list(LENGTH sdk_includes sdk_include_count)
-if(NOT sdk_include_count EQUAL 1)
-    message(FATAL_ERROR "Expected exactly one public include directory")
-endif()
-file(GLOB installed_headers RELATIVE "${sdk_includes}/xgl" "${sdk_includes}/xgl/*")
-list(SORT installed_headers)
-if(NOT installed_headers STREQUAL "xgl.h;xgl_build_config.h;xgl_config.h;xgl_error.h;xgl_types.h")
-    message(FATAL_ERROR "Unexpected installed SDK header set: ${installed_headers}")
-endif()
-
-add_executable(xgl_consumer main.c)
-target_link_libraries(xgl_consumer PRIVATE xgl::xgl)
-add_executable(xgl_public_api_consumer public_api.c)
-target_link_libraries(xgl_public_api_consumer PRIVATE xgl::xgl)
-set_target_properties(xgl_consumer xgl_public_api_consumer PROPERTIES
-    C_STANDARD 11 C_STANDARD_REQUIRED YES C_EXTENSIONS NO)
-]=])
-
-configure_file("${CMAKE_CURRENT_LIST_DIR}/../tools/static_workspace_smoke.c"
+configure_file("${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt"
+    "${consumer_src}/CMakeLists.txt" COPYONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/../../smoke/static_workspace_smoke.c"
     "${consumer_src}/main.c" COPYONLY)
-configure_file("${CMAKE_CURRENT_LIST_DIR}/../tools/public_api_smoke.c"
+configure_file("${CMAKE_CURRENT_LIST_DIR}/../../smoke/public_api_smoke.c"
     "${consumer_src}/public_api.c" COPYONLY)
-configure_file("${CMAKE_CURRENT_LIST_DIR}/../test/cmake/VerifySdkPrefix.cmake"
+configure_file("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake"
     "${consumer_src}/VerifySdkPrefix.cmake" COPYONLY)
 
 execute_process(

@@ -1,8 +1,19 @@
 # Host protocol benchmarks
 
-Configure with `XGL_BUILD_TESTS=ON` and `XGL_BUILD_BENCHMARKS=ON`, then build the
-`xgl_benchmarks` target. The three executables print CSV and exit nonzero if an
-exchange does not complete.
+Use the Full host profile and a prepared GoogleTest/GoogleMock 1.16.0 package.
+The memory benchmark requires statistics. Each executable prints CSV and exits
+nonzero if an exchange does not complete.
+
+```sh
+cmake -S . -B build/bench -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DXGL_PROFILE=full \
+  -DXGL_BUILD_TESTS=ON -DXGL_BUILD_BENCHMARKS=ON \
+  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
+cmake --build build/bench --target xgl_benchmarks
+build/bench/test/bench_throughput
+build/bench/test/bench_latency
+build/bench/test/bench_memory
+```
 
 `benchmark_support.h` owns both configurations, route/PHY descriptors, callbacks,
 and handles until teardown. Every exchange uses explicit logical milliseconds,

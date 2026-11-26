@@ -12,7 +12,7 @@
 | Fragment budgets, overlaps, timeout, messages larger than a window | `test/unit/transport/test_fragment.cpp`, memory properties |
 | Explicit trusted sessions, nonce/AAD, replay, closed slots | `test/unit/security/test_security.cpp` |
 | Static authenticated lost-ACK recovery and exactly-once delivery | `test/unit/api/test_send.cpp` |
-| Static workspace, backpressure, wraparound, storage reuse | `tools/static_workspace_smoke.c` |
+| Static workspace, backpressure, wraparound, storage reuse | `test/smoke/static_workspace_smoke.c` |
 | One backend reservation and no runtime backend allocations | `test/unit/api/test_footprint.cpp`, memory properties |
 | Public installed C consumer, ABI/profile rejection | SDK consumer CTest and instance tests |
 | Exact creation errors, pure work-budget deadlines and clock wraparound | `test/unit/api/test_api_contracts.cpp` |
@@ -20,11 +20,11 @@
 | Message limits, terminal scope rejection and pure layout across send APIs | `test/unit/api/test_send_policy.cpp` |
 | ACK size overflow, failed-init release, PHY failure and recovery | `test/unit/wire/test_coverage_wire.cpp`, `test/unit/api/test_coverage_api.cpp`, `test/integration/test_coverage_delivery.cpp` |
 | RTT observations, workspace reservations and streaming CRC classification | `test/unit/api/test_stats.cpp`, `test/unit/datalink/test_datalink.cpp` |
-| Boot error contracts with statistics and detailed diagnostics disabled | Conditional checks in `tools/static_workspace_smoke.c` |
+| Boot error contracts with statistics and detailed diagnostics disabled | Conditional checks in `test/smoke/static_workspace_smoke.c` |
 | Boot/Lite reliable delivery, capacity rejection, parsing, and multi-window fragmentation | Capability-selected cases in `test/unit/api/test_bounded_profile.cpp` |
 | Boot 32-byte logical-TX extension limit and independent raw-wire boundary | `test/unit/network/test_boot_network.cpp` |
-| Multi-configuration publication/installation, exported capabilities, and budget rejection | `test/cmake/test_profile_builds.py`, `test/cmake/test_footprint_budget.py` |
-| Four resource-configured API sets, installed fixed-RTO tests and complete labels | `test/cmake/test_transport_resource_config.py` |
+| Multi-configuration publication/installation, exported capabilities, and budget rejection | `test/contracts/build/test_profile_builds.py`, `test/contracts/footprint/test_footprint_budget.py` |
+| Four resource-configured API sets, installed fixed-RTO tests and complete labels | `test/contracts/build/test_transport_resource_config.py` |
 | Independent C11/C++17 public/private header compilation, discovery and seed replay | `test/cmake/HeaderContracts.cmake`, classification and runner contracts |
 
 ## Build and installation

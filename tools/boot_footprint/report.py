@@ -20,7 +20,7 @@ def source_identity(root):
         capture_output=True, text=True, check=False)
     digest = hashlib.sha256()
     files = []
-    for name in ("src", "include", "cmake", "ports", "tools/boot_footprint"):
+    for name in ("src", "include", "cmake", "tools/boot_footprint"):
         directory = root / name
         if directory.exists():
             files.extend(path for path in directory.rglob("*") if path.is_file()
@@ -129,12 +129,15 @@ def generate_layout(args):
         "the consumer also compares this value with the runtime API if executed."
     )
     write_json(args.output, values)
-    Path(args.header).write_text(
+    header = Path(args.header)
+    content = (
         "/* Generated from Cortex-M0 ABI sizes; not a host sizeof estimate. */\n"
         "#ifndef XGL_FOOTPRINT_WORKSPACE_LAYOUT_H\n"
         "#define XGL_FOOTPRINT_WORKSPACE_LAYOUT_H\n"
         f"#define XGL_FOOTPRINT_WORKSPACE_SIZE {required}U\n"
-        "#endif\n", encoding="utf-8")
+        "#endif\n")
+    if not header.exists() or header.read_text(encoding="utf-8") != content:
+        header.write_text(content, encoding="utf-8")
     print(f"Cortex-M0 workspace layout: {required} bytes, alignment {alignment}")
 
 

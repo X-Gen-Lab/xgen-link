@@ -41,4 +41,6 @@ flowchart LR
 
 `include/xgl/` 仅保留公开 SDK。私有头与实现同放 `src/api`、`wire`、`datalink`、`network`、`transport`、`security`；跨层数据与资源契约放 `src/internal`。私有目录不安装、不导出给消费者。
 
-生产导出一个 `xgl::xgl` target。`cmake/XglSources.cmake` 管理显式源码和 profile 裁剪，`XglInstall.cmake` 管理 SDK 包，`XglDevelopment.cmake` 管理开发检查。测试位于 `test/unit/<layer>`、`integration`、`property` 和 `support`，不改变历史测试名称与回放种子。
+生产导出一个 `xgl::xgl` target。`cmake/XglVersion.cmake` 为库与独立文档提供版本，`XglProfiles.cmake` 解析档位与资源身份，`XglSources.cmake` 按能力列出生产编译单元，`XglLibrary.cmake` 组装带匹配配置头的库。`XglInstall.cmake` 导出 SDK，`XglDevelopment.cmake` 接入按需启用的开发检查。
+
+协议回归位于 `test/unit/<layer>`、`test/integration` 和 `test/property`。`test/smoke` 保存 C11 夹具，`test/interop` 保存 Wire 两代端点，`test/contracts` 按构建、安装、CTest 与资源报告区分验证对象。历史用例和回放种子由现有发现入口维护。

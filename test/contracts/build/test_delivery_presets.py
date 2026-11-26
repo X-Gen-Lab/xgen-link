@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 ARGS = None
 
 
@@ -63,6 +63,8 @@ class DeliveryPresets(unittest.TestCase):
     def test_test_presets_reject_an_empty_selection(self):
         source, presets = self.prepare("empty")
         for preset in presets["testPresets"]:
+            if preset.get("hidden"):
+                continue
             with self.subTest(preset=preset["name"]):
                 configured = self.execute(
                     source, "cmake", "--preset", preset["configurePreset"])

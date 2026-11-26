@@ -9,6 +9,7 @@ on:
       - 'docs/**'
       - 'include/xgl/**'
       - CMakeLists.txt
+      - cmake/XglVersion.cmake
       - Doxyfile
       - mkdocs.yml
       - tools/docs_qa.ps1

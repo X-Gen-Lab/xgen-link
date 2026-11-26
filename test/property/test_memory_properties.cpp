@@ -13,10 +13,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <internal/xgl_allocator.h>
+#include <mock_allocator.h>
 #include <vector>
 
-#include "../mocks/mock_allocator.h"
-#include "../mocks/mock_phy.h"
 #include "property_framework.h"
 
 using ::testing::_;

@@ -68,12 +68,12 @@ jobs:
         run: |
           binary=build/debug/test/xgl_tests
           if [[ "$RUNNER_OS" == Windows ]]; then binary+=.exe; fi
-          python test/cmake/test_runner_contracts.py --build-dir build/debug --binary "$binary"
+          python test/contracts/ctest/test_runner_contracts.py --build-dir build/debug --binary "$binary"
       - name: Exercise the Full Wire v3 peer exchange
         run: |
           peer=build/debug/test/xgl_interop_peer
           if [[ "$RUNNER_OS" == Windows ]]; then peer+=.exe; fi
-          python test/integration/test_wire_interop.py "$peer" "$peer" --profile full
+          python test/interop/test_wire_interop.py "$peer" "$peer" --profile full
       - name: Preserve host evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -187,7 +187,7 @@ jobs:
         if: matrix.preset == 'boot-host-test' || matrix.preset == 'boot-small-host-test'
         run: |
           peer=build/${{ matrix.preset }}/test/xgl_interop_peer
-          python test/integration/test_wire_interop.py "$peer" "$peer" --profile boot
+          python test/interop/test_wire_interop.py "$peer" "$peer" --profile boot
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -211,30 +211,31 @@ jobs:
       - uses: ./.github/actions/setup-gtest
       - name: Check CTest discovery and footprint tooling
         run: |
-          python test/cmake/test_discovery_policy.py
-          python test/cmake/test_delivery_presets.py --work-dir out/reports/delivery-presets
-          python test/cmake/test_footprint_budget.py
-          python test/cmake/test_footprint_storage.py
-          python test/cmake/test_footprint_report.py
+          python test/contracts/ctest/test_discovery_policy.py
+          python test/contracts/ctest/test_ctest_evidence.py
+          python test/contracts/build/test_delivery_presets.py --work-dir out/reports/delivery-presets
+          python test/contracts/footprint/test_footprint_budget.py
+          python test/contracts/footprint/test_footprint_storage.py
+          python test/contracts/footprint/test_footprint_report.py
       - name: Validate real source and package consumers
         run: |
-          python test/cmake/dependency_contracts.py \
+          python test/contracts/sdk/dependency_contracts.py \
             --link-source . \
             --work-dir out/reports/dependency-contracts \
             --deny-network
       - name: Validate profiles, package capabilities and Debug/Release consumers
         run: |
-          python test/cmake/test_profile_builds.py \
+          python test/contracts/build/test_profile_builds.py \
             --link-source . \
             --work-dir out/reports/profile-contracts
       - name: Validate bounded RX chunk selection and installed configuration
         run: |
-          python test/cmake/test_rx_chunk_config.py \
+          python test/contracts/build/test_rx_chunk_config.py \
             --link-source . \
             --work-dir out/reports/rx-chunk-contracts
       - name: Validate transport capacities, identity and fixed RTO consumers
         run: |
-          python test/cmake/test_transport_resource_config.py \
+          python test/contracts/build/test_transport_resource_config.py \
             --link-source . \
             --gtest-dir "$GTest_DIR" \
             --work-dir out/reports/transport-resource-contracts
@@ -252,35 +253,38 @@ jobs:
           if-no-files-found: warn
 
   wire-compatibility:
-    name: Wire v3 SDK 3 and SDK 4 interoperability
+    name: Wire v3 SDK 3 and SDK 4 interoperability (${{ matrix.profile }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [boot, full]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - uses: ./.github/actions/setup-gtest
       - name: Build and exchange frames with the pinned SDK 3 baseline
+        env:
+          PROFILE: ${{ matrix.profile }}
         run: |
-          mkdir -p out/reports/wire-interop
-          for profile in boot full; do
-            build="build/wire-interop-$profile"
-            fixture="out/reports/wire-interop/$profile"
-            mkdir -p "$fixture"
-            cmake -S . -B "$build" -G Ninja -DXGL_PROFILE="$profile" -DXGL_BUILD_TESTS=ON 2>&1 | tee "$fixture/configure.log"
-            cmake --build "$build" --target xgl_interop_peer --parallel 2 2>&1 | tee "$fixture/build.log"
-            work="$RUNNER_TEMP/xgl-interop-$profile"
-            python test/integration/build_wire_interop_legacy.py --work-dir "$work" --profile "$profile" --fetch 2>&1 | tee "$fixture/sdk3.log"
-            python test/integration/test_wire_interop.py "$work/sdk3-$profile/xgl_interop_peer" "$build/test/xgl_interop_peer" \
-              --profile "$profile" --transcript "$fixture/exchange.log"
-          done
+          build="build/wire-interop-$PROFILE"
+          fixture="out/reports/wire-interop/$PROFILE"
+          work="$RUNNER_TEMP/xgl-interop-$PROFILE"
+          mkdir -p "$fixture"
+          git rev-parse HEAD > "$fixture/sdk4-revision.txt"
+          cmake -S test/interop -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DXGL_PROFILE="$PROFILE" 2>&1 | tee "$fixture/configure.log"
+          cmake --build "$build" --target xgl_interop_peer --parallel 2 2>&1 | tee "$fixture/build.log"
+          python test/interop/build_wire_interop_legacy.py --work-dir "$work" --profile "$PROFILE" --fetch 2>&1 | tee "$fixture/sdk3.log"
+          python test/interop/test_wire_interop.py "$work/sdk3-$PROFILE/xgl_interop_peer" "$build/xgl_interop_peer" \
+            --profile "$PROFILE" --transcript "$fixture/exchange.log"
       - name: Preserve cross-version exchange evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: wire-interop
-          path: out/reports/wire-interop/
+          name: wire-interop-${{ matrix.profile }}
+          path: out/reports/wire-interop/${{ matrix.profile }}/
           if-no-files-found: warn
 
   arm-footprint:
@@ -328,12 +332,12 @@ jobs:
       - name: Verify LTO scope in the existing link
         if: matrix.resource == 'default' && matrix.mtu == 128
         run: |
-          python test/cmake/test_footprint_lto.py --link-source . \
+          python test/contracts/footprint/test_footprint_lto.py --link-source . \
             --work-dir out/footprint-lto-contracts --build-dir "$ARM_BUILD" --expect-lto "$ARM_LTO"
       - name: Compare the classic and bounded APIs in advanced Boot
         if: matrix.resource == 'default' && matrix.mtu == 128 && matrix.lto == 'OFF'
         run: |
-          python test/cmake/test_footprint_advanced.py --link-source . \
+          python test/contracts/footprint/test_footprint_advanced.py --link-source . \
             --work-dir out/footprint-advanced-contracts
       - name: Summarize measured resources
         if: always()

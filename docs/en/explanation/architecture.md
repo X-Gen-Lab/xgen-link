@@ -41,4 +41,6 @@ Calls on one instance are serialized by the caller. Callbacks cannot reenter or 
 
 `include/xgl/` contains only the public SDK. Private headers live with their implementations under `src/api`, `wire`, `datalink`, `network`, `transport` and `security`. Cross-layer data and resource contracts live under `src/internal`. Private directories are neither installed nor exported to consumers.
 
-Production exports one `xgl::xgl` target. `cmake/XglSources.cmake` owns explicit source selection and profile trimming, `XglInstall.cmake` owns SDK packaging, and `XglDevelopment.cmake` owns development checks. Tests live under `test/unit/<layer>`, `integration`, `property` and `support`, preserving historical case names and replay seeds.
+Production exports one `xgl::xgl` target. `cmake/XglVersion.cmake` supplies the version to the library and standalone docs. `XglProfiles.cmake` resolves the profile and resource identity, `XglSources.cmake` selects the production translation units by capability, and `XglLibrary.cmake` assembles the library with its matching configuration header. `XglInstall.cmake` exports the SDK and `XglDevelopment.cmake` registers the selected development checks.
+
+Protocol regression suites live under `test/unit/<layer>`, `test/integration`, and `test/property`. `test/smoke` contains the C11 fixtures, `test/interop` contains the cross-SDK Wire peers, and `test/contracts` groups build, SDK, CTest, and footprint checks. Test discovery preserves historical names and replay seeds.

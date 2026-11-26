@@ -6,141 +6,10 @@ if(CMAKE_CROSSCOMPILING)
     message(FATAL_ERROR "GoogleTest requires a separate native host build")
 endif()
 
-#-----------------------------------------------------------------------------
-# Google Test Setup
-#-----------------------------------------------------------------------------
-
 find_package(GTest 1.16.0 EXACT CONFIG REQUIRED)
 
-#-----------------------------------------------------------------------------
-# Test Sources
-#-----------------------------------------------------------------------------
-
-set(TEST_SOURCES
-    support/test_main.cpp
-    unit/api/test_cpp17_presets.cpp
-    unit/wire/test_coverage_wire.cpp
-    unit/api/test_coverage_api.cpp
-    integration/test_coverage_delivery.cpp
-    # Public API contracts
-    unit/api/test_types.cpp
-    unit/api/test_instance.cpp
-    unit/api/test_config.cpp
-    unit/api/test_creation_policy.cpp
-    unit/api/test_footprint.cpp
-    unit/api/test_send.cpp
-    unit/api/test_stats.cpp
-    unit/security/test_security.cpp
-
-    # Cross-layer statistics
-    integration/test_layered_stats.cpp
-
-    # Wire and stream framing
-    unit/wire/test_frame.cpp
-    unit/wire/test_wire.cpp
-    unit/datalink/test_parser.cpp
-    unit/datalink/test_datalink.cpp
-
-    # Network tests
-    unit/network/test_network.cpp
-
-    # Transport tests
-    unit/transport/test_rtt.cpp
-    unit/transport/test_window.cpp
-    unit/transport/test_window_storage.cpp
-    unit/transport/test_reliable.cpp
-    unit/transport/test_fragment.cpp
-    unit/transport/test_transport.cpp
-
-    # Integration tests
-    integration/test_integration.cpp
-
-    # Property tests
-    property/test_memory_properties.cpp
-    property/test_frame_properties.cpp
-    property/test_network_properties.cpp
-    property/test_transport_properties.cpp
-    property/test_fragment_properties.cpp
-    property/test_instance_properties.cpp
-    property/test_error_properties.cpp
-    property/test_alignment_properties.cpp
-    property/test_generator.cpp
-)
-
-if(NOT XGL_FEATURE_AUTH)
-    # These profiles exercise their supported production capabilities without
-    # registering authentication cases which cannot exist in their image.
-    set(TEST_SOURCES
-        support/test_main.cpp
-        unit/api/test_bounded_profile.cpp
-        unit/wire/test_wire.cpp
-        unit/transport/test_rtt.cpp
-        unit/transport/test_window.cpp
-        unit/transport/test_window_storage.cpp
-    )
-    if(XGL_FEATURE_FRAGMENTATION)
-        list(APPEND TEST_SOURCES unit/transport/test_fragment.cpp
-            unit/transport/test_reliable.cpp)
-    endif()
-    if(XGL_PROFILE STREQUAL "boot")
-        list(APPEND TEST_SOURCES unit/network/test_boot_network.cpp)
-    endif()
-endif()
-
-# SACK wire views and bounded transport admission apply to every profile.
-list(APPEND TEST_SOURCES
-    unit/api/test_api_contracts.cpp
-    unit/api/test_extended_options.cpp
-    unit/transport/test_transport_advanced.cpp
-    unit/api/test_config_consistency.cpp
-    unit/api/test_send_policy.cpp
-    unit/datalink/test_datalink_span.cpp
-    unit/datalink/test_datalink_resync.cpp
-    unit/wire/test_wire_sack_view.cpp
-    unit/wire/test_wire_rx_contracts.cpp
-    unit/transport/test_transport_sack_view.cpp
-    unit/transport/test_transport_rx_contracts.cpp
-    unit/transport/test_transport_tx_contracts.cpp
-    unit/transport/test_transport_runtime_contracts.cpp
-    unit/transport/test_transport_storage.cpp
-    unit/transport/test_reliable_owned.cpp
-    unit/transport/test_transport_fragment_scope.cpp
-    unit/transport/test_transport_fixed_rto.cpp
-    unit/transport/test_timeout_control.cpp
-    unit/datalink/test_parser_recovery.cpp
-    unit/datalink/test_parser_resync.cpp
-    unit/network/test_route.cpp
-    unit/network/test_network_contracts.cpp
-    integration/test_network_routes_contracts.cpp
-    integration/test_transport_admission.cpp
-)
-
-#-----------------------------------------------------------------------------
-# Mock Objects
-#-----------------------------------------------------------------------------
-
-if(XGL_FEATURE_STATISTICS)
-    list(APPEND TEST_SOURCES integration/test_network_tx_contracts.cpp)
-endif()
-
-if(XGL_FEATURE_FORWARDING AND XGL_FEATURE_AUTH)
-    list(APPEND TEST_SOURCES integration/test_network_multihop.cpp)
-endif()
-
-set(MOCK_SOURCES
-    mocks/mock_phy.cpp
-    mocks/mock_allocator.cpp
-    mocks/mock_callbacks.cpp
-)
-
-#-----------------------------------------------------------------------------
-# Test Executable
-#-----------------------------------------------------------------------------
-
-add_executable(xgl_tests
-    ${TEST_SOURCES}
-    ${MOCK_SOURCES}
-)
+include(TestSources.cmake)
+add_executable(xgl_tests ${XGL_TEST_SOURCES})
 
 target_link_libraries(xgl_tests
     PRIVATE
@@ -152,7 +21,7 @@ target_link_libraries(xgl_tests
 target_include_directories(xgl_tests
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+        ${CMAKE_CURRENT_SOURCE_DIR}/support/mocks
         ${CMAKE_CURRENT_SOURCE_DIR}/support
         ${PROJECT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/property
@@ -165,11 +34,7 @@ else()
     target_compile_options(xgl_tests PRIVATE -pedantic-errors)
 endif()
 
-#-----------------------------------------------------------------------------
-# CTest Entry
-#-----------------------------------------------------------------------------
-
-add_executable(xgl_interop_peer integration/interop_peer.c)
+add_executable(xgl_interop_peer interop/interop_peer.c)
 target_link_libraries(xgl_interop_peer PRIVATE xgl::xgl)
 
 include(cmake/HeaderContracts.cmake)
@@ -184,17 +49,13 @@ set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES
 file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/profile-tests.cmake" CONTENT
     "set(xgl_complete_regression_suite ${XGL_FEATURE_AUTH})\ninclude(\"${CMAKE_CURRENT_SOURCE_DIR}/cmake/classify_tests.cmake\")\n")
 
-#-----------------------------------------------------------------------------
-# Custom Test Targets
-#-----------------------------------------------------------------------------
-
-# Run all tests
+# Run individually discovered protocol cases with the xgl label.
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -L xgl
         --no-tests=error --output-on-failure
     DEPENDS xgl_tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Running all tests..."
+    COMMENT "Running protocol tests..."
 )
 
 # Run property tests only
@@ -215,16 +76,16 @@ add_custom_target(run_unit_tests
     COMMENT "Running unit tests..."
 )
 
-# Run architecture improvement tests only
+# Keep the existing shortcut for the layered statistics suite.
 add_custom_target(run_architecture_tests
     COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -R XglLayeredStatsTest
         --no-tests=error --output-on-failure
     DEPENDS xgl_tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Running architecture improvement tests..."
+    COMMENT "Running layered statistics tests..."
 )
 
-# Generate XML report
+# Generate GoogleTest XML for the host test executable.
 add_custom_target(test_report
     COMMAND xgl_tests --gtest_output=xml:test_results.xml
     DEPENDS xgl_tests
@@ -232,58 +93,7 @@ add_custom_target(test_report
     COMMENT "Generating test report..."
 )
 
-#-----------------------------------------------------------------------------
-# Benchmark Targets (optional, OFF by default)
-#-----------------------------------------------------------------------------
-
 option(XGL_BUILD_BENCHMARKS "Build performance benchmarks" OFF)
-
 if(XGL_BUILD_BENCHMARKS)
-    # Throughput benchmark
-    add_executable(bench_throughput
-        benchmark/bench_throughput.cpp
-        mocks/mock_phy.cpp
-    )
-    target_link_libraries(bench_throughput PRIVATE xgl GTest::gmock)
-    target_include_directories(bench_throughput
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/mocks
-            ${CMAKE_CURRENT_SOURCE_DIR}/support
-            ${PROJECT_SOURCE_DIR}/src
-    )
-
-    # Latency benchmark
-    add_executable(bench_latency
-        benchmark/bench_latency.cpp
-        mocks/mock_phy.cpp
-    )
-    target_link_libraries(bench_latency PRIVATE xgl GTest::gmock)
-    target_include_directories(bench_latency
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/mocks
-            ${CMAKE_CURRENT_SOURCE_DIR}/support
-            ${PROJECT_SOURCE_DIR}/src
-    )
-
-    # Memory usage benchmark
-    add_executable(bench_memory
-        benchmark/bench_memory.cpp
-        mocks/mock_phy.cpp
-    )
-    target_link_libraries(bench_memory PRIVATE xgl GTest::gmock)
-    target_include_directories(bench_memory
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/mocks
-            ${CMAKE_CURRENT_SOURCE_DIR}/support
-            ${PROJECT_SOURCE_DIR}/src
-    )
-
-    # Convenience target to build all benchmarks
-    add_custom_target(xgl_benchmarks
-        DEPENDS bench_throughput bench_latency bench_memory
-        COMMENT "Building all benchmarks..."
-    )
+    include(benchmark/Targets.cmake)
 endif()

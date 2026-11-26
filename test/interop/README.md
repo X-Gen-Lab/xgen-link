@@ -11,7 +11,7 @@
 ```sh
 work="$PWD/build/wire-interop"
 profile=boot
-python3 test/integration/build_wire_interop_legacy.py \
+python3 test/interop/build_wire_interop_legacy.py \
   --work-dir "$work" --profile "$profile" --fetch
 ```
 
@@ -19,17 +19,18 @@ python3 test/integration/build_wire_interop_legacy.py \
 
 ## 运行双向互通
 
-当前 SDK 测试配置需要显式安装带 GoogleMock 的 GoogleTest 1.16.0。每个 profile 使用独立的构建目录。
+当前 SDK 的端点通过纯 C11 工程编译，每个 profile 使用独立的构建目录。
 
 ```sh
-cmake -S . -B "$work/sdk4-$profile" -G Ninja \
-  -DXGL_PROFILE="$profile" -DXGL_BUILD_TESTS=ON \
-  -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
+cmake -S test/interop -B "$work/sdk4-$profile" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DXGL_PROFILE="$profile"
 cmake --build "$work/sdk4-$profile" --target xgl_interop_peer
-python3 test/integration/test_wire_interop.py \
+python3 test/interop/test_wire_interop.py \
   "$work/sdk3-$profile/xgl_interop_peer" \
-  "$work/sdk4-$profile/test/xgl_interop_peer" --profile "$profile" \
+  "$work/sdk4-$profile/xgl_interop_peer" --profile "$profile" \
   --transcript "$work/$profile-transcript.log"
 ```
+
+使用安装包时，在新的构建目录配置同一工程，传入 `-DXGL_INTEROP_SDK_PREFIX=/path/to/sdk` 和 `-DXGL_INTEROP_SDK_VERSION=4.0.0`。端点要求该前缀中的 SDK 精确匹配指定的版本和 profile。
 
 Windows 使用对应的 `.exe` 路径。脚本使用确定性的模拟协议时间。每条命令及端点退出默认有 10 秒真实等待上限，可通过 `--timeout-seconds` 调整。转录按处理顺序记录命令、端点回复、丢 ACK 或重排及最终判定，保留失败前的输出。测试认证 provider 用于核对 nonce、AAD 和负载绑定，产品应使用自己的认证实现。

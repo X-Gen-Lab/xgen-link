@@ -242,7 +242,7 @@ class TransportResourceConfig(unittest.TestCase):
         self.execute("cmake", "--install", binary, "--prefix", prefix)
         source = self.root / "sdk-consumer"
         source.mkdir()
-        shutil.copyfile(Path(__file__).with_name("VerifySdkPrefix.cmake"),
+        shutil.copyfile(ARGS.link_source / "test/contracts/sdk/VerifySdkPrefix.cmake",
                         source / "VerifySdkPrefix.cmake")
         (source / "main.c").write_text(
             '#include <xgl/xgl.h>\n'

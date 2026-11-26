@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 
-SCRIPT = Path(__file__).resolve().with_name("classify_tests.cmake")
+SCRIPT = Path(__file__).resolve().parents[2] / "cmake" / "classify_tests.cmake"
 BASELINE = SCRIPT.with_name("baseline_tests.txt").read_text("utf-8").splitlines()
 CTEST = "ctest"
 

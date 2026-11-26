@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,8 +13,8 @@ from zipfile import ZipFile
 
 LEGACY_REVISION = "f09efca25abe84c344ce8c41d5645006c7b61df9"
 COMPONENTS = ("status", "bytes", "crc", "memory", "containers")
-ROOT = Path(__file__).resolve().parents[2]
-PEER_SOURCE = ROOT / "test" / "integration" / "interop_peer.c"
+FIXTURE_DIR = Path(__file__).resolve().parent
+ROOT = FIXTURE_DIR.parents[1]
 
 
 def run(*command, capture=False, env=None):
@@ -81,28 +80,10 @@ def build_peer(staging, profile, local_dependencies):
     run("cmake", "--build", library_build)
     run("cmake", "--install", library_build, "--prefix", install)
 
-    peer_source = staging / "peer-source"
-    peer_source.mkdir()
-    shutil.copyfile(PEER_SOURCE, peer_source / PEER_SOURCE.name)
-    (peer_source / "CMakeLists.txt").write_text(
-        """cmake_minimum_required(VERSION 3.24)
-project(xgl_interop_peer LANGUAGES C)
-find_package(xgl 3.0.0 EXACT CONFIG REQUIRED)
-if(NOT xgl_PROFILE STREQUAL INTEROP_PROFILE)
-    message(FATAL_ERROR "SDK 3 peer received the wrong profile")
-endif()
-add_executable(xgl_interop_peer interop_peer.c)
-set_target_properties(xgl_interop_peer PROPERTIES
-    C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
-target_link_libraries(xgl_interop_peer PRIVATE xgl::xgl)
-""",
-        encoding="utf-8",
-    )
     peer_build = staging / "peer-build"
-    run("cmake", "-S", peer_source, "-B", peer_build, "-G", "Ninja",
-        "-DCMAKE_BUILD_TYPE=Release", f"-DINTEROP_PROFILE={profile}",
-        f"-DCMAKE_PREFIX_PATH={install}", "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF",
-        "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF")
+    run("cmake", "-S", FIXTURE_DIR, "-B", peer_build, "-G", "Ninja",
+        "-DCMAKE_BUILD_TYPE=Release", f"-DXGL_PROFILE={profile}",
+        f"-DXGL_INTEROP_SDK_PREFIX={install}", "-DXGL_INTEROP_SDK_VERSION=3.0.0")
     run("cmake", "--build", peer_build)
     suffix = ".exe" if os.name == "nt" else ""
     return peer_build / f"xgl_interop_peer{suffix}"

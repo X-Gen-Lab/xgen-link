@@ -29,6 +29,9 @@
       "hidden": true,
       "inherits": "base",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "XGL_BUILD_TESTS": "ON",
+        "XGL_BUILD_EXAMPLES": "ON",
         "XGL_BUILD_NOHEAP_SMOKE": "ON",
         "XGL_BUILD_SDK_CONSUMER_SMOKE": "ON",
         "XGL_BUILD_FOOTPRINT_REPORT": "ON",
@@ -36,15 +39,44 @@
       }
     },
     {
+      "name": "gcc-validation",
+      "hidden": true,
+      "inherits": [
+        "gcc-base",
+        "host-validation"
+      ]
+    },
+    {
+      "name": "gcc-coverage",
+      "hidden": true,
+      "inherits": "gcc-validation",
+      "cacheVariables": {
+        "XGL_ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "bounded",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "XGL_BUILD_TESTS": "OFF",
+        "XGL_BUILD_EXAMPLES": "OFF",
+        "XGL_ALLOW_FALLBACK_MALLOC": "OFF"
+      }
+    },
+    {
+      "name": "bounded-host-validation",
+      "hidden": true,
+      "cacheVariables": {
+        "XGL_BUILD_TESTS": "ON"
+      }
+    },
+    {
       "name": "debug",
       "displayName": "Debug",
-      "description": "Debug build with all features enabled",
-      "inherits": "host-validation",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "XGL_BUILD_TESTS": "ON",
-        "XGL_BUILD_EXAMPLES": "ON"
-      }
+      "description": "Native host regression and examples",
+      "inherits": "host-validation"
     },
     {
       "name": "release",
@@ -61,43 +93,20 @@
       "name": "test",
       "displayName": "Test",
       "description": "Build and test with GCC and coverage enabled",
-      "inherits": [
-        "gcc-base",
-        "host-validation"
-      ],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "XGL_BUILD_TESTS": "ON",
-        "XGL_BUILD_EXAMPLES": "ON",
-        "XGL_ENABLE_COVERAGE": "ON"
-      }
+      "inherits": "gcc-coverage"
     },
     {
       "name": "gcc-debug",
       "displayName": "GCC Debug",
       "description": "Debug build using GCC on Windows or MinGW-like environments",
-      "inherits": [
-        "gcc-base",
-        "host-validation"
-      ],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "XGL_BUILD_TESTS": "ON",
-        "XGL_BUILD_EXAMPLES": "ON"
-      }
+      "inherits": "gcc-validation"
     },
     {
       "name": "gcc-test",
       "displayName": "GCC Test",
       "description": "Test build using GCC without MSVC runtime requirements",
-      "inherits": [
-        "gcc-base",
-        "host-validation"
-      ],
+      "inherits": "gcc-validation",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "XGL_BUILD_TESTS": "ON",
-        "XGL_BUILD_EXAMPLES": "ON",
         "XGL_ENABLE_COVERAGE": "OFF"
       }
     },
@@ -105,17 +114,10 @@
       "name": "ci",
       "displayName": "CI",
       "description": "Full host validation with advanced runtime and coverage",
-      "inherits": [
-        "gcc-base",
-        "host-validation"
-      ],
+      "inherits": "gcc-coverage",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
         "XGL_PROFILE": "full",
-        "XGL_BUILD_TESTS": "ON",
-        "XGL_BUILD_EXAMPLES": "ON",
         "XGL_ENABLE_ADVANCED_RUNTIME": "ON",
-        "XGL_ENABLE_COVERAGE": "ON",
         "XGL_BUILD_STATIC_ANALYSIS_TARGET": "ON"
       }
     },
@@ -123,14 +125,8 @@
       "name": "asan",
       "displayName": "ASan",
       "description": "AddressSanitizer + UndefinedBehaviorSanitizer build",
-      "inherits": [
-        "gcc-base",
-        "host-validation"
-      ],
+      "inherits": "gcc-validation",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "XGL_BUILD_TESTS": "ON",
-        "XGL_BUILD_EXAMPLES": "ON",
         "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
@@ -139,41 +135,33 @@
     },
     {
       "name": "boot",
-      "inherits": "base",
+      "inherits": "bounded",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "MinSizeRel",
-        "XGL_PROFILE": "boot",
-        "XGL_BUILD_TESTS": "OFF",
-        "XGL_BUILD_EXAMPLES": "OFF",
-        "XGL_ALLOW_FALLBACK_MALLOC": "OFF"
+        "XGL_PROFILE": "boot"
       }
     },
     {
       "name": "embedded-lite",
-      "inherits": "boot",
+      "inherits": "bounded",
       "cacheVariables": {
         "XGL_PROFILE": "embedded-lite"
       }
     },
     {
       "name": "embedded",
-      "inherits": "base",
+      "inherits": "bounded",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "MinSizeRel",
-        "XGL_PROFILE": "embedded",
-        "XGL_BUILD_TESTS": "OFF",
-        "XGL_BUILD_EXAMPLES": "OFF",
-        "XGL_ALLOW_FALLBACK_MALLOC": "OFF"
+        "XGL_PROFILE": "embedded"
       }
     },
     {
       "name": "boot-host-test",
       "displayName": "boot host regression",
       "description": "Native GoogleTest regression; requires a matching host compiler and GoogleTest installation",
-      "inherits": "boot",
-      "cacheVariables": {
-        "XGL_BUILD_TESTS": "ON"
-      }
+      "inherits": [
+        "bounded-host-validation",
+        "boot"
+      ]
     },
     {
       "name": "boot-small-host-test",
@@ -190,19 +178,19 @@
       "name": "embedded-lite-host-test",
       "displayName": "embedded-lite host regression",
       "description": "Native GoogleTest regression; requires a matching host compiler and GoogleTest installation",
-      "inherits": "embedded-lite",
-      "cacheVariables": {
-        "XGL_BUILD_TESTS": "ON"
-      }
+      "inherits": [
+        "bounded-host-validation",
+        "embedded-lite"
+      ]
     },
     {
       "name": "embedded-host-test",
       "displayName": "embedded host regression",
       "description": "Native GoogleTest regression; requires a matching host compiler and GoogleTest installation",
-      "inherits": "embedded",
-      "cacheVariables": {
-        "XGL_BUILD_TESTS": "ON"
-      }
+      "inherits": [
+        "bounded-host-validation",
+        "embedded"
+      ]
     }
   ],
   "buildPresets": [
@@ -279,8 +267,8 @@
   ],
   "testPresets": [
     {
-      "name": "ci",
-      "configurePreset": "ci",
+      "name": "test-results",
+      "hidden": true,
       "output": {
         "outputOnFailure": true
       },
@@ -289,100 +277,65 @@
       }
     },
     {
+      "name": "bounded-tests",
+      "hidden": true,
+      "inherits": "test-results",
+      "filter": {
+        "include": {
+          "label": "^xgl$"
+        }
+      }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
+      "inherits": "test-results"
+    },
+    {
       "name": "debug",
       "configurePreset": "debug",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "test-results"
     },
     {
       "name": "test",
       "configurePreset": "test",
       "displayName": "Run Tests",
       "description": "Run all tests",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "test-results"
     },
     {
       "name": "gcc-test",
       "configurePreset": "gcc-test",
       "displayName": "Run GCC Tests",
       "description": "Run all tests from the GCC test build",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "test-results"
     },
     {
       "name": "asan",
       "configurePreset": "asan",
       "displayName": "Run ASan Tests",
       "description": "Run tests with AddressSanitizer",
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "test-results"
     },
     {
       "name": "boot-host-test",
       "configurePreset": "boot-host-test",
-      "filter": {
-        "include": {
-          "label": "^xgl$"
-        }
-      },
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "bounded-tests"
     },
     {
       "name": "boot-small-host-test",
       "configurePreset": "boot-small-host-test",
-      "inherits": "boot-host-test"
+      "inherits": "bounded-tests"
     },
     {
       "name": "embedded-lite-host-test",
       "configurePreset": "embedded-lite-host-test",
-      "filter": {
-        "include": {
-          "label": "^xgl$"
-        }
-      },
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "bounded-tests"
     },
     {
       "name": "embedded-host-test",
       "configurePreset": "embedded-host-test",
-      "filter": {
-        "include": {
-          "label": "^xgl$"
-        }
-      },
-      "output": {
-        "outputOnFailure": true
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
+      "inherits": "bounded-tests"
     }
   ]
 }

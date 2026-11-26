@@ -1,3 +1,4 @@
+# Script-mode writer for the host archive measured by the xgl_footprint target.
 foreach(argument IN ITEMS XGL_TARGET_FILE XGL_REPORT_FILE XGL_PROJECT_VERSION XGL_PROFILE XGL_BUILD_CONFIG)
     if(NOT DEFINED ${argument})
         message(FATAL_ERROR "${argument} is required")

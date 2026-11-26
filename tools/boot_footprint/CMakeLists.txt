@@ -71,36 +71,38 @@ target_compile_definitions(xgl_boot_layout PRIVATE
 set(layout_binary "${CMAKE_CURRENT_BINARY_DIR}/workspace-layout.bin")
 set(layout_header "${CMAKE_CURRENT_BINARY_DIR}/workspace_layout.h")
 set(layout_json "${CMAKE_CURRENT_BINARY_DIR}/workspace-layout.json")
+set(report_script "${CMAKE_CURRENT_SOURCE_DIR}/report.py")
 add_custom_command(OUTPUT "${layout_binary}" "${layout_header}" "${layout_json}"
     COMMAND "${XGL_ARM_OBJCOPY}"
         --dump-section ".xgl_footprint_layout=${layout_binary}"
         $<TARGET_OBJECTS:xgl_boot_layout>
         "${CMAKE_CURRENT_BINARY_DIR}/layout-inspected.o"
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/report.py"
+    COMMAND "${Python3_EXECUTABLE}" "${report_script}"
         layout --input "${layout_binary}" --header "${layout_header}"
         --output "${layout_json}"
-    DEPENDS xgl_boot_layout $<TARGET_OBJECTS:xgl_boot_layout>
-        "${CMAKE_CURRENT_SOURCE_DIR}/report.py"
+    DEPENDS xgl_boot_layout $<TARGET_OBJECTS:xgl_boot_layout> "${report_script}"
     COMMAND_EXPAND_LISTS VERBATIM)
 add_custom_target(xgl_boot_layout_data DEPENDS "${layout_header}" "${layout_json}")
 
-add_executable(xgl_boot_probe consumer.c startup.S "${layout_header}")
-add_dependencies(xgl_boot_probe xgl_boot_layout_data)
-set_target_properties(xgl_boot_probe PROPERTIES SUFFIX .elf)
-set_property(TARGET xgl_boot_probe PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
-target_include_directories(xgl_boot_probe PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-target_link_libraries(xgl_boot_probe PRIVATE xgl::xgl)
-target_compile_options(xgl_boot_probe PRIVATE -Wall -Wextra -Werror -Wpedantic)
-target_compile_definitions(xgl_boot_probe PRIVATE
+add_executable(xgl_boot_probe_elf consumer.c startup.S "${layout_header}")
+add_dependencies(xgl_boot_probe_elf xgl_boot_layout_data)
+set_target_properties(xgl_boot_probe_elf PROPERTIES
+    OUTPUT_NAME xgl_boot_probe
+    SUFFIX .elf
+    INTERPROCEDURAL_OPTIMIZATION FALSE)
+target_include_directories(xgl_boot_probe_elf PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(xgl_boot_probe_elf PRIVATE xgl::xgl)
+target_compile_options(xgl_boot_probe_elf PRIVATE -Wall -Wextra -Werror -Wpedantic)
+target_compile_definitions(xgl_boot_probe_elf PRIVATE
     XGL_FOOTPRINT_ADVANCED_API=$<BOOL:${XGL_FOOTPRINT_ADVANCED_API}>
     XGL_FOOTPRINT_FRAME_SIZE=${XGL_FOOTPRINT_FRAME_SIZE}U
     XGL_FOOTPRINT_RX_SIZE=${XGL_FOOTPRINT_RX_SIZE}U)
-target_link_options(xgl_boot_probe PRIVATE
+target_link_options(xgl_boot_probe_elf PRIVATE
     -nostartfiles --specs=nano.specs --specs=nosys.specs
     "-T${CMAKE_CURRENT_SOURCE_DIR}/memory.ld"
     "-Wl,-Map,${CMAKE_CURRENT_BINARY_DIR}/xgl_boot_probe.map"
     -Wl,--gc-sections,--print-memory-usage)
-set_property(TARGET xgl_boot_probe APPEND PROPERTY LINK_DEPENDS
+set_property(TARGET xgl_boot_probe_elf APPEND PROPERTY LINK_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/memory.ld")
 
 # Keep target layout and the external PHY callbacks opaque to whole-program
@@ -108,28 +110,32 @@ set_property(TARGET xgl_boot_probe APPEND PROPERTY LINK_DEPENDS
 set(footprint_ipo_compile_options "[]")
 set(footprint_ipo_link_options "[]")
 if(XGL_FOOTPRINT_LTO)
-    target_link_options(xgl_boot_probe PRIVATE -flto)
+    target_link_options(xgl_boot_probe_elf PRIVATE -flto)
     string(JOIN "\", \"" footprint_ipo_flags ${CMAKE_C_COMPILE_OPTIONS_IPO})
     set(footprint_ipo_compile_options "[\"${footprint_ipo_flags}\"]")
     set(footprint_ipo_link_options "[\"-flto\"]")
 endif()
-file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/footprint-optimization.json"
+set(optimization_json "${CMAKE_CURRENT_BINARY_DIR}/footprint-optimization.json")
+file(GENERATE OUTPUT "${optimization_json}"
     CONTENT "{\n\
   \"enabled\": $<IF:$<BOOL:${XGL_FOOTPRINT_LTO}>,true,false>,\n\
   \"library_ipo\": $<IF:$<BOOL:$<TARGET_PROPERTY:xgl,INTERPROCEDURAL_OPTIMIZATION>>,true,false>,\n\
   \"layout_ipo\": $<IF:$<BOOL:$<TARGET_PROPERTY:xgl_boot_layout,INTERPROCEDURAL_OPTIMIZATION>>,true,false>,\n\
-  \"consumer_ipo\": $<IF:$<BOOL:$<TARGET_PROPERTY:xgl_boot_probe,INTERPROCEDURAL_OPTIMIZATION>>,true,false>,\n\
+  \"consumer_ipo\": $<IF:$<BOOL:$<TARGET_PROPERTY:xgl_boot_probe_elf,INTERPROCEDURAL_OPTIMIZATION>>,true,false>,\n\
   \"compile_options\": ${footprint_ipo_compile_options},\n\
   \"link_options\": ${footprint_ipo_link_options}\n\
 }\n")
-set_property(TARGET xgl_boot_probe APPEND PROPERTY LINK_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/report.py"
-    "${CMAKE_CURRENT_BINARY_DIR}/footprint-optimization.json")
 
-add_custom_command(TARGET xgl_boot_probe POST_BUILD
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/report.py"
-        report --elf $<TARGET_FILE:xgl_boot_probe> --build "${CMAKE_CURRENT_BINARY_DIR}"
+# Keep the public build target and measure the linked ELF through separate outputs.
+set(report_json "${CMAKE_CURRENT_BINARY_DIR}/boot-footprint.json")
+set(report_text "${CMAKE_CURRENT_BINARY_DIR}/boot-footprint.txt")
+add_custom_command(OUTPUT "${report_json}" "${report_text}"
+    COMMAND "${Python3_EXECUTABLE}" "${report_script}"
+        report --elf "$<TARGET_FILE:xgl_boot_probe_elf>" --build "${CMAKE_CURRENT_BINARY_DIR}"
         --layout "${layout_json}" --size "${XGL_ARM_SIZE}" --nm "${XGL_ARM_NM}"
         --compiler "${CMAKE_C_COMPILER}" --configuration "${CMAKE_BUILD_TYPE}"
-        --output "${CMAKE_CURRENT_BINARY_DIR}/boot-footprint.json"
+        --output "${report_json}"
+    DEPENDS xgl_boot_probe_elf "${layout_json}" "${optimization_json}"
+        "${CMAKE_CURRENT_BINARY_DIR}/CMakeCache.txt" "${report_script}"
     VERBATIM)
+add_custom_target(xgl_boot_probe ALL DEPENDS "${report_json}" "${report_text}")

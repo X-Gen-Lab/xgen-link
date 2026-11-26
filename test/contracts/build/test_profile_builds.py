@@ -138,7 +138,7 @@ class ProfileBuilds(unittest.TestCase):
         prefix = binary / "sdk-consumer-smoke/Debug/install"
         source = self.root / "capability-consumer"
         source.mkdir()
-        shutil.copyfile(ARGS.link_source / "test/cmake/VerifySdkPrefix.cmake",
+        shutil.copyfile(ARGS.link_source / "test/contracts/sdk/VerifySdkPrefix.cmake",
                         source / "VerifySdkPrefix.cmake")
         (source / "CMakeLists.txt").write_text(
             'cmake_minimum_required(VERSION 3.24)\nproject(capability_consumer C)\n'

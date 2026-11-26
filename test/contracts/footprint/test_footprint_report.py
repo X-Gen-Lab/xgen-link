@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location(
     "footprint_report", ROOT / "tools/boot_footprint/report.py")
 REPORT = importlib.util.module_from_spec(SPEC)
@@ -91,6 +91,9 @@ class FootprintReport(unittest.TestCase):
 
     def test_source_identity_includes_profile_configuration(self):
         self.assert_build_input_tracked("cmake/XglProfiles.cmake")
+
+    def test_source_identity_includes_archive_report_writer(self):
+        self.assert_build_input_tracked("cmake/XglArchiveSizeReport.cmake")
 
     def assert_build_input_tracked(self, relative):
         (self.directory / "CMakeLists.txt").write_text("project(probe)\n", encoding="utf-8")

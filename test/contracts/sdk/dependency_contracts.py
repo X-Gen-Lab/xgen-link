@@ -12,7 +12,7 @@ import tempfile
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[2]
+FIXTURES = Path(__file__).resolve().parent
 ARGS = None
 FORMER_PACKAGES = ("status", "bytes", "crc", "memory", "containers")
 PUBLIC_HEADERS = {"xgl.h", "xgl_config.h", "xgl_error.h", "xgl_types.h", "xgl_build_config.h"}
@@ -110,8 +110,8 @@ class StandaloneContracts(unittest.TestCase):
         source.mkdir()
         suffix = "c" if language == "C" else "cpp"
         fixture = f"consumer.{suffix}"
-        shutil.copyfile(ROOT / "test/cmake/consumer.c", source / fixture)
-        shutil.copyfile(ROOT / "test/cmake/VerifySdkPrefix.cmake",
+        shutil.copyfile(FIXTURES / "consumer.c", source / fixture)
+        shutil.copyfile(FIXTURES / "VerifySdkPrefix.cmake",
                         source / "VerifySdkPrefix.cmake")
         (source / "CMakeLists.txt").write_text(
             "cmake_minimum_required(VERSION 3.24)\n"
