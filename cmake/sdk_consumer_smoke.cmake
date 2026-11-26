@@ -11,9 +11,7 @@ set(consumer_src "${XGL_SMOKE_DIR}/consumer")
 set(consumer_build "${XGL_SMOKE_DIR}/consumer-build")
 set(consumer_configure_args
     "${CMAKE_COMMAND}" -S "${consumer_src}" -B "${consumer_build}" -G Ninja
-    "-DCMAKE_PREFIX_PATH=${install_prefix}"
-    -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
-    -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
+    "-DXGL_SDK_PREFIX=${install_prefix}"
 )
 set(configuration_args)
 if(DEFINED XGL_BUILD_CONFIG AND NOT XGL_BUILD_CONFIG STREQUAL "")
@@ -45,30 +43,31 @@ endif()
 
 file(RENAME "${smoke_root}/install-stage" "${install_prefix}")
 
-set(forbidden_installed_headers
-    xgl_parser.h
-    xgl_reliable.h
-    xgl_window.h
-    xgl_fragment.h
-    xgl_wire.h
-    xgl_hashtable.h
-)
-
-foreach(header IN LISTS forbidden_installed_headers)
-    if(EXISTS "${install_prefix}/include/xgl/${header}")
-        message(FATAL_ERROR "internal xgl header was installed: ${header}")
-    endif()
-endforeach()
-
-if(EXISTS "${install_prefix}/include/xgl/internal")
-    message(FATAL_ERROR "internal xgl header directory was installed")
+file(GLOB_RECURSE sdk_configs LIST_DIRECTORIES FALSE "${install_prefix}/xglConfig.cmake")
+list(LENGTH sdk_configs sdk_config_count)
+if(NOT sdk_config_count EQUAL 1)
+    message(FATAL_ERROR "Expected exactly one xglConfig.cmake in the installed SDK")
 endif()
+get_filename_component(sdk_config_dir "${sdk_configs}" DIRECTORY)
+list(APPEND consumer_configure_args "-Dxgl_DIR=${sdk_config_dir}")
 
 file(WRITE "${consumer_src}/CMakeLists.txt" [=[
 cmake_minimum_required(VERSION 3.21)
 project(xgl_consumer_smoke C)
 
-find_package(xgl CONFIG REQUIRED)
+find_package(xgl CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)
+include("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake")
+xgl_verify_sdk_prefix("${XGL_SDK_PREFIX}")
+get_target_property(sdk_includes xgl::xgl INTERFACE_INCLUDE_DIRECTORIES)
+list(LENGTH sdk_includes sdk_include_count)
+if(NOT sdk_include_count EQUAL 1)
+    message(FATAL_ERROR "Expected exactly one public include directory")
+endif()
+file(GLOB installed_headers RELATIVE "${sdk_includes}/xgl" "${sdk_includes}/xgl/*")
+list(SORT installed_headers)
+if(NOT installed_headers STREQUAL "xgl.h;xgl_build_config.h;xgl_config.h;xgl_error.h;xgl_types.h")
+    message(FATAL_ERROR "Unexpected installed SDK header set: ${installed_headers}")
+endif()
 
 add_executable(xgl_consumer main.c)
 target_link_libraries(xgl_consumer PRIVATE xgl::xgl)
@@ -82,6 +81,8 @@ configure_file("${CMAKE_CURRENT_LIST_DIR}/../tools/static_workspace_smoke.c"
     "${consumer_src}/main.c" COPYONLY)
 configure_file("${CMAKE_CURRENT_LIST_DIR}/../tools/public_api_smoke.c"
     "${consumer_src}/public_api.c" COPYONLY)
+configure_file("${CMAKE_CURRENT_LIST_DIR}/../test/cmake/VerifySdkPrefix.cmake"
+    "${consumer_src}/VerifySdkPrefix.cmake" COPYONLY)
 
 execute_process(
     COMMAND ${consumer_configure_args}

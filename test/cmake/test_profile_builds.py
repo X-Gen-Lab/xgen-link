@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -40,7 +41,7 @@ class ProfileBuilds(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, f"Unexpected acceptance: {log}")
         return result
 
-    def configure(self, name, profile, *, tests=False, multi=False, examples=False):
+    def configure(self, name, profile, *options, tests=False, multi=False, examples=False):
         binary = self.root / name
         command = ["cmake", "-S", ARGS.link_source, "-B", binary,
                    "-G", "Ninja Multi-Config" if multi else "Ninja",
@@ -53,7 +54,7 @@ class ProfileBuilds(unittest.TestCase):
                    "-DXGL_BUILD_NOHEAP_SMOKE=ON",
                    "-DXGL_BUILD_SDK_CONSUMER_SMOKE=ON",
                    "-DXGL_BUILD_RELEASE_VALIDATION_TARGET=ON",
-                   "-DXGL_ALLOW_FALLBACK_MALLOC=OFF"]
+                   "-DXGL_ALLOW_FALLBACK_MALLOC=OFF", *options]
         if ARGS.gtest_dir:
             command.append(f"-DGTest_DIR={ARGS.gtest_dir.as_posix()}")
         if ARGS.c_compiler:
@@ -87,9 +88,9 @@ class ProfileBuilds(unittest.TestCase):
             with self.subTest(configuration=configuration):
                 self.execute("cmake", "--build", binary, "--config", configuration,
                              "--target", "xgl_release_validation", "--parallel", "2")
-                installed = (binary / "sdk-consumer-smoke-ctest" / configuration
-                             / "install/lib/cmake/xgl")
-                self.assertTrue((installed / f"xglTargets-{configuration.lower()}.cmake").is_file())
+                installed = binary / "sdk-consumer-smoke-ctest" / configuration / "install"
+                self.assertEqual(
+                    len(list(installed.rglob(f"xglTargets-{configuration.lower()}.cmake"))), 1)
                 self.assertFalse((binary / "sdk-consumer-smoke" / configuration).exists())
 
     def test_release_validation_rejects_missing_checks_at_configure_time(self):
@@ -97,6 +98,16 @@ class ProfileBuilds(unittest.TestCase):
                               "-G", "Ninja", "-DXGL_BUILD_RELEASE_VALIDATION_TARGET=ON",
                               expected_success=False)
         self.assertIn("XGL_BUILD_RELEASE_VALIDATION_TARGET requires", result.stderr)
+
+    def test_sdk_consumer_smoke_supports_custom_install_directories(self):
+        binary = self.configure("custom-install", "boot",
+                                "-DCMAKE_INSTALL_INCLUDEDIR=public/api",
+                                "-DCMAKE_INSTALL_LIBDIR=archives/toolchain")
+        self.execute("cmake", "--build", binary, "--target", "xgl_sdk_consumer_smoke",
+                     "--parallel", "2")
+        prefix = binary / "sdk-consumer-smoke/Debug/install"
+        self.assertTrue((prefix / "archives/toolchain/cmake/xgl/xglConfig.cmake").is_file())
+        self.assertTrue((prefix / "public/api/xgl/xgl_build_config.h").is_file())
 
     def test_boot_runs_the_supported_capability_suite(self):
         binary = self.configure("boot", "boot", tests=True)
@@ -127,9 +138,14 @@ class ProfileBuilds(unittest.TestCase):
         prefix = binary / "sdk-consumer-smoke/Debug/install"
         source = self.root / "capability-consumer"
         source.mkdir()
+        shutil.copyfile(ARGS.link_source / "test/cmake/VerifySdkPrefix.cmake",
+                        source / "VerifySdkPrefix.cmake")
         (source / "CMakeLists.txt").write_text(
             'cmake_minimum_required(VERSION 3.24)\nproject(capability_consumer C)\n'
-            'find_package(xgl CONFIG REQUIRED COMPONENTS ${REQUESTED_CAPABILITIES})\n'
+            'find_package(xgl CONFIG REQUIRED COMPONENTS ${REQUESTED_CAPABILITIES}\n'
+            '    PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+            'include("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake")\n'
+            'xgl_verify_sdk_prefix("${XGL_SDK_PREFIX}")\n'
             'if(NOT xgl_PROFILE STREQUAL "embedded-lite" OR NOT xgl_BUILD_CONFIG_ID EQUAL 304)\n'
             '  message(FATAL_ERROR "Installed profile identity does not match")\nendif()\n'
             'get_target_property(profile xgl::xgl XGL_PROFILE)\n'
@@ -137,7 +153,7 @@ class ProfileBuilds(unittest.TestCase):
             '  message(FATAL_ERROR "Target and package identities disagree")\nendif()\n',
             encoding="utf-8")
         command = ["cmake", "-S", source, "-G", "Ninja",
-                   f"-DCMAKE_PREFIX_PATH={prefix.as_posix()}"]
+                   f"-DXGL_SDK_PREFIX={prefix.as_posix()}"]
         if ARGS.c_compiler:
             command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")
         self.execute(*command, "-B", self.root / "capability-valid",

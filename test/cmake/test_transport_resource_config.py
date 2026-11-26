@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -241,6 +242,8 @@ class TransportResourceConfig(unittest.TestCase):
         self.execute("cmake", "--install", binary, "--prefix", prefix)
         source = self.root / "sdk-consumer"
         source.mkdir()
+        shutil.copyfile(Path(__file__).with_name("VerifySdkPrefix.cmake"),
+                        source / "VerifySdkPrefix.cmake")
         (source / "main.c").write_text(
             '#include <xgl/xgl.h>\n'
             '_Static_assert(XGL_BUILD_CONFIG_ID != 301U, "custom SDK identity");\n'
@@ -260,7 +263,10 @@ class TransportResourceConfig(unittest.TestCase):
             'cmake_minimum_required(VERSION 3.24)\nproject(resource_sdk_consumer C CXX)\n'
             'set(CMAKE_CXX_STANDARD 17)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n'
             'set(CMAKE_CXX_EXTENSIONS OFF)\n'
-            'find_package(xgl CONFIG REQUIRED COMPONENTS reliable)\n'
+            'find_package(xgl CONFIG REQUIRED COMPONENTS reliable\n'
+            '  PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+            'include("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake")\n'
+            'xgl_verify_sdk_prefix("${XGL_SDK_PREFIX}")\n'
             'get_target_property(identity xgl::xgl XGL_RESOURCE_CONFIG_ID)\n'
             'if(NOT identity STREQUAL xgl_RESOURCE_CONFIG_ID)\n'
             '  message(FATAL_ERROR "Target/package resource identities disagree")\nendif()\n'
@@ -280,7 +286,7 @@ class TransportResourceConfig(unittest.TestCase):
             'gtest_discover_tests(fixed_rto TEST_LIST fixed_rto_cases PROPERTIES LABELS "xgl\\\\;unit\\\\;transport\\\\;fixed-rto")\n',
             encoding="utf-8")
         command = ["cmake", "-S", source, "-G", "Ninja",
-                   f"-DCMAKE_PREFIX_PATH={prefix.as_posix()}",
+                   f"-DXGL_SDK_PREFIX={prefix.as_posix()}",
                    f"-DGTest_DIR={ARGS.gtest_dir.as_posix()}"]
         if ARGS.c_compiler:
             command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")

@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 ARGS = None
 FORMER_PACKAGES = ("status", "bytes", "crc", "memory", "containers")
 PUBLIC_HEADERS = {"xgl.h", "xgl_config.h", "xgl_error.h", "xgl_types.h", "xgl_build_config.h"}
+VERIFY_PREFIX = ('include("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake")\n'
+                 'xgl_verify_sdk_prefix("${XGL_SDK_PREFIX}")\n')
 
 
 def deny_network():
@@ -109,6 +111,8 @@ class StandaloneContracts(unittest.TestCase):
         suffix = "c" if language == "C" else "cpp"
         fixture = f"consumer.{suffix}"
         shutil.copyfile(ROOT / "test/cmake/consumer.c", source / fixture)
+        shutil.copyfile(ROOT / "test/cmake/VerifySdkPrefix.cmake",
+                        source / "VerifySdkPrefix.cmake")
         (source / "CMakeLists.txt").write_text(
             "cmake_minimum_required(VERSION 3.24)\n"
             f"project(xgl_consumer {language})\n"
@@ -189,18 +193,94 @@ for family in (socket.AF_INET, socket.AF_INET6):
                 shutil.rmtree(binary)
         shutil.rmtree(source)
 
+        boot = f'-DBOOT_PREFIX={prefixes["boot"].as_posix()}'
+        full = f'-DFULL_PREFIX={prefixes["full"].as_posix()}'
+        cases = (
+            (
+                "required-then-full",
+                'find_package(xgl 4 QUIET CONFIG COMPONENTS authentication\n'
+                '    PATHS "${BOOT_PREFIX}" NO_DEFAULT_PATH)\n'
+                'if(xgl_FOUND OR TARGET xgl::xgl OR xgl_authentication_FOUND)\n'
+                '  message(FATAL_ERROR "Failed required capability imported a target")\nendif()\n'
+                'if(NOT xgl_NOT_FOUND_MESSAGE MATCHES "Unsupported xgl capability: authentication")\n'
+                '  message(FATAL_ERROR "Missing required capability diagnostic")\nendif()\n'
+                'unset(xgl_DIR CACHE)\n'
+                'find_package(xgl 4 CONFIG REQUIRED COMPONENTS authentication\n'
+                '    PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
+                'if(NOT xgl_authentication_FOUND OR DEFINED xgl_NOT_FOUND_MESSAGE)\n'
+                '  message(FATAL_ERROR "Successful retry retained failed capability state")\nendif()\n'
+                'set(XGL_SDK_PREFIX "${FULL_PREFIX}")\n' + VERIFY_PREFIX,
+                None,
+            ),
+            (
+                "optional-missing",
+                'find_package(xgl 4 CONFIG REQUIRED COMPONENTS reliable\n'
+                '    OPTIONAL_COMPONENTS authentication PATHS "${BOOT_PREFIX}" NO_DEFAULT_PATH)\n'
+                'if(xgl_authentication_FOUND OR NOT xgl_reliable_FOUND OR\n'
+                '    NOT TARGET xgl::xgl OR DEFINED xgl_NOT_FOUND_MESSAGE)\n'
+                '  message(FATAL_ERROR "Optional missing capability invalidated the package")\nendif()\n'
+                'set(XGL_SDK_PREFIX "${BOOT_PREFIX}")\n' + VERIFY_PREFIX,
+                None,
+            ),
+            (
+                "later-incompatible",
+                'find_package(xgl 4 CONFIG REQUIRED PATHS "${BOOT_PREFIX}" NO_DEFAULT_PATH)\n'
+                'unset(xgl_DIR CACHE)\n'
+                'find_package(xgl 4 QUIET CONFIG OPTIONAL_COMPONENTS authentication\n'
+                '    PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n',
+                "xgl::xgl conflicts with the requested SDK resource identity",
+            ),
+        )
+        for name, selection, diagnostic in cases:
+            with self.subTest(component_selection=name):
+                consumer = self.new_consumer(
+                    name, "C", selection, include_consumer=diagnostic is None)
+                binary = self.work / (name + "-build")
+                output = self.configure(consumer, binary, boot, full,
+                                        succeeds=diagnostic is None)
+                if diagnostic is None:
+                    self.build(binary)
+                    self.executable(binary, "consumer")
+                else:
+                    self.assertIn(diagnostic, output)
+
+        empty_prefix = self.work / "empty-prefix"
+        empty_prefix.mkdir()
+        location = f"-DXGL_SDK_PREFIX={empty_prefix}"
+        ambient = self.new_consumer(
+            "ambient-sdk", "C",
+            'set(ENV{xgl_ROOT} "${BOOT_PREFIX}")\n'
+            'find_package(xgl 4 QUIET CONFIG PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+            'if(xgl_FOUND OR TARGET xgl::xgl)\n'
+            '  message(FATAL_ERROR "Found ambient xgl_ROOT despite empty expected prefix")\nendif()\n',
+            include_consumer=False)
+        self.configure(ambient, self.work / "ambient-sdk-build", boot, location)
+
+        boot_config_dir = next(prefixes["boot"].rglob("xglConfig.cmake")).parent
+        wrong = self.new_consumer(
+            "wrong-xgl-dir", "C",
+            'set(xgl_DIR "${BOOT_CONFIG_DIR}")\n'
+            'find_package(xgl 4 CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+            + VERIFY_PREFIX, include_consumer=False)
+        output = self.configure(wrong, self.work / "wrong-xgl-dir-build",
+                                f"-DBOOT_CONFIG_DIR={boot_config_dir}", location,
+                                succeeds=False)
+        self.assertIn("Selected SDK config is outside the expected prefix", output)
+
         for profile, prefix in prefixes.items():
             for language in ("C", "CXX"):
                 with self.subTest(profile=profile, language=language):
                     suffix = f"{profile}-{language}"
                     consumer = self.new_consumer(
                         "sdk-" + suffix, language,
-                        "find_package(xgl 4 CONFIG REQUIRED COMPONENTS reliable)\n"
+                        'find_package(xgl 4 CONFIG REQUIRED COMPONENTS reliable\n'
+                        '    PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+                        + VERIFY_PREFIX +
                         "if(NOT xgl_CONFIG_ABI_VERSION EQUAL 4)\n"
                         '  message(FATAL_ERROR "Unexpected SDK ABI")\n'
                         "endif()")
                     binary = self.work / ("sdk-build-" + suffix)
-                    location = f"-DCMAKE_PREFIX_PATH={prefix.as_posix()}"
+                    location = f"-DXGL_SDK_PREFIX={prefix.as_posix()}"
                     self.configure(consumer, binary, location)
                     self.build(binary)
                     self.executable(binary, "consumer")
@@ -215,13 +295,15 @@ for family in (socket.AF_INET, socket.AF_INET6):
                         self.assertIn("XGL_CONFIG_ABI_VERSION conflicts", output)
 
         for name, selection, diagnostic in (
-            ("legacy-sdk", "find_package(xgl 3 CONFIG REQUIRED)", 'requested version "3"'),
-            ("boot-auth", "find_package(xgl 4 CONFIG REQUIRED COMPONENTS authentication)",
+            ("legacy-sdk", "find_package(xgl 3 CONFIG REQUIRED", 'requested version "3"'),
+            ("boot-auth", "find_package(xgl 4 CONFIG REQUIRED COMPONENTS authentication",
              "Unsupported xgl capability: authentication"),
         ):
-            consumer = self.new_consumer(name, "C", selection, include_consumer=False)
+            consumer = self.new_consumer(
+                name, "C", selection + ' PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n',
+                include_consumer=False)
             output = self.configure(consumer, self.work / (name + "-build"),
-                                    f"-DCMAKE_PREFIX_PATH={prefixes['boot'].as_posix()}",
+                                    f"-DXGL_SDK_PREFIX={prefixes['boot'].as_posix()}",
                                     succeeds=False)
             self.assertIn(diagnostic, output)
 
