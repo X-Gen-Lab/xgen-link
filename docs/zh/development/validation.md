@@ -31,7 +31,20 @@
 
 在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库、源码子目录和独立安装消费者。消费检查需实际编译、链接并运行公共 C 程序，验证 ABI、profile 和必需能力的错误组合会被拒绝。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。
 
-准备发布所需的测试、分析与文档工具，配置本仓根目录的 `ci` preset，再运行 `cmake --build build/ci --target xgl_release_validation`。质量门禁要求行、函数和分支覆盖率各至少 80%。同时核对适用的 profile、编译器及 sanitizer 执行范围。质量工具和主机框架的版本来源见 `tools/quality.json` 与 `test/CMakeLists.txt`。
+`ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。复现 CI 主机验证时，对同一个构建运行测试、分析器和覆盖率检查。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。行、函数和分支覆盖率均至少达到 80%。
+
+```sh
+cmake --preset ci
+cmake --build --preset ci
+python test/cmake/run_ctest.py --build-dir build/ci --config Debug
+cmake --build --preset ci --target xgl_static_analysis xgl_footprint
+python tools/quality.py tidy --build-dir build/ci
+python tools/quality.py coverage --build-dir build/ci
+```
+
+本地使用 CMake 时，运行 `cmake --build --preset ci --target xgl_release_validation` 构建并执行已注册的 CTest 用例，包含 SDK 搬移消费和无堆检查。该目标也执行已选的 Cppcheck 与静态库体积报告。
+
+使用 `boot-small-host-test` 的配置、构建和测试 preset 验证单窗口槽与固定 RTO。`asan` preset 会让 AddressSanitizer 和 UndefinedBehaviorSanitizer 的诊断使测试失败。记录实际执行的 profile、编译器和 sanitizer。工具和主机测试框架的版本来源见 `tools/quality.json` 与 `test/CMakeLists.txt`。
 
 ## 资源和产品验收
 

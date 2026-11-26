@@ -60,8 +60,11 @@
     {
       "name": "test",
       "displayName": "Test",
-      "description": "Build with tests and coverage enabled",
-      "inherits": "host-validation",
+      "description": "Build and test with GCC and coverage enabled",
+      "inherits": [
+        "gcc-base",
+        "host-validation"
+      ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "XGL_BUILD_TESTS": "ON",
@@ -101,15 +104,17 @@
     {
       "name": "ci",
       "displayName": "CI",
-      "description": "Continuous integration build",
+      "description": "Full host validation with advanced runtime and coverage",
       "inherits": [
         "gcc-base",
         "host-validation"
       ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "XGL_PROFILE": "full",
         "XGL_BUILD_TESTS": "ON",
         "XGL_BUILD_EXAMPLES": "ON",
+        "XGL_ENABLE_ADVANCED_RUNTIME": "ON",
         "XGL_ENABLE_COVERAGE": "ON",
         "XGL_BUILD_STATIC_ANALYSIS_TARGET": "ON"
       }
@@ -126,8 +131,8 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "XGL_BUILD_TESTS": "ON",
         "XGL_BUILD_EXAMPLES": "ON",
-        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
-        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
         "XGL_BUILD_SDK_CONSUMER_SMOKE": "OFF"
       }
@@ -168,6 +173,17 @@
       "inherits": "boot",
       "cacheVariables": {
         "XGL_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "boot-small-host-test",
+      "displayName": "Boot Small host regression",
+      "description": "Native GoogleTest regression with one window slot and fixed RTO",
+      "inherits": "boot-host-test",
+      "cacheVariables": {
+        "XGL_RELIABLE_INDEX_BUCKETS": "1",
+        "XGL_TRANSPORT_WINDOW_CAPACITY": "1",
+        "XGL_ENABLE_ADAPTIVE_RTO": "OFF"
       }
     },
     {
@@ -249,6 +265,10 @@
       "configurePreset": "boot-host-test"
     },
     {
+      "name": "boot-small-host-test",
+      "configurePreset": "boot-small-host-test"
+    },
+    {
       "name": "embedded-lite-host-test",
       "configurePreset": "embedded-lite-host-test"
     },
@@ -328,6 +348,11 @@
       "execution": {
         "noTestsAction": "error"
       }
+    },
+    {
+      "name": "boot-small-host-test",
+      "configurePreset": "boot-small-host-test",
+      "inherits": "boot-host-test"
     },
     {
       "name": "embedded-lite-host-test",

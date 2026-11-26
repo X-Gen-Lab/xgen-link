@@ -19,6 +19,6 @@ cmake -S docs -B build/docs
 cmake --build build/docs --target xgl_docs
 ```
 
-严格构建成功后查看 `build/docs/site/index.html`、中英文入口和生成 API。若工具缺失，准备相应工具后重新配置。若链接或注释失败，修正源输入后重新构建。当前分支的构建成功与 Pages 发布分别记录。
+严格构建成功后查看 `build/docs/site/index.html`、中英文入口和生成 API。将 C API 导航页 `docs/api/index.md` 纳入 Git 跟踪，并在干净检出中验证文档变更。工作流失败时，查看其 `documentation-diagnostics` 产物，其中保存了失败前收集的日志和工具版本。当前分支的构建成功与 Pages 发布分别记录。
 
 可用 `mkdocs serve` 预览 Markdown，使用完整构建查看生成 C API。Pre-commit 与文档检查命令参见[开发工作流](workflow.md)。

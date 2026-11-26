@@ -88,7 +88,7 @@ LTO 应使用独立构建目录。`footprint-optimization.json` 和最终报告�
 
 ## 固定工具链与自动门槛
 
-`toolchain-lock.json` 固定 Arm GNU 15.2.rel1/GCC 15.2.1 的官方 Linux 归档与官方 SHA-256，并记录校验和来源 URL。CI 在独立准备步骤下载、验证校验和并加入 PATH；生产配置及本地探针不下载工具。Windows 本地验证必须自行准备同版本的 ARM 工具链。
+`toolchain-lock.json` 固定 Arm GNU 15.2.rel1/GCC 15.2.1 的官方 Linux 归档与官方 SHA-256，并记录校验和来源 URL。CI 缓存按 runner 系统、架构和锁文件摘要区分的下载归档，每次解包前重新验证 SHA-256。缓存归档校验失败时，CI 重新下载并验证。生产配置及本地探针不下载工具。Windows 本地验证必须自行准备同版本的 ARM 工具链。
 
 `budget-mtu128.json` 和 `budget-mtu64.json` 分别固定 profile、MTU/RX、编译器、基线来源及资源限额。Flash 的 16,384 B 是本轮回归上限，其他限额固定本轮实际 workspace、静态 RAM、预留栈、总 RAM 和最大单函数栈；它不是已达成的 8 KiB 设计目标。运行门槛：
 
@@ -109,7 +109,9 @@ LTO 测量分别使用 `budget-mtu128-lto.json`、`budget-mtu64-lto.json`。这�
 python test/cmake/test_footprint_lto.py --link-source . --work-dir out/lto-contracts
 ```
 
-测试分别构建默认配置和 LTO 配置，核查真实编译/链接命令、布局与消费者隔离、完整报告、禁堆约束及预算模式拒绝。命令日志保存在显式工作目录中。
+CI 在 Default MTU128 的普通和 LTO 预算任务中复用已有构建。若已生成 `compile_commands.json` 并成功链接探针，可以用 `--build-dir` 指定构建目录，以 `--expect-lto OFF` 或 `--expect-lto ON` 核验对应模式。
+
+独立运行时，测试分别构建默认配置和 LTO 配置。两种运行方式均核查真实编译及链接命令、布局与消费者隔离、完整报告和禁堆约束。CI 矩阵另用各自的预算策略核验资源限额。命令日志保存在显式工作目录中。
 
 ## Datalink 接收优化阶段的配置
 

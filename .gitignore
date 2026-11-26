@@ -43,7 +43,6 @@ cmake-build-*/
 
 # Documentation build
 docs/build/
-docs/api/
 site/
 *.log
 

@@ -14,7 +14,9 @@ python tools/quality.py format
 python tools/quality.py test --build-dir build/gcc-test
 ```
 
-The shared runner checks the CTest inventory and actual JUnit results. Retain the original error and reproduction command on failure. Use `XGL_PROPERTY_SEED` to set property-test inputs.
+The shared runner checks the CTest inventory and actual JUnit results. CI host jobs record and verify every CTest execution with `python test/cmake/run_ctest.py --build-dir build/debug --config Debug`, independently of shared quality tool installation. Retain the original error and reproduction command on failure. Use `XGL_PROPERTY_SEED` to set property-test inputs.
+
+Use `status` in `CI` and `Build documentation site` in `Documentation` as merge gates. Deployment reuses the site artifact from the validated documentation build. The lint and analysis jobs read the quality tool source and version from `tools/quality.json`.
 
 ## Analysis and documentation
 

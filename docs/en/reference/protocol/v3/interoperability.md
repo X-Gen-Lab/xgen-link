@@ -8,14 +8,17 @@ Peers must agree on MTU, extension semantics, authentication tag length, trusted
 
 ## Reproduce the cross-SDK test
 
-In the repository, `test/integration/README.md` identifies the pinned baseline, installed prefix and two independent build directories. Both endpoints use `test/integration/interop_peer.c`, one linked against the installed SDK 3 and the other against the current production library. The driver `test/integration/test_wire_interop.py` passes actual frames over standard streams.
+In the repository, `test/integration/README.md` identifies the pinned SDK 3 baseline and dependency preparation. Both endpoints use `test/integration/interop_peer.c`, one linked against the installed SDK 3 and the other against the current production library. The driver `test/integration/test_wire_interop.py` passes actual frames over standard streams.
 
-Run from the repository root after configuring the independent build directories as described in the fixture. Run once for `boot` and once for `full`, using the corresponding SDK 3 install prefix each time.
+Run from the repository root with GoogleTest 1.16.0 available to CMake. Run once for `boot` and once for `full`.
 
 ```sh
 profile=boot
 work="$PWD/build/wire-interop"
-cmake --build "$work/sdk3-$profile"
+python3 test/integration/build_wire_interop_legacy.py \
+  --work-dir "$work" --profile "$profile" --fetch
+cmake -S . -B "$work/sdk4-$profile" -G Ninja \
+  -DXGL_PROFILE="$profile" -DXGL_BUILD_TESTS=ON
 cmake --build "$work/sdk4-$profile" --target xgl_interop_peer
 python3 test/integration/test_wire_interop.py \
   "$work/sdk3-$profile/xgl_interop_peer" \

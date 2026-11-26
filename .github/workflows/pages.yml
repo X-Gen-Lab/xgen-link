@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+      - 'feat/**'
+    paths:
+      - 'docs/**'
+      - 'include/xgl/**'
+      - CMakeLists.txt
+      - Doxyfile
+      - mkdocs.yml
+      - tools/docs_qa.ps1
+      - .github/workflows/pages.yml
   pull_request:
     branches:
       - main
@@ -25,6 +34,9 @@ jobs:
     permissions:
       contents: read
       pages: read
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout
@@ -39,23 +51,37 @@ jobs:
 
       - name: Install documentation dependencies
         run: |
-          python -m pip install -r docs/requirements.txt
-          doxygen_archive="$RUNNER_TEMP/doxygen-1.14.0.linux.bin.tar.gz"
-          curl --fail --location --retry 3 \
-            https://github.com/doxygen/doxygen/releases/download/Release_1_14_0/doxygen-1.14.0.linux.bin.tar.gz \
-            --output "$doxygen_archive"
-          echo "e5d6ae24d0bf3f0cdc4d8f146726b89ca323922f19441af99b1872d503665ad6  $doxygen_archive" | sha256sum --check
-          tar -xzf "$doxygen_archive" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/doxygen-1.14.0/bin" >> "$GITHUB_PATH"
+          mkdir -p build/docs-diagnostics
+          (
+            set -euo pipefail
+            python -m pip install -r docs/requirements.txt
+            doxygen_archive="$RUNNER_TEMP/doxygen-1.14.0.linux.bin.tar.gz"
+            curl --fail --location --retry 3 \
+              https://github.com/doxygen/doxygen/releases/download/Release_1_14_0/doxygen-1.14.0.linux.bin.tar.gz \
+              --output "$doxygen_archive"
+            echo "e5d6ae24d0bf3f0cdc4d8f146726b89ca323922f19441af99b1872d503665ad6  $doxygen_archive" | sha256sum --check
+            tar -xzf "$doxygen_archive" -C "$RUNNER_TEMP"
+            echo "$RUNNER_TEMP/doxygen-1.14.0/bin" >> "$GITHUB_PATH"
+          ) 2>&1 | tee build/docs-diagnostics/dependencies.log
+
+      - name: Record documentation tool versions
+        run: |
+          (
+            set -euo pipefail
+            python --version
+            python -m pip show mkdocs mkdocs-material
+            cmake --version
+            doxygen --version
+            pwsh --version
+          ) 2>&1 | tee build/docs-diagnostics/tool-versions.log
 
       - name: Run documentation QA
-        shell: pwsh
-        run: ./tools/docs_qa.ps1
+        run: pwsh -NoProfile -File tools/docs_qa.ps1 2>&1 | tee build/docs-diagnostics/qa.log
 
       - name: Build MkDocs and Doxygen
         run: |
-          cmake -S docs -B build/docs
-          cmake --build build/docs --target xgl_docs
+          cmake -S docs -B build/docs 2>&1 | tee build/docs-diagnostics/configure.log
+          cmake --build build/docs --target xgl_docs 2>&1 | tee build/docs-diagnostics/build.log
 
       - name: Configure GitHub Pages
         if: github.ref == 'refs/heads/main'
@@ -66,6 +92,16 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: build/docs/site
+
+      - name: Preserve documentation failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: documentation-diagnostics
+          path: |
+            build/docs-diagnostics/
+            build/docs/doxygen/warnings.log
+          if-no-files-found: warn
 
   deploy:
     name: Deploy to GitHub Pages

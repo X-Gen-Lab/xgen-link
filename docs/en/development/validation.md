@@ -31,7 +31,20 @@
 
 Use a clean build with only the C11 toolchain to validate the default production library, Boot production library, source subdirectory and isolated installed consumer. Compile, link and run real public C consumers. Exercise rejected ABI, profile and required capability combinations. Follow the [development workflow](workflow.md) for host tests. Keep missing test inventories, missing reports and failing exit statuses visible.
 
-After preparing the release tools, configure the root `ci` preset and run `cmake --build build/ci --target xgl_release_validation`. The quality gate requires at least 80% each for line, function and branch coverage. Record which profiles, compiler and sanitizer runs actually executed. Tool and framework versions are defined by `tools/quality.json` and `test/CMakeLists.txt`.
+The `ci` preset selects Full with advanced runtime and GCC coverage instrumentation. Reproduce the CI host validation with the same build for the tests, analyzers and coverage. `run_ctest.py` records the inventory and JUnit report and rejects skipped tests. The coverage gate requires at least 80% each for line, function and branch coverage.
+
+```sh
+cmake --preset ci
+cmake --build --preset ci
+python test/cmake/run_ctest.py --build-dir build/ci --config Debug
+cmake --build --preset ci --target xgl_static_analysis xgl_footprint
+python tools/quality.py tidy --build-dir build/ci
+python tools/quality.py coverage --build-dir build/ci
+```
+
+For a local CMake check, `cmake --build --preset ci --target xgl_release_validation` builds and runs the registered CTest cases, including the relocated SDK and no-heap smoke tests. It also runs the selected Cppcheck and archive footprint targets.
+
+Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. Record the profiles, compiler and sanitizer runs that executed. Tool and framework versions are defined by `tools/quality.json` and `test/CMakeLists.txt`.
 
 ## Resources and product qualification
 

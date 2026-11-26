@@ -1,11 +1,13 @@
 """Verify standalone source and relocated SDK consumption with real CMake builds."""
 
 import argparse
+import errno
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -14,6 +16,41 @@ ROOT = Path(__file__).resolve().parents[2]
 ARGS = None
 FORMER_PACKAGES = ("status", "bytes", "crc", "memory", "containers")
 PUBLIC_HEADERS = {"xgl.h", "xgl_config.h", "xgl_error.h", "xgl_types.h", "xgl_build_config.h"}
+
+
+def deny_network():
+    import ctypes
+
+    # Seccomp filters survive exec and propagate to CMake and its subprocesses.
+    seccomp = ctypes.CDLL("libseccomp.so.2")
+    seccomp.seccomp_init.argtypes = [ctypes.c_uint32]
+    seccomp.seccomp_init.restype = ctypes.c_void_p
+    seccomp.seccomp_syscall_resolve_name.argtypes = [ctypes.c_char_p]
+    seccomp.seccomp_rule_add.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
+                                        ctypes.c_int, ctypes.c_uint]
+    seccomp.seccomp_load.argtypes = [ctypes.c_void_p]
+    seccomp.seccomp_release.argtypes = [ctypes.c_void_p]
+    seccomp.seccomp_release.restype = None
+
+    allow = 0x7FFF0000  # SCMP_ACT_ALLOW
+    deny_operation = 0x00050000 | errno.EPERM  # SCMP_ACT_ERRNO(EPERM)
+    context = seccomp.seccomp_init(allow)
+    if not context:
+        raise OSError("libseccomp could not allocate a filter")
+    try:
+        # io_uring can create sockets without calling the socket syscall.
+        for name in (b"socket", b"io_uring_setup"):
+            number = seccomp.seccomp_syscall_resolve_name(name)
+            if number == -1:
+                raise OSError(f"libseccomp could not resolve {name.decode()}")
+            status = seccomp.seccomp_rule_add(context, deny_operation, number, 0)
+            if status < 0:
+                raise OSError(f"could not deny {name.decode()}: {os.strerror(-status)}")
+        status = seccomp.seccomp_load(context)
+        if status < 0:
+            raise OSError(f"could not load seccomp filter: {os.strerror(-status)}")
+    finally:
+        seccomp.seccomp_release(context)
 
 
 class StandaloneContracts(unittest.TestCase):
@@ -114,6 +151,21 @@ class StandaloneContracts(unittest.TestCase):
         self.executable(binary, "consumer")
 
     def test_offline_source_and_relocated_sdk_reject_foreign_abi(self):
+        if ARGS.deny_network:
+            self.run_command(sys.executable, "-c", """
+import errno
+import socket
+
+for family in (socket.AF_INET, socket.AF_INET6):
+    try:
+        with socket.socket(family):
+            raise SystemExit(f"{family.name}: socket creation was allowed")
+    except PermissionError as error:
+        if error.errno != errno.EPERM:
+            raise
+        print(f"{family.name}: socket creation denied with EPERM")
+""")
+
         source = self.work / "production-source"
         source.mkdir()
         shutil.copyfile(ARGS.link_source / "CMakeLists.txt", source / "CMakeLists.txt")
@@ -178,7 +230,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--link-source", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
+    parser.add_argument("--deny-network", action="store_true",
+                        help="deny network socket creation using Linux libseccomp")
     ARGS, remaining = parser.parse_known_args()
     ARGS.link_source = ARGS.link_source.resolve()
     ARGS.work_dir = ARGS.work_dir.resolve()
+    if ARGS.deny_network:
+        if sys.platform != "linux":
+            parser.error("--deny-network requires Linux and libseccomp.so.2")
+        try:
+            deny_network()
+        except OSError as error:
+            parser.error(f"--deny-network: {error}")
     unittest.main(argv=[__file__, *remaining])

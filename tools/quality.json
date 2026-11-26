@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "standard_version": "1.0.0",
-  "quality_version": "0.2.0",
+  "quality_version": "0.1.0",
   "quality_source": {
-    "revision": "357a0b9ed557d068aab4403d6688960afd800e99"
+    "revision": "ddd42d4b7eb8c8b744a019015d6ad412f78c10fe"
   },
   "public_headers": [
     "include/xgl/xgl.h",

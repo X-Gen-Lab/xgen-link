@@ -90,6 +90,13 @@ class ProfileBuilds(unittest.TestCase):
                 installed = (binary / "sdk-consumer-smoke-ctest" / configuration
                              / "install/lib/cmake/xgl")
                 self.assertTrue((installed / f"xglTargets-{configuration.lower()}.cmake").is_file())
+                self.assertFalse((binary / "sdk-consumer-smoke" / configuration).exists())
+
+    def test_release_validation_rejects_missing_checks_at_configure_time(self):
+        result = self.execute("cmake", "-S", ARGS.link_source, "-B", self.root / "empty-release",
+                              "-G", "Ninja", "-DXGL_BUILD_RELEASE_VALIDATION_TARGET=ON",
+                              expected_success=False)
+        self.assertIn("XGL_BUILD_RELEASE_VALIDATION_TARGET requires", result.stderr)
 
     def test_boot_runs_the_supported_capability_suite(self):
         binary = self.configure("boot", "boot", tests=True)

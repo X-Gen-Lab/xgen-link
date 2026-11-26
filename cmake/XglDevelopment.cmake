@@ -1,24 +1,36 @@
 # Explicitly requested host checks, footprint reports and release helpers.
-if(XGL_BUILD_NOHEAP_SMOKE)
+function(xgl_add_noheap_test_library)
+    set(XGL_ALLOW_FALLBACK_MALLOC OFF)
+    set(generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated-noheap")
+    xgl_finalize_build_config("${generated_dir}")
     add_library(xgl_noheap STATIC ${XGL_SOURCES})
+    xgl_apply_build_contract(xgl_noheap)
     target_compile_features(xgl_noheap PUBLIC c_std_11)
     target_compile_options(xgl_noheap PRIVATE ${XGL_C_WARNINGS})
     target_compile_definitions(xgl_noheap PUBLIC XGL_ALLOW_FALLBACK_MALLOC=0)
     target_include_directories(xgl_noheap
         PUBLIC
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+            "${CMAKE_CURRENT_SOURCE_DIR}/include"
+            "${generated_dir}"
         PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            "${CMAKE_CURRENT_SOURCE_DIR}/src"
     )
+endfunction()
+
+if(XGL_BUILD_NOHEAP_SMOKE)
+    set(noheap_test_library xgl)
+    if(XGL_ALLOW_FALLBACK_MALLOC)
+        xgl_add_noheap_test_library()
+        set(noheap_test_library xgl_noheap)
+    endif()
 
     if(NOT XGL_PROFILE STREQUAL "boot")
         add_executable(xgl_noheap_smoke tools/noheap_smoke.c)
-        target_link_libraries(xgl_noheap_smoke PRIVATE xgl_noheap)
+        target_link_libraries(xgl_noheap_smoke PRIVATE ${noheap_test_library})
         target_include_directories(xgl_noheap_smoke PRIVATE src)
     endif()
     add_executable(xgl_static_workspace_smoke tools/static_workspace_smoke.c)
-    target_link_libraries(xgl_static_workspace_smoke PRIVATE xgl_noheap)
+    target_link_libraries(xgl_static_workspace_smoke PRIVATE ${noheap_test_library})
     enable_testing()
     add_test(NAME xgl_static_workspace_smoke COMMAND xgl_static_workspace_smoke)
     set_tests_properties(xgl_static_workspace_smoke PROPERTIES
@@ -86,6 +98,10 @@ if(TARGET xgl_noheap_smoke)
 endif()
 
 if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
+    if(NOT (XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE OR XGL_BUILD_SDK_CONSUMER_SMOKE))
+        message(FATAL_ERROR
+            "XGL_BUILD_RELEASE_VALIDATION_TARGET requires host tests, no-heap smoke, or SDK consumer smoke")
+    endif()
     set(XGL_RELEASE_VALIDATION_DEPS xgl)
     if(XGL_BUILD_TESTS)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_tests)
@@ -95,9 +111,6 @@ if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
     endif()
     if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_static_analysis)
-    endif()
-    if(XGL_BUILD_SDK_CONSUMER_SMOKE)
-        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_sdk_consumer_smoke)
     endif()
     if(TARGET xgl_noheap_smoke)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_noheap_smoke)

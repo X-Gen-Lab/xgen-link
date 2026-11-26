@@ -11,7 +11,7 @@ if(XGL_PROFILE STREQUAL "boot")
     set(XGL_FEATURE_DIAGNOSTICS 0)
     set(XGL_FEATURE_STATISTICS 0)
     set(XGL_RELIABLE_BUCKET_COUNT 1)
-    set(XGL_BUILD_CONFIG_ID 301)
+    set(XGL_PROFILE_CONFIG_ID 301)
 elseif(XGL_PROFILE STREQUAL "embedded" OR XGL_PROFILE STREQUAL "full" OR
        XGL_PROFILE STREQUAL "embedded-lite")
     set(XGL_FEATURE_AUTH 1)
@@ -28,12 +28,12 @@ elseif(XGL_PROFILE STREQUAL "embedded" OR XGL_PROFILE STREQUAL "full" OR
         set(XGL_FEATURE_FORWARDING 0)
         set(XGL_SECURITY_SESSION_CAPACITY 0)
         set(XGL_RELIABLE_BUCKET_COUNT 8)
-        set(XGL_BUILD_CONFIG_ID 304)
+        set(XGL_PROFILE_CONFIG_ID 304)
     elseif(XGL_PROFILE STREQUAL "embedded")
-        set(XGL_BUILD_CONFIG_ID 302)
+        set(XGL_PROFILE_CONFIG_ID 302)
         set(XGL_SECURITY_SESSION_CAPACITY 4)
     else()
-        set(XGL_BUILD_CONFIG_ID 303)
+        set(XGL_PROFILE_CONFIG_ID 303)
     endif()
 else()
     message(FATAL_ERROR "Unknown XGL_PROFILE '${XGL_PROFILE}'")
@@ -110,7 +110,7 @@ endforeach()
 
 # Finalize after the root has resolved fallback malloc. The identity is a
 # collision-free mixed-radix encoding of all compiled capacity selections.
-function(xgl_finalize_build_config)
+function(xgl_finalize_build_config generated_dir)
     set(bucket_values 1 2 4 8 16 32)
     set(window_values 1 8 16 32 64 128)
     set(chunk_values 16 32 64 128)
@@ -122,7 +122,7 @@ function(xgl_finalize_build_config)
     else()
         set(heap_code 0)
     endif()
-    math(EXPR profile_code "${XGL_BUILD_CONFIG_ID} - 300")
+    math(EXPR profile_code "${XGL_PROFILE_CONFIG_ID} - 300")
     math(EXPR resource_id
         "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * (${heap_code} + 2 * ${XGL_FEATURE_ADVANCED_RUNTIME})))))")
 
@@ -137,6 +137,7 @@ function(xgl_finalize_build_config)
     elseif(XGL_PROFILE STREQUAL "full")
         set(default_heap 1)
     endif()
+    set(XGL_BUILD_CONFIG_ID "${XGL_PROFILE_CONFIG_ID}")
     if(NOT (XGL_RELIABLE_BUCKET_COUNT EQUAL default_buckets AND
             XGL_BUILD_WINDOW_CAPACITY EQUAL 128 AND
             XGL_FEATURE_ADAPTIVE_RTO EQUAL 1 AND
@@ -149,7 +150,7 @@ function(xgl_finalize_build_config)
     set(XGL_BUILD_CONFIG_ID "${XGL_BUILD_CONFIG_ID}" PARENT_SCOPE)
     set(XGL_RESOURCE_CONFIG_ID "${resource_id}")
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/xgl_build_config.h.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/generated/xgl/xgl_build_config.h" @ONLY)
+        "${generated_dir}/xgl/xgl_build_config.h" @ONLY)
 endfunction()
 
 function(xgl_apply_build_contract target)

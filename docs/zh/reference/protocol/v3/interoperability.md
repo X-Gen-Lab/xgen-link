@@ -8,14 +8,17 @@ SDK 4 与 SDK 3 共用 wire v3。对端需使用同一线上版本。SDK 版本�
 
 ## 复现新旧端点
 
-仓库中的 `test/integration/README.md` 给出旧版固定修订、安装前缀和两个独立构建目录的配置命令。`test/integration/interop_peer.c` 是两个端点共用的 C 夹具，分别链接各自安装的 SDK 3 和当前生产库。`test/integration/test_wire_interop.py` 通过标准流转发实际帧。
+仓库中的 `test/integration/README.md` 给出固定的 SDK 3 修订及依赖准备方式。`test/integration/interop_peer.c` 是两个端点共用的 C 夹具，分别链接已安装的 SDK 3 和当前生产库。`test/integration/test_wire_interop.py` 通过标准流转发实际帧。
 
-从仓库根目录执行。按 fixture 的说明配置两个目录后，分别构建，用同一 profile 启动驱动。以下命令对 `boot` 和 `full` 各运行一次，并使用对应的 SDK 3 安装前缀。
+从仓库根目录执行，确保 CMake 能找到已安装的 GoogleTest 1.16.0。以下命令分别用 `boot` 和 `full` 运行一次。
 
 ```sh
 profile=boot
 work="$PWD/build/wire-interop"
-cmake --build "$work/sdk3-$profile"
+python3 test/integration/build_wire_interop_legacy.py \
+  --work-dir "$work" --profile "$profile" --fetch
+cmake -S . -B "$work/sdk4-$profile" -G Ninja \
+  -DXGL_PROFILE="$profile" -DXGL_BUILD_TESTS=ON
 cmake --build "$work/sdk4-$profile" --target xgl_interop_peer
 python3 test/integration/test_wire_interop.py \
   "$work/sdk3-$profile/xgl_interop_peer" \

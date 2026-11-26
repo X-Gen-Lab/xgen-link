@@ -14,7 +14,9 @@ python tools/quality.py format
 python tools/quality.py test --build-dir build/gcc-test
 ```
 
-共享运行器检查 CTest 清单和实际 JUnit。失败时保留首次错误和可复现命令。性质测试支持 `XGL_PROPERTY_SEED` 固定随机输入。
+共享运行器检查 CTest 清单和实际 JUnit。CI 主机任务用 `python test/cmake/run_ctest.py --build-dir build/debug --config Debug` 记录并核对全部 CTest 执行，无需安装共享质量工具。失败时保留首次错误和可复现命令。性质测试支持 `XGL_PROPERTY_SEED` 固定随机输入。
+
+合并验收以 `CI` 的 `status` 和 `Documentation` 的 `Build documentation site` 为门禁。部署复用同一次文档构建的站点产物。格式和分析任务从 `tools/quality.json` 读取质量工具来源和版本。
 
 ## 分析与文档
 

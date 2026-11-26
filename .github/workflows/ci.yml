@@ -14,7 +14,32 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
+  lint:
+    name: Text and source layout
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/setup-quality
+        with:
+          repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
+      - run: python -m pre_commit run --all-files
+      - name: Preserve lint evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lint
+          path: out/reports/
+          if-no-files-found: warn
+
   host:
     name: Host (${{ matrix.os }}, advanced=${{ matrix.advanced }})
     runs-on: ${{ matrix.os }}
@@ -24,9 +49,6 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-2022, macos-15]
         advanced: ['OFF', 'ON']
-    defaults:
-      run:
-        shell: bash
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -35,20 +57,13 @@ jobs:
       - name: Prepare MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c # v1.13.0
-      - uses: ./.github/actions/setup-quality
-        with:
-          repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
       - uses: ./.github/actions/setup-gtest
-      - name: Text and source layout
-        run: |
-          python tools/quality.py text
-          python tools/quality.py format
-          python -m pre_commit run --all-files
       - name: Native C++17 build and individual CTest execution
         run: |
-          cmake --preset debug -DXGL_ENABLE_ADVANCED_RUNTIME=${{ matrix.advanced }}
-          cmake --build build/debug --parallel 2
-          python tools/quality.py test --build-dir build/debug
+          mkdir -p out/reports
+          cmake --preset debug -DXGL_ENABLE_ADVANCED_RUNTIME=${{ matrix.advanced }} 2>&1 | tee out/reports/configure.log
+          cmake --build --preset debug --parallel 2 2>&1 | tee out/reports/build.log
+          python test/cmake/run_ctest.py --build-dir build/debug --config Debug
       - name: Verify language, discovery and seed replay contracts
         run: |
           binary=build/debug/test/xgl_tests
@@ -68,38 +83,38 @@ jobs:
             out/reports/
             build/debug/Testing/
             build/debug/compile_commands.json
-          if-no-files-found: error
+            build/debug/ctest.xml
+            build/debug/ctest-inventory.json
+          if-no-files-found: warn
 
   analysis:
     name: Static analysis and coverage
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+      - uses: ./.github/actions/setup-gtest
+      - name: Build instrumented real protocol
+        run: |
+          mkdir -p out/reports
+          cmake --preset ci 2>&1 | tee out/reports/configure.log
+          cmake --build --preset ci --parallel 2 2>&1 | tee out/reports/build.log
+          python test/cmake/run_ctest.py --build-dir build/ci --config Debug
       - uses: ./.github/actions/setup-quality
         with:
           repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
           native-analyzers: 'true'
-      - uses: ./.github/actions/setup-gtest
-      - name: Build instrumented real protocol
-        run: |
-          cmake --preset ci -DXGL_ENABLE_ADVANCED_RUNTIME=ON
-          cmake --build build/ci --parallel 2
-          python tools/quality.py test --build-dir build/ci
       - name: Cppcheck through the shared CMake target
         run: cmake --build build/ci --target xgl_static_analysis
       - name: Clang-Tidy
         run: python tools/quality.py tidy --build-dir build/ci
       - name: Require each production coverage metric to reach 80 percent
         run: python tools/quality.py coverage --build-dir build/ci
-      - name: Validate release composition
-        run: cmake --build build/ci --target xgl_release_validation --parallel 2
+      - name: Record native library size
+        run: cmake --build build/ci --target xgl_footprint
       - name: Preserve analysis evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -108,9 +123,11 @@ jobs:
           path: |
             out/reports/
             build/ci/Testing/
+            build/ci/ctest.xml
+            build/ci/ctest-inventory.json
             build/ci/compile_commands.json
             build/ci/footprint/
-          if-no-files-found: error
+          if-no-files-found: warn
 
   sanitizers:
     name: Address and undefined behavior sanitizers
@@ -121,56 +138,66 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - uses: ./.github/actions/setup-quality
-        with:
-          repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
       - uses: ./.github/actions/setup-gtest
       - name: Build and check every selected executable
         run: |
-          cmake --preset asan -DXGL_ENABLE_ADVANCED_RUNTIME=ON
-          cmake --build build/asan --parallel 2
-          python tools/quality.py test --build-dir build/asan
+          mkdir -p out/reports
+          cmake --preset asan -DXGL_ENABLE_ADVANCED_RUNTIME=ON 2>&1 | tee out/reports/configure.log
+          cmake --build --preset asan --parallel 2 2>&1 | tee out/reports/build.log
+          python test/cmake/run_ctest.py --build-dir build/asan --config Debug
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: sanitizers
-          path: out/reports/
-          if-no-files-found: error
+          path: |
+            out/reports/
+            build/asan/Testing/
+            build/asan/ctest.xml
+            build/asan/ctest-inventory.json
+          if-no-files-found: warn
 
   bounded-profiles:
-    name: Bounded profile (${{ matrix.profile }}, advanced=${{ matrix.advanced }})
+    name: Bounded profile (${{ matrix.preset }}, advanced=${{ matrix.advanced }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        profile: [boot, embedded-lite, embedded]
+        preset: [boot-host-test, embedded-lite-host-test, embedded-host-test]
         advanced: ['OFF', 'ON']
+        include:
+          - preset: boot-small-host-test
+            advanced: 'OFF'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - uses: ./.github/actions/setup-quality
-        with:
-          repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
       - uses: ./.github/actions/setup-gtest
-      - run: cmake --preset ${{ matrix.profile }}-host-test -DXGL_ENABLE_ADVANCED_RUNTIME=${{ matrix.advanced }}
-      - run: cmake --build build/${{ matrix.profile }}-host-test --parallel 2
-      - run: python tools/quality.py test --build-dir build/${{ matrix.profile }}-host-test --config MinSizeRel
-      - name: Exercise the Boot Wire v3 peer exchange
-        if: matrix.profile == 'boot'
+      - name: Build and test the bounded preset
+        env:
+          PRESET: ${{ matrix.preset }}
+          ADVANCED: ${{ matrix.advanced }}
         run: |
-          peer=build/boot-host-test/test/xgl_interop_peer
+          mkdir -p out/reports
+          cmake --preset "$PRESET" -DXGL_ENABLE_ADVANCED_RUNTIME="$ADVANCED" 2>&1 | tee out/reports/configure.log
+          cmake --build --preset "$PRESET" --parallel 2 2>&1 | tee out/reports/build.log
+          python test/cmake/run_ctest.py --build-dir "build/$PRESET" --config MinSizeRel
+      - name: Exercise the Boot Wire v3 peer exchange
+        if: matrix.preset == 'boot-host-test' || matrix.preset == 'boot-small-host-test'
+        run: |
+          peer=build/${{ matrix.preset }}/test/xgl_interop_peer
           python test/integration/test_wire_interop.py "$peer" "$peer" --profile boot
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: bounded-${{ matrix.profile }}-${{ matrix.advanced }}
+          name: bounded-${{ matrix.preset }}-${{ matrix.advanced }}
           path: |
             out/reports/
-            build/${{ matrix.profile }}-host-test/Testing/
-          if-no-files-found: error
+            build/${{ matrix.preset }}/Testing/
+            build/${{ matrix.preset }}/ctest.xml
+            build/${{ matrix.preset }}/ctest-inventory.json
+          if-no-files-found: warn
 
   dependency-contracts:
     name: Standalone build and package contracts
@@ -193,7 +220,8 @@ jobs:
         run: |
           python test/cmake/dependency_contracts.py \
             --link-source . \
-            --work-dir out/reports/dependency-contracts
+            --work-dir out/reports/dependency-contracts \
+            --deny-network
       - name: Validate profiles, package capabilities and Debug/Release consumers
         run: |
           python test/cmake/test_profile_builds.py \
@@ -208,7 +236,7 @@ jobs:
         run: |
           python test/cmake/test_transport_resource_config.py \
             --link-source . \
-            --gtest-dir "$GTest_ROOT/lib/cmake/GTest" \
+            --gtest-dir "$GTest_DIR" \
             --work-dir out/reports/transport-resource-contracts
       - name: Preserve contract results
         if: always()
@@ -221,7 +249,39 @@ jobs:
             out/reports/rx-chunk-contracts
             out/reports/transport-resource-contracts
             out/reports/delivery-presets
-          if-no-files-found: error
+          if-no-files-found: warn
+
+  wire-compatibility:
+    name: Wire v3 SDK 3 and SDK 4 interoperability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/setup-gtest
+      - name: Build and exchange frames with the pinned SDK 3 baseline
+        run: |
+          mkdir -p out/reports/wire-interop
+          for profile in boot full; do
+            build="build/wire-interop-$profile"
+            fixture="out/reports/wire-interop/$profile"
+            mkdir -p "$fixture"
+            cmake -S . -B "$build" -G Ninja -DXGL_PROFILE="$profile" -DXGL_BUILD_TESTS=ON 2>&1 | tee "$fixture/configure.log"
+            cmake --build "$build" --target xgl_interop_peer --parallel 2 2>&1 | tee "$fixture/build.log"
+            work="$RUNNER_TEMP/xgl-interop-$profile"
+            python test/integration/build_wire_interop_legacy.py --work-dir "$work" --profile "$profile" --fetch 2>&1 | tee "$fixture/sdk3.log"
+            python test/integration/test_wire_interop.py "$work/sdk3-$profile/xgl_interop_peer" "$build/test/xgl_interop_peer" \
+              --profile "$profile" --transcript "$fixture/exchange.log"
+          done
+      - name: Preserve cross-version exchange evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wire-interop
+          path: out/reports/wire-interop/
+          if-no-files-found: warn
 
   arm-footprint:
     name: Cortex-M0 ELF budget (${{ matrix.resource }}, MTU ${{ matrix.mtu }}, LTO ${{ matrix.lto }})
@@ -233,38 +293,66 @@ jobs:
         mtu: [128, 64]
         lto: ['OFF', 'ON']
         resource: ['default', 'small']
+    env:
+      ARM_BUILD: out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}
+      ARM_MTU: ${{ matrix.mtu }}
+      ARM_LTO: ${{ matrix.lto }}
+      ARM_RESOURCE: ${{ matrix.resource }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
       - uses: ./.github/actions/setup-arm-toolchain
-      - name: Validate explicit LTO mode and budget contracts
-        if: matrix.resource == 'default' && matrix.mtu == 128 && matrix.lto == 'OFF'
-        run: |
-          python test/cmake/test_footprint_lto.py \
-            --link-source . \
-            --work-dir out/footprint-lto-contracts
-          python test/cmake/test_footprint_advanced.py \
-            --link-source . \
-            --work-dir out/footprint-advanced-contracts
       - name: Link the fixed no-heap Boot consumer
         run: |
-          cmake -S tools/boot_footprint -B out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }} -G Ninja \
+          mkdir -p "$ARM_BUILD"
+          cp tools/boot_footprint/toolchain-lock.json "$ARM_BUILD/toolchain-lock.json"
+          lto=()
+          if [[ "$ARM_LTO" == ON ]]; then lto=(-DXGL_FOOTPRINT_LTO=ON); fi
+          cmake -S tools/boot_footprint -B "$ARM_BUILD" -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/tools/boot_footprint/toolchain-arm-cortex-m0.cmake" \
-            -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DXGL_FOOTPRINT_LTO=${{ matrix.lto }} \
-            -DXGL_FOOTPRINT_FRAME_SIZE=${{ matrix.mtu }} -DXGL_FOOTPRINT_RX_SIZE=${{ matrix.mtu }} \
+            -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "${lto[@]}" \
+            -DXGL_FOOTPRINT_FRAME_SIZE="$ARM_MTU" -DXGL_FOOTPRINT_RX_SIZE="$ARM_MTU" \
             -DXGL_RELIABLE_INDEX_BUCKETS=1 \
             -DXGL_TRANSPORT_WINDOW_CAPACITY=${{ matrix.resource == 'small' && '1' || '128' }} \
-            -DXGL_ENABLE_ADAPTIVE_RTO=${{ matrix.resource == 'small' && 'OFF' || 'ON' }}
-          cmake --build out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }} --parallel 2
+            -DXGL_ENABLE_ADAPTIVE_RTO=${{ matrix.resource == 'small' && 'OFF' || 'ON' }} \
+            2>&1 | tee "$ARM_BUILD/configure.log"
+          cmake --build "$ARM_BUILD" --parallel 2 2>&1 | tee "$ARM_BUILD/build.log"
       - name: Enforce the probe budget and retain baseline deltas
         run: |
           python tools/boot_footprint/check_budget.py \
-            --report out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/boot-footprint.json \
+            --report "$ARM_BUILD/boot-footprint.json" \
             --policy tools/boot_footprint/budget-${{ matrix.resource == 'small' && 'small-' || '' }}mtu${{ matrix.mtu }}${{ matrix.lto == 'ON' && '-lto' || '' }}.json \
-            --output out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/budget-result.json
+            --output "$ARM_BUILD/budget-result.json"
+      - name: Verify LTO scope in the existing link
+        if: matrix.resource == 'default' && matrix.mtu == 128
+        run: |
+          python test/cmake/test_footprint_lto.py --link-source . \
+            --work-dir out/footprint-lto-contracts --build-dir "$ARM_BUILD" --expect-lto "$ARM_LTO"
+      - name: Compare the classic and bounded APIs in advanced Boot
+        if: matrix.resource == 'default' && matrix.mtu == 128 && matrix.lto == 'OFF'
+        run: |
+          python test/cmake/test_footprint_advanced.py --link-source . \
+            --work-dir out/footprint-advanced-contracts
+      - name: Summarize measured resources
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          report = Path(os.environ['ARM_BUILD']) / 'budget-result.json'
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write(f"## Cortex-M0 {os.environ['ARM_RESOURCE']} | MTU {os.environ['ARM_MTU']} | LTO {os.environ['ARM_LTO']}\n\n")
+              if not report.is_file():
+                  summary.write('No budget result. See the configure and build steps.\n')
+              else:
+                  data = json.loads(report.read_text(encoding='utf-8'))
+                  summary.write(f"Budget: **{data['status']}**\n\n| Metric | Bytes | Limit |\n| --- | ---: | ---: |\n")
+                  for name, limit in data['limits'].items():
+                      summary.write(f"| `{name}` | {data['observed'].get(name, 'missing')} | {limit} |\n")
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -274,14 +362,15 @@ jobs:
             out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.txt
             out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.elf
             out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.map
+            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.log
             out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/**/*.su
             out/footprint-lto-contracts/
             out/footprint-advanced-contracts/
-          if-no-files-found: error
+          if-no-files-found: warn
 
   status:
     if: always()
-    needs: [host, analysis, sanitizers, bounded-profiles, dependency-contracts, arm-footprint]
+    needs: [lint, host, analysis, sanitizers, bounded-profiles, dependency-contracts, wire-compatibility, arm-footprint]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every selected job to succeed
@@ -291,6 +380,10 @@ jobs:
           python - <<'PY'
           import json, os
           results = json.loads(os.environ['RESULTS'])
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write(f"## CI gate for `{os.environ['GITHUB_SHA']}`\n\n| Check | Result |\n| --- | --- |\n")
+              for name, job in results.items():
+                  summary.write(f"| `{name}` | {job['result']} |\n")
           failed = [name for name, job in results.items() if job['result'] != 'success']
           if failed:
               raise SystemExit('Required jobs did not succeed: ' + ', '.join(failed))

@@ -52,7 +52,7 @@ option(XGL_ALLOW_FALLBACK_MALLOC "Allow instance creation to select the explicit
 if(XGL_PROFILE STREQUAL "boot" AND XGL_ALLOW_FALLBACK_MALLOC)
     message(FATAL_ERROR "The boot profile requires XGL_ALLOW_FALLBACK_MALLOC=OFF")
 endif()
-xgl_finalize_build_config()
+xgl_finalize_build_config("${CMAKE_CURRENT_BINARY_DIR}/generated")
 option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" OFF)
 
 if(XGL_BUILD_TESTS)

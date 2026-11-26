@@ -19,6 +19,6 @@ cmake -S docs -B build/docs
 cmake --build build/docs --target xgl_docs
 ```
 
-After the strict build passes, inspect `build/docs/site/index.html`, both language entry points and the generated API. If a tool is missing, prepare it and reconfigure. Fix source links or comments after a failure, then rebuild. Record the current build and Pages deployment separately.
+After the strict build passes, inspect `build/docs/site/index.html`, both language entry points and the generated API. Keep the C API navigation page `docs/api/index.md` tracked in Git and verify documentation changes from a clean checkout. If the workflow fails, inspect its `documentation-diagnostics` artifact for the logs and tool versions captured before the failure. Record the current build and Pages deployment separately.
 
 Use `mkdocs serve` for a Markdown preview and the complete build for the generated C API. See the [development workflow](workflow.md) for pre-commit and other checks.

@@ -27,6 +27,9 @@ runs:
             raise SystemExit('Pin a full quality source commit in tools/quality.json.')
         with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
             output.write(f'repository={repository}\nrevision={revision}\n')
+        evidence = Path('out/reports/quality-source.txt')
+        evidence.parent.mkdir(parents=True, exist_ok=True)
+        evidence.write_text(f'{repository}@{revision}\n', encoding='utf-8')
         PY
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
@@ -36,7 +39,13 @@ runs:
         persist-credentials: false
     - name: Install fixed Python tools
       shell: bash
-      run: python -m pip install ./out/deps/quality-source
+      env:
+        EXPECTED_REVISION: ${{ steps.quality.outputs.revision }}
+      run: |
+        test "$(git -C out/deps/quality-source rev-parse HEAD)" = "$EXPECTED_REVISION"
+        python -m pip install ./out/deps/quality-source
+        python -m pip check
+        python tools/quality.py --version | tee -a out/reports/quality-source.txt
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       if: inputs.native-analyzers == 'true'
       with:
@@ -49,8 +58,6 @@ runs:
       shell: bash
       run: |
         test "$RUNNER_OS" = Linux
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends ninja-build
         cmake -S out/deps/cppcheck-src -B out/deps/cppcheck-build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DBUILD_TESTING=OFF \
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/out/deps/cppcheck"

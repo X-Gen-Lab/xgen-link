@@ -54,8 +54,12 @@ class FootprintLto(unittest.TestCase):
         return binary
 
     def verify_build(self, enabled):
-        binary = self.configure("enabled" if enabled else "default", enabled)
+        binary = ARGS.build_dir
+        if binary is None:
+            binary = self.configure("enabled" if enabled else "default", enabled)
         cache = (binary / "CMakeCache.txt").read_text(encoding="utf-8")
+        source = ARGS.link_source / "tools/boot_footprint"
+        self.assertIn(f"CMAKE_HOME_DIRECTORY:INTERNAL={source.as_posix()}", cache)
         self.assertIn(f"XGL_FOOTPRINT_LTO:BOOL={'ON' if enabled else 'OFF'}", cache)
         commands = json.loads((binary / "compile_commands.json").read_text())
         production = [item for item in commands
@@ -71,7 +75,9 @@ class FootprintLto(unittest.TestCase):
         ninja = self.execute("ninja", "-C", binary, "-t", "commands", "xgl_boot_probe")
         link = next(line for line in reversed(ninja.splitlines()) if " -o xgl_boot_probe.elf " in line)
         self.assertEqual("-flto" in link, enabled)
-        self.execute("cmake", "--build", binary, "--parallel", "4")
+        if ARGS.build_dir is None:
+            self.execute("cmake", "--build", binary, "--parallel", "4")
+        self.assertTrue((binary / "xgl_boot_probe.elf").is_file())
         report = json.loads((binary / "boot-footprint.json").read_text())
         self.assertIs(report["lto"], enabled)
         self.assertIs(report["optimization"]["library_ipo"], enabled)
@@ -125,8 +131,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--link-source", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
+    parser.add_argument("--build-dir", type=Path,
+                        help="Inspect an existing Ninja probe build with compile commands")
+    parser.add_argument("--expect-lto", choices=("OFF", "ON"),
+                        help="Expected mode of the existing build")
     ARGS, remaining = parser.parse_known_args()
+    if (ARGS.build_dir is None) != (ARGS.expect_lto is None):
+        parser.error("--build-dir and --expect-lto must be provided together")
     for name, value in vars(ARGS).items():
         if isinstance(value, Path):
             setattr(ARGS, name, value.resolve())
-    unittest.main(argv=[__file__, *remaining])
+    selected = None
+    if ARGS.expect_lto == "OFF":
+        selected = [
+            "FootprintLto.test_default_keeps_every_object_and_link_without_lto",
+            "FootprintLto.test_non_lto_policy_rejects_enabled_missing_and_nonboolean_mode",
+            "FootprintLto.test_policy_accepts_only_its_explicit_optimization_mode",
+        ]
+    elif ARGS.expect_lto == "ON":
+        selected = ["FootprintLto.test_lto_preserves_opaque_layout_and_external_consumer"]
+    unittest.main(argv=[__file__, *remaining], defaultTest=selected)

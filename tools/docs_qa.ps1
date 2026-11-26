@@ -21,6 +21,16 @@ function Get-RelativeMarkdown {
 
 $enRoot = Join-Path $RepoRoot "docs/en"
 $zhRoot = Join-Path $RepoRoot "docs/zh"
+$apiPage = "docs/api/index.md"
+
+if (-not (Test-Path -PathType Leaf (Join-Path $RepoRoot $apiPage))) {
+    Add-Failure "Missing C API navigation page $apiPage"
+} elseif (Test-Path (Join-Path $RepoRoot ".git")) {
+    git -C $RepoRoot ls-files --error-unmatch -- $apiPage 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Add-Failure "The C API navigation page $apiPage must be tracked in Git"
+    }
+}
 
 $enPages = @(Get-RelativeMarkdown $enRoot)
 $zhPages = @(Get-RelativeMarkdown $zhRoot)

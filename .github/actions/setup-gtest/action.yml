@@ -3,19 +3,55 @@ description: Explicitly build the fixed host test dependency before configuring 
 runs:
   using: composite
   steps:
-    - shell: bash
+    - name: Identify GoogleTest compiler and install directory
+      id: toolchain
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS" in
+          Windows)
+            compiler="MSVC-${VCToolsVersion:?MSVC developer environment required}-${VSCMD_ARG_TGT_ARCH:?MSVC target architecture required}"
+            ;;
+          *)
+            compiler=$({ "${CXX:-c++}" --version; "${CXX:-c++}" -dumpmachine; })
+            ;;
+        esac
+        echo "identity=$(printf '%s\n' "$compiler" | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+        echo "prefix=$RUNNER_TEMP/xgen-googletest-install" >> "$GITHUB_OUTPUT"
+        echo "revision=ff6133ab49b364a883a55ba75c39e520fea6245b" >> "$GITHUB_OUTPUT"
+    - name: Cache installed GoogleTest and GoogleMock
+      id: cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ${{ steps.toolchain.outputs.prefix }}
+        key: gtest-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-${{ steps.toolchain.outputs.revision }}-${{ hashFiles('.github/actions/setup-gtest/action.yml') }}
+    - name: Build and install pinned GoogleTest
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GTEST_REVISION: ${{ steps.toolchain.outputs.revision }}
+        GTEST_INSTALL_PREFIX: ${{ steps.toolchain.outputs.prefix }}
       run: |
         set -euo pipefail
         source_dir="$RUNNER_TEMP/xgen-googletest"
         build_dir="$RUNNER_TEMP/xgen-googletest-build"
-        install_dir="$RUNNER_TEMP/xgen-googletest-install"
         git init "$source_dir"
         git -C "$source_dir" remote add origin https://github.com/google/googletest.git
-        git -C "$source_dir" fetch --depth 1 origin ff6133ab49b364a883a55ba75c39e520fea6245b
+        git -C "$source_dir" fetch --depth 1 origin "$GTEST_REVISION"
         git -C "$source_dir" checkout --detach FETCH_HEAD
+        test "$(git -C "$source_dir" rev-parse HEAD)" = "$GTEST_REVISION"
         cmake -S "$source_dir" -B "$build_dir" -G Ninja \
           -DCMAKE_BUILD_TYPE=Debug -DBUILD_GMOCK=ON -DINSTALL_GTEST=ON \
-          -Dgtest_force_shared_crt=ON -DCMAKE_INSTALL_PREFIX="$install_dir"
+          -Dgtest_force_shared_crt=ON -DCMAKE_INSTALL_PREFIX="$GTEST_INSTALL_PREFIX"
         cmake --build "$build_dir" --parallel 2
         cmake --install "$build_dir"
-        echo "GTest_ROOT=$install_dir" >> "$GITHUB_ENV"
+    - name: Expose installed GoogleTest package
+      shell: bash
+      env:
+        GTEST_INSTALL_PREFIX: ${{ steps.toolchain.outputs.prefix }}
+      run: |
+        set -euo pipefail
+        config=$(find "$GTEST_INSTALL_PREFIX" -name GTestConfig.cmake -print -quit)
+        test -f "$config"
+        echo "GTest_ROOT=$GTEST_INSTALL_PREFIX" >> "$GITHUB_ENV"
+        echo "GTest_DIR=$(dirname "$config")" >> "$GITHUB_ENV"

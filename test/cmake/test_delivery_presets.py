@@ -43,6 +43,10 @@ class DeliveryPresets(unittest.TestCase):
             "  if(NOT XGL_BUILD_TESTS OR NOT XGL_PROFILE STREQUAL XGL_REQUIRE_PROFILE)\n"
             "    message(FATAL_ERROR \"Host preset did not select protocol regressions\")\n"
             "  endif()\n"
+            "endif()\n"
+            "if(XGL_REQUIRE_BOOT_SMALL AND NOT (XGL_RELIABLE_INDEX_BUCKETS EQUAL 1 AND\n"
+            "    XGL_TRANSPORT_WINDOW_CAPACITY EQUAL 1 AND NOT XGL_ENABLE_ADAPTIVE_RTO))\n"
+            "  message(FATAL_ERROR \"Boot Small preset did not select compact fixed RTO\")\n"
             "endif()\n", encoding="utf-8")
         return source, presets
 
@@ -72,12 +76,15 @@ class DeliveryPresets(unittest.TestCase):
         source, presets = self.prepare("host")
         build_names = {preset["name"] for preset in presets["buildPresets"]}
         test_names = {preset["name"] for preset in presets["testPresets"]}
-        for profile in ("boot", "embedded-lite", "embedded"):
-            name = profile + "-host-test"
+        for name, profile in (("boot-host-test", "boot"), ("boot-small-host-test", "boot"),
+                              ("embedded-lite-host-test", "embedded-lite"),
+                              ("embedded-host-test", "embedded")):
             with self.subTest(preset=name):
+                options = ["-DXGL_REQUIRE_HOST_TESTS=ON", f"-DXGL_REQUIRE_PROFILE={profile}"]
+                if name == "boot-small-host-test":
+                    options.append("-DXGL_REQUIRE_BOOT_SMALL=ON")
                 result = self.execute(
-                    source, "cmake", "--preset", name,
-                    "-DXGL_REQUIRE_HOST_TESTS=ON", f"-DXGL_REQUIRE_PROFILE={profile}")
+                    source, "cmake", "--preset", name, *options)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn(name, build_names)
                 self.assertIn(name, test_names)
