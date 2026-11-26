@@ -1,9 +1,21 @@
 # Executed by CTest after GoogleTest discovery has registered individual cases.
+set(xgl_integration_suites
+    XglIntegrationTest
+    XglPhyStreamTest
+    XglNetworkTxContractTest
+    XglNetworkRoutesContract
+    XglNetworkMultihopTest
+    XglTransportAdmissionIntegrationTest
+    XglLayeredStatsTest
+    XglCoverageDelivery
+)
+list(JOIN xgl_integration_suites "|" xgl_integration_pattern)
+
 foreach(test_name IN LISTS xgl_discovered_tests)
     set(labels xgl unit)
-    if(test_name MATCHES "^(XglIntegrationTest|XglPhyStreamTest|XglNetworkTxContractTest|XglNetworkRoutesContract|XglNetworkMultihopTest|XglTransportAdmissionIntegrationTest)\\.")
+    if(test_name MATCHES "^(${xgl_integration_pattern})[.]")
         set(labels xgl integration)
-    elseif(test_name MATCHES "Properties\\.")
+    elseif(test_name MATCHES "Properties[.]|^(PropertyGeneratorTest|PropertySeedTest)[.]")
         list(APPEND labels property)
     endif()
     set_tests_properties("${test_name}" PROPERTIES LABELS "${labels}")

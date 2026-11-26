@@ -46,6 +46,22 @@ class DiscoveryPolicyTests(unittest.TestCase):
         self.assertEqual(set(labels["XglFrameProperties.CrcErrorDetection"]),
                          {"unit", "property", "xgl"})
 
+    def test_cross_layer_and_property_support_labels(self):
+        expected = {
+            "XglLayeredStatsTest.StatisticsStructureHasLayerFields": {"integration", "xgl"},
+            "XglCoverageDelivery.InvalidPollArgumentsNeverCallTheDriver": {"integration", "xgl"},
+            "PropertyGeneratorTest.ExplicitSeedReplaysTheSameSequence": {"unit", "property", "xgl"},
+            "PropertySeedTest.ParsesUnsignedDecimalBoundariesWithoutTruncation": {"unit", "property", "xgl"},
+        }
+        names = list(dict.fromkeys([*BASELINE, *expected]))
+        result = self.discover(names)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        observed = {
+            case["name"]: set(next(p["value"] for p in case["properties"] if p["name"] == "LABELS"))
+            for case in json.loads(result.stdout)["tests"] if case["name"] in expected
+        }
+        self.assertEqual(observed, expected)
+
     def test_missing_historical_case_is_rejected_by_name(self):
         result = self.discover(BASELINE[1:])
         self.assertNotEqual(result.returncode, 0)
