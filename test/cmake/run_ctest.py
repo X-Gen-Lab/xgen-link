@@ -10,16 +10,19 @@ import xml.etree.ElementTree as ET
 
 
 def run(build, configuration):
+    inventory_path = build / "ctest-inventory.json"
+    junit = build / "ctest.xml"
+    inventory_path.unlink(missing_ok=True)
+    junit.unlink(missing_ok=True)
+
     command = ["ctest", "--test-dir", build, "-C", configuration]
     inventory = subprocess.check_output(command + ["--show-only=json-v1"])
-    (build / "ctest-inventory.json").write_bytes(inventory)
+    inventory_path.write_bytes(inventory)
     tests = json.loads(inventory)["tests"]
     expected = Counter(test["name"] for test in tests)
     if not expected or len(expected) != len(tests):
         raise ValueError("Expected a nonempty inventory of unique CTest names")
 
-    junit = build / "ctest.xml"
-    junit.unlink(missing_ok=True)
     result = subprocess.run(command + ["--no-tests=error", "--output-on-failure",
                                        "--output-junit", junit], check=False)
     if result.returncode != 0:
@@ -43,7 +46,10 @@ def main():
     options = parser.parse_args()
     try:
         return run(options.build_dir.resolve(), options.config)
-    except (OSError, ValueError, KeyError, ET.ParseError, subprocess.CalledProcessError) as error:
+    except subprocess.CalledProcessError as error:
+        print(f"CTest discovery failed: {error}", file=sys.stderr)
+        return error.returncode
+    except (OSError, ValueError, KeyError, ET.ParseError) as error:
         print(f"CTest validation failed: {error}", file=sys.stderr)
         return 1
 
