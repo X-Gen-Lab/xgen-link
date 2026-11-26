@@ -127,15 +127,20 @@ file(GENERATE OUTPUT "${optimization_json}"
 }\n")
 
 # Keep the public build target and measure the linked ELF through separate outputs.
+set(report_stamp "${CMAKE_CURRENT_BINARY_DIR}/boot-footprint.stamp")
 set(report_json "${CMAKE_CURRENT_BINARY_DIR}/boot-footprint.json")
 set(report_text "${CMAKE_CURRENT_BINARY_DIR}/boot-footprint.txt")
-add_custom_command(OUTPUT "${report_json}" "${report_text}"
+# The writer preserves diagnostics on failure. Only a successful audit marks
+# those outputs up to date.
+add_custom_command(OUTPUT "${report_stamp}" "${report_json}" "${report_text}"
+    COMMAND "${CMAKE_COMMAND}" -E rm -f "${report_stamp}"
     COMMAND "${Python3_EXECUTABLE}" "${report_script}"
         report --elf "$<TARGET_FILE:xgl_boot_probe_elf>" --build "${CMAKE_CURRENT_BINARY_DIR}"
         --layout "${layout_json}" --size "${XGL_ARM_SIZE}" --nm "${XGL_ARM_NM}"
         --compiler "${CMAKE_C_COMPILER}" --configuration "${CMAKE_BUILD_TYPE}"
         --output "${report_json}"
+    COMMAND "${CMAKE_COMMAND}" -E touch "${report_stamp}"
     DEPENDS xgl_boot_probe_elf "${layout_json}" "${optimization_json}"
         "${CMAKE_CURRENT_BINARY_DIR}/CMakeCache.txt" "${report_script}"
     VERBATIM)
-add_custom_target(xgl_boot_probe ALL DEPENDS "${report_json}" "${report_text}")
+add_custom_target(xgl_boot_probe ALL DEPENDS "${report_stamp}" "${report_json}" "${report_text}")

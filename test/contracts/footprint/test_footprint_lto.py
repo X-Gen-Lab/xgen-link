@@ -31,7 +31,7 @@ class FootprintLto(unittest.TestCase):
             json.dumps(cls.commands, indent=2) + "\n", encoding="utf-8")
         print(f"Footprint LTO evidence: {cls.root}")
 
-    def execute(self, *command):
+    def execute(self, *command, expected_success=True):
         result = subprocess.run([str(part) for part in command],
                                 capture_output=True, text=True, encoding="utf-8",
                                 errors="replace", timeout=300, check=False)
@@ -39,7 +39,8 @@ class FootprintLto(unittest.TestCase):
         log.write_text(result.stdout + result.stderr, encoding="utf-8")
         self.commands.append({"arguments": [str(part) for part in command],
                               "exit_code": result.returncode, "log": str(log)})
-        self.assertEqual(result.returncode, 0, f"{log}\n{result.stdout}{result.stderr}")
+        self.assertEqual(result.returncode == 0, expected_success,
+                         f"{log}\n{result.stdout}{result.stderr}")
         return result.stdout
 
     def configure(self, name, enabled):
@@ -92,12 +93,30 @@ class FootprintLto(unittest.TestCase):
         self.assertEqual(report["unresolved_symbols"], [])
         self.assertGreater(report["flash_bytes"], 0)
         if ARGS.build_dir is None:
-            elf_mtime = elf.stat().st_mtime_ns
-            for path in (report_json, report_text):
-                path.unlink()
-                self.execute("cmake", "--build", binary, "--target", "xgl_boot_probe")
-                self.assertTrue(path.is_file())
-                self.assertEqual(elf.stat().st_mtime_ns, elf_mtime)
+            self.verify_report_rebuild(binary, elf, report_json, report_text)
+
+    def verify_report_rebuild(self, binary, elf, report_json, report_text):
+        elf_mtime = elf.stat().st_mtime_ns
+        build = ("cmake", "--build", binary, "--target", "xgl_boot_probe")
+        for report in (report_json, report_text):
+            report.unlink()
+            self.execute(*build)
+            self.assertTrue(report.is_file())
+            self.assertEqual(elf.stat().st_mtime_ns, elf_mtime)
+
+        invalid_stack = binary / "invalid-linked-stack.su"
+        invalid_stack.write_text("probe.c:1:1:Reset_Handler\t8\tdynamic\n", encoding="utf-8")
+        try:
+            report_json.unlink()
+            for _ in range(2):
+                self.execute(*build, expected_success=False)
+                rejected = json.loads(report_json.read_text())
+                self.assertTrue(rejected["stack_evidence_errors"])
+        finally:
+            invalid_stack.unlink()
+        self.execute(*build)
+        self.assertFalse(json.loads(report_json.read_text())["stack_evidence_errors"])
+        self.assertEqual(elf.stat().st_mtime_ns, elf_mtime)
 
     def test_default_keeps_every_object_and_link_without_lto(self):
         self.verify_build(False)
