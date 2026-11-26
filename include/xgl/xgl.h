@@ -19,28 +19,8 @@
 extern "C" {
 #endif
 
-/** \brief           Protocol major version; changes can break compatibility. */
-#define XGL_VERSION_MAJOR 3
-
 /**
- * \brief           Protocol minor version
- * \note            Incremented for new features (backward compatible)
- */
-#define XGL_VERSION_MINOR 0
-
-/**
- * \brief           Protocol patch version
- * \note            Incremented for bug fixes
- */
-#define XGL_VERSION_PATCH 0
-
-/**
- * \brief           Protocol version string
- */
-#define XGL_VERSION_STRING "3.0.0"
-
-/**
- * \brief           Protocol version as integer (MAJOR * 10000 + MINOR * 100 +
+ * \brief           SDK version as integer (MAJOR * 10000 + MINOR * 100 +
  * PATCH)
  * \note            Useful for compile-time version checks
  */
@@ -49,7 +29,7 @@ extern "C" {
      XGL_VERSION_PATCH)
 
 /**
- * \brief           Check if protocol version is at least the specified version
+ * \brief           Check if SDK version is at least the specified version
  * \param[in]       major: Major version
  * \param[in]       minor: Minor version
  * \param[in]       patch: Patch version

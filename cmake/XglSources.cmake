@@ -12,7 +12,14 @@ set(XGL_SOURCES
     src/api/xgl_stats.c
     src/api/xgl_version.c
 
+    # Private storage primitives
+    src/internal/xgl_allocator.c
+    src/internal/xgl_list.c
+    src/internal/xgl_pool.c
+    src/internal/xgl_size_class_allocator.c
+
     # Wire format and serialization
+    src/wire/xgl_crc16.c
     src/wire/xgl_wire_ack_ext.c
     src/wire/xgl_wire_ext.c
     src/wire/xgl_wire.c
@@ -57,6 +64,10 @@ set(XGL_SOURCES
     src/transport/xgl_transport_tx_message.c
     src/transport/xgl_window.c
 )
+
+if(XGL_FEATURE_ROUTE_INDEX)
+    list(APPEND XGL_SOURCES src/network/xgl_route_index.c)
+endif()
 
 if(NOT XGL_FEATURE_AUTH)
     list(REMOVE_ITEM XGL_SOURCES src/security/xgl_security.c src/security/xgl_security_frame.c)

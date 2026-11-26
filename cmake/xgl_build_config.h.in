@@ -1,5 +1,9 @@
 #ifndef XGL_BUILD_CONFIG_H
 #define XGL_BUILD_CONFIG_H
+#define XGL_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define XGL_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define XGL_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define XGL_VERSION_STRING "@PROJECT_VERSION@"
 #define XGL_BUILD_PROFILE "@XGL_PROFILE@"
 #if defined(XGL_BUILD_CONFIG_ID) && XGL_BUILD_CONFIG_ID != @XGL_BUILD_CONFIG_ID@U
 #error "XGL_BUILD_CONFIG_ID conflicts with the compiled protocol"
@@ -19,7 +23,16 @@
 #error "xgl headers and target have different compiled resource identities"
 #endif
 #define XGL_BUILD_RX_CHUNK_SIZE @XGL_BUILD_RX_CHUNK_SIZE@U
-#define XGL_CONFIG_ABI_VERSION 3U
+#if defined(XGL_CONFIG_ABI_VERSION) && XGL_CONFIG_ABI_VERSION != @XGL_CONFIG_ABI_VERSION@U
+#error "XGL_CONFIG_ABI_VERSION conflicts with the compiled protocol"
+#endif
+#ifndef XGL_CONFIG_ABI_VERSION
+#define XGL_CONFIG_ABI_VERSION @XGL_CONFIG_ABI_VERSION@U
+#endif
+#if defined(XGL_EXPECTED_CONFIG_ABI_VERSION) && \
+    XGL_EXPECTED_CONFIG_ABI_VERSION != XGL_CONFIG_ABI_VERSION
+#error "xgl headers and target have different configuration ABI versions"
+#endif
 #if defined(XGL_FEATURE_ADVANCED_RUNTIME) && \
     XGL_FEATURE_ADVANCED_RUNTIME != @XGL_FEATURE_ADVANCED_RUNTIME@
 #error "XGL_FEATURE_ADVANCED_RUNTIME conflicts with the compiled protocol"

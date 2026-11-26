@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
+#include "internal/xgl_allocator.h"
 #include <string.h>
-#include <xgen/memory/allocator.h>
 
 #include "xgl_instance_internal.h"
 
@@ -66,9 +66,9 @@ void xgl_instance_destroy_links(xgl_handle_t handle) {
         return;
     }
     for (size_t i = 0; i < handle->link_count; ++i) {
-        xgm_free(handle->allocator, handle->links[i].parser.cache);
+        xgl_free(handle->allocator, handle->links[i].parser.cache);
     }
-    xgm_free(handle->allocator, handle->links);
+    xgl_free(handle->allocator, handle->links);
     handle->links = NULL;
     handle->link_count = 0U;
 }
@@ -85,7 +85,7 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
         return XGL_ERR_INVALID_PARAM;
     }
     handle->links =
-        xgm_alloc(handle->allocator, count * sizeof(*handle->links));
+        xgl_alloc(handle->allocator, count * sizeof(*handle->links));
     if (handle->links == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
@@ -98,7 +98,7 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle) {
         link->phy = handle->config->route_table[i].phy;
         link->poll_interval_ms = link_config_interval(handle->config, i);
         link->parser.cache =
-            xgm_alloc(handle->allocator, handle->config->memory.rx_buffer_size);
+            xgl_alloc(handle->allocator, handle->config->memory.rx_buffer_size);
         if (link->parser.cache == NULL) {
             xgl_instance_destroy_links(handle);
             return XGL_ERR_NO_MEMORY;

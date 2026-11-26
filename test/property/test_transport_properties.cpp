@@ -1,6 +1,6 @@
 #include <transport/xgl_transport.h>
 
-#include <xgen/memory/libc_allocator.h>
+#include "test_host_allocator.h"
 /**
  * \file            test_transport_properties.cpp
  * \brief           Transport layer property tests
@@ -661,7 +661,7 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuing) {
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS;
          ++iteration) {
         xgl_reliable_queue_t queue;
-        xgl_error_t err = xgl_reliable_init(&queue, xgm_allocator_libc());
+        xgl_error_t err = xgl_reliable_init(&queue, xgl_test_host_allocator());
         ASSERT_EQ(err, XGL_OK) << "Queue initialization failed";
 
         /* Verify queue starts empty */
@@ -728,7 +728,7 @@ TEST(XglTransportProperties, Property13_ReliableTransmissionQueuingMultiple) {
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS;
          ++iteration) {
         xgl_reliable_queue_t queue;
-        xgl_error_t err = xgl_reliable_init(&queue, xgm_allocator_libc());
+        xgl_error_t err = xgl_reliable_init(&queue, xgl_test_host_allocator());
         ASSERT_EQ(err, XGL_OK);
 
         /* Add random number of packets (1-20) */
@@ -901,7 +901,7 @@ TEST(XglTransportProperties, Property16_ACKProcessing) {
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS;
          ++iteration) {
         xgl_reliable_queue_t queue;
-        xgl_error_t err = xgl_reliable_init(&queue, xgm_allocator_libc());
+        xgl_error_t err = xgl_reliable_init(&queue, xgl_test_host_allocator());
         ASSERT_EQ(err, XGL_OK) << "Queue initialization failed";
 
         /* Generate random packet parameters */
@@ -963,7 +963,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingMultiplePackets) {
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS;
          ++iteration) {
         xgl_reliable_queue_t queue;
-        xgl_error_t err = xgl_reliable_init(&queue, xgm_allocator_libc());
+        xgl_error_t err = xgl_reliable_init(&queue, xgl_test_host_allocator());
         ASSERT_EQ(err, XGL_OK);
 
         /* Add multiple packets with different Packet numbers */
@@ -1016,7 +1016,7 @@ TEST(XglTransportProperties, Property16_ACKProcessingNonMatching) {
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS;
          ++iteration) {
         xgl_reliable_queue_t queue;
-        xgl_error_t err = xgl_reliable_init(&queue, xgm_allocator_libc());
+        xgl_error_t err = xgl_reliable_init(&queue, xgl_test_host_allocator());
         ASSERT_EQ(err, XGL_OK);
 
         /* Add packet with specific Packet number */
@@ -1090,7 +1090,7 @@ struct ProductionRetryProbe {
         config.tx_retries = &retries;
         config.error_callback = Error;
         config.callback_user_data = this;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.max_peers = 1;
         config.max_tx_packets = window;
         config.max_rx_buffered_packets = window;

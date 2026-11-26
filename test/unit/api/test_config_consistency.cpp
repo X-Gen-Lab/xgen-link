@@ -3,8 +3,8 @@
  * \brief           Configuration admission agrees with workspace and lifecycle
  */
 
+#include "test_host_allocator.h"
 #include <gtest/gtest.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 #if XGL_FEATURE_AUTH
@@ -31,22 +31,22 @@ struct ScopedInstance {
 xgl_config_t bounded_config() {
     xgl_config_t config;
     xgl_config_get_preset_boot(&config);
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
     return config;
 }
 
 struct CountingAllocator {
-    xgm_allocator_t service = {};
+    xgl_allocator_t service = {};
     size_t attempts = 0U;
 
     CountingAllocator() {
         service.ctx = this;
         service.alloc = [](void* context, size_t size) -> void* {
             ++static_cast<CountingAllocator*>(context)->attempts;
-            return xgm_alloc(xgm_allocator_libc(), size);
+            return xgl_alloc(xgl_test_host_allocator(), size);
         };
         service.free = [](void*, void* pointer) {
-            xgm_free(xgm_allocator_libc(), pointer);
+            xgl_free(xgl_test_host_allocator(), pointer);
         };
     }
 };
@@ -185,12 +185,12 @@ TEST(XglConfigConsistency, DisabledFragmentationIgnoresUnrepresentableLimit) {
 
     xgl_memory_requirements_t requirements = {};
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
-    std::vector<xgm_max_align_t> workspace(
-        (requirements.size + sizeof(xgm_max_align_t) - 1U) /
-        sizeof(xgm_max_align_t));
+    std::vector<xgl_max_align_t> workspace(
+        (requirements.size + sizeof(xgl_max_align_t) - 1U) /
+        sizeof(xgl_max_align_t));
     ScopedInstance instance;
     EXPECT_EQ(xgl_init_static(&config, workspace.data(),
-                              workspace.size() * sizeof(xgm_max_align_t),
+                              workspace.size() * sizeof(xgl_max_align_t),
                               &instance.handle),
               XGL_OK);
     EXPECT_NE(instance.handle, nullptr);

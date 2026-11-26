@@ -11,7 +11,6 @@ from types import SimpleNamespace
 import unittest
 
 
-PACKAGES = ("status", "bytes", "crc", "memory", "containers")
 ARGS = None
 
 
@@ -52,7 +51,7 @@ class RxChunkConfig(unittest.TestCase):
 
     def configure(self, name, profile, chunk=None, succeeds=True):
         binary = self.root / name
-        command = ["cmake", "-S", ARGS.link_source / "dev", "-B", binary, "-G", "Ninja",
+        command = ["cmake", "-S", ARGS.link_source, "-B", binary, "-G", "Ninja",
                    f"-DXGL_PROFILE={profile}", "-DCMAKE_BUILD_TYPE=Debug",
                    "-DXGL_BUILD_TESTS=OFF", "-DXGL_BUILD_EXAMPLES=OFF",
                    "-DXGL_BUILD_DOCS=OFF", "-DXGL_BUILD_FOOTPRINT_REPORT=OFF",
@@ -63,9 +62,6 @@ class RxChunkConfig(unittest.TestCase):
             command.append(f"-DXGL_DATALINK_RX_CHUNK_SIZE={chunk}")
         if ARGS.c_compiler:
             command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")
-        for package in PACKAGES:
-            command.append(f"-DXGL_DEV_{package.upper()}_SOURCE_DIR="
-                           f"{getattr(ARGS, package + '_source').as_posix()}")
         self.execute(*command, succeeds=succeeds)
         return binary
 
@@ -92,7 +88,7 @@ class RxChunkConfig(unittest.TestCase):
         return self.execute("cmake", "--build", binary, succeeds=succeeds)
 
     def source_includes(self, binary):
-        return [ARGS.link_source / "include", binary / "link/generated"]
+        return [ARGS.link_source / "include", binary / "generated"]
 
     def test_auto_follows_profile_without_stale_cache(self):
         for profile, expected in (("boot", 32), ("full", 128), ("boot", 32)):
@@ -163,8 +159,6 @@ if __name__ == "__main__":
     parser.add_argument("--link-source", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--c-compiler")
-    for package in PACKAGES:
-        parser.add_argument(f"--{package}-source", type=Path, required=True)
     ARGS, remaining = parser.parse_known_args()
     for name, value in vars(ARGS).items():
         if isinstance(value, Path):

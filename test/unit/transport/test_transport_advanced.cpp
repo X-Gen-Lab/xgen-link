@@ -3,9 +3,9 @@
  * \brief           Optional scoped runtime, deadlines and bounded maintenance
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include <algorithm>
 #include <array>
@@ -71,7 +71,7 @@ class XglTransportAdvancedTest : public ::testing::Test {
         config.max_rx_buffered_packets = 3U;
         config.lower_layer = &lower;
         config.stats = &stats;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.tx_lifetime_ms = lifetime;
         config.reassembly_timeout_ms = reassembly;
         config.rx_scoped_callback = Accept;

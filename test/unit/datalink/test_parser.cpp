@@ -11,8 +11,8 @@
 
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include "test_security_helpers.h"
 
@@ -37,7 +37,7 @@ static xgl_error_t parser_test_auth_sign(const xgl_auth_input_t* input,
         acc = (acc * 33U) ^ payload[i];
     }
 
-    xgb_serialize_u32_le(tag, acc);
+    xgl_serialize_u32_le(tag, acc);
     *tag_len = 4U;
     return XGL_OK;
 }
@@ -126,8 +126,8 @@ class XglParserTest : public ::testing::Test {
             offset += payload.size();
         }
 
-        uint16_t crc16 = xgcrc_crc16_modbus(frame.data(), offset);
-        xgb_serialize_u16_le(&frame[offset], crc16);
+        uint16_t crc16 = xgl_crc16_modbus(frame.data(), offset);
+        xgl_serialize_u16_le(&frame[offset], crc16);
         return frame;
     }
 

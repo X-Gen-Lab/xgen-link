@@ -147,13 +147,13 @@ static xgl_error_t transport_process_ack_range(xgl_transport_ctx_t* ctx,
     ranges.index = 0U;
     ranges.next_high = ranges.view.largest_ack;
     bool has_range = ack_ranges_next(&ranges, &low, &high) == XGL_OK;
-    xgct_list_node_t* node = peer->reliable_queue.wait_ack_list.tail;
+    xgl_list_node_t* node = peer->reliable_queue.wait_ack_list.tail;
     while (node != NULL && has_range) {
-        xgct_list_node_t* previous = node->prev;
+        xgl_list_node_t* previous = node->prev;
         xgl_reliable_packet_t* packet =
             /* The queue owns this intrusive record. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         while (has_range && packet->packet_number < low) {
             has_range = ack_ranges_next(&ranges, &low, &high) == XGL_OK;
         }
@@ -234,12 +234,12 @@ static xgl_error_t transport_process_sack_value(
     uint32_t now = transport_now(ctx);
     /* Visit actual records rather than every bitmap position. Commit all
      * acknowledgements before marking any missing record for later retry. */
-    xgct_list_node_t *node, *next;
-    XGCT_LIST_FOR_EACH_SAFE(&peer->reliable_queue.wait_ack_list, node, next) {
+    xgl_list_node_t *node, *next;
+    XGL_LIST_FOR_EACH_SAFE(&peer->reliable_queue.wait_ack_list, node, next) {
         /* The queue owns this intrusive record. */
         xgl_reliable_packet_t* packet =
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         if (packet->packet_number >= view.base_packet) {
             size_t bit = packet->packet_number - view.base_packet;
             if (bit <= highest_set &&
@@ -250,11 +250,11 @@ static xgl_error_t transport_process_sack_value(
     }
     (void)xgl_window_advance_base_packet_number(&peer->tx_window);
 
-    XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+    XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
         /* The queue owns this intrusive record. */
         xgl_reliable_packet_t* packet =
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         if (packet->target_id == source_id &&
             packet->packet_number >= view.base_packet &&
             packet->packet_number - view.base_packet <= highest_set) {

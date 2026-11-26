@@ -4,9 +4,9 @@
  */
 
 #include <security/xgl_security.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include <string.h>
-#include <xgen/bytes/bytes.h>
 
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
@@ -342,8 +342,8 @@ static void security_prepare_input(xgl_security_ctx_t* ctx,
     input->session_epoch = epoch;
     input->key_id = key_id;
     input->security_seq = sequence;
-    xgb_serialize_u32_be(input->nonce, prefix);
-    xgb_serialize_u64_be(input->nonce + 4U, sequence);
+    xgl_serialize_u32_be(input->nonce, prefix);
+    xgl_serialize_u64_be(input->nonce + 4U, sequence);
     memcpy(ctx->aad_scratch, buffer, header->header_len);
     ctx->aad_scratch[6] = 0U;
     ctx->aad_scratch[22] = 0U;

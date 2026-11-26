@@ -234,9 +234,9 @@ TEST(XglExtendedOptions, StaticAndOwnedInitializationUseTheSameOptions) {
     xgl_memory_report_t report = {};
     ASSERT_EQ(xgl_memory_report_with_options(&config, &options, &report),
               XGL_OK);
-    std::vector<xgm_max_align_t> storage(
-        (report.requirements.size + sizeof(xgm_max_align_t) - 1U) /
-        sizeof(xgm_max_align_t));
+    std::vector<xgl_max_align_t> storage(
+        (report.requirements.size + sizeof(xgl_max_align_t) - 1U) /
+        sizeof(xgl_max_align_t));
     xgl_handle_t handle = nullptr;
     EXPECT_EQ(xgl_init_static_with_options(&config, &options, storage.data(),
                                            report.requirements.size - 1U,

@@ -145,8 +145,6 @@ add_executable(xgl_tests
 target_link_libraries(xgl_tests
     PRIVATE
         xgl
-        xgm::libc_allocator
-        ${XGL_PRIVATE_DEPENDENCIES}
         GTest::gtest
         GTest::gmock
 )
@@ -170,6 +168,9 @@ endif()
 #-----------------------------------------------------------------------------
 # CTest Entry
 #-----------------------------------------------------------------------------
+
+add_executable(xgl_interop_peer integration/interop_peer.c)
+target_link_libraries(xgl_interop_peer PRIVATE xgl::xgl)
 
 include(cmake/HeaderContracts.cmake)
 include(GoogleTest)
@@ -243,7 +244,7 @@ if(XGL_BUILD_BENCHMARKS)
         benchmark/bench_throughput.cpp
         mocks/mock_phy.cpp
     )
-    target_link_libraries(bench_throughput PRIVATE xgl xgm::libc_allocator GTest::gmock)
+    target_link_libraries(bench_throughput PRIVATE xgl GTest::gmock)
     target_include_directories(bench_throughput
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -257,7 +258,7 @@ if(XGL_BUILD_BENCHMARKS)
         benchmark/bench_latency.cpp
         mocks/mock_phy.cpp
     )
-    target_link_libraries(bench_latency PRIVATE xgl xgm::libc_allocator GTest::gmock)
+    target_link_libraries(bench_latency PRIVATE xgl GTest::gmock)
     target_include_directories(bench_latency
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -271,7 +272,7 @@ if(XGL_BUILD_BENCHMARKS)
         benchmark/bench_memory.cpp
         mocks/mock_phy.cpp
     )
-    target_link_libraries(bench_memory PRIVATE xgl xgm::libc_allocator GTest::gmock)
+    target_link_libraries(bench_memory PRIVATE xgl GTest::gmock)
     target_include_directories(bench_memory
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}

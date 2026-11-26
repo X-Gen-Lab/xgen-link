@@ -3,8 +3,8 @@
  * \brief           Owned reliable record removal and queue isolation
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_reliable.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include <gtest/gtest.h>
 
@@ -16,8 +16,8 @@ class XglReliableOwnedTest : public ::testing::Test {
     xgl_reliable_queue_t other = {};
 
     void SetUp() override {
-        ASSERT_EQ(xgl_reliable_init(&queue, xgm_allocator_libc()), XGL_OK);
-        ASSERT_EQ(xgl_reliable_init(&other, xgm_allocator_libc()), XGL_OK);
+        ASSERT_EQ(xgl_reliable_init(&queue, xgl_test_host_allocator()), XGL_OK);
+        ASSERT_EQ(xgl_reliable_init(&other, xgl_test_host_allocator()), XGL_OK);
     }
 
     void TearDown() override {

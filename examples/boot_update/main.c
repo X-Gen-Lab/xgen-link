@@ -4,9 +4,10 @@
  * ACK recovery
  * \author          X-Gen Lab
  */
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
+
 #include <stdio.h>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
 
 #include "../common/sim_link.h"
 
@@ -59,7 +60,7 @@ static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
         app->busy_returns++;
         return XGL_ERR_BUSY;
     }
-    uint32_t offset = xgb_deserialize_u32_le(data);
+    uint32_t offset = xgl_deserialize_u32_le(data);
     if (offset != app->committed || offset > IMAGE_BYTES - FLASH_BLOCK_BYTES) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -93,7 +94,7 @@ static xgl_error_t host_accept(xgl_handle_t handle, uint16_t source,
     if (source != 2U || type != COMMIT_TYPE || length != 4U) {
         return XGL_ERR_INVALID_PARAM;
     }
-    uint32_t committed = xgb_deserialize_u32_le(data);
+    uint32_t committed = xgl_deserialize_u32_le(data);
     if (committed > IMAGE_BYTES || committed < app->confirmed ||
         committed % FLASH_BLOCK_BYTES != 0U) {
         return XGL_ERR_INVALID_PARAM;
@@ -185,7 +186,7 @@ int main(void) {
         flash_complete(&flash);
         if (flash.notice_pending) {
             uint8_t committed[4];
-            xgb_serialize_u32_le(committed, (uint32_t)flash.committed);
+            xgl_serialize_u32_le(committed, (uint32_t)flash.committed);
             const xgl_tx_data_t notice = {.target_id = 1U,
                                           .data_type = COMMIT_TYPE,
                                           .data = committed,
@@ -202,7 +203,7 @@ int main(void) {
          * commit. */
         if (submitted == host_app.confirmed && submitted < IMAGE_BYTES) {
             uint8_t block[4U + FLASH_BLOCK_BYTES];
-            xgb_serialize_u32_le(block, (uint32_t)submitted);
+            xgl_serialize_u32_le(block, (uint32_t)submitted);
             memcpy(block + 4U, image + submitted, FLASH_BLOCK_BYTES);
             const xgl_tx_data_t tx = {.target_id = 2U,
                                       .data_type = BLOCK_TYPE,
@@ -229,8 +230,8 @@ int main(void) {
     xgl_statistics_t statistics = {0};
     (void)xgl_stats_get(host.handle, &statistics);
 #endif
-    uint16_t expected_crc = xgcrc_crc16_modbus(image, sizeof(image));
-    uint16_t actual_crc = xgcrc_crc16_modbus(flash.flash, sizeof(flash.flash));
+    uint16_t expected_crc = xgl_crc16_modbus(image, sizeof(image));
+    uint16_t actual_crc = xgl_crc16_modbus(flash.flash, sizeof(flash.flash));
     bool complete = host_app.confirmed == IMAGE_BYTES &&
                     flash.committed == IMAGE_BYTES &&
                     flash.flash_writes == IMAGE_BYTES / FLASH_BLOCK_BYTES &&

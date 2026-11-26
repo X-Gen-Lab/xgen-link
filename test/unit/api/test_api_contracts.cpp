@@ -90,7 +90,7 @@ TEST_F(XglApiContractsTest, CreationReportsBackendFailureAndReservesOnly) {
         size_t frees = 0U;
     } backend;
 
-    const xgm_allocator_t allocator = {
+    const xgl_allocator_t allocator = {
         &backend,
         [](void* user, size_t) -> void* {
             ++static_cast<FailingBackend*>(user)->calls;
@@ -103,12 +103,12 @@ TEST_F(XglApiContractsTest, CreationReportsBackendFailureAndReservesOnly) {
     EXPECT_EQ(backend.calls, 1U);
     EXPECT_EQ(backend.frees, 0U);
 
-    const xgm_allocator_t invalid = {};
+    const xgl_allocator_t invalid = {};
     config.memory.allocator = &invalid;
     EXPECT_EQ(xgl_create_with_error(&config, &handle), XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(handle, nullptr);
 
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
     ASSERT_EQ(xgl_create_with_error(&config, &handle), XGL_OK);
     ASSERT_NE(handle, nullptr);
     const xgl_work_budget_t budget = {0U, 10U};

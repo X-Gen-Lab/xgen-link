@@ -3,18 +3,18 @@
  * \brief           Production wire-format encoding primitives
  */
 
+#include <wire/xgl_crc16.h>
 #include <wire/xgl_wire.h>
+#include <wire/xgl_wire_bytes.h>
 #include <xgl/xgl_config.h>
 
 #include <string.h>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
 
 static uint16_t wire_header_crc16(const uint8_t* buffer) {
     const uint8_t zero_crc[XGL_CRC16_SIZE] = {0U, 0U};
     uint16_t crc =
-        xgcrc_crc16_modbus(buffer, XGL_WIRE_BASE_HEADER_SIZE - XGL_CRC16_SIZE);
-    return xgcrc_crc16_modbus_update(crc, zero_crc, sizeof(zero_crc));
+        xgl_crc16_modbus(buffer, XGL_WIRE_BASE_HEADER_SIZE - XGL_CRC16_SIZE);
+    return xgl_crc16_modbus_update(crc, zero_crc, sizeof(zero_crc));
 }
 
 static bool wire_packet_type_valid(uint8_t packet_type) {
@@ -54,12 +54,12 @@ xgl_error_t xgl_wire_encode_header(uint8_t* buffer, size_t buffer_size,
     buffer[5] = header->flags;
     buffer[6] = header->ttl;
     buffer[7] = header->traffic_class;
-    xgb_serialize_u16_le(&buffer[8], header->source_id);
-    xgb_serialize_u16_le(&buffer[10], header->target_id);
-    xgb_serialize_u32_le(&buffer[12], header->connection_id);
-    xgb_serialize_u32_le(&buffer[16], header->packet_number);
-    xgb_serialize_u16_le(&buffer[20], header->payload_len);
-    xgb_serialize_u16_le(&buffer[22], wire_header_crc16(buffer));
+    xgl_serialize_u16_le(&buffer[8], header->source_id);
+    xgl_serialize_u16_le(&buffer[10], header->target_id);
+    xgl_serialize_u32_le(&buffer[12], header->connection_id);
+    xgl_serialize_u32_le(&buffer[16], header->packet_number);
+    xgl_serialize_u16_le(&buffer[20], header->payload_len);
+    xgl_serialize_u16_le(&buffer[22], wire_header_crc16(buffer));
 
     return XGL_OK;
 }
@@ -79,7 +79,7 @@ xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
     }
 
     uint16_t expected_crc = wire_header_crc16(buffer);
-    uint16_t actual_crc = xgb_deserialize_u16_le(&buffer[22]);
+    uint16_t actual_crc = xgl_deserialize_u16_le(&buffer[22]);
     if (expected_crc != actual_crc) {
         return XGL_ERR_CRC_FAILED;
     }
@@ -91,11 +91,11 @@ xgl_error_t xgl_wire_decode_header(xgl_wire_header_t* header,
     header->flags = buffer[5];
     header->ttl = buffer[6];
     header->traffic_class = buffer[7];
-    header->source_id = xgb_deserialize_u16_le(&buffer[8]);
-    header->target_id = xgb_deserialize_u16_le(&buffer[10]);
-    header->connection_id = xgb_deserialize_u32_le(&buffer[12]);
-    header->packet_number = xgb_deserialize_u32_le(&buffer[16]);
-    header->payload_len = xgb_deserialize_u16_le(&buffer[20]);
+    header->source_id = xgl_deserialize_u16_le(&buffer[8]);
+    header->target_id = xgl_deserialize_u16_le(&buffer[10]);
+    header->connection_id = xgl_deserialize_u32_le(&buffer[12]);
+    header->packet_number = xgl_deserialize_u32_le(&buffer[16]);
+    header->payload_len = xgl_deserialize_u16_le(&buffer[20]);
     header->header_crc16 = actual_crc;
 
     if (!wire_header_valid(header)) {
@@ -164,8 +164,8 @@ xgl_error_t xgl_wire_decode_frame(xgl_wire_frame_view_t* view,
         err = XGL_ERR_INVALID_FRAME;
         goto failed;
     }
-    if (xgcrc_crc16_modbus(buffer, body_end) !=
-        xgb_deserialize_u16_le(buffer + body_end)) {
+    if (xgl_crc16_modbus(buffer, body_end) !=
+        xgl_deserialize_u16_le(buffer + body_end)) {
         if (status != NULL) {
             *status = XGL_WIRE_DECODE_FRAME_CRC;
         }

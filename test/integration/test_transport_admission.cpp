@@ -4,9 +4,9 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include <gtest/gtest.h>
 
@@ -77,7 +77,7 @@ class XglTransportAdmissionIntegrationTest : public ::testing::Test {
         config.max_frame_size = 128U;
         config.default_timeout_ms = 10000U;
         config.peer_idle_timeout_ms = 0U;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.lower_layer = &sender_endpoint;
         config.stats = &sender_stats;
         ASSERT_EQ(xgl_transport_init(&sender, &config), XGL_OK);

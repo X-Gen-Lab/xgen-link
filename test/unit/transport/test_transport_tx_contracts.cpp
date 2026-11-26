@@ -4,11 +4,11 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <api/xgl_instance_internal.h>
 #include <network/xgl_route.h>
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 #include <gtest/gtest.h>
@@ -16,21 +16,21 @@
 namespace {
 
 struct FailingResource {
-    const xgm_allocator_t* upstream = nullptr;
+    const xgl_allocator_t* upstream = nullptr;
     bool reject = true;
-    xgm_allocator_t service = {};
+    xgl_allocator_t service = {};
 
     static void* Allocate(void* context, size_t size) {
         auto& self = *static_cast<FailingResource*>(context);
-        return self.reject ? nullptr : xgm_alloc(self.upstream, size);
+        return self.reject ? nullptr : xgl_alloc(self.upstream, size);
     }
 
     static void Release(void* context, void* storage) {
         auto& self = *static_cast<FailingResource*>(context);
-        xgm_free(self.upstream, storage);
+        xgl_free(self.upstream, storage);
     }
 
-    void Replace(const xgm_allocator_t*& resource) {
+    void Replace(const xgl_allocator_t*& resource) {
         upstream = resource;
         service.ctx = this;
         service.alloc = Allocate;
@@ -85,7 +85,7 @@ class XglTransportTxContractTest : public ::testing::Test {
         route = {2U, &phy, 128U, 1000U, 0U};
         xgl_config_get_preset_boot(&config);
         config.features.peer_idle_timeout_ms = 0U;
-        config.memory.allocator = xgm_allocator_libc();
+        config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;
         instance = xgl_create(&config);
@@ -160,7 +160,7 @@ class XglTransportTxContractTest : public ::testing::Test {
         xgl_config_get_preset_small(&config);
         config.features.peer_idle_timeout_ms = 0U;
         config.features.enable_fragmentation = true;
-        config.memory.allocator = xgm_allocator_libc();
+        config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;
         instance = xgl_create(&config);
@@ -277,7 +277,7 @@ TEST_F(XglTransportTxContractTest,
 
 TEST_F(XglTransportTxContractTest,
        FailedScopeErrorPrecedesOtherScopeCapacityPressure) {
-    Transport().memory.peer = xgm_allocator_libc();
+    Transport().memory.peer = xgl_test_host_allocator();
     Transport().max_peers = 2U;
     auto* failed = transport_get_or_create_peer_scope(&Transport(), 2U, 7U, 0U);
     ASSERT_NE(failed, nullptr);
@@ -357,7 +357,7 @@ TEST_F(XglTransportTxContractTest, HelloLeasePreservesFailedScopeIdentity) {
 TEST_F(XglTransportTxContractTest,
        PendingMessageErrorPrecedesOtherScopeCapacityPressure) {
     EnableFragments();
-    Transport().memory.peer = xgm_allocator_libc();
+    Transport().memory.peer = xgl_test_host_allocator();
     Transport().max_peers = 2U;
     Transport().window_size = 1U;
     Transport().max_tx_packets = 2U;

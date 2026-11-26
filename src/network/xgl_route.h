@@ -16,7 +16,7 @@
 #include "xgl/xgl_types.h"
 
 #if XGL_FEATURE_ROUTE_INDEX
-#include <xgen/containers/hash.h>
+#include <network/xgl_route_index.h>
 #endif
 
 #ifdef __cplusplus
@@ -51,13 +51,13 @@ extern "C" {
  */
 typedef struct {
 #if XGL_FEATURE_ROUTE_INDEX
-    xgct_hash_t index;       /**< Caller-sized route index */
-    xgct_hash_node_t* nodes; /**< One node per reserved route */
+    xgl_route_index_t index;       /**< Caller-sized route index */
+    xgl_route_index_node_t* nodes; /**< One node per reserved route */
 #endif
     xgl_route_item_t* routes;         /**< Array of route items */
     size_t route_count;               /**< Number of routes */
     size_t route_capacity;            /**< Capacity of routes array */
-    const xgm_allocator_t* allocator; /**< Memory allocator */
+    const xgl_allocator_t* allocator; /**< Memory allocator */
 } xgl_route_table_t;
 
 /*---------------------------------------------------------------------------*/
@@ -74,7 +74,7 @@ typedef struct {
  */
 xgl_error_t xgl_route_table_init(xgl_route_table_t* table,
                                  size_t initial_capacity,
-                                 const xgm_allocator_t* allocator);
+                                 const xgl_allocator_t* allocator);
 
 /**
  * \brief           Destroy route table and free resources

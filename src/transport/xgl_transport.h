@@ -225,7 +225,7 @@ typedef struct {
     void* callback_user_data; /**< User data for callbacks (can be NULL) */
     xgl_layer_stats_t* stats; /**< Layer statistics pointer */
     uint64_t* tx_retries; /**< Retransmission counter pointer (can be NULL) */
-    const xgm_allocator_t* allocator; /**< Required allocator service */
+    const xgl_allocator_t* allocator; /**< Required allocator service */
     uint32_t
         peer_idle_timeout_ms; /**< Unused peer reclaim timeout; 0 = disabled */
     uint8_t max_reassembly_slots; /**< Max concurrent fragment reassembly slots

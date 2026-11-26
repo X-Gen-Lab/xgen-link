@@ -10,7 +10,7 @@
 
 #include <algorithm>
 #include <gtest/gtest.h>
-#include <xgen/memory/allocator.h>
+#include <internal/xgl_allocator.h>
 
 static xgl_error_t mock_auth_sign(const xgl_auth_input_t* /*input*/,
                                   uint8_t* tag, size_t tag_capacity,
@@ -451,7 +451,7 @@ TEST(XglConfigResourceTest,
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(xgl_memory_requirements(&config, &required),
               XGL_ERR_INVALID_PARAM);
-    alignas(xgm_max_align_t) static uint8_t storage[32768];
+    alignas(xgl_max_align_t) static uint8_t storage[32768];
     xgl_handle_t handle = nullptr;
     EXPECT_EQ(xgl_init_static(&config, storage, sizeof(storage), &handle),
               XGL_ERR_INVALID_PARAM);

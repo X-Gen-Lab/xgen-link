@@ -1,4 +1,4 @@
-# X-Gen quality 0.1.0. The runner selects the public protocol headers.
+# Shared strict documentation policy for the public protocol headers.
 PROJECT_NAME           = xgen-link
 OUTPUT_DIRECTORY       = out/reports/doxygen
 INPUT                  = include/xgl/xgl.h include/xgl/xgl_config.h include/xgl/xgl_types.h include/xgl/xgl_error.h

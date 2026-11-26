@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Build the production SDK from the repository root with a C11 toolchain. Protocol utilities are private to XGL. The public allocator is `xgl_allocator_t` and the configuration ABI is 4.
+- Keep wire v3 and the `xgl::xgl` consumption target.
+- Reorganize bilingual documentation by reader task and build the site without the production dependency graph.
+
+## SDK 3 development (historical)
+
 ### Added
 
 - Opt-in `advanced_runtime` build capability with versioned options, independent message slots, scoped receive/event callbacks and allocation-free resource snapshots, without changing the existing configuration ABI.
@@ -109,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic foundation implementations, old core dependency, nested production submodules and implicit source-directory dependency selection.
 - Protocol-owned platform time, mutex and timer wrappers; callers provide time and serialized access.
 
-## [1.0.0] - 2026-01-XX
+## [1.0.0]
 
 ### Added
 

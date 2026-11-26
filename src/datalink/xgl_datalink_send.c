@@ -8,7 +8,7 @@
 #include <wire/xgl_frame_internal.h>
 #include <xgl/xgl_config.h>
 
-#include <xgen/memory/allocator.h>
+#include "internal/xgl_allocator.h"
 
 static void datalink_count_tx_error(xgl_datalink_ctx_t* ctx) {
 #if XGL_FEATURE_STATISTICS
@@ -109,7 +109,7 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
     }
     const size_t frame_size = owned ? layout.frame_len : capacity;
     uint8_t* frame_buffer =
-        owned ? xgm_alloc(ctx->allocator, frame_size) : buffer;
+        owned ? xgl_alloc(ctx->allocator, frame_size) : buffer;
     if (frame_buffer == NULL) {
         datalink_count_tx_error(ctx);
         datalink_report_tx_error(
@@ -137,14 +137,14 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
         datalink_report_tx_error(
             ctx, err, XGL_ERROR_MESSAGE("Frame serialization failed"));
         if (owned) {
-            xgm_free(ctx->allocator, frame_buffer);
+            xgl_free(ctx->allocator, frame_buffer);
         }
         return err;
     }
 
     err = xgl_datalink_send_raw(ctx, phy, frame_buffer, bytes_written);
     if (owned) {
-        xgm_free(ctx->allocator, frame_buffer);
+        xgl_free(ctx->allocator, frame_buffer);
     }
     return err;
 }

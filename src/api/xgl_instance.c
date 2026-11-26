@@ -10,11 +10,8 @@
 #include <transport/xgl_window.h>
 #include <xgl/xgl.h>
 
+#include "internal/xgl_allocator.h"
 #include <string.h>
-#include <xgen/memory/allocator.h>
-#if XGL_ALLOW_FALLBACK_MALLOC
-#include <xgen/memory/libc_allocator.h>
-#endif
 
 #include "xgl_instance_internal.h"
 
@@ -249,24 +246,24 @@ xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
         return err;
     }
 
-    const xgm_allocator_t* allocator = config->memory.allocator;
+    const xgl_allocator_t* allocator = config->memory.allocator;
 #if XGL_ALLOW_FALLBACK_MALLOC
     if (allocator == NULL) {
-        allocator = xgm_allocator_libc();
+        allocator = xgl_allocator_libc();
     }
 #endif
-    if (!xgm_allocator_is_valid(allocator)) {
+    if (!xgl_allocator_is_valid(allocator)) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    void* storage = xgm_alloc(allocator, requirements.size);
+    void* storage = xgl_alloc(allocator, requirements.size);
     if (storage == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
     err = xgl_workspace_prepare(config, storage, requirements.size, allocator,
                                 handle);
     if (err != XGL_OK) {
-        xgm_free(allocator, storage);
+        xgl_free(allocator, storage);
         return err;
     }
     return XGL_OK;
@@ -294,6 +291,6 @@ void xgl_destroy(xgl_handle_t handle) {
     }
     instance_release_resources(handle);
     if (!handle->caller_owned) {
-        xgm_free(handle->storage_allocator, handle);
+        xgl_free(handle->storage_allocator, handle);
     }
 }

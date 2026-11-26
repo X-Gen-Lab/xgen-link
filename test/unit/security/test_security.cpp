@@ -67,8 +67,8 @@ TEST(XglSecurityTest, ReplayWindowValidatesParameters) {
 #include <array>
 #include <cstring>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include "test_security_helpers.h"
 
@@ -121,7 +121,7 @@ static xgl_error_t security_test_sign(const xgl_auth_input_t* input,
     if (capacity < 4U) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    xgb_serialize_u32_le(tag, security_test_digest(input));
+    xgl_serialize_u32_le(tag, security_test_digest(input));
     *length = spy->wrong_tag_length ? 3U : 4U;
     return XGL_OK;
 }
@@ -132,7 +132,7 @@ static xgl_error_t security_test_verify(const xgl_auth_input_t* input,
     auto* spy = static_cast<SecurityProviderSpy*>(user);
     spy->verify_calls++;
     *valid = !spy->fail_verify && length == 4U &&
-             xgb_deserialize_u32_le(tag) == security_test_digest(input);
+             xgl_deserialize_u32_le(tag) == security_test_digest(input);
     return XGL_OK;
 }
 
@@ -201,8 +201,8 @@ class XglSecuritySessionTest : public ::testing::Test {
     }
 
     void RecomputeCrc() {
-        xgb_serialize_u16_le(bytes + length - 2,
-                             xgcrc_crc16_modbus(bytes, length - 2));
+        xgl_serialize_u16_le(bytes + length - 2,
+                             xgl_crc16_modbus(bytes, length - 2));
     }
 };
 }  // namespace
@@ -277,7 +277,7 @@ TEST_F(XglSecuritySessionTest, ProducesFixedNonceAndCanonicalAadVector) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0D, 0x07, 0x00, 0x00, 0x00,
         0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x04};
     EXPECT_EQ(spy.aad, expected_aad);
-    EXPECT_EQ(xgb_deserialize_u32_le(bytes + 16), 17U);
+    EXPECT_EQ(xgl_deserialize_u32_le(bytes + 16), 17U);
     EXPECT_EQ(Verify(), XGL_OK);
 }
 
@@ -289,7 +289,7 @@ TEST_F(XglSecuritySessionTest,
     EXPECT_EQ(Verify(), XGL_ERR_INVALID_FRAME);
     ASSERT_EQ(Sign(), XGL_OK);
     EXPECT_EQ(spy.last_sequence, 1U);
-    EXPECT_EQ(xgb_deserialize_u32_le(bytes + 16), 17U);
+    EXPECT_EQ(xgl_deserialize_u32_le(bytes + 16), 17U);
     EXPECT_EQ(Verify(), XGL_OK);
 }
 
@@ -308,7 +308,7 @@ TEST_F(XglSecuritySessionTest,
     frame.header.packet_number = 18;
     ASSERT_EQ(Sign(), XGL_OK);
     EXPECT_EQ(spy.last_sequence, 3U);
-    EXPECT_EQ(xgb_deserialize_u32_le(bytes + 16), 18U);
+    EXPECT_EQ(xgl_deserialize_u32_le(bytes + 16), 18U);
     EXPECT_EQ(Verify(), XGL_OK);
 }
 

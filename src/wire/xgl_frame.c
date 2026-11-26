@@ -4,15 +4,15 @@
  * \author          X-Gen Lab
  */
 
+#include <wire/xgl_crc16.h>
 #include <wire/xgl_frame.h>
 #include <wire/xgl_frame_internal.h>
 #include <wire/xgl_wire.h>
+#include <wire/xgl_wire_bytes.h>
 #include <xgl/xgl_error.h>
 #include <xgl/xgl_types.h>
 
 #include <string.h>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
 
 #define XGL_FRAME_DEFAULT_TTL 8U
 
@@ -253,8 +253,8 @@ xgl_error_t xgl_frame_finalize_crc(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     size_t crc_offset = layout->frame_len - XGL_CRC16_SIZE;
-    xgb_serialize_u16_le(buffer + crc_offset,
-                         xgcrc_crc16_modbus(buffer, crc_offset));
+    xgl_serialize_u16_le(buffer + crc_offset,
+                         xgl_crc16_modbus(buffer, crc_offset));
     *bytes_written = layout->frame_len;
     return XGL_OK;
 }

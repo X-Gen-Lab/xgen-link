@@ -5,8 +5,7 @@
 #ifndef XGL_WORKSPACE_INTERNAL_H
 #define XGL_WORKSPACE_INTERNAL_H
 
-#include <xgen/memory/pool.h>
-#include <xgen/memory/size_class_allocator.h>
+#include "internal/xgl_size_class_allocator.h"
 
 #include "xgl_instance_internal.h"
 
@@ -41,10 +40,10 @@ typedef enum {
 typedef struct {
     struct xgl_instance instance;
     xgl_protocol_memory_t memory;
-    xgm_size_class_allocator_t initialization;
-    xgm_pool_t initial_pools[XGL_INIT_CLASSES];
-    xgm_pool_t runtime_pools[XGL_RESOURCE_COUNT];
-    xgm_allocator_t runtime_services[XGL_RESOURCE_COUNT];
+    xgl_size_class_allocator_t initialization;
+    xgl_pool_t initial_pools[XGL_INIT_CLASSES];
+    xgl_pool_t runtime_pools[XGL_RESOURCE_COUNT];
+    xgl_allocator_t runtime_services[XGL_RESOURCE_COUNT];
 } xgl_workspace_t;
 
 #endif /* XGL_WORKSPACE_INTERNAL_H */

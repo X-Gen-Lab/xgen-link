@@ -102,7 +102,7 @@ static xgl_error_t transport_send_message_fragment(
 void transport_clear_tx_message(xgl_transport_ctx_t* ctx,
                                 xgl_transport_peer_state_t* peer) {
     ctx->tx_message_bytes -= peer->tx_message.data_len;
-    xgm_free(ctx->memory.tx_message, peer->tx_message_storage);
+    xgl_free(ctx->memory.tx_message, peer->tx_message_storage);
     peer->tx_message_storage = NULL;
     memset(&peer->tx_message, 0, sizeof(peer->tx_message));
     peer->tx_message_offset = 0U;
@@ -229,7 +229,7 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
         tx_data->data_len > ctx->max_tx_message_bytes - ctx->tx_message_bytes) {
         return XGL_ERR_NO_MEMORY;
     }
-    uint8_t* owned_data = xgm_alloc(ctx->memory.tx_message, tx_data->data_len);
+    uint8_t* owned_data = xgl_alloc(ctx->memory.tx_message, tx_data->data_len);
     if (owned_data == NULL) {
         return XGL_ERR_NO_MEMORY;
     }

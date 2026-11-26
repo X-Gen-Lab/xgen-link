@@ -6,9 +6,9 @@
 
 #include <xgl/xgl.h>
 
+#include "test_host_allocator.h"
 #include <array>
 #include <gtest/gtest.h>
-#include <xgen/memory/libc_allocator.h>
 
 namespace {
 
@@ -28,7 +28,7 @@ class XglNetworkTxContractTest : public ::testing::Test {
         };
         phy.user_data = this;
         xgl_config_get_preset_boot(&config);
-        config.memory.allocator = xgm_allocator_libc();
+        config.memory.allocator = xgl_test_host_allocator();
         route.target_id = 2U;
         route.phy = &phy;
         route.max_frame_size = config.protocol.max_frame_size;

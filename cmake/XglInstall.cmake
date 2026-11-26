@@ -41,6 +41,5 @@ write_basic_package_version_file(
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/xglConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/xglConfigVersion.cmake
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/XglDependencyVersions.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/xgl
 )

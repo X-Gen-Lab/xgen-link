@@ -11,6 +11,7 @@
 
 #include "transport/xgl_window.h"
 
+#if XGL_BUILD_WINDOW_CAPACITY >= 128
 TEST(CompactWindowTest, AllocatesOnlyRequiredBitmapBytes) {
     const std::array<std::array<uint8_t, 2>, 6> cases = {
         {{1U, 1U}, {7U, 1U}, {8U, 1U}, {9U, 2U}, {127U, 16U}, {128U, 16U}}};
@@ -28,6 +29,7 @@ TEST(CompactWindowTest, AllocatesOnlyRequiredBitmapBytes) {
         xgl_window_destroy(&window);
     }
 }
+#endif
 
 TEST(CompactWindowTest, FailedInitializationPreservesCallerState) {
     xgl_sliding_window_t window = {};
@@ -46,6 +48,7 @@ TEST(CompactWindowTest, FailedInitializationPreservesCallerState) {
               0);
 }
 
+#if XGL_BUILD_WINDOW_CAPACITY >= 9
 TEST(CompactWindowTest, ReusesNonByteAlignedWindowWithoutStaleAcknowledgments) {
     xgl_sliding_window_t window = {};
     ASSERT_EQ(xgl_window_init(&window, 9U), XGL_OK);
@@ -133,3 +136,4 @@ TEST(CompactWindowTest, AcknowledgesNewTailAfterPartialAdvanceAtMaximumWidths) {
         xgl_window_destroy(&window);
     }
 }
+#endif

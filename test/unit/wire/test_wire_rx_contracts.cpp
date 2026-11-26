@@ -10,8 +10,8 @@
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 namespace {
 
@@ -37,9 +37,9 @@ std::vector<uint8_t> make_frame(const std::vector<uint8_t>& extensions = {}) {
     }
     bytes[header.header_len] = 0x42U;
     bytes[header.header_len + 1U] = 0x87U;
-    xgb_serialize_u16_le(
+    xgl_serialize_u16_le(
         bytes.data() + bytes.size() - XGL_CRC16_SIZE,
-        xgcrc_crc16_modbus(bytes.data(), bytes.size() - XGL_CRC16_SIZE));
+        xgl_crc16_modbus(bytes.data(), bytes.size() - XGL_CRC16_SIZE));
     return bytes;
 }
 

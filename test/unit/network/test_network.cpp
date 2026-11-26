@@ -1,4 +1,4 @@
-#include <xgen/memory/libc_allocator.h>
+#include "test_host_allocator.h"
 /**
  * \file            test_network.cpp
  * \brief           Unit tests for network layer
@@ -16,8 +16,8 @@
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 /*---------------------------------------------------------------------------*/
 /* Test PHY Operations                                                       */
@@ -138,7 +138,7 @@ class XglNetworkTest : public ::testing::Test {
   protected:
     void SetUp() override {
         /* Initialize route table */
-        xgl_route_table_init(&route_table, 4, xgm_allocator_libc());
+        xgl_route_table_init(&route_table, 4, xgl_test_host_allocator());
 
         /* Initialize statistics */
         memset(&stats, 0, sizeof(stats));
@@ -152,7 +152,7 @@ class XglNetworkTest : public ::testing::Test {
         config.error_callback = nullptr;
         config.callback_user_data = nullptr;
         config.stats = &stats;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         xgl_network_init(&network_ctx, &config);
 
         /* Initialize PHY operations */
@@ -163,7 +163,7 @@ class XglNetworkTest : public ::testing::Test {
 
         xgl_datalink_config_t datalink_config = {};
         datalink_config.stats = &datalink_stats;
-        datalink_config.allocator = xgm_allocator_libc();
+        datalink_config.allocator = xgl_test_host_allocator();
         ASSERT_EQ(xgl_datalink_init(&datalink_ctx, &datalink_config), XGL_OK);
         ASSERT_EQ(xgl_datalink_get_tx_endpoint(&datalink_ctx, &datalink_tx),
                   XGL_OK);
@@ -380,7 +380,7 @@ TEST_F(XglNetworkTest, ForwardAllocationFailureDoesNotSubmitOrChangeInput) {
     ASSERT_EQ(
         xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
         XGL_OK);
-    xgm_allocator_t unavailable = {};
+    xgl_allocator_t unavailable = {};
     unavailable.alloc = [](void*, size_t) -> void* { return nullptr; };
     unavailable.free = [](void*, void*) { FAIL() << "No allocation to free"; };
     network_ctx.allocator = &unavailable;
@@ -400,7 +400,7 @@ TEST_F(XglNetworkTest, ForwardMissingLowerEndpointReleasesScratch) {
         xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
         XGL_OK);
     size_t live_allocations = 0U;
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     allocator.ctx = &live_allocations;
     allocator.alloc = [](void* context, size_t size) -> void* {
         void* memory = std::malloc(size);
@@ -559,7 +559,7 @@ TEST_F(XglNetworkTest, InitializeNetworkContext) {
     xgl_route_table_t table;
     xgl_layer_stats_t test_stats = {0};
 
-    xgl_route_table_init(&table, 4, xgm_allocator_libc());
+    xgl_route_table_init(&table, 4, xgl_test_host_allocator());
 
     xgl_network_config_t config = {};
     config.local_id = 1;
@@ -569,7 +569,7 @@ TEST_F(XglNetworkTest, InitializeNetworkContext) {
     config.error_callback = nullptr;
     config.callback_user_data = nullptr;
     config.stats = &test_stats;
-    config.allocator = xgm_allocator_libc();
+    config.allocator = xgl_test_host_allocator();
     xgl_error_t err = xgl_network_init(&ctx, &config);
 
     EXPECT_EQ(err, XGL_OK);
@@ -1011,7 +1011,7 @@ TEST_F(XglNetworkTest, ForwardingRejectsRouteMtuOverflow) {
 TEST_F(XglNetworkTest, ForwardingAllocatesWholeFrameFromNetworkResource) {
     NetworkForwardAllocatorState allocator_state;
     g_network_forward_allocator_state = &allocator_state;
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     allocator.ctx = nullptr;
     allocator.alloc = network_forward_test_malloc;
     allocator.free = network_forward_test_free;
@@ -1067,7 +1067,7 @@ TEST_F(XglNetworkTest,
        SmallForwardReleasesAllocatorBufferAfterSuccessAndFailure) {
     NetworkForwardAllocatorState allocator_state;
     g_network_forward_allocator_state = &allocator_state;
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     allocator.ctx = nullptr;
     allocator.alloc = network_forward_test_malloc;
     allocator.free = network_forward_test_free;

@@ -8,8 +8,8 @@
 #define XGL_BENCHMARK_SUPPORT_H
 #include <xgl/xgl.h>
 
+#include "test_host_allocator.h"
 #include <mock_phy.h>
-#include <xgen/memory/libc_allocator.h>
 
 /** \brief           Own all configuration and driver state for the entire
  * benchmark. */
@@ -55,7 +55,7 @@ class BenchmarkPair {
         config_b.route_table = &route_b;
         config_a.route_table_len = config_b.route_table_len = 1U;
         config_a.memory.allocator = config_b.memory.allocator =
-            xgm_allocator_libc();
+            xgl_test_host_allocator();
         config_b.rx_callback = [](xgl_handle_t, uint16_t, uint8_t,
                                   const uint8_t*, size_t, void* context) {
             ++static_cast<BenchmarkPair*>(context)->delivered;

@@ -23,7 +23,7 @@ foreach(header IN LISTS public_header_inputs private_header_inputs)
     endforeach()
 endforeach()
 add_library(xgl_header_contracts OBJECT ${header_contract_sources})
-target_link_libraries(xgl_header_contracts PRIVATE xgl ${XGL_PRIVATE_DEPENDENCIES})
+target_link_libraries(xgl_header_contracts PRIVATE xgl)
 target_include_directories(xgl_header_contracts PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_compile_features(xgl_header_contracts PRIVATE c_std_11 cxx_std_17)
 set_target_properties(xgl_header_contracts PROPERTIES

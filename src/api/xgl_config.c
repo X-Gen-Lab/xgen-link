@@ -13,7 +13,6 @@
 #endif
 
 #include <string.h>
-#include <xgen/memory/allocator.h>
 
 /*---------------------------------------------------------------------------*/
 /* Configuration Limits                                                      */

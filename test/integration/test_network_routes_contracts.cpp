@@ -13,9 +13,9 @@
 #include <memory>
 #include <vector>
 
+#include "test_host_allocator.h"
 #include <api/xgl_instance_internal.h>
 #include <network/xgl_route.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 namespace {
@@ -37,7 +37,7 @@ xgl_error_t route_rx(uint8_t*, size_t* len, void* user_data) {
 xgl_config_t route_config(xgl_route_item_t* routes, size_t count) {
     xgl_config_t config = {};
     xgl_config_get_preset_boot(&config);
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
     config.route_table = routes;
     config.route_table_len = count;
     return config;
@@ -136,7 +136,8 @@ TEST(XglNetworkRoutesContract, InvalidLoadedSetPreservesExistingRoute) {
     RoutePhy state;
     xgl_phy_ops_t phy = {route_tx, route_rx, &state};
     xgl_route_table_t table = {};
-    ASSERT_EQ(xgl_route_table_init(&table, 2U, xgm_allocator_libc()), XGL_OK);
+    ASSERT_EQ(xgl_route_table_init(&table, 2U, xgl_test_host_allocator()),
+              XGL_OK);
     ASSERT_EQ(xgl_route_table_add(&table, 9U, &phy, 128U, 100U, 1U), XGL_OK);
     const std::array<std::array<uint16_t, 2>, 2> invalid_targets = {
         {{{2U, 2U}}, {{2U, 0U}}}};
@@ -195,7 +196,7 @@ TEST(XglNetworkRoutesContract, LinkAllocationFailureReleasesPartialSetup) {
         SCOPED_TRACE(failure);
         LinkAllocator state;
         state.fail_at = failure;
-        xgm_allocator_t allocator = {};
+        xgl_allocator_t allocator = {};
         allocator.ctx = &state;
         allocator.alloc = LinkAllocator::allocate;
         allocator.free = LinkAllocator::release;

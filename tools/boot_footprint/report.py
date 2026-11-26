@@ -20,7 +20,7 @@ def source_identity(root):
         capture_output=True, text=True, check=False)
     digest = hashlib.sha256()
     files = []
-    for name in ("src", "include", "cmake", "ports", "dev", "tools/boot_footprint"):
+    for name in ("src", "include", "cmake", "ports", "tools/boot_footprint"):
         directory = root / name
         if directory.exists():
             files.extend(path for path in directory.rglob("*") if path.is_file()
@@ -53,8 +53,7 @@ def cache_values(build):
             "XGL_DATALINK_RX_CHUNK_SIZE",
             "XGL_RELIABLE_INDEX_BUCKETS", "XGL_TRANSPORT_WINDOW_CAPACITY",
             "XGL_ENABLE_ADAPTIVE_RTO", "XGL_ALLOW_FALLBACK_MALLOC",
-            "CMAKE_INTERPROCEDURAL_OPTIMIZATION") or (
-                key.startswith(("XGL_", "xgen_")) and key.endswith("_SOURCE_DIR")):
+            "CMAKE_INTERPROCEDURAL_OPTIMIZATION"):
             result[key] = value
     return result
 
@@ -208,11 +207,6 @@ def report_elf(args):
         "compiler": run([args.compiler, "--version"]).splitlines()[0],
         "build_parameters": configuration,
         "link_source": source_identity(Path(__file__).resolve().parents[2]),
-        "dependency_sources": {
-            key: source_identity(value)
-            for key, value in configuration.items()
-            if key.startswith("xgen_") and key.endswith("_SOURCE_DIR") and value
-        },
         "flash_bytes": text_bytes + data_bytes,
         "text_and_rodata_bytes": text_bytes,
         "initialized_data_bytes": data_bytes,

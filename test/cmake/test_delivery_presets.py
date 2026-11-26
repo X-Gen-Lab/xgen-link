@@ -26,10 +26,10 @@ class DeliveryPresets(unittest.TestCase):
         (cls.work / "commands.json").write_text(
             json.dumps(cls.commands, indent=2) + "\n", encoding="utf-8")
 
-    def prepare(self, entry, suffix):
-        source = self.work / (entry.replace("/", "-") + "-" + suffix)
+    def prepare(self, suffix):
+        source = self.work / suffix
         source.mkdir()
-        presets = json.loads((ROOT / entry).read_text(encoding="utf-8"))
+        presets = json.loads((ROOT / "CMakePresets.json").read_text(encoding="utf-8"))
         for preset in presets["configurePresets"]:
             if "binaryDir" in preset:
                 preset["binaryDir"] = "${sourceDir}/build/${presetName}"
@@ -57,32 +57,30 @@ class DeliveryPresets(unittest.TestCase):
         return result
 
     def test_test_presets_reject_an_empty_selection(self):
-        for entry in ("CMakePresets.json", "dev/CMakePresets.json"):
-            source, presets = self.prepare(entry, "empty")
-            for preset in presets["testPresets"]:
-                with self.subTest(entry=entry, preset=preset["name"]):
-                    configured = self.execute(
-                        source, "cmake", "--preset", preset["configurePreset"])
-                    self.assertEqual(configured.returncode, 0, configured.stderr)
-                    result = self.execute(source, "ctest", "--preset", preset["name"])
-                    self.assertNotEqual(result.returncode, 0,
-                                        "An empty CTest selection was reported as success")
-                    self.assertIn("No tests were found", result.stdout + result.stderr)
+        source, presets = self.prepare("empty")
+        for preset in presets["testPresets"]:
+            with self.subTest(preset=preset["name"]):
+                configured = self.execute(
+                    source, "cmake", "--preset", preset["configurePreset"])
+                self.assertEqual(configured.returncode, 0, configured.stderr)
+                result = self.execute(source, "ctest", "--preset", preset["name"])
+                self.assertNotEqual(result.returncode, 0,
+                                    "An empty CTest selection was reported as success")
+                self.assertIn("No tests were found", result.stdout + result.stderr)
 
     def test_bounded_host_presets_enable_protocol_regressions(self):
-        for entry in ("CMakePresets.json", "dev/CMakePresets.json"):
-            source, presets = self.prepare(entry, "host")
-            build_names = {preset["name"] for preset in presets["buildPresets"]}
-            test_names = {preset["name"] for preset in presets["testPresets"]}
-            for profile in ("boot", "embedded-lite", "embedded"):
-                name = profile + "-host-test"
-                with self.subTest(entry=entry, preset=name):
-                    result = self.execute(
-                        source, "cmake", "--preset", name,
-                        "-DXGL_REQUIRE_HOST_TESTS=ON", f"-DXGL_REQUIRE_PROFILE={profile}")
-                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertIn(name, build_names)
-                    self.assertIn(name, test_names)
+        source, presets = self.prepare("host")
+        build_names = {preset["name"] for preset in presets["buildPresets"]}
+        test_names = {preset["name"] for preset in presets["testPresets"]}
+        for profile in ("boot", "embedded-lite", "embedded"):
+            name = profile + "-host-test"
+            with self.subTest(preset=name):
+                result = self.execute(
+                    source, "cmake", "--preset", name,
+                    "-DXGL_REQUIRE_HOST_TESTS=ON", f"-DXGL_REQUIRE_PROFILE={profile}")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(name, build_names)
+                self.assertIn(name, test_names)
 
 
 if __name__ == "__main__":

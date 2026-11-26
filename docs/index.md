@@ -1,18 +1,9 @@
-# XGL Documentation
+# XGen Link
 
-XGL is a production-grade MCU multi-node reliable protocol stack.
+可离线构建的 C11 嵌入式通信协议库，提供有界存储、可靠收发和可选认证。请选择文档语言。
 
-Choose a documentation language:
+Portable C11 communication for embedded systems, with bounded storage, reliable delivery and optional authentication.
 
 - [简体中文](zh/index.md)
 - [English](en/index.md)
-
-## Documentation Map
-
-| Section | Description |
-| --- | --- |
-| **Getting Started** | Quick start, build & test, examples |
-| **Guides** | Configuration, send API, zero-copy, porting, thread safety, Kconfig, performance tuning, troubleshooting |
-| **Protocol** | Architecture, wire format, extensions, reliability, fragmentation, routing, security, state machines, datalink, transport internals, memory, platform, codec, implementation map |
-| **Reference** | Public API, errors, statistics, performance, config presets, glossary, release validation, static analysis, CI, interoperability, validation matrix |
-| **Contributing** | Documentation standards, testing guide |
+- [Generated C API](api/index.md)

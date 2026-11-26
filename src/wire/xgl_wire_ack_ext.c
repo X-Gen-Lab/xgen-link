@@ -4,9 +4,9 @@
  */
 
 #include <wire/xgl_wire.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include <string.h>
-#include <xgen/bytes/bytes.h>
 
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
@@ -34,14 +34,14 @@ xgl_wire_encode_ack_range_ext_value(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    xgb_serialize_u32_le(&buffer[0], largest_ack);
-    xgb_serialize_u32_le(&buffer[4], ack_delay_us);
+    xgl_serialize_u32_le(&buffer[0], largest_ack);
+    xgl_serialize_u32_le(&buffer[4], ack_delay_us);
     buffer[8] = (uint8_t)range_count;
 
     size_t offset = 9U;
     for (size_t i = 0; i < range_count; ++i) {
-        xgb_serialize_u16_le(&buffer[offset], ranges[i].gap);
-        xgb_serialize_u16_le(&buffer[offset + 2U], ranges[i].length);
+        xgl_serialize_u16_le(&buffer[offset], ranges[i].gap);
+        xgl_serialize_u16_le(&buffer[offset + 2U], ranges[i].length);
         offset += 4U;
     }
 
@@ -96,8 +96,8 @@ xgl_error_t xgl_wire_decode_ack_range_view(const uint8_t* buffer,
     if (buffer_size < 9U || 9U + (size_t)buffer[8] * 4U != buffer_size) {
         return XGL_ERR_INVALID_FRAME;
     }
-    view->largest_ack = xgb_deserialize_u32_le(buffer);
-    view->ack_delay_us = xgb_deserialize_u32_le(buffer + 4U);
+    view->largest_ack = xgl_deserialize_u32_le(buffer);
+    view->ack_delay_us = xgl_deserialize_u32_le(buffer + 4U);
     view->range_count = buffer[8];
     view->ranges = buffer + 9U;
     return XGL_OK;
@@ -115,8 +115,8 @@ xgl_error_t xgl_wire_ack_range_at(const xgl_wire_ack_range_view_t* view,
         return XGL_ERR_NULL_POINTER;
     }
     const uint8_t* bytes = view->ranges + index * 4U;
-    range->gap = xgb_deserialize_u16_le(bytes);
-    range->length = xgb_deserialize_u16_le(bytes + 2U);
+    range->gap = xgl_deserialize_u16_le(bytes);
+    range->length = xgl_deserialize_u16_le(bytes + 2U);
     return XGL_OK;
 }
 
@@ -145,7 +145,7 @@ xgl_error_t xgl_wire_encode_sack_ext_value(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    xgb_serialize_u32_le(&buffer[0], base_packet);
+    xgl_serialize_u32_le(&buffer[0], base_packet);
     buffer[4] = (uint8_t)bitmap_len;
     if (bitmap_len > 0U) {
         memcpy(&buffer[5], bitmap, bitmap_len);
@@ -198,7 +198,7 @@ xgl_error_t xgl_wire_decode_sack_view(const uint8_t* buffer, size_t buffer_size,
     if (buffer_size < 5U || 5U + (size_t)buffer[4] != buffer_size) {
         return XGL_ERR_INVALID_FRAME;
     }
-    view->base_packet = xgb_deserialize_u32_le(buffer);
+    view->base_packet = xgl_deserialize_u32_le(buffer);
     view->bitmap = buffer + 5U;
     view->bitmap_len = buffer[4];
     return XGL_OK;

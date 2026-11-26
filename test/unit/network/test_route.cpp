@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <network/xgl_route.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl_error.h>
 
 #include <cstdlib>
@@ -45,7 +45,7 @@ class XglRouteTest : public ::testing::Test {
 
         /* Initialize route table */
         xgl_error_t err =
-            xgl_route_table_init(&route_table, 4, xgm_allocator_libc());
+            xgl_route_table_init(&route_table, 4, xgl_test_host_allocator());
         ASSERT_EQ(err, XGL_OK);
     }
 
@@ -83,7 +83,8 @@ class XglRouteTest : public ::testing::Test {
 TEST_F(XglRouteTest, InitializeRouteTable) {
     xgl_route_table_t table;
 
-    xgl_error_t err = xgl_route_table_init(&table, 8, xgm_allocator_libc());
+    xgl_error_t err =
+        xgl_route_table_init(&table, 8, xgl_test_host_allocator());
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(table.route_count, 0);
@@ -94,14 +95,16 @@ TEST_F(XglRouteTest, InitializeRouteTable) {
 }
 
 TEST_F(XglRouteTest, InitializeWithNullPointer) {
-    xgl_error_t err = xgl_route_table_init(nullptr, 8, xgm_allocator_libc());
+    xgl_error_t err =
+        xgl_route_table_init(nullptr, 8, xgl_test_host_allocator());
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 
 TEST_F(XglRouteTest, InitializeWithZeroCapacity) {
     xgl_route_table_t table;
 
-    xgl_error_t err = xgl_route_table_init(&table, 0, xgm_allocator_libc());
+    xgl_error_t err =
+        xgl_route_table_init(&table, 0, xgl_test_host_allocator());
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_EQ(table.route_count, 0);
@@ -444,7 +447,7 @@ TEST_F(XglRouteTest, LoadNullEmptySetClearsRoutesAndRetainsStorage) {
 
 TEST_F(XglRouteTest, LoadNullEmptySetIntoZeroCapacityTable) {
     xgl_route_table_destroy(&route_table);
-    ASSERT_EQ(xgl_route_table_init(&route_table, 0U, xgm_allocator_libc()),
+    ASSERT_EQ(xgl_route_table_init(&route_table, 0U, xgl_test_host_allocator()),
               XGL_OK);
 
     EXPECT_EQ(xgl_route_table_load(&route_table, nullptr, 0U), XGL_OK);
@@ -484,8 +487,9 @@ TEST_F(XglRouteTest, IsEmpty) {
 
 TEST_F(XglRouteTest, LookupPerformanceWithManyRoutes) {
     xgl_route_table_destroy(&route_table);
-    ASSERT_EQ(xgl_route_table_init(&route_table, 100, xgm_allocator_libc()),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_route_table_init(&route_table, 100, xgl_test_host_allocator()),
+        XGL_OK);
     /* Add many routes */
     for (uint8_t i = 0; i < 100; i++) {
         xgl_route_table_add(&route_table, i, &phy_ops, 256, 100, 1);
@@ -505,7 +509,7 @@ TEST_F(XglRouteTest, InitializationFailureReleasesEveryPartialReservation) {
         size_t live = 0U;
     } state;
 
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     allocator.ctx = &state;
     allocator.alloc = [](void* context, size_t size) -> void* {
         auto& current = *static_cast<AllocationState*>(context);

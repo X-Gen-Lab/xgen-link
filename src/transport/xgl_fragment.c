@@ -4,6 +4,7 @@
  * release
  */
 
+#include "internal/xgl_allocator.h"
 #include "xgl_fragment_internal.h"
 #include <transport/xgl_fragment.h>
 
@@ -17,8 +18,8 @@
 xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
                               size_t max_reassembly_buffers,
                               uint32_t reassembly_timeout_ms,
-                              const xgm_allocator_t* allocator) {
-    if (manager == NULL || !xgm_allocator_is_valid(allocator)) {
+                              const xgl_allocator_t* allocator) {
+    if (manager == NULL || !xgl_allocator_is_valid(allocator)) {
         return XGL_ERR_NULL_POINTER;
     }
 
@@ -27,7 +28,7 @@ xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
     }
 
     /* Initialize reassembly list */
-    xgct_list_init(&manager->reassembly_list);
+    xgl_list_init(&manager->reassembly_list);
 
     /* Store configuration */
     manager->max_reassembly_buffers = max_reassembly_buffers;
@@ -87,17 +88,17 @@ uint32_t xgl_fragment_process_timeouts_scoped(
     }
 
     uint32_t timeout_count = 0U;
-    xgct_list_t expired;
-    xgct_list_init(&expired);
+    xgl_list_t expired;
+    xgl_list_init(&expired);
 
     /* Iterate through reassembly buffers */
-    xgct_list_node_t* node;
-    xgct_list_node_t* tmp;
-    XGCT_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
+    xgl_list_node_t* node;
+    xgl_list_node_t* tmp;
+    XGL_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
         xgl_reassembly_buffer_t* buffer =
             /* Intrusive node membership is established by the owning list. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
 
         /* Skip if first fragment hasn't been received yet */
         if (buffer->received_bytes == 0U || buffer->timeout_ms == 0U) {
@@ -109,18 +110,18 @@ uint32_t xgl_fragment_process_timeouts_scoped(
 
         /* Check if timeout occurred */
         if (elapsed_ms >= buffer->timeout_ms) {
-            xgct_list_remove(&manager->reassembly_list, node);
-            xgct_list_insert_tail(&expired, node);
+            xgl_list_remove(&manager->reassembly_list, node);
+            xgl_list_insert_tail(&expired, node);
         }
     }
 
     /* A callback can clear its entire active scope. Keep all expired records
      * in a separate owner queue until that callback has returned. */
-    while ((node = xgct_list_remove_head(&expired)) != NULL) {
+    while ((node = xgl_list_remove_head(&expired)) != NULL) {
         xgl_reassembly_buffer_t* buffer =
             /* Intrusive node membership is established by the owning list. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
         if (callback != NULL) {
             callback(buffer, user_data);
         }
@@ -140,7 +141,7 @@ xgl_fragment_get_reassembly_count(const xgl_fragment_manager_t* manager) {
         return 0;
     }
 
-    return xgct_list_count(&manager->reassembly_list);
+    return xgl_list_count(&manager->reassembly_list);
 }
 
 /**
@@ -152,12 +153,12 @@ void xgl_fragment_clear_reassembly(xgl_fragment_manager_t* manager) {
     }
 
     /* Remove and free all reassembly buffers */
-    xgct_list_node_t* node;
-    while ((node = xgct_list_remove_head(&manager->reassembly_list)) != NULL) {
+    xgl_list_node_t* node;
+    while ((node = xgl_list_remove_head(&manager->reassembly_list)) != NULL) {
         xgl_reassembly_buffer_t* buffer =
             /* Intrusive node membership is established by the owning list. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
         fragment_free_reassembly_buffer(manager, buffer);
     }
 }
@@ -171,13 +172,13 @@ size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
     }
 
     size_t cleared = 0U;
-    xgct_list_node_t* node;
-    xgct_list_node_t* tmp;
-    XGCT_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
+    xgl_list_node_t* node;
+    xgl_list_node_t* tmp;
+    XGL_LIST_FOR_EACH_SAFE(&manager->reassembly_list, node, tmp) {
         xgl_reassembly_buffer_t* buffer =
             /* Intrusive node membership is established by the owning list. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+            XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
 
         bool matches_production_scope =
             buffer->source_id == source_id &&
@@ -185,7 +186,7 @@ size_t xgl_fragment_clear_reassembly_scope(xgl_fragment_manager_t* manager,
             buffer->session_epoch == session_epoch;
 
         if (matches_production_scope) {
-            xgct_list_remove(&manager->reassembly_list, node);
+            xgl_list_remove(&manager->reassembly_list, node);
             fragment_free_reassembly_buffer(manager, buffer);
             cleared++;
         }
@@ -200,7 +201,7 @@ void xgl_fragment_release_message(xgl_fragment_manager_t* manager,
         return;
     }
     manager->current_reassembly_bytes -= message->len;
-    xgm_free(manager->data_allocator, message->data);
+    xgl_free(manager->data_allocator, message->data);
     message->data = NULL;
     message->len = 0U;
 }

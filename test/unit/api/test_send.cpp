@@ -13,9 +13,8 @@
 #include <cstring>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <internal/xgl_allocator.h>
 #include <vector>
-#include <xgen/memory/allocator.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include "test_security_helpers.h"
 
@@ -132,7 +131,7 @@ class XglSendTest : public ::testing::Test {
         config.source_id = 1;
         config.route_table = &route;
         config.route_table_len = 1;
-        config.memory.allocator = xgm_allocator_libc();
+        config.memory.allocator = xgl_test_host_allocator();
 
         /* Create and initialize instance */
         xgl_test_use_host_allocator(&config);
@@ -507,7 +506,7 @@ TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
     provider.user_data = nullptr;
     config.auth_required = true;
     config.auth_provider = &provider;
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
 
     xgl_test_use_host_allocator(&config);
     handle = xgl_create(&config);
@@ -722,8 +721,8 @@ static xgl_error_t static_auth_accept(xgl_handle_t, uint16_t, uint8_t,
 
 TEST(XglStaticAuthenticatedSendTest,
      LostAckRetransmitsWithFreshNonceAndExactlyOnceDelivery) {
-    alignas(xgm_max_align_t) static uint8_t storage_a[32768];
-    alignas(xgm_max_align_t) static uint8_t storage_b[32768];
+    alignas(xgl_max_align_t) static uint8_t storage_a[32768];
+    alignas(xgl_max_align_t) static uint8_t storage_b[32768];
     StaticAuthEndpoint a, b;
     a.remote = &b;
     b.remote = &a;

@@ -324,7 +324,6 @@ TEST_F(XglIntegrationTest, VersionInformation) {
     /* Test version integer */
     uint32_t version_int = xgl_version_int();
     EXPECT_EQ(version_int, XGL_VERSION_INT);
-    EXPECT_EQ(version_int, 30000); /* SDK 3; wire version is independent. */
 }
 
 /*---------------------------------------------------------------------------*/

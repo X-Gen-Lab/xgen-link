@@ -6,8 +6,15 @@
 #ifndef XGL_TEST_HOST_ALLOCATOR_H
 #define XGL_TEST_HOST_ALLOCATOR_H
 
-#include <xgen/memory/libc_allocator.h>
+#include <cstdlib>
 #include <xgl/xgl.h>
+
+inline const xgl_allocator_t* xgl_test_host_allocator() {
+    static const xgl_allocator_t service = {
+        nullptr, [](void*, size_t size) -> void* { return std::malloc(size); },
+        [](void*, void* address) { std::free(address); }};
+    return &service;
+}
 
 /**
  * \brief           Supply host storage without overriding a fault-injection
@@ -17,7 +24,7 @@
  */
 inline void xgl_test_use_host_allocator(xgl_config_t* config) {
     if (config->memory.allocator == nullptr) {
-        config->memory.allocator = xgm_allocator_libc();
+        config->memory.allocator = xgl_test_host_allocator();
     }
 }
 

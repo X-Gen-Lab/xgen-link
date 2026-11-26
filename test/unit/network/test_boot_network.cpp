@@ -57,7 +57,7 @@ class XglBootNetworkTest : public ::testing::Test {
         packet.data = &payload;
     }
 
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     std::array<uint8_t, 128> scratch{}, captured{};
     bool leased = false;
     unsigned transmissions = 0U;

@@ -133,15 +133,15 @@ static xgl_error_t transport_process_retransmission_queue(
     xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
     xgl_handle_t handle, uint32_t current_time_ms) {
     xgl_reliable_queue_t* queue = &peer->reliable_queue;
-    xgct_list_node_t* node;
-    xgct_list_node_t* tmp;
+    xgl_list_node_t* node;
+    xgl_list_node_t* tmp;
     xgl_error_t first_error = XGL_OK;
 
-    XGCT_LIST_FOR_EACH_SAFE(&queue->wait_ack_list, node, tmp) {
+    XGL_LIST_FOR_EACH_SAFE(&queue->wait_ack_list, node, tmp) {
         xgl_reliable_packet_t* rel_packet =
             /* Intrusive node membership is established by the owning list. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
 
         if (!rel_packet->sent) {
             continue;
@@ -422,13 +422,13 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
         }
 #endif
 #endif
-        xgct_list_node_t* node;
-        XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+        xgl_list_node_t* node;
+        XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
             const xgl_reliable_packet_t* packet =
                 /* Intrusive node membership is established by the owning list.
                  */
                 /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-                XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+                XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
             uint32_t start;
             uint32_t interval;
             if (packet->retry_pending) {
@@ -470,13 +470,13 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
     }
 #if XGL_FEATURE_FRAGMENTATION
     if (ctx->fragment_mgr != NULL) {
-        xgct_list_node_t* node;
-        XGCT_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
+        xgl_list_node_t* node;
+        XGL_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
             const xgl_reassembly_buffer_t* buffer =
                 /* Intrusive node membership is established by the owning list.
                  */
                 /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-                XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+                XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
             if (buffer->received_bytes > 0U && buffer->timeout_ms != 0U) {
                 transport_take_timeout(now_ms, buffer->first_fragment_time,
                                        buffer->timeout_ms, &active, timeout_ms);

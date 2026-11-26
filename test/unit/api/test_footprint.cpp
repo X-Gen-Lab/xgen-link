@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <gtest/gtest.h>
-#include <xgen/memory/allocator.h>
+#include <internal/xgl_allocator.h>
 
 namespace {
 
@@ -60,7 +60,7 @@ xgl_error_t null_rx(uint8_t*, size_t* size, void*) {
 
 TEST(XglFootprintTest, CreateReservesExactlyTheMeasuredWorkspaceOnce) {
     CountingAllocator counter;
-    xgm_allocator_t allocator = {&counter, counting_alloc, counting_free};
+    xgl_allocator_t allocator = {&counter, counting_alloc, counting_free};
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;
@@ -85,7 +85,7 @@ TEST(XglFootprintTest, CreateReservesExactlyTheMeasuredWorkspaceOnce) {
 
 TEST(XglFootprintTest, SendsReuseReservedStorageWithoutBackendAllocations) {
     CountingAllocator counter;
-    xgm_allocator_t allocator = {&counter, counting_alloc, counting_free};
+    xgl_allocator_t allocator = {&counter, counting_alloc, counting_free};
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;

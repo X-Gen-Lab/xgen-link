@@ -69,8 +69,8 @@ struct xgl_instance {
     /*-----------------------------------------------------------------------*/
     /* Memory Management                                                     */
     /*-----------------------------------------------------------------------*/
-    const xgm_allocator_t* allocator;
-    const xgm_allocator_t* storage_allocator;
+    const xgl_allocator_t* allocator;
+    const xgl_allocator_t* storage_allocator;
     const xgl_protocol_memory_t* memory;
 
     /*-----------------------------------------------------------------------*/
@@ -112,7 +112,7 @@ size_t xgl_instance_count_links(const xgl_config_t* config);
  */
 xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
                                   size_t storage_size,
-                                  const xgm_allocator_t* storage_allocator,
+                                  const xgl_allocator_t* storage_allocator,
                                   xgl_handle_t* handle);
 
 xgl_error_t xgl_options_validate(const xgl_config_t* config,

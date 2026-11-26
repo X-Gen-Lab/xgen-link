@@ -3,8 +3,8 @@
  * \brief           Explicit allocation and configured heap fallback contracts
  * \author          X-Gen Lab
  */
+#include "test_host_allocator.h"
 #include <gtest/gtest.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 TEST(CreationPolicyTest, MissingAllocatorFollowsCompiledPolicy) {
@@ -23,7 +23,7 @@ TEST(CreationPolicyTest, MissingAllocatorFollowsCompiledPolicy) {
 TEST(CreationPolicyTest, ExplicitAllocatorWorksWithoutHeapFallback) {
     xgl_config_t config;
     xgl_config_get_preset_tiny(&config);
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
     const xgl_handle_t handle = xgl_create(&config);
     ASSERT_NE(handle, nullptr);
     EXPECT_EQ(xgl_init(handle), XGL_OK);

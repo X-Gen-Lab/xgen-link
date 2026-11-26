@@ -37,6 +37,7 @@ class XglWindowTest : public ::testing::Test {
     }
 };
 
+#if XGL_BUILD_WINDOW_CAPACITY >= 8
 TEST_F(XglWindowTest, InitSuccess) {
     ASSERT_EQ(xgl_window_init(&window, 8), XGL_OK);
 
@@ -58,6 +59,7 @@ TEST_F(XglWindowTest, InitUsesProvidedAllocator) {
     EXPECT_EQ(window.window_size, 0U);
     EXPECT_EQ(window.ack_received[15], 0U);
 }
+#endif
 
 TEST_F(XglWindowTest, InitRejectsInvalidParams) {
     EXPECT_EQ(xgl_window_init(nullptr, 8), XGL_ERR_NULL_POINTER);
@@ -65,6 +67,7 @@ TEST_F(XglWindowTest, InitRejectsInvalidParams) {
     EXPECT_EQ(xgl_window_init(&window, 129), XGL_ERR_INVALID_PARAM);
 }
 
+#if XGL_BUILD_WINDOW_CAPACITY >= 4
 TEST_F(XglWindowTest, CanSendUntilWindowFull) {
     ASSERT_EQ(xgl_window_init(&window, 4), XGL_OK);
 
@@ -160,6 +163,7 @@ TEST_F(XglWindowTest, ResetClearsPacketNumberState) {
     EXPECT_EQ(xgl_window_get_usage(&window), 0U);
     EXPECT_TRUE(xgl_window_can_send_packet_number(&window));
 }
+#endif
 
 TEST_F(XglWindowTest, NullPointerSafety) {
     EXPECT_FALSE(xgl_window_can_send_packet_number(nullptr));

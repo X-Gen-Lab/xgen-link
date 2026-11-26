@@ -11,8 +11,8 @@
 #include <array>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 namespace {
 
@@ -39,8 +39,8 @@ std::vector<uint8_t> make_frame(uint16_t payload_length = 2U) {
                                0x42U);
     std::copy(header.begin(), header.end(), bytes.begin());
     const size_t body_end = bytes.size() - XGL_CRC16_SIZE;
-    xgb_serialize_u16_le(bytes.data() + body_end,
-                         xgcrc_crc16_modbus(bytes.data(), body_end));
+    xgl_serialize_u16_le(bytes.data() + body_end,
+                         xgl_crc16_modbus(bytes.data(), body_end));
     return bytes;
 }
 

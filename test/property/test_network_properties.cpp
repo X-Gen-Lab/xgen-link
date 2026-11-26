@@ -1,4 +1,4 @@
-#include <xgen/memory/libc_allocator.h>
+#include "test_host_allocator.h"
 /**
  * \file            test_network_properties.cpp
  * \brief           Network layer property tests
@@ -84,8 +84,9 @@ TEST(XglNetworkProperties, RouteLookupCorrectness) {
          ++iteration) {
         /* Create route table */
         xgl_route_table_t route_table;
-        ASSERT_EQ(xgl_route_table_init(&route_table, 20, xgm_allocator_libc()),
-                  XGL_OK);
+        ASSERT_EQ(
+            xgl_route_table_init(&route_table, 20, xgl_test_host_allocator()),
+            XGL_OK);
 
         /* Generate random number of routes (1-20) */
         size_t num_routes = 1 + (gen.random_uint32() % 20);
@@ -164,8 +165,9 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
          ++iteration) {
         /* Create route table */
         xgl_route_table_t route_table;
-        ASSERT_EQ(xgl_route_table_init(&route_table, 20, xgm_allocator_libc()),
-                  XGL_OK);
+        ASSERT_EQ(
+            xgl_route_table_init(&route_table, 20, xgl_test_host_allocator()),
+            XGL_OK);
 
         /* Add some random routes */
         size_t num_routes = 1 + (gen.random_uint32() % 10);
@@ -226,7 +228,7 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
         config.error_callback = test_error_callback;
         config.callback_user_data = nullptr;
         config.stats = &stats;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         ASSERT_EQ(xgl_network_init(&ctx, &config), XGL_OK);
 
         /* Exercise the real missing-route path and its callback. */
@@ -277,8 +279,9 @@ TEST(XglNetworkProperties, PacketForwardingToSelf) {
 
         /* Create route table (can be empty for this test) */
         xgl_route_table_t route_table;
-        ASSERT_EQ(xgl_route_table_init(&route_table, 20, xgm_allocator_libc()),
-                  XGL_OK);
+        ASSERT_EQ(
+            xgl_route_table_init(&route_table, 20, xgl_test_host_allocator()),
+            XGL_OK);
 
         /* Create network context */
         xgl_layer_stats_t stats = {0};
@@ -292,7 +295,7 @@ TEST(XglNetworkProperties, PacketForwardingToSelf) {
         config.error_callback = nullptr;
         config.callback_user_data = nullptr;
         config.stats = &stats;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         ASSERT_EQ(xgl_network_init(&ctx, &config), XGL_OK);
 
         /* Test 1: Packet addressed to local_id should be for local node */

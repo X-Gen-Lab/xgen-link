@@ -3,7 +3,7 @@
  * \brief           Owned reliable records, index and retry backoff
  */
 
-#include <xgen/memory/allocator.h>
+#include "internal/xgl_allocator.h"
 
 #include <string.h>
 #include <transport/xgl_reliable.h>
@@ -59,16 +59,16 @@ static void reliable_free_packet(const xgl_reliable_queue_t* queue,
     }
 
     if (packet->data != NULL) {
-        xgm_free(queue->data_allocator, packet->data);
+        xgl_free(queue->data_allocator, packet->data);
         packet->data = NULL;
     }
 
     if (packet->extensions != NULL) {
-        xgm_free(queue->extensions_allocator, packet->extensions);
+        xgl_free(queue->extensions_allocator, packet->extensions);
         packet->extensions = NULL;
     }
 
-    xgm_free(queue->allocator, packet);
+    xgl_free(queue->allocator, packet);
 }
 
 xgl_reliable_packet_t*
@@ -103,7 +103,7 @@ xgl_error_t xgl_reliable_set_packet_extensions(
     }
 
     if (packet->extensions != NULL) {
-        xgm_free(queue->extensions_allocator, packet->extensions);
+        xgl_free(queue->extensions_allocator, packet->extensions);
         packet->extensions = NULL;
         packet->extensions_len = 0U;
     }
@@ -113,7 +113,7 @@ xgl_error_t xgl_reliable_set_packet_extensions(
     }
 
     packet->extensions =
-        (uint8_t*)xgm_alloc(queue->extensions_allocator, extensions_len);
+        (uint8_t*)xgl_alloc(queue->extensions_allocator, extensions_len);
     if (packet->extensions == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
@@ -131,15 +131,15 @@ xgl_error_t xgl_reliable_set_packet_extensions(
  * \brief           Initialize reliable transmission queue
  */
 xgl_error_t xgl_reliable_init(xgl_reliable_queue_t* queue,
-                              const xgm_allocator_t* allocator) {
-    if (queue == NULL || !xgm_allocator_is_valid(allocator)) {
+                              const xgl_allocator_t* allocator) {
+    if (queue == NULL || !xgl_allocator_is_valid(allocator)) {
         return XGL_ERR_NULL_POINTER;
     }
 
     memset(queue, 0, sizeof(*queue));
 
     /* Initialize wait-ACK list */
-    xgct_list_init(&queue->wait_ack_list);
+    xgl_list_init(&queue->wait_ack_list);
 
     /* Store configuration */
     queue->allocator = allocator;
@@ -177,7 +177,7 @@ xgl_error_t xgl_reliable_add_packet_number(
     }
 
     /* Allocate packet structure */
-    xgl_reliable_packet_t* packet = (xgl_reliable_packet_t*)xgm_alloc(
+    xgl_reliable_packet_t* packet = (xgl_reliable_packet_t*)xgl_alloc(
         queue->allocator, sizeof(xgl_reliable_packet_t));
 
     if (packet == NULL) {
@@ -186,9 +186,9 @@ xgl_error_t xgl_reliable_add_packet_number(
     memset(packet, 0, sizeof(*packet));
 
     /* Allocate data buffer */
-    packet->data = (uint8_t*)xgm_alloc(queue->data_allocator, data_len);
+    packet->data = (uint8_t*)xgl_alloc(queue->data_allocator, data_len);
     if (packet->data == NULL) {
-        xgm_free(queue->allocator, packet);
+        xgl_free(queue->allocator, packet);
         return XGL_ERR_NO_MEMORY;
     }
 
@@ -213,10 +213,10 @@ xgl_error_t xgl_reliable_add_packet_number(
     packet->initial_timeout_ms = timeout_ms;
 
     /* Initialize list node */
-    xgct_list_node_init(&packet->node);
+    xgl_list_node_init(&packet->node);
 
     /* Add to wait-ACK list */
-    xgct_list_insert_tail(&queue->wait_ack_list, &packet->node);
+    xgl_list_insert_tail(&queue->wait_ack_list, &packet->node);
     reliable_index_packet(queue, packet);
     if (packet_out != NULL) {
         *packet_out = packet;
@@ -246,7 +246,7 @@ xgl_error_t xgl_reliable_remove_owned(xgl_reliable_queue_t* queue,
     if (!reliable_unindex_packet(queue, packet)) {
         return XGL_ERR_SEQUENCE_ERROR;
     }
-    xgct_list_remove(&queue->wait_ack_list, &packet->node);
+    xgl_list_remove(&queue->wait_ack_list, &packet->node);
     reliable_free_packet(queue, packet);
     return XGL_OK;
 }
@@ -259,7 +259,7 @@ size_t xgl_reliable_get_count(const xgl_reliable_queue_t* queue) {
         return 0;
     }
 
-    return xgct_list_count(&queue->wait_ack_list);
+    return xgl_list_count(&queue->wait_ack_list);
 }
 
 /**
@@ -270,7 +270,7 @@ bool xgl_reliable_is_empty(const xgl_reliable_queue_t* queue) {
         return true;
     }
 
-    return xgct_list_is_empty(&queue->wait_ack_list);
+    return xgl_list_is_empty(&queue->wait_ack_list);
 }
 
 /**
@@ -284,12 +284,12 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
     /* Invalidate the lookup once; unlinking each oldest record would rescan
      * the reverse collision chain and make a full clear quadratic. */
     memset((void*)queue->index_buckets, 0, sizeof(queue->index_buckets));
-    xgct_list_node_t* node;
-    while ((node = xgct_list_remove_head(&queue->wait_ack_list)) != NULL) {
+    xgl_list_node_t* node;
+    while ((node = xgl_list_remove_head(&queue->wait_ack_list)) != NULL) {
         xgl_reliable_packet_t* packet =
             /* Intrusive node membership is established by the owning list. */
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         reliable_free_packet(queue, packet);
     }
 }

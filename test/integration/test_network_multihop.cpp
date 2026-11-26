@@ -12,7 +12,7 @@
 #include <network/xgl_network.h>
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
-#include <xgen/bytes/bytes.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include <algorithm>
 #include <array>
@@ -85,7 +85,7 @@ struct AuthenticationLedger {
              copy_bytes(input->payload, input->payload_len)});
         self.signed_inputs.back().fields.aad = nullptr;
         self.signed_inputs.back().fields.payload = nullptr;
-        xgb_serialize_u32_le(tag,
+        xgl_serialize_u32_le(tag,
                              static_cast<uint32_t>(self.signed_inputs.size()));
         *length = 4U;
         return XGL_OK;
@@ -101,7 +101,7 @@ struct AuthenticationLedger {
         if (length != 4U) {
             return XGL_OK;
         }
-        const uint32_t id = xgb_deserialize_u32_le(tag);
+        const uint32_t id = xgl_deserialize_u32_le(tag);
         if (id == 0U || id > self.signed_inputs.size()) {
             return XGL_OK;
         }

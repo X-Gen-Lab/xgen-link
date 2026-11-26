@@ -24,7 +24,7 @@ __attribute__((used, section(".xgl_footprint_layout")))
 const uint32_t xgl_boot_target_layout[] = {UINT32_C(0x58474c42),
                                            6U,
                                            sizeof(void*),
-                                           _Alignof(xgm_max_align_t),
+                                           _Alignof(xgl_max_align_t),
                                            sizeof(xgl_workspace_t),
                                            sizeof(xgl_route_item_t),
                                            sizeof(xgl_instance_link_t),

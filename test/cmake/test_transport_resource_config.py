@@ -9,7 +9,6 @@ import unittest
 import xml.etree.ElementTree as ET
 
 
-PACKAGES = ("status", "bytes", "crc", "memory", "containers")
 API_CASE_PATTERN = r"^(XglConfigTest|XglConfigResourceTest|XglStatsTest|XglStatisticsBehavior)\."
 ARGS = None
 
@@ -46,7 +45,7 @@ class TransportResourceConfig(unittest.TestCase):
     def configure(self, name, profile="full", *, buckets="AUTO", capacity="AUTO",
                   adaptive="ON", advanced="OFF", heap=None, chunk="AUTO", entry=None, succeeds=True):
         binary = self.root / name
-        command = ["cmake", "-S", entry or ARGS.link_source / "dev", "-B", binary, "-G", "Ninja",
+        command = ["cmake", "-S", entry or ARGS.link_source, "-B", binary, "-G", "Ninja",
                    f"-DXGL_PROFILE={profile}", "-DCMAKE_BUILD_TYPE=Debug",
                    "-DXGL_BUILD_TESTS=OFF", "-DXGL_BUILD_EXAMPLES=OFF",
                    "-DXGL_BUILD_DOCS=OFF", "-DXGL_BUILD_FOOTPRINT_REPORT=OFF",
@@ -66,9 +65,6 @@ class TransportResourceConfig(unittest.TestCase):
             command.append(f"-DGTest_DIR={ARGS.gtest_dir.as_posix()}")
             if ARGS.cxx_compiler:
                 command.append(f"-DCMAKE_CXX_COMPILER={ARGS.cxx_compiler}")
-        for package in PACKAGES:
-            command.append(f"-DXGL_DEV_{package.upper()}_SOURCE_DIR="
-                           f"{getattr(ARGS, package + '_source').as_posix()}")
         self.execute(*command, succeeds=succeeds)
         return binary
 
@@ -88,20 +84,14 @@ class TransportResourceConfig(unittest.TestCase):
                     'set(CMAKE_C_STANDARD 11)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n'
                     'set(CMAKE_C_EXTENSIONS OFF)\nset(CMAKE_CXX_STANDARD 17)\n'
                     'set(CMAKE_CXX_STANDARD_REQUIRED ON)\nset(CMAKE_CXX_EXTENSIONS OFF)\n'
-                    f'add_subdirectory("{(ARGS.link_source / "dev").as_posix()}" production)\n'
+                    f'add_subdirectory("{(ARGS.link_source).as_posix()}" production)\n'
                     'find_package(GTest 1.16.0 EXACT CONFIG REQUIRED)\n'
-                    'if(TARGET xgm::libc_allocator)\n  set(host_allocator xgm::libc_allocator)\nelse()\n'
-                    f'  add_library(api_host_allocator STATIC "{(ARGS.memory_source / "src/libc_allocator.c").as_posix()}")\n'
-                    '  target_link_libraries(api_host_allocator PRIVATE xgm::allocator)\n'
-                    '  set(host_allocator api_host_allocator)\nendif()\n'
                     'add_executable(api_tests\n' +
                     ''.join(f'    "{(ARGS.link_source / path).as_posix()}"\n' for path in sources) + ')\n'
                     'target_include_directories(api_tests PRIVATE\n' +
                     ''.join(f'    "{(ARGS.link_source / path).as_posix()}"\n'
                             for path in ("src", "test", "test/support")) + ')\n'
-                    'target_link_libraries(api_tests PRIVATE xgl ${host_allocator} GTest::gtest GTest::gmock\n'
-                    '    xgs::status xgb::bytes xgcrc::crc16 xgm::allocator xgm::pool\n'
-                    '    xgm::size_class xgct::list xgct::bitset xgct::hash)\n'
+                    'target_link_libraries(api_tests PRIVATE xgl::xgl GTest::gtest GTest::gmock)\n'
                     'if(MSVC)\n  target_compile_options(api_tests PRIVATE /permissive-)\n'
                     'else()\n  target_compile_options(api_tests PRIVATE -pedantic-errors)\nendif()\n'
                     'enable_testing()\ninclude(GoogleTest)\n'
@@ -139,7 +129,7 @@ class TransportResourceConfig(unittest.TestCase):
                     self.assertIsNone(case.find("skipped"))
 
     def header(self, binary):
-        return binary / "link/generated/xgl/xgl_build_config.h"
+        return binary / "generated/xgl/xgl_build_config.h"
 
     def probe(self, name, binary, code, *, definitions="", window=False, succeeds=True):
         source = self.root / (name + "-probe")
@@ -155,11 +145,9 @@ class TransportResourceConfig(unittest.TestCase):
             'target_include_directories(probe PRIVATE\n' +
             ''.join(f'    "{path.as_posix()}"\n' for path in (
                 ARGS.link_source / "src", ARGS.link_source / "include",
-                binary / "link/generated", ARGS.status_source / "include",
-                ARGS.memory_source / "include", ARGS.containers_source / "include")) + ')\n' +
-            (f'target_compile_definitions(probe PRIVATE {definitions})\n' if definitions else "") +
-            (f'target_sources(probe PRIVATE "{(ARGS.containers_source / "src/bitset.c").as_posix()}")\n'
-             if window else ""), encoding="utf-8")
+                binary / "generated")) + ')\n' +
+            (f'target_compile_definitions(probe PRIVATE {definitions})\n' if definitions else ""),
+            encoding="utf-8")
         command = ["cmake", "-S", source, "-B", build, "-G", "Ninja"]
         if ARGS.c_compiler:
             command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")
@@ -282,10 +270,9 @@ class TransportResourceConfig(unittest.TestCase):
             '  set_property(TARGET conflict PROPERTY INTERFACE_XGL_RESOURCE_CONFIG_ID conflict)\n'
             '  target_link_libraries(probe PRIVATE conflict)\nendif()\n'
             'find_package(GTest 1.16.0 EXACT CONFIG REQUIRED)\n'
-            f'add_executable(fixed_rto "{(ARGS.link_source / "test/unit/transport/test_transport_fixed_rto.cpp").as_posix()}"\n'
-            f'    "{(ARGS.memory_source / "src/libc_allocator.c").as_posix()}")\n'
+            f'add_executable(fixed_rto "{(ARGS.link_source / "test/unit/transport/test_transport_fixed_rto.cpp").as_posix()}")\n'
             f'target_include_directories(fixed_rto PRIVATE "{(ARGS.link_source / "src").as_posix()}"\n'
-            f'    "{(ARGS.memory_source / "include").as_posix()}")\n'
+            f'    "{(ARGS.link_source / "test/support").as_posix()}")\n'
             'target_link_libraries(fixed_rto PRIVATE xgl::xgl GTest::gtest_main)\n'
             'if(MSVC)\n  target_compile_options(fixed_rto PRIVATE /permissive-)\n'
             'else()\n  target_compile_options(fixed_rto PRIVATE -pedantic-errors)\nendif()\n'
@@ -330,8 +317,6 @@ if __name__ == "__main__":
     parser.add_argument("--c-compiler")
     parser.add_argument("--cxx-compiler")
     parser.add_argument("--gtest-dir", type=Path, required=True)
-    for package in PACKAGES:
-        parser.add_argument(f"--{package}-source", type=Path, required=True)
     ARGS, remaining = parser.parse_known_args()
     for name, value in vars(ARGS).items():
         if isinstance(value, Path):

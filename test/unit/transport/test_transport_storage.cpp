@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_transport_rx_internal.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 #include <array>
@@ -17,7 +17,7 @@
 TEST(XglTransportStorageTest, WorkspaceDoesNotReserveWindowAllocations) {
     xgl_config_t config = {};
     xgl_config_get_preset_boot(&config);
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
     xgl_memory_report_t report = {};
     ASSERT_EQ(xgl_memory_report(&config, &report), XGL_OK);
     EXPECT_EQ(report.window_bytes, 0U);
@@ -65,7 +65,7 @@ struct StorageAllocator {
 class XglTransportBufferedStorageTest : public ::testing::Test {
   protected:
     StorageAllocator allocations;
-    xgm_allocator_t allocator = {&allocations, StorageAllocator::Allocate,
+    xgl_allocator_t allocator = {&allocations, StorageAllocator::Allocate,
                                  StorageAllocator::Release};
     xgl_transport_ctx_t context = {};
     xgl_transport_peer_state_t peer = {};

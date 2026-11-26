@@ -10,8 +10,8 @@
 
 #include <cstring>
 #include <gtest/gtest.h>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include "test_security_helpers.h"
 
@@ -39,7 +39,7 @@ static xgl_error_t frame_test_auth_sign(const xgl_auth_input_t* input,
         acc = (acc * 33U) ^ payload[i];
     }
 
-    xgb_serialize_u32_le(tag, acc);
+    xgl_serialize_u32_le(tag, acc);
     *tag_len = 4U;
     return XGL_OK;
 }
@@ -315,9 +315,9 @@ TEST(XglFrameTest, SerializeAuthenticatedFrameAddsSecurityExtensionAndTrailer) {
     EXPECT_TRUE(valid);
 
     uint16_t received_crc =
-        xgb_deserialize_u16_le(&buffer[bytes_written - XGL_CRC16_SIZE]);
+        xgl_deserialize_u16_le(&buffer[bytes_written - XGL_CRC16_SIZE]);
     EXPECT_EQ(received_crc,
-              xgcrc_crc16_modbus(buffer, bytes_written - XGL_CRC16_SIZE));
+              xgl_crc16_modbus(buffer, bytes_written - XGL_CRC16_SIZE));
 }
 
 TEST(XglFrameTest, SerializeAuthenticatedFrameRejectsUnspecifiedTagLength) {
@@ -417,8 +417,8 @@ TEST(XglFrameTest,
     header.ttl = 3;
     ASSERT_EQ(xgl_wire_encode_header(buffer, bytes_written, &header), XGL_OK);
     uint16_t frame_crc =
-        xgcrc_crc16_modbus(buffer, bytes_written - XGL_CRC16_SIZE);
-    xgb_serialize_u16_le(&buffer[bytes_written - XGL_CRC16_SIZE], frame_crc);
+        xgl_crc16_modbus(buffer, bytes_written - XGL_CRC16_SIZE);
+    xgl_serialize_u16_le(&buffer[bytes_written - XGL_CRC16_SIZE], frame_crc);
 
     bool valid = false;
     ASSERT_EQ(test_verify_trusted_frame(buffer, bytes_written - XGL_CRC16_SIZE,
@@ -701,7 +701,7 @@ TEST(XglFrameTest, ValidateHeaderCRC) {
 
     xgl_wire_header_t decoded = {};
     EXPECT_EQ(xgl_wire_decode_header(&decoded, buffer, bytes_written), XGL_OK);
-    EXPECT_EQ(decoded.header_crc16, xgb_deserialize_u16_le(&buffer[22]));
+    EXPECT_EQ(decoded.header_crc16, xgl_deserialize_u16_le(&buffer[22]));
 }
 
 TEST(XglFrameTest, InvalidHeaderCRC) {

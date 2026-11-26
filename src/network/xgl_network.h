@@ -66,7 +66,7 @@ typedef struct xgl_network_ctx_s {
     xgl_security_ctx_t* security; /**< Borrowed instance security state */
 #endif
 #if XGL_FEATURE_FORWARDING
-    const xgm_allocator_t*
+    const xgl_allocator_t*
         allocator; /**< Allocator for forwarded frame copies */
 #endif
 } xgl_network_ctx_t;
@@ -88,7 +88,7 @@ typedef struct {
 #if XGL_FEATURE_AUTH
     xgl_security_ctx_t* security; /**< Local receive security state */
 #endif
-    const xgm_allocator_t*
+    const xgl_allocator_t*
         allocator; /**< Allocator for forwarded frame copies */
 } xgl_network_config_t;
 

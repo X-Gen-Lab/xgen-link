@@ -48,7 +48,7 @@ typedef struct xgl_datalink_ctx_s {
     xgl_error_callback_t error_callback; /**< Error callback */
     void* callback_user_data;            /**< User data for callbacks */
     xgl_handle_t owner_handle;           /**< Owning protocol instance handle */
-    const xgm_allocator_t* allocator; /**< Allocator for temporary TX buffers */
+    const xgl_allocator_t* allocator; /**< Allocator for temporary TX buffers */
 #if XGL_FEATURE_AUTH
     xgl_security_ctx_t* security; /**< Borrowed instance security state */
 #endif
@@ -73,7 +73,7 @@ typedef struct {
     void* callback_user_data; /**< User data for callbacks (can be NULL) */
     xgl_handle_t
         owner_handle; /**< Owning protocol instance handle (can be NULL) */
-    const xgm_allocator_t*
+    const xgl_allocator_t*
         allocator; /**< Allocator for temporary TX buffers; NULL
                               fallback is build-policy controlled */
 #if XGL_FEATURE_AUTH

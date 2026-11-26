@@ -22,10 +22,8 @@
       "examples",
       "tools",
       "cmake",
-      "dev",
       "docs",
-      ".github",
-      "xgen"
+      ".github"
     ]
   }
 }

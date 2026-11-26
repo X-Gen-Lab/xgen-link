@@ -3,7 +3,7 @@
  * \brief           Transport lifecycle and layer entry points
  */
 
-#include "xgen/memory/allocator.h"
+#include "internal/xgl_allocator.h"
 #include "xgl/xgl_config.h"
 #include "xgl_transport_internal.h"
 #include <internal/xgl_diagnostics.h>
@@ -25,7 +25,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (!xgm_allocator_is_valid(config->allocator)) {
+    if (!xgl_allocator_is_valid(config->allocator)) {
         return XGL_ERR_NULL_POINTER;
     }
 #if XGL_FEATURE_STATISTICS
@@ -117,24 +117,24 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 #endif
     if (config->memory != NULL) {
         ctx->memory = *config->memory;
-        if (!xgm_allocator_is_valid(ctx->memory.peer) ||
-            !xgm_allocator_is_valid(ctx->memory.tx_packet) ||
-            !xgm_allocator_is_valid(ctx->memory.tx_payload)) {
+        if (!xgl_allocator_is_valid(ctx->memory.peer) ||
+            !xgl_allocator_is_valid(ctx->memory.tx_packet) ||
+            !xgl_allocator_is_valid(ctx->memory.tx_payload)) {
             return XGL_ERR_INVALID_PARAM;
         }
 #if XGL_FEATURE_FRAGMENTATION
         if (config->enable_fragmentation &&
-            (!xgm_allocator_is_valid(ctx->memory.tx_extensions) ||
-             !xgm_allocator_is_valid(ctx->memory.tx_message) ||
-             !xgm_allocator_is_valid(ctx->memory.reassembly) ||
-             !xgm_allocator_is_valid(ctx->memory.reassembly_payload))) {
+            (!xgl_allocator_is_valid(ctx->memory.tx_extensions) ||
+             !xgl_allocator_is_valid(ctx->memory.tx_message) ||
+             !xgl_allocator_is_valid(ctx->memory.reassembly) ||
+             !xgl_allocator_is_valid(ctx->memory.reassembly_payload))) {
             return XGL_ERR_INVALID_PARAM;
         }
 #endif
 #if XGL_FEATURE_OUT_OF_ORDER
         if (config->max_rx_buffered_packets > 0U &&
-            (!xgm_allocator_is_valid(ctx->memory.rx_packet) ||
-             !xgm_allocator_is_valid(ctx->memory.rx_payload))) {
+            (!xgl_allocator_is_valid(ctx->memory.rx_packet) ||
+             !xgl_allocator_is_valid(ctx->memory.rx_payload))) {
             return XGL_ERR_INVALID_PARAM;
         }
 #endif

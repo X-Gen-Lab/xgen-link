@@ -1,4 +1,4 @@
-#include <xgen/memory/libc_allocator.h>
+#include "test_host_allocator.h"
 /**
  * \file            test_fragment.cpp
  * \brief           Production FRAGMENT_EXT reassembly tests
@@ -16,8 +16,9 @@ class XglFragmentTest : public ::testing::Test {
     xgl_fragment_manager_t manager;
 
     void SetUp() override {
-        ASSERT_EQ(xgl_fragment_init(&manager, 10, 5000, xgm_allocator_libc()),
-                  XGL_OK);
+        ASSERT_EQ(
+            xgl_fragment_init(&manager, 10, 5000, xgl_test_host_allocator()),
+            XGL_OK);
     }
 
     void TearDown() override {
@@ -193,7 +194,7 @@ TEST_F(XglFragmentTest, ReassemblyTracksReceivedRangesInsteadOfByteBitmap) {
               XGL_ERR_BUSY);
 
     ASSERT_NE(manager.reassembly_list.head, nullptr);
-    xgl_reassembly_buffer_t* buffer = XGCT_LIST_ENTRY(
+    xgl_reassembly_buffer_t* buffer = XGL_LIST_ENTRY(
         manager.reassembly_list.head, xgl_reassembly_buffer_t, node);
 
     ASSERT_EQ(buffer->received_range_count, 1U);

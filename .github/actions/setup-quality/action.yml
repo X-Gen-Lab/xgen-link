@@ -1,11 +1,11 @@
 name: Prepare shared quality tools
-description: Install the pinned shared policy and optional native Linux analyzers
+description: Install the pinned shared policy and optional native Linux analyzer
 inputs:
   repository:
     description: Published quality repository
     default: X-Gen-Lab/xgen-quality
   native-analyzers:
-    description: Build fixed Cppcheck and Doxygen on Linux
+    description: Build fixed Cppcheck on Linux
     default: 'false'
 runs:
   using: composite
@@ -44,27 +44,16 @@ runs:
         ref: e73bf44c3e49686b7495fab352d03a6c6075516b
         path: out/deps/cppcheck-src
         persist-credentials: false
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      if: inputs.native-analyzers == 'true'
-      with:
-        repository: doxygen/doxygen
-        ref: 0128237a63c2ca9ca4c8d772d0cee9e8e5415835
-        path: out/deps/doxygen-src
-        persist-credentials: false
-    - name: Build fixed native analyzers
+    - name: Build fixed Cppcheck
       if: inputs.native-analyzers == 'true'
       shell: bash
       run: |
         test "$RUNNER_OS" = Linux
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends flex bison graphviz ninja-build
+        sudo apt-get install -y --no-install-recommends ninja-build
         cmake -S out/deps/cppcheck-src -B out/deps/cppcheck-build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release -DBUILD_GUI=OFF -DBUILD_TESTING=OFF \
           -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/out/deps/cppcheck"
         cmake --build out/deps/cppcheck-build --parallel 2
         cmake --install out/deps/cppcheck-build
-        cmake -S out/deps/doxygen-src -B out/deps/doxygen-build -G Ninja -DCMAKE_BUILD_TYPE=Release
-        cmake --build out/deps/doxygen-build --target doxygen --parallel 2
         echo "XGEN_CPPCHECK=$GITHUB_WORKSPACE/out/deps/cppcheck/bin/cppcheck" >> "$GITHUB_ENV"
-        echo "XGEN_DOXYGEN=$GITHUB_WORKSPACE/out/deps/doxygen-build/bin/doxygen" >> "$GITHUB_ENV"
-        echo "$GITHUB_WORKSPACE/out/deps/doxygen-build/bin" >> "$GITHUB_PATH"

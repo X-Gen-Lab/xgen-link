@@ -10,14 +10,14 @@
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_config.h>
 
+#include "test_host_allocator.h"
 #include <cstdlib>
 #include <cstring>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
-#include <xgen/memory/libc_allocator.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include "test_security_helpers.h"
 
@@ -61,7 +61,7 @@ TEST(XglDatalinkMetadataTest, RejectsDuplicateSessionExtensions) {
     header.source_id = 1;
     header.target_id = 2;
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
-    xgb_serialize_u16_le(bytes + offset, xgcrc_crc16_modbus(bytes, offset));
+    xgl_serialize_u16_le(bytes + offset, xgl_crc16_modbus(bytes, offset));
     xgl_layer_stats_t statistics = {};
     xgl_datalink_ctx_t context = {};
     xgl_datalink_config_t config = {};
@@ -123,7 +123,7 @@ static xgl_error_t datalink_test_auth_sign(const xgl_auth_input_t* input,
         acc = (acc * 33U) ^ payload[i];
     }
 
-    xgb_serialize_u32_le(tag, acc);
+    xgl_serialize_u32_le(tag, acc);
     *tag_len = 4U;
     return XGL_OK;
 }
@@ -261,7 +261,7 @@ class XglDatalinkTest : public ::testing::Test {
         config.upper_layer = nullptr;
         config.error_callback = nullptr;
         config.callback_user_data = nullptr;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         xgl_datalink_init(&ctx, &config);
     }
 
@@ -452,7 +452,7 @@ TEST_F(XglDatalinkTest, SendFramePhyError) {
 TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     CountingAllocatorState allocator_state;
     g_counting_allocator_state = &allocator_state;
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     allocator.ctx = &allocator_state;
     allocator.alloc = counting_malloc;
     allocator.free = counting_free;
@@ -495,7 +495,7 @@ TEST_F(XglDatalinkTest,
        SmallFrameReleasesAllocatorBufferAfterSuccessAndFailure) {
     CountingAllocatorState allocator_state;
     g_counting_allocator_state = &allocator_state;
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     allocator.ctx = &allocator_state;
     allocator.alloc = counting_malloc;
     allocator.free = counting_free;
@@ -544,7 +544,7 @@ TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {
     xgl_security_ctx_t security = {};
     ASSERT_EQ(xgl_security_init(&security, SOURCE_ID, true, &provider), XGL_OK);
     config.security = &security;
-    config.allocator = xgm_allocator_libc();
+    config.allocator = xgl_test_host_allocator();
     ASSERT_EQ(xgl_datalink_init(&auth_ctx, &config), XGL_OK);
 
     xgl_frame_t frame;
@@ -623,8 +623,8 @@ TEST_F(XglDatalinkTest, ProcessFrameLeavesEndToEndAuthenticationToNetwork) {
     xgl_wire_header_t header = {};
     ASSERT_EQ(xgl_wire_decode_header(&header, encoded, encoded_len), XGL_OK);
     encoded[header.header_len] ^= 0x01U;
-    uint16_t crc = xgcrc_crc16_modbus(encoded, encoded_len - XGL_CRC16_SIZE);
-    xgb_serialize_u16_le(&encoded[encoded_len - XGL_CRC16_SIZE], crc);
+    uint16_t crc = xgl_crc16_modbus(encoded, encoded_len - XGL_CRC16_SIZE);
+    xgl_serialize_u16_le(&encoded[encoded_len - XGL_CRC16_SIZE], crc);
 
     EXPECT_EQ(xgl_datalink_process_frame(&auth_ctx, encoded, encoded_len),
               XGL_OK);
@@ -775,8 +775,8 @@ TEST_F(XglDatalinkTest, ProcessFrameHasNoImplicitEndpointAuthenticationPolicy) {
     ASSERT_EQ(xgl_wire_decode_header(&header, encoded, encoded_len), XGL_OK);
     encoded[header.header_len] ^= 0x01U;
     uint16_t frame_crc =
-        xgcrc_crc16_modbus(encoded, encoded_len - XGL_CRC16_SIZE);
-    xgb_serialize_u16_le(&encoded[encoded_len - XGL_CRC16_SIZE], frame_crc);
+        xgl_crc16_modbus(encoded, encoded_len - XGL_CRC16_SIZE);
+    xgl_serialize_u16_le(&encoded[encoded_len - XGL_CRC16_SIZE], frame_crc);
 
     EXPECT_EQ(
         xgl_datalink_process_frame(&optional_auth_ctx, encoded, encoded_len),

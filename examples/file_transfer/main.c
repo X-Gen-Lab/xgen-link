@@ -3,8 +3,9 @@
  * \brief           Reliable fixed-block transfer using bounded host storage
  * \author          X-Gen Lab
  */
+#include <wire/xgl_crc16.h>
+
 #include <stdio.h>
-#include <xgen/crc/crc.h>
 
 #include "../common/sim_link.h"
 #define FILE_BYTES  1024U
@@ -88,7 +89,7 @@ int main(void) {
                     memcmp(source, application.bytes, sizeof(source)) == 0;
     printf("Fixed-block transfer: %s, CRC16=%04X (not authentication)\n",
            complete ? "PASS" : "FAIL",
-           (unsigned)xgcrc_crc16_modbus(application.bytes, application.used));
+           (unsigned)xgl_crc16_modbus(application.bytes, application.used));
     xgl_destroy(sender.handle);
     xgl_destroy(receiver.handle);
     return complete ? 0 : 4;

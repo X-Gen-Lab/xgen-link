@@ -1,18 +1,18 @@
 #include <xgl/xgl.h>
 
+#include <internal/xgl_allocator.h>
 #include <stddef.h>
 #include <string.h>
-#include <xgen/memory/allocator.h>
 
 typedef struct {
-    xgm_max_align_t alignment;
+    xgl_max_align_t alignment;
     unsigned char bytes[16384];
     size_t used;
 } smoke_storage_t;
 
 static void* smoke_alloc(void* ctx, size_t size) {
     smoke_storage_t* storage = (smoke_storage_t*)ctx;
-    const size_t alignment = _Alignof(xgm_max_align_t);
+    const size_t alignment = _Alignof(xgl_max_align_t);
     size_t start = (storage->used + alignment - 1U) & ~(alignment - 1U);
     if (start > sizeof(storage->bytes) ||
         size > sizeof(storage->bytes) - start) {
@@ -46,7 +46,7 @@ static xgl_error_t smoke_rx(uint8_t* data, size_t* len, void* ctx) {
 
 static int smoke_instance(void) {
     static smoke_storage_t storage;
-    xgm_allocator_t core = {&storage, smoke_alloc, smoke_free};
+    xgl_allocator_t core = {&storage, smoke_alloc, smoke_free};
     xgl_phy_ops_t phy = {smoke_tx, smoke_rx, NULL};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;
@@ -83,7 +83,7 @@ int main(void) {
 #error "noheap smoke must compile xgl with fallback malloc disabled"
 #endif
 
-    void* ptr = xgm_alloc(NULL, 16U);
+    void* ptr = xgl_alloc(NULL, 16U);
     if (ptr != NULL) {
         return 1;
     }

@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "xgen/containers/list.h"
+#include "internal/xgl_list.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 
@@ -52,7 +52,7 @@ typedef struct {
  * \note            Tracks fragments for a single fragmented message
  */
 typedef struct {
-    xgct_list_node_t node; /**< List node for reassembly queue */
+    xgl_list_node_t node; /**< List node for reassembly queue */
 
     /* Fragment identification */
     uint16_t source_id; /**< Source node ID */
@@ -99,13 +99,13 @@ typedef void (*xgl_fragment_timeout_callback_t)(
  */
 typedef struct {
     /* Reassembly buffers */
-    xgct_list_t reassembly_list;   /**< List of active reassembly buffers */
+    xgl_list_t reassembly_list;    /**< List of active reassembly buffers */
     size_t max_reassembly_buffers; /**< Maximum concurrent reassembly buffers */
 
     /* Memory management */
-    const xgm_allocator_t*
+    const xgl_allocator_t*
         data_allocator;               /**< Owned reassembly payload allocator */
-    const xgm_allocator_t* allocator; /**< Memory allocator */
+    const xgl_allocator_t* allocator; /**< Memory allocator */
 
     /* Configuration */
     uint32_t reassembly_timeout_ms;  /**< Reassembly timeout */
@@ -133,7 +133,7 @@ typedef struct {
 xgl_error_t xgl_fragment_init(xgl_fragment_manager_t* manager,
                               size_t max_reassembly_buffers,
                               uint32_t reassembly_timeout_ms,
-                              const xgm_allocator_t* allocator);
+                              const xgl_allocator_t* allocator);
 
 /**
  * \brief           Configure reassembly memory limits

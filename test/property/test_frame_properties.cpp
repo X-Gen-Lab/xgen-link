@@ -11,8 +11,8 @@
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include "property_framework.h"
 
@@ -340,8 +340,8 @@ TEST(XglFrameProperties, FieldValidation) {
         /* Validate CRC16 */
         size_t crc16_offset = bytes_written - 2;
         uint16_t calculated_crc16 =
-            xgcrc_crc16_modbus(buffer.data(), crc16_offset);
-        uint16_t received_crc16 = xgb_deserialize_u16_le(&buffer[crc16_offset]);
+            xgl_crc16_modbus(buffer.data(), crc16_offset);
+        uint16_t received_crc16 = xgl_deserialize_u16_le(&buffer[crc16_offset]);
         EXPECT_EQ(calculated_crc16, received_crc16)
             << "CRC16 validation failed at iteration " << iteration;
     }

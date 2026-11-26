@@ -3,8 +3,8 @@
  * \brief           Public lifecycle and bounded workspace edge contracts
  */
 
+#include "test_host_allocator.h"
 #include <gtest/gtest.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 #include "api/xgl_instance_internal.h"
@@ -44,7 +44,7 @@ xgl_auth_provider_t coverage_provider() {
 xgl_config_t coverage_config() {
     xgl_config_t config;
     xgl_config_get_preset_tiny(&config);
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
     return config;
 }
 
@@ -77,8 +77,8 @@ xgl_phy_ops_t coverage_phy(CoveragePhy* state) {
 }
 
 struct AllocationObserver {
-    const xgm_allocator_t* backing;
-    xgm_allocator_t service = {};
+    const xgl_allocator_t* backing;
+    xgl_allocator_t service = {};
     std::vector<void*> live;
     size_t attempts = 0;
     size_t fail_at = 0;
@@ -86,7 +86,7 @@ struct AllocationObserver {
     size_t releases = 0;
     size_t duplicate_releases = 0;
 
-    explicit AllocationObserver(const xgm_allocator_t* allocator)
+    explicit AllocationObserver(const xgl_allocator_t* allocator)
         : backing(allocator) {
         service.ctx = this;
         service.alloc = [](void* context, size_t size) -> void* {
@@ -96,7 +96,7 @@ struct AllocationObserver {
                 observer.attempts == observer.fail_at) {
                 return nullptr;
             }
-            void* result = xgm_alloc(observer.backing, size);
+            void* result = xgl_alloc(observer.backing, size);
             if (result != nullptr) {
                 observer.live.push_back(result);
                 ++observer.allocations;
@@ -113,7 +113,7 @@ struct AllocationObserver {
             }
             observer.live.erase(found);
             ++observer.releases;
-            xgm_free(observer.backing, pointer);
+            xgl_free(observer.backing, pointer);
         };
     }
 };
@@ -339,7 +339,7 @@ TEST(XglCoverageApi, RuntimeUsesFastestSharedPhyAndPreservesFirstReceiveError) {
 
 TEST(XglCoverageApi, InvalidAllocatorAndDriverConfigurationFailBeforeUse) {
     auto config = coverage_config();
-    xgm_allocator_t allocator = {};
+    xgl_allocator_t allocator = {};
     config.memory.allocator = &allocator;
     EXPECT_EQ(xgl_create(&config), nullptr);
     CoveragePhy state;
@@ -349,7 +349,7 @@ TEST(XglCoverageApi, InvalidAllocatorAndDriverConfigurationFailBeforeUse) {
     route.phy = &phy;
     route.max_frame_size = 128;
     route.read_freq_hz = 10;
-    config.memory.allocator = xgm_allocator_libc();
+    config.memory.allocator = xgl_test_host_allocator();
     config.route_table = &route;
     config.route_table_len = 1;
     phy.rx = nullptr;
@@ -372,7 +372,7 @@ TEST(XglCoverageApi, ReplayRejectsAnotherConnectionWithoutConsumingSequence) {
 
 #if XGL_FEATURE_AUTH
 TEST(XglCoverageApi, FailedInitializationReleasesEachAllocationOnlyOnce) {
-    AllocationObserver workspace(xgm_allocator_libc());
+    AllocationObserver workspace(xgl_test_host_allocator());
     auto config = coverage_config();
     CoveragePhy state;
     auto phy = coverage_phy(&state);

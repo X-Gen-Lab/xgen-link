@@ -12,8 +12,8 @@
 #include <cstring>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <internal/xgl_allocator.h>
 #include <vector>
-#include <xgen/memory/allocator.h>
 
 #include "../mocks/mock_allocator.h"
 #include "../mocks/mock_phy.h"
@@ -124,9 +124,9 @@ static void verify_static_workspace(bool fragmentation) {
 
     xgl_memory_requirements_t required{};
     ASSERT_EQ(xgl_memory_requirements(&config_a, &required), XGL_OK);
-    const size_t words = (required.size + sizeof(xgm_max_align_t) - 1U) /
-                         sizeof(xgm_max_align_t);
-    std::vector<xgm_max_align_t> storage_a(words), storage_b(words);
+    const size_t words = (required.size + sizeof(xgl_max_align_t) - 1U) /
+                         sizeof(xgl_max_align_t);
+    std::vector<xgl_max_align_t> storage_a(words), storage_b(words);
     std::vector<uint8_t> payload(fragmentation ? 300U : 1U, 0x65U);
     xgl_tx_data_t tx{};
     tx.target_id = 2U;

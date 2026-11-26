@@ -8,12 +8,11 @@ import tempfile
 import unittest
 
 
-PACKAGES = ("status", "bytes", "crc", "memory", "containers")
 ARGS = None
 
 
 class ProfileBuilds(unittest.TestCase):
-    """Build real protocol targets using explicitly prepared dependencies."""
+    """Build and exercise real protocol targets."""
 
     @classmethod
     def setUpClass(cls):
@@ -43,7 +42,7 @@ class ProfileBuilds(unittest.TestCase):
 
     def configure(self, name, profile, *, tests=False, multi=False, examples=False):
         binary = self.root / name
-        command = ["cmake", "-S", ARGS.link_source / "dev", "-B", binary,
+        command = ["cmake", "-S", ARGS.link_source, "-B", binary,
                    "-G", "Ninja Multi-Config" if multi else "Ninja",
                    f"-DXGL_PROFILE={profile}", "-DCMAKE_BUILD_TYPE=Debug",
                    f"-DXGL_BUILD_TESTS={'ON' if tests else 'OFF'}",
@@ -55,9 +54,6 @@ class ProfileBuilds(unittest.TestCase):
                    "-DXGL_BUILD_SDK_CONSUMER_SMOKE=ON",
                    "-DXGL_BUILD_RELEASE_VALIDATION_TARGET=ON",
                    "-DXGL_ALLOW_FALLBACK_MALLOC=OFF"]
-        for package in PACKAGES:
-            command.append(f"-DXGL_DEV_{package.upper()}_SOURCE_DIR="
-                           f"{getattr(ARGS, package + '_source').as_posix()}")
         if ARGS.gtest_dir:
             command.append(f"-DGTest_DIR={ARGS.gtest_dir.as_posix()}")
         if ARGS.c_compiler:
@@ -91,7 +87,7 @@ class ProfileBuilds(unittest.TestCase):
             with self.subTest(configuration=configuration):
                 self.execute("cmake", "--build", binary, "--config", configuration,
                              "--target", "xgl_release_validation", "--parallel", "2")
-                installed = (binary / "link/sdk-consumer-smoke-ctest" / configuration
+                installed = (binary / "sdk-consumer-smoke-ctest" / configuration
                              / "install/lib/cmake/xgl")
                 self.assertTrue((installed / f"xglTargets-{configuration.lower()}.cmake").is_file())
 
@@ -111,7 +107,7 @@ class ProfileBuilds(unittest.TestCase):
         self.execute("cmake", "--build", binary, "--parallel", "2")
         self.execute("ctest", "--test-dir", binary, "--output-on-failure",
                      "--no-tests=error")
-        config = (binary / "link/generated/xgl/xgl_build_config.h").read_text()
+        config = (binary / "generated/xgl/xgl_build_config.h").read_text()
         for definition in ("XGL_BUILD_CONFIG_ID 304U", "XGL_FEATURE_AUTH 0",
                            "XGL_FEATURE_FORWARDING 0", "XGL_FEATURE_FRAGMENTATION 1",
                            "XGL_FEATURE_OUT_OF_ORDER 1"):
@@ -121,7 +117,7 @@ class ProfileBuilds(unittest.TestCase):
         binary = self.configure("lite-package", "embedded-lite")
         self.execute("cmake", "--build", binary, "--target", "xgl_sdk_consumer_smoke",
                      "--parallel", "2")
-        prefix = binary / "link/sdk-consumer-smoke/Debug/install"
+        prefix = binary / "sdk-consumer-smoke/Debug/install"
         source = self.root / "capability-consumer"
         source.mkdir()
         (source / "CMakeLists.txt").write_text(
@@ -153,8 +149,6 @@ if __name__ == "__main__":
     parser.add_argument("--gtest-dir", type=Path)
     parser.add_argument("--c-compiler")
     parser.add_argument("--cxx-compiler")
-    for package in PACKAGES:
-        parser.add_argument(f"--{package}-source", type=Path, required=True)
     ARGS, remaining = parser.parse_known_args()
     for name, value in vars(ARGS).items():
         if isinstance(value, Path):

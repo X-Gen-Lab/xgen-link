@@ -9,7 +9,6 @@ import tempfile
 import unittest
 
 
-PACKAGES = ("status", "bytes", "crc", "memory", "containers")
 ARGS = None
 
 
@@ -51,9 +50,6 @@ class FootprintLto(unittest.TestCase):
                    "-DCMAKE_BUILD_TYPE=MinSizeRel", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
         if enabled:
             command.append("-DXGL_FOOTPRINT_LTO=ON")
-        for package in PACKAGES:
-            command.append(f"-DXGL_DEV_{package.upper()}_SOURCE_DIR="
-                           f"{getattr(ARGS, package + '_source').as_posix()}")
         self.execute(*command)
         return binary
 
@@ -129,8 +125,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--link-source", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, required=True)
-    for package in PACKAGES:
-        parser.add_argument(f"--{package}-source", type=Path, required=True)
     ARGS, remaining = parser.parse_known_args()
     for name, value in vars(ARGS).items():
         if isinstance(value, Path):

@@ -3,9 +3,9 @@
  * \brief           Fragment reliability, timeout and scope ownership contracts
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include <array>
 #include <gtest/gtest.h>
@@ -51,7 +51,7 @@ class XglTransportFragmentScopeTest : public ::testing::Test {
     void SetUp() override {
         lower = {this, SendPacket};
         xgl_transport_config_t config = {};
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.local_id = 1U;
         config.max_peers = 3U;
         config.max_tx_packets = 4U;

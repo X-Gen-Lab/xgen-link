@@ -1,4 +1,4 @@
-#include <xgen/memory/libc_allocator.h>
+#include "test_host_allocator.h"
 /**
  * \file            test_reliable.cpp
  * \brief           Reliable transmission unit tests
@@ -53,7 +53,7 @@ static_assert(
 class XglReliableTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        xgl_reliable_init(&queue, xgm_allocator_libc());
+        xgl_reliable_init(&queue, xgl_test_host_allocator());
     }
 
     void TearDown() override {
@@ -69,7 +69,7 @@ class XglReliableTest : public ::testing::Test {
 
 TEST_F(XglReliableTest, InitializeQueue) {
     xgl_reliable_queue_t q;
-    xgl_error_t err = xgl_reliable_init(&q, xgm_allocator_libc());
+    xgl_error_t err = xgl_reliable_init(&q, xgl_test_host_allocator());
 
     EXPECT_EQ(err, XGL_OK);
     EXPECT_TRUE(xgl_reliable_is_empty(&q));
@@ -79,7 +79,7 @@ TEST_F(XglReliableTest, InitializeQueue) {
 }
 
 TEST_F(XglReliableTest, InitializeWithNullPointer) {
-    xgl_error_t err = xgl_reliable_init(nullptr, xgm_allocator_libc());
+    xgl_error_t err = xgl_reliable_init(nullptr, xgl_test_host_allocator());
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
 

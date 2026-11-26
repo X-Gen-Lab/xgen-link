@@ -3,7 +3,7 @@
  * \brief           Owned out-of-order packet storage
  */
 
-#include "xgen/memory/allocator.h"
+#include "internal/xgl_allocator.h"
 #include "xgl_transport_rx_internal.h"
 #include <string.h>
 
@@ -21,8 +21,8 @@ void transport_free_rx_buffered_packet(
         return;
     }
 
-    xgm_free(ctx->memory.rx_payload, buffered->storage);
-    xgm_free(ctx->memory.rx_packet, buffered);
+    xgl_free(ctx->memory.rx_payload, buffered->storage);
+    xgl_free(ctx->memory.rx_packet, buffered);
 }
 
 #endif
@@ -83,7 +83,7 @@ transport_copy_rx_buffered_packet(const xgl_transport_ctx_t* ctx,
                                   uint32_t packet_number) {
     const size_t payload_len = packet->data->data_len;
     const size_t extensions_len = packet->extensions_len;
-    buffered->storage = (uint8_t*)xgm_alloc(ctx->memory.rx_payload,
+    buffered->storage = (uint8_t*)xgl_alloc(ctx->memory.rx_payload,
                                             payload_len + extensions_len);
     if (buffered->storage == NULL) {
         return XGL_ERR_NO_MEMORY;
@@ -163,7 +163,7 @@ xgl_error_t transport_cache_out_of_order_packet(
     }
 
     xgl_transport_rx_buffered_packet_t* buffered =
-        (xgl_transport_rx_buffered_packet_t*)xgm_alloc(ctx->memory.rx_packet,
+        (xgl_transport_rx_buffered_packet_t*)xgl_alloc(ctx->memory.rx_packet,
                                                        sizeof(*buffered));
     if (buffered == NULL) {
         return XGL_ERR_NO_MEMORY;

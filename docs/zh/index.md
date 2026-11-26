@@ -1,20 +1,15 @@
-# xgen-link SDK 3
+# XGen Link SDK
 
-具有显式资源上限的可移植 C11 协议。通用能力由独立的 xgen-status、xgen-bytes、xgen-crc、xgen-memory、xgen-containers 提供；准备方式见[构建与测试](getting-started/build-and-test.md)。
+XGen Link 为嵌入式系统提供 C11 通信协议、显式有界存储与可靠传输。产品提供 PHY、时间和执行者。
 
-## 架构
+| 任务 | 入口 |
+| --- | --- |
+| 第一次运行 | [跑通收发](tutorials/first-link.md) |
+| 构建、安装和接入工程 | [构建与消费](guides/build-and-consume.md) |
+| 配置容量和硬件接口 | [配置](guides/configuration.md)、[移植](guides/porting.md) |
+| 接入 Boot 传输 | [Boot 接入](guides/boot.md) |
+| 了解架构及资源 | [架构](explanation/architecture.md)、[资源模型](explanation/resource-model.md) |
+| 查 API 与协议 | [公开 API](reference/api.md)、[wire v3](reference/protocol/v3/index.md) |
+| 开发和验证 | [开发工作流](development/workflow.md)、[验证](development/validation.md) |
 
-静态初始化和 allocator 初始化共用工作区布局及状态机。应用提供时间、串行访问实例并实现同步 PHY 回调。wire v3 分离可靠 DATA 编号与认证安全序号。
-
-## 阅读入口
-
-- [构建与测试](getting-started/build-and-test.md)
-- [快速开始](getting-started/quick-start.md)
-- [迁移指南](guide/modular-migration.md)
-- [公开 API](reference/public-api.md)
-- [架构](protocol/architecture.md)
-- [验证矩阵](reference/validation-matrix.md)
-
-## 产品边界
-
-Boot 裁剪认证、分片、转发及乱序缓存；Embedded/Full 提供这些有界能力。压缩、payload 加密和异步 DMA 所有权接口未实现。PHY TX 返回前必须消费或复制字节。板级接入与生产认证需要应用专属验证。
+[English](../en/index.md)

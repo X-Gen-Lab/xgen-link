@@ -21,9 +21,11 @@ class XglBoundedProfileTest : public ::testing::Test {
         std::vector<uint8_t> incoming;
         std::vector<uint8_t> delivered;
         unsigned deliveries = 0U;
+        bool drop_next_transmission = false;
+        bool reject_delivery = false;
     } a, b;
 
-    std::array<xgm_max_align_t, 4096> storage_a{}, storage_b{};
+    std::array<xgl_max_align_t, 4096> storage_a{}, storage_b{};
     xgl_phy_ops_t phy_a{Transmit, Receive, &a};
     xgl_phy_ops_t phy_b{Transmit, Receive, &b};
     xgl_route_item_t route_a{2U, &phy_a, 128U, 1000U, 0U};
@@ -35,6 +37,10 @@ class XglBoundedProfileTest : public ::testing::Test {
     static xgl_error_t Transmit(const uint8_t* data, size_t len,
                                 void* context) {
         auto* endpoint = static_cast<Endpoint*>(context);
+        if (endpoint->drop_next_transmission) {
+            endpoint->drop_next_transmission = false;
+            return XGL_OK;
+        }
         endpoint->remote->incoming.insert(endpoint->remote->incoming.end(),
                                           data, data + len);
         return XGL_OK;
@@ -56,6 +62,16 @@ class XglBoundedProfileTest : public ::testing::Test {
         auto* endpoint = static_cast<Endpoint*>(context);
         endpoint->delivered.assign(data, data + len);
         ++endpoint->deliveries;
+    }
+
+    static xgl_error_t Accept(xgl_handle_t handle, uint16_t source,
+                              uint8_t type, const uint8_t* data, size_t len,
+                              void* context) {
+        if (static_cast<Endpoint*>(context)->reject_delivery) {
+            return XGL_ERR_BUSY;
+        }
+        Deliver(handle, source, type, data, len, context);
+        return XGL_OK;
     }
 
     void SetUp() override {
@@ -86,20 +102,20 @@ class XglBoundedProfileTest : public ::testing::Test {
         xgl_destroy(handle_b);
     }
 
-    xgl_error_t Send(const uint8_t* data, size_t len) {
+    xgl_error_t Send(const uint8_t* data, size_t len, uint32_t now_ms = 0U) {
         xgl_tx_data_t request{};
         request.target_id = 2U;
         request.data = data;
         request.data_len = len;
         request.reliable = true;
-        return xgl_send_at(handle_a, &request, 0U);
+        return xgl_send_at(handle_a, &request, now_ms);
     }
 
-    void Drive(unsigned steps = 16U) {
+    void Drive(unsigned steps = 16U, uint32_t now_ms = 0U) {
         const xgl_work_budget_t budget{128U, 100U};
-        for (unsigned now = 0U; now < steps; ++now) {
-            ASSERT_EQ(xgl_step(handle_b, now, &budget), XGL_OK);
-            ASSERT_EQ(xgl_step(handle_a, now, &budget), XGL_OK);
+        for (unsigned i = 0U; i < steps; ++i, ++now_ms) {
+            ASSERT_EQ(xgl_step(handle_b, now_ms, &budget), XGL_OK);
+            ASSERT_EQ(xgl_step(handle_a, now_ms, &budget), XGL_OK);
         }
     }
 };
@@ -113,6 +129,57 @@ TEST_F(XglBoundedProfileTest, ReliableDeliveryUsesExplicitStorage) {
     EXPECT_EQ(b.deliveries, 1U);
     EXPECT_EQ(b.delivered,
               std::vector<uint8_t>(payload, payload + sizeof(payload)));
+}
+
+TEST_F(XglBoundedProfileTest, LostAckRetransmitsWithoutRedelivery) {
+    Initialize();
+    const uint8_t first = 3U;
+    const uint8_t second = 5U;
+    b.drop_next_transmission = true;
+
+    ASSERT_EQ(Send(&first, 1U), XGL_OK);
+    EXPECT_EQ(Send(&second, 1U), XGL_ERR_WINDOW_FULL);
+    Drive();
+    EXPECT_FALSE(b.drop_next_transmission);
+    EXPECT_EQ(b.deliveries, 1U);
+    EXPECT_EQ(Send(&second, 1U, 16U), XGL_ERR_WINDOW_FULL);
+
+    const uint32_t retry_at = config_a.protocol.ack_timeout_ms;
+    Drive(16U, retry_at);
+    EXPECT_EQ(b.deliveries, 1U);
+    EXPECT_EQ(b.delivered, std::vector<uint8_t>{first});
+
+    ASSERT_EQ(Send(&second, 1U, retry_at + 16U), XGL_OK);
+    Drive(16U, retry_at + 16U);
+    EXPECT_EQ(b.deliveries, 2U);
+    EXPECT_EQ(b.delivered, std::vector<uint8_t>{second});
+}
+
+TEST_F(XglBoundedProfileTest, BusyReceiverRetainsSenderWindowUntilRetry) {
+    config_b.rx_accept_callback = Accept;
+    b.reject_delivery = true;
+    Initialize();
+    const uint8_t payload = 7U;
+    ASSERT_EQ(Send(&payload, 1U), XGL_OK);
+
+    const xgl_work_budget_t budget{128U, 100U};
+    bool rejected = false;
+    for (uint32_t now_ms = 0U; now_ms < 16U; ++now_ms) {
+        const xgl_error_t result = xgl_step(handle_b, now_ms, &budget);
+        ASSERT_TRUE(result == XGL_OK || result == XGL_ERR_BUSY);
+        rejected |= result == XGL_ERR_BUSY;
+        ASSERT_EQ(xgl_step(handle_a, now_ms, &budget), XGL_OK);
+    }
+    EXPECT_TRUE(rejected);
+    EXPECT_EQ(b.deliveries, 0U);
+    EXPECT_EQ(Send(&payload, 1U, 16U), XGL_ERR_WINDOW_FULL);
+
+    b.reject_delivery = false;
+    const uint32_t retry_at = config_a.protocol.ack_timeout_ms;
+    Drive(16U, retry_at);
+    EXPECT_EQ(b.deliveries, 1U);
+    EXPECT_EQ(b.delivered, std::vector<uint8_t>{payload});
+    EXPECT_EQ(Send(&payload, 1U, retry_at + 16U), XGL_OK);
 }
 
 TEST_F(XglBoundedProfileTest, RejectsUnsupportedAuthentication) {

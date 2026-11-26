@@ -34,7 +34,7 @@ class MockAllocator {
     /**
      * \brief           Get C-style allocator interface
      */
-    const xgm_allocator_t* get_allocator() {
+    const xgl_allocator_t* get_allocator() {
         service_.ctx = this;
         service_.alloc = [](void* ctx, size_t size) -> void* {
             return static_cast<MockAllocator*>(ctx)->malloc_wrapper(size);
@@ -85,7 +85,7 @@ class MockAllocator {
         }
     }
 
-    xgm_allocator_t service_{};
+    xgl_allocator_t service_{};
     std::map<void*, size_t> allocations_;
     size_t total_allocated_;
     size_t total_freed_;

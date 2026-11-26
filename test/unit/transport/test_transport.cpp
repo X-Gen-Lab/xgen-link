@@ -1,4 +1,4 @@
-#include <xgen/memory/libc_allocator.h>
+#include "test_host_allocator.h"
 /**
  * \file            test_transport.cpp
  * \brief           Transport layer unit tests
@@ -126,7 +126,7 @@ static xgl_transport_config_t
 make_transport_config(xgl_packet_tx_endpoint_t* lower_layer,
                       xgl_layer_stats_t* stats, uint64_t* tx_retries) {
     xgl_transport_config_t config = {};
-    config.allocator = xgm_allocator_libc();
+    config.allocator = xgl_test_host_allocator();
     config.max_peers = 32;
     config.max_message_size = 65535;
     config.max_reassembly_slots = 8;
@@ -1022,7 +1022,7 @@ TEST(XglTransportTest, ReliableSendDoesNotTransmitWhenQueueAdmissionFails) {
               XGL_OK);
     xgl_window_reset(&peer->tx_window);
 
-    xgm_allocator_t failing_allocator = {};
+    xgl_allocator_t failing_allocator = {};
     failing_allocator.ctx = nullptr;
     failing_allocator.alloc = always_fail_malloc;
     failing_allocator.free = always_fail_free;
@@ -1034,7 +1034,7 @@ TEST(XglTransportTest, ReliableSendDoesNotTransmitWhenQueueAdmissionFails) {
     EXPECT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 0U);
     EXPECT_TRUE(xgl_window_can_send_packet_number(&peer->tx_window));
 
-    peer->reliable_queue.allocator = xgm_allocator_libc();
+    peer->reliable_queue.allocator = xgl_test_host_allocator();
     xgl_transport_destroy(&ctx);
 }
 
@@ -1973,7 +1973,7 @@ TEST(XglTransportTest, SendPlanUsesRouteMtuAndAuthBudget) {
 
     xgl_route_table_t route_table;
     xgl_phy_ops_t phy = {};
-    ASSERT_EQ(xgl_route_table_init(&route_table, 4, xgm_allocator_libc()),
+    ASSERT_EQ(xgl_route_table_init(&route_table, 4, xgl_test_host_allocator()),
               XGL_OK);
     ASSERT_EQ(xgl_route_table_add(&route_table, 2, &phy, 80, 100, 1), XGL_OK);
     config.route_table = &route_table;
@@ -2307,10 +2307,10 @@ TEST(XglTransportTest,
 
     xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
     ASSERT_NE(peer, nullptr);
-    xgct_list_node_t* node = nullptr;
-    XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+    xgl_list_node_t* node = nullptr;
+    XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
         xgl_reliable_packet_t* packet =
-            XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         packet->send_timestamp = 200;
     }
     xgl_reliable_packet_t* queued = xgl_reliable_find_packet_number(
@@ -2839,7 +2839,7 @@ TEST_F(TransportRegressionTest, InitRequiresExplicitAllocatorAndCapacities) {
     auto config = make_transport_config(&lower, &stats, &retries);
     config.allocator = nullptr;
     EXPECT_EQ(xgl_transport_init(&ctx, &config), XGL_ERR_NULL_POINTER);
-    config.allocator = xgm_allocator_libc();
+    config.allocator = xgl_test_host_allocator();
     config.max_peers = 0;
     EXPECT_EQ(xgl_transport_init(&ctx, &config), XGL_ERR_INVALID_PARAM);
     config.max_peers = 1;

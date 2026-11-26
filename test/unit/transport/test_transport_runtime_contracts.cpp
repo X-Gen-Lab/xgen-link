@@ -3,10 +3,10 @@
  * \brief           Deferred transport work and observable maintenance failures
  */
 
+#include "test_host_allocator.h"
 #include <api/xgl_instance_internal.h>
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include <array>
 #include <gtest/gtest.h>
@@ -80,7 +80,7 @@ class XglTransportRuntimeTest : public ::testing::Test {
         config.lower_layer = &lower;
         config.stats = &statistics;
         config.tx_retries = &retries;
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.error_callback = Error;
         config.rx_accept_callback = Accept;
         config.callback_user_data = this;
@@ -157,6 +157,7 @@ class XglTransportRuntimeTest : public ::testing::Test {
     }
 };
 
+#if XGL_BUILD_WINDOW_CAPACITY >= 4
 TEST_F(XglTransportRuntimeTest, SackCommitsAckAndDefersTransmissionUntilRun) {
     Init();
     ASSERT_EQ(Send(), XGL_OK);
@@ -247,6 +248,7 @@ TEST_F(XglTransportRuntimeTest, RetryLimitIsReturnedOnceAtTerminalTransition) {
     ASSERT_EQ(errors.size(), 1U);
     EXPECT_EQ(errors.front(), XGL_ERR_ACK_TIMEOUT);
 }
+#endif
 
 #if XGL_FEATURE_OUT_OF_ORDER
 TEST_F(XglTransportRuntimeTest, BufferedDeliveryReturnsAckBusyAfterAcceptance) {
@@ -407,7 +409,7 @@ TEST(XglTransportPublicRuntimeTest, StepReturnsHardRetryAndExhaustionErrors) {
         route.read_freq_hz = 1000U;
         xgl_config_t config;
         xgl_config_get_preset_boot(&config);
-        config.memory.allocator = xgm_allocator_libc();
+        config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;
         config.protocol.max_retry_count = 1U;

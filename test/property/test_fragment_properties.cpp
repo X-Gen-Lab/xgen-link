@@ -8,17 +8,17 @@
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_error.h>
 
+#include "test_host_allocator.h"
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/memory/libc_allocator.h>
 
 #include "property_framework.h"
 
 TEST(XglFragmentProperties, ManagerInitialization) {
     xgl_fragment_manager_t manager = {};
     xgl_error_t err =
-        xgl_fragment_init(&manager, 10, 5000, xgm_allocator_libc());
+        xgl_fragment_init(&manager, 10, 5000, xgl_test_host_allocator());
     ASSERT_EQ(err, XGL_OK);
     EXPECT_EQ(manager.current_reassembly_bytes, 0U);
 
@@ -26,7 +26,7 @@ TEST(XglFragmentProperties, ManagerInitialization) {
 }
 
 TEST(XglFragmentProperties, ManagerInitInvalidParameters) {
-    EXPECT_EQ(xgl_fragment_init(nullptr, 10, 5000, xgm_allocator_libc()),
+    EXPECT_EQ(xgl_fragment_init(nullptr, 10, 5000, xgl_test_host_allocator()),
               XGL_ERR_NULL_POINTER);
 }
 
@@ -58,7 +58,7 @@ TEST(XglFragmentProperties, MessageIdAssignmentIsMonotonic32Bit) {
     };
     xgl_layer_stats_t stats = {};
     xgl_transport_config_t config = {};
-    config.allocator = xgm_allocator_libc();
+    config.allocator = xgl_test_host_allocator();
     config.local_id = 1;
     config.max_peers = 1;
     config.max_tx_packets = 1;
@@ -95,8 +95,9 @@ TEST(XglFragmentProperties, FragmentExtensionReassemblyRoundTrip) {
     for (int iteration = 0; iteration < XGL_PROPERTY_TEST_ITERATIONS;
          ++iteration) {
         xgl_fragment_manager_t manager = {};
-        ASSERT_EQ(xgl_fragment_init(&manager, 10, 5000, xgm_allocator_libc()),
-                  XGL_OK);
+        ASSERT_EQ(
+            xgl_fragment_init(&manager, 10, 5000, xgl_test_host_allocator()),
+            XGL_OK);
 
         size_t total_len = 2U + (gen.random_uint32() % 128U);
         std::vector<uint8_t> data = gen.random_bytes(total_len);

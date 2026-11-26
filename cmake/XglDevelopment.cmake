@@ -2,15 +2,12 @@
 if(XGL_BUILD_NOHEAP_SMOKE)
     add_library(xgl_noheap STATIC ${XGL_SOURCES})
     target_compile_features(xgl_noheap PUBLIC c_std_11)
-    target_link_libraries(xgl_noheap PUBLIC xgm::allocator
-        PRIVATE ${XGL_PRIVATE_DEPENDENCIES})
     target_compile_options(xgl_noheap PRIVATE ${XGL_C_WARNINGS})
     target_compile_definitions(xgl_noheap PUBLIC XGL_ALLOW_FALLBACK_MALLOC=0)
     target_include_directories(xgl_noheap
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
-            $<INSTALL_INTERFACE:include>
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
@@ -18,6 +15,7 @@ if(XGL_BUILD_NOHEAP_SMOKE)
     if(NOT XGL_PROFILE STREQUAL "boot")
         add_executable(xgl_noheap_smoke tools/noheap_smoke.c)
         target_link_libraries(xgl_noheap_smoke PRIVATE xgl_noheap)
+        target_include_directories(xgl_noheap_smoke PRIVATE src)
     endif()
     add_executable(xgl_static_workspace_smoke tools/static_workspace_smoke.c)
     target_link_libraries(xgl_static_workspace_smoke PRIVATE xgl_noheap)
@@ -54,32 +52,14 @@ if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
 endif()
 
 if(XGL_BUILD_SDK_CONSUMER_SMOKE)
-    if(NOT DEFINED XGL_SDK_INSTALL_BINARY_DIR)
-        set(XGL_SDK_INSTALL_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-    endif()
-    # An SDK built against installed dependencies does not install them again.
-    # Preserve their explicit discovery locations for the isolated consumer.
-    set(XGL_SDK_DEPENDENCY_HINTS "${CMAKE_CURRENT_BINARY_DIR}/sdk-dependency-hints.cmake")
-    file(WRITE "${XGL_SDK_DEPENDENCY_HINTS}"
-        "set(XGL_UPSTREAM_PREFIX_PATH [==[${CMAKE_PREFIX_PATH}]==])\n")
-    foreach(dependency STATUS BYTES CRC MEMORY CONTAINERS)
-        string(TOLOWER "${dependency}" package_suffix)
-        set(package_dir "xgen_${package_suffix}_DIR")
-        if(DEFINED ${package_dir} AND IS_DIRECTORY "${${package_dir}}")
-            file(APPEND "${XGL_SDK_DEPENDENCY_HINTS}"
-                "set(${package_dir} [==[${${package_dir}}]==] CACHE PATH \"Explicit dependency package\")\n")
-        endif()
-    endforeach()
     add_custom_target(xgl_sdk_consumer_smoke
         COMMAND ${CMAKE_COMMAND}
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
-            -D XGL_INSTALL_BINARY_DIR=${XGL_SDK_INSTALL_BINARY_DIR}
             -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke/$<CONFIG>
             -D XGL_BUILD_CONFIG=$<CONFIG>
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
-            -D XGL_DEPENDENCY_HINTS=${XGL_SDK_DEPENDENCY_HINTS}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
-        DEPENDS xgl ${XGL_SDK_DEPENDENCY_TARGETS}
+        DEPENDS xgl
         COMMENT "Validating installed xgl CMake package with a consumer project"
         VERBATIM
     )
@@ -90,11 +70,9 @@ if(XGL_BUILD_SDK_CONSUMER_SMOKE)
     add_test(NAME xgl_sdk_consumer_smoke
         COMMAND ${CMAKE_COMMAND}
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
-            -D XGL_INSTALL_BINARY_DIR=${XGL_SDK_INSTALL_BINARY_DIR}
             -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest/$<CONFIG>
             -D XGL_BUILD_CONFIG=$<CONFIG>
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
-            -D XGL_DEPENDENCY_HINTS=${XGL_SDK_DEPENDENCY_HINTS}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdk_consumer_smoke.cmake
     )
     set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES

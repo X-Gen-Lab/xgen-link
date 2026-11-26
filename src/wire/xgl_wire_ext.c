@@ -4,9 +4,9 @@
  */
 
 #include <wire/xgl_wire.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include <string.h>
-#include <xgen/bytes/bytes.h>
 
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
@@ -162,9 +162,9 @@ xgl_error_t xgl_wire_encode_fragment_ext_value(
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    xgb_serialize_u32_le(&buffer[0], message_id);
-    xgb_serialize_u32_le(&buffer[4], fragment_offset);
-    xgb_serialize_u32_le(&buffer[8], message_len);
+    xgl_serialize_u32_le(&buffer[0], message_id);
+    xgl_serialize_u32_le(&buffer[4], fragment_offset);
+    xgl_serialize_u32_le(&buffer[8], message_len);
     *bytes_written = XGL_FRAGMENT_EXT_VALUE_SIZE;
 
     return XGL_OK;
@@ -184,9 +184,9 @@ xgl_error_t xgl_wire_decode_fragment_ext_value(const uint8_t* buffer,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    *message_id = xgb_deserialize_u32_le(&buffer[0]);
-    *fragment_offset = xgb_deserialize_u32_le(&buffer[4]);
-    *message_len = xgb_deserialize_u32_le(&buffer[8]);
+    *message_id = xgl_deserialize_u32_le(&buffer[0]);
+    *fragment_offset = xgl_deserialize_u32_le(&buffer[4]);
+    *message_len = xgl_deserialize_u32_le(&buffer[8]);
 
     return XGL_OK;
 }
@@ -207,8 +207,8 @@ xgl_error_t xgl_wire_encode_session_ext_value(uint8_t* buffer,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    xgb_serialize_u32_le(&buffer[0], session_epoch);
-    xgb_serialize_u64_le(&buffer[4], incarnation_id);
+    xgl_serialize_u32_le(&buffer[0], session_epoch);
+    xgl_serialize_u64_le(&buffer[4], incarnation_id);
     *bytes_written = XGL_SESSION_EXT_VALUE_SIZE;
 
     return XGL_OK;
@@ -226,8 +226,8 @@ xgl_error_t xgl_wire_decode_session_ext_value(const uint8_t* buffer,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    *session_epoch = xgb_deserialize_u32_le(&buffer[0]);
-    *incarnation_id = xgb_deserialize_u64_le(&buffer[4]);
+    *session_epoch = xgl_deserialize_u32_le(&buffer[0]);
+    *incarnation_id = xgl_deserialize_u64_le(&buffer[4]);
 
     return XGL_OK;
 }
@@ -251,8 +251,8 @@ xgl_wire_encode_security_ext_value(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    xgb_serialize_u32_le(&buffer[0], key_id);
-    xgb_serialize_u64_le(&buffer[4], nonce_id);
+    xgl_serialize_u32_le(&buffer[0], key_id);
+    xgl_serialize_u64_le(&buffer[4], nonce_id);
     buffer[12] = tag_len;
     *bytes_written = XGL_SECURITY_EXT_VALUE_SIZE;
 
@@ -273,8 +273,8 @@ xgl_error_t xgl_wire_decode_security_ext_value(const uint8_t* buffer,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    *key_id = xgb_deserialize_u32_le(&buffer[0]);
-    *nonce_id = xgb_deserialize_u64_le(&buffer[4]);
+    *key_id = xgl_deserialize_u32_le(&buffer[0]);
+    *nonce_id = xgl_deserialize_u64_le(&buffer[4]);
     *tag_len = buffer[12];
     if (*tag_len == 0U) {
         return XGL_ERR_INVALID_FRAME;
@@ -300,10 +300,10 @@ xgl_error_t xgl_wire_encode_route_ext_value(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    xgb_serialize_u16_le(&buffer[0], previous_hop);
-    xgb_serialize_u16_le(&buffer[2], next_hop);
-    xgb_serialize_u32_le(&buffer[4], route_epoch);
-    xgb_serialize_u16_le(&buffer[8], metric);
+    xgl_serialize_u16_le(&buffer[0], previous_hop);
+    xgl_serialize_u16_le(&buffer[2], next_hop);
+    xgl_serialize_u32_le(&buffer[4], route_epoch);
+    xgl_serialize_u16_le(&buffer[8], metric);
     *bytes_written = 10U;
 
     return XGL_OK;
@@ -322,10 +322,10 @@ xgl_wire_decode_route_ext_value(const uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_INVALID_FRAME;
     }
 
-    *previous_hop = xgb_deserialize_u16_le(&buffer[0]);
-    *next_hop = xgb_deserialize_u16_le(&buffer[2]);
-    *route_epoch = xgb_deserialize_u32_le(&buffer[4]);
-    *metric = xgb_deserialize_u16_le(&buffer[8]);
+    *previous_hop = xgl_deserialize_u16_le(&buffer[0]);
+    *next_hop = xgl_deserialize_u16_le(&buffer[2]);
+    *route_epoch = xgl_deserialize_u32_le(&buffer[4]);
+    *metric = xgl_deserialize_u16_le(&buffer[8]);
 
     return XGL_OK;
 }

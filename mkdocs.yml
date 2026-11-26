@@ -1,5 +1,5 @@
 site_name: XGL
-site_description: Production-grade MCU multi-node reliable protocol stack
+site_description: Bounded C11 communication for embedded systems
 site_author: X-Gen Lab
 site_url: https://x-gen-lab.github.io/xgen-link/
 repo_name: xgen-link
@@ -16,6 +16,7 @@ exclude_docs: |
 theme:
   name: material
   language: zh
+  font: false
   features:
     - navigation.tabs
     - navigation.sections
@@ -31,10 +32,10 @@ theme:
 extra:
   alternate:
     - name: 简体中文
-      link: https://x-gen-lab.github.io/xgen-link/zh/
+      link: zh/
       lang: zh
     - name: English
-      link: https://x-gen-lab.github.io/xgen-link/en/
+      link: en/
       lang: en
 
 plugins:
@@ -57,113 +58,133 @@ markdown_extensions:
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
 
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    anchors: warn
+
+not_in_nav: |
+  /en/getting-started/build-and-test.md
+  /en/getting-started/quick-start.md
+  /en/guide/kconfig.md
+  /en/guide/modular-migration.md
+  /en/guide/porting.md
+  /en/guide/thread-safety.md
+  /en/protocol/architecture.md
+  /en/protocol/codec.md
+  /en/protocol/extensions.md
+  /en/protocol/reliability.md
+  /en/protocol/security.md
+  /en/protocol/wire-format.md
+  /en/reference/datalink-optimization.md
+  /en/reference/public-api.md
+  /en/reference/validation-matrix.md
+  /en/reference/wire-optimization.md
+  /zh/getting-started/build-and-test.md
+  /zh/getting-started/quick-start.md
+  /zh/guide/kconfig.md
+  /zh/guide/modular-migration.md
+  /zh/guide/porting.md
+  /zh/guide/thread-safety.md
+  /zh/protocol/architecture.md
+  /zh/protocol/codec.md
+  /zh/protocol/extensions.md
+  /zh/protocol/reliability.md
+  /zh/protocol/security.md
+  /zh/protocol/wire-format.md
+  /zh/reference/datalink-optimization.md
+  /zh/reference/public-api.md
+  /zh/reference/validation-matrix.md
+  /zh/reference/wire-optimization.md
+
 nav:
   - Home: index.md
   - 简体中文:
       - 首页: zh/index.md
-      - 快速开始:
-          - 快速开始: zh/getting-started/quick-start.md
-          - 构建与测试: zh/getting-started/build-and-test.md
-          - 示例: zh/getting-started/examples.md
-      - 协议规范:
-          - 概览: zh/protocol/overview.md
-          - 架构设计: zh/protocol/architecture.md
-          - 实现映射: zh/protocol/implementation-map.md
-          - 状态机: zh/protocol/state-machines.md
-          - Wire Format: zh/protocol/wire-format.md
-          - TLV 扩展: zh/protocol/extensions.md
-          - 可靠传输: zh/protocol/reliability.md
-          - 安全模型: zh/protocol/security.md
-          - 路由: zh/protocol/routing.md
-          - 分片重组: zh/protocol/fragmentation.md
-          - Datalink 层: zh/protocol/datalink.md
-          - Transport 内部: zh/protocol/transport-internals.md
-          - Memory 子系统: zh/protocol/memory.md
-          - Platform 抽象层: zh/protocol/platform.md
-          - Codec 层: zh/protocol/codec.md
-      - 使用指南:
-          - SDK 3 模块化迁移: zh/guide/modular-migration.md
-          - 配置: zh/guide/configuration.md
-          - Kconfig 配置: zh/guide/kconfig.md
-          - Send API: zh/guide/send-api.md
-          - Zero-Copy: zh/guide/zero-copy.md
-          - 低功耗运行时: zh/guide/low-power-runtime.md
-          - 扩展运行选项: zh/guide/advanced-options.md
-          - 有界接收与运行: zh/guide/bounded-runtime.md
-          - 移植: zh/guide/porting.md
-          - 线程安全: zh/guide/thread-safety.md
-          - 诊断与调试: zh/guide/troubleshooting.md
-          - 性能调优: zh/guide/performance-tuning.md
-          - 资源模型: zh/guide/resource-model.md
-          - 生产检查表: zh/guide/production-checklist.md
+      - 教程:
+          - "首次收发": zh/tutorials/first-link.md
+          - "可运行示例": zh/tutorials/examples.md
+      - 指南:
+          - "构建与消费": zh/guides/build-and-consume.md
+          - "配置": zh/guides/configuration.md
+          - "移植": zh/guides/porting.md
+          - "发送": zh/guides/send.md
+          - "原地发送": zh/guides/in-place-send.md
+          - "Boot 接入": zh/guides/boot.md
+          - "低功耗调度": zh/guides/low-power.md
+          - "扩展运行时": zh/guides/advanced-runtime.md
+          - "SDK 4 迁移": zh/guides/migration.md
+          - "诊断与调试": zh/guides/troubleshooting.md
+      - 原理和实现:
+          - "架构": zh/explanation/architecture.md
+          - "资源模型": zh/explanation/resource-model.md
+          - "运行预算": zh/explanation/runtime.md
+          - "链路接收": zh/explanation/datalink.md
+          - "传输内部": zh/explanation/transport-internals.md
+          - "状态机": zh/explanation/state-machines.md
+          - "实现映射": zh/explanation/implementation-map.md
       - 参考:
-          - 公共 API: zh/reference/public-api.md
-          - 错误码: zh/reference/errors.md
-          - 统计系统: zh/reference/statistics.md
-          - 性能分析: zh/reference/performance.md
-          - 配置预设: zh/reference/config-presets.md
-          - 互操作性: zh/reference/interoperability.md
-          - 发布验证: zh/reference/release-validation.md
-          - GitHub CI/CD: zh/reference/github-ci.md
-          - 验证矩阵: zh/reference/validation-matrix.md
-          - Wire 优化: zh/reference/wire-optimization.md
-          - Datalink 优化: zh/reference/datalink-optimization.md
-          - 静态分析: zh/reference/static-analysis.md
-          - 术语表: zh/reference/glossary.md
-      - 贡献:
-          - 文档规范: zh/contributing/documentation.md
-          - 测试策略: zh/contributing/testing.md
+          - "公开 API": zh/reference/api.md
+          - "编译档位": zh/reference/profiles.md
+          - "错误码": zh/reference/errors.md
+          - "统计": zh/reference/statistics.md
+          - "术语": zh/reference/glossary.md
+      - 协议 v3:
+          - "协议概览": zh/reference/protocol/v3/index.md
+          - "帧格式": zh/reference/protocol/v3/wire-format.md
+          - "TLV 扩展": zh/reference/protocol/v3/extensions.md
+          - "可靠传输": zh/reference/protocol/v3/reliability.md
+          - "路由": zh/reference/protocol/v3/routing.md
+          - "分片": zh/reference/protocol/v3/fragmentation.md
+          - "安全": zh/reference/protocol/v3/security.md
+          - "互操作": zh/reference/protocol/v3/interoperability.md
+      - 维护:
+          - "工作流": zh/development/workflow.md
+          - "验证": zh/development/validation.md
+          - "文档维护": zh/development/documentation.md
   - English:
       - Home: en/index.md
-      - Getting Started:
-          - Quick Start: en/getting-started/quick-start.md
-          - Build and Test: en/getting-started/build-and-test.md
-          - Examples: en/getting-started/examples.md
-      - Protocol:
-          - Overview: en/protocol/overview.md
-          - Architecture: en/protocol/architecture.md
-          - Implementation Map: en/protocol/implementation-map.md
-          - State Machines: en/protocol/state-machines.md
-          - Wire Format: en/protocol/wire-format.md
-          - TLV Extensions: en/protocol/extensions.md
-          - Reliability: en/protocol/reliability.md
-          - Security: en/protocol/security.md
-          - Routing: en/protocol/routing.md
-          - Fragmentation: en/protocol/fragmentation.md
-          - Datalink Layer: en/protocol/datalink.md
-          - Transport Internals: en/protocol/transport-internals.md
-          - Memory Subsystem: en/protocol/memory.md
-          - Platform Abstraction: en/protocol/platform.md
-          - Codec Layer: en/protocol/codec.md
+      - Tutorials:
+          - "Run your first link": en/tutorials/first-link.md
+          - "Runnable examples": en/tutorials/examples.md
       - Guides:
-          - SDK 3 Modular Migration: en/guide/modular-migration.md
-          - Configuration: en/guide/configuration.md
-          - Kconfig Configuration: en/guide/kconfig.md
-          - Send API: en/guide/send-api.md
-          - Zero-Copy: en/guide/zero-copy.md
-          - Low-Power Runtime: en/guide/low-power-runtime.md
-          - Advanced Runtime Options: en/guide/advanced-options.md
-          - Bounded Receive and Runtime: en/guide/bounded-runtime.md
-          - Porting: en/guide/porting.md
-          - Thread Safety: en/guide/thread-safety.md
-          - Troubleshooting: en/guide/troubleshooting.md
-          - Performance Tuning: en/guide/performance-tuning.md
-          - Resource Model: en/guide/resource-model.md
-          - Production Checklist: en/guide/production-checklist.md
+          - "Build and consume": en/guides/build-and-consume.md
+          - "Configuration": en/guides/configuration.md
+          - "Porting": en/guides/porting.md
+          - "Send": en/guides/send.md
+          - "In-place send": en/guides/in-place-send.md
+          - "Integrate Boot": en/guides/boot.md
+          - "Low-power scheduling": en/guides/low-power.md
+          - "Advanced runtime": en/guides/advanced-runtime.md
+          - "Migrate to SDK 4": en/guides/migration.md
+          - "Troubleshooting": en/guides/troubleshooting.md
+      - Explanation:
+          - "Architecture": en/explanation/architecture.md
+          - "Resource model": en/explanation/resource-model.md
+          - "Runtime budgets": en/explanation/runtime.md
+          - "Datalink": en/explanation/datalink.md
+          - "Transport internals": en/explanation/transport-internals.md
+          - "State machines": en/explanation/state-machines.md
+          - "Implementation map": en/explanation/implementation-map.md
       - Reference:
-          - Public API: en/reference/public-api.md
-          - Errors: en/reference/errors.md
-          - Statistics: en/reference/statistics.md
-          - Performance: en/reference/performance.md
-          - Config Presets: en/reference/config-presets.md
-          - Interoperability: en/reference/interoperability.md
-          - Release Validation: en/reference/release-validation.md
-          - GitHub CI/CD: en/reference/github-ci.md
-          - Validation Matrix: en/reference/validation-matrix.md
-          - Wire Optimization: en/reference/wire-optimization.md
-          - Datalink Optimization: en/reference/datalink-optimization.md
-          - Static Analysis: en/reference/static-analysis.md
-          - Glossary: en/reference/glossary.md
-      - Contributing:
-          - Documentation: en/contributing/documentation.md
-          - Testing: en/contributing/testing.md
+          - "Public API": en/reference/api.md
+          - "Build profiles": en/reference/profiles.md
+          - "Errors": en/reference/errors.md
+          - "Statistics": en/reference/statistics.md
+          - "Glossary": en/reference/glossary.md
+      - Protocol v3:
+          - "Protocol overview": en/reference/protocol/v3/index.md
+          - "Wire format": en/reference/protocol/v3/wire-format.md
+          - "Extensions": en/reference/protocol/v3/extensions.md
+          - "Reliable transport": en/reference/protocol/v3/reliability.md
+          - "Routing": en/reference/protocol/v3/routing.md
+          - "Fragmentation": en/reference/protocol/v3/fragmentation.md
+          - "Security": en/reference/protocol/v3/security.md
+          - "Interoperability": en/reference/protocol/v3/interoperability.md
+      - Development:
+          - "Workflow": en/development/workflow.md
+          - "Validation": en/development/validation.md
+          - "Maintain documentation": en/development/documentation.md
+  - C API: api/index.md
+  - 工程约定: standards.md

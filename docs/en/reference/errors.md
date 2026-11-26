@@ -1,6 +1,6 @@
 # Errors
 
-`xgl_error_t` is the protocol error domain. Generic utility statuses belong to `xgs_status_t` in xgen-status; the protocol maps utility failures at module boundaries.
+`xgl_error_t` defines the public protocol errors. Public entry points return the statuses in this reference. The owning protocol boundary maps failures from private resource operations.
 
 ## Handling
 

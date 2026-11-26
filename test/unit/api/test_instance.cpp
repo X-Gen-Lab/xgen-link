@@ -709,9 +709,9 @@ TEST_F(XglInstanceTest, StaticWorkspaceSupportsWindowsAndFragmentation) {
     config.features.max_tx_message_bytes = 256U;
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
     EXPECT_GT(requirements.size, unfragmented);
-    std::vector<xgm_max_align_t> storage(
-        (requirements.size + sizeof(xgm_max_align_t) - 1U) /
-        sizeof(xgm_max_align_t));
+    std::vector<xgl_max_align_t> storage(
+        (requirements.size + sizeof(xgl_max_align_t) - 1U) /
+        sizeof(xgl_max_align_t));
     xgl_handle_t handle = nullptr;
     ASSERT_EQ(
         xgl_init_static(&config, storage.data(), requirements.size, &handle),
@@ -730,7 +730,7 @@ TEST_F(XglInstanceTest, WorkspaceBackendFailureAndInitializationIsolation) {
         size_t live = 0U;
     } state;
 
-    xgm_allocator_t service = {
+    xgl_allocator_t service = {
         &state,
         [](void* ctx, size_t size) -> void* {
             auto* state = static_cast<FailureAllocator*>(ctx);

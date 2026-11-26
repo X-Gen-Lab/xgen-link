@@ -89,8 +89,8 @@ class FootprintReport(unittest.TestCase):
     def test_source_identity_includes_nested_probe_cmake(self):
         self.assert_build_input_tracked("tools/boot_footprint/CMakeLists.txt")
 
-    def test_source_identity_includes_explicit_development_assembly(self):
-        self.assert_build_input_tracked("dev/Dependencies.cmake")
+    def test_source_identity_includes_profile_configuration(self):
+        self.assert_build_input_tracked("cmake/XglProfiles.cmake")
 
     def assert_build_input_tracked(self, relative):
         (self.directory / "CMakeLists.txt").write_text("project(probe)\n", encoding="utf-8")

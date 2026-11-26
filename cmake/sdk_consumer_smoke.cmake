@@ -9,37 +9,22 @@ endif()
 set(install_prefix "${XGL_SMOKE_DIR}/install")
 set(consumer_src "${XGL_SMOKE_DIR}/consumer")
 set(consumer_build "${XGL_SMOKE_DIR}/consumer-build")
-if(DEFINED XGL_DEPENDENCY_HINTS)
-    include("${XGL_DEPENDENCY_HINTS}")
-endif()
-set(consumer_prefixes "${install_prefix}" ${XGL_UPSTREAM_PREFIX_PATH})
-string(REPLACE ";" "\\;" consumer_prefixes "${consumer_prefixes}")
 set(consumer_configure_args
     "${CMAKE_COMMAND}" -S "${consumer_src}" -B "${consumer_build}" -G Ninja
-    "-DCMAKE_PREFIX_PATH=${consumer_prefixes}"
+    "-DCMAKE_PREFIX_PATH=${install_prefix}"
+    -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
+    -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
 )
 set(configuration_args)
 if(DEFINED XGL_BUILD_CONFIG AND NOT XGL_BUILD_CONFIG STREQUAL "")
     list(APPEND configuration_args --config "${XGL_BUILD_CONFIG}")
     list(APPEND consumer_configure_args "-DCMAKE_BUILD_TYPE=${XGL_BUILD_CONFIG}")
 endif()
-if(DEFINED XGL_DEPENDENCY_HINTS)
-    list(APPEND consumer_configure_args -C "${XGL_DEPENDENCY_HINTS}")
-endif()
-
 if(DEFINED XGL_C_COMPILER AND NOT XGL_C_COMPILER STREQUAL "")
     list(APPEND consumer_configure_args "-DCMAKE_C_COMPILER=${XGL_C_COMPILER}")
 endif()
 
 file(REAL_PATH "${XGL_BINARY_DIR}" binary_root)
-if(NOT DEFINED XGL_INSTALL_BINARY_DIR)
-    set(XGL_INSTALL_BINARY_DIR "${XGL_BINARY_DIR}")
-endif()
-file(REAL_PATH "${XGL_INSTALL_BINARY_DIR}" install_root)
-cmake_path(IS_PREFIX install_root "${binary_root}" NORMALIZE install_contains_binary)
-if(NOT install_contains_binary)
-    message(FATAL_ERROR "SDK installation root must contain the link build directory")
-endif()
 file(REAL_PATH "${XGL_SMOKE_DIR}" smoke_root)
 cmake_path(IS_PREFIX binary_root "${smoke_root}" NORMALIZE smoke_is_child)
 if(NOT smoke_is_child OR smoke_root STREQUAL binary_root)
@@ -49,14 +34,16 @@ file(REMOVE_RECURSE "${smoke_root}")
 file(MAKE_DIRECTORY "${consumer_src}")
 
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" --install "${install_root}" ${configuration_args}
-        --prefix "${install_prefix}"
+    COMMAND "${CMAKE_COMMAND}" --install "${binary_root}" ${configuration_args}
+        --prefix "${smoke_root}/install-stage"
     RESULT_VARIABLE install_result
 )
 
 if(NOT install_result EQUAL 0)
     message(FATAL_ERROR "xgl install failed with exit code ${install_result}")
 endif()
+
+file(RENAME "${smoke_root}/install-stage" "${install_prefix}")
 
 set(forbidden_installed_headers
     xgl_parser.h

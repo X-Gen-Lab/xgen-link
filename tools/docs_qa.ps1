@@ -106,25 +106,29 @@ foreach ($match in $todoMatches) {
 }
 
 $requiredProtocolRefs = @{
-    "docs/en/protocol/wire-format.md" = "test/unit/wire/test_wire.cpp"
-    "docs/en/protocol/extensions.md" = "test/unit/wire/test_wire.cpp"
-    "docs/en/protocol/reliability.md" = "test/unit/transport/test_reliable.cpp"
-    "docs/en/protocol/security.md" = "test/unit/security/test_security.cpp"
-    "docs/en/protocol/routing.md" = "test/unit/network/test_network.cpp"
-    "docs/en/protocol/fragmentation.md" = "test/unit/transport/test_fragment.cpp"
-    "docs/zh/protocol/wire-format.md" = "test/unit/wire/test_wire.cpp"
-    "docs/zh/protocol/extensions.md" = "test/unit/wire/test_wire.cpp"
-    "docs/zh/protocol/reliability.md" = "test/unit/transport/test_reliable.cpp"
-    "docs/zh/protocol/security.md" = "test/unit/security/test_security.cpp"
-    "docs/zh/protocol/routing.md" = "test/unit/network/test_network.cpp"
-    "docs/zh/protocol/fragmentation.md" = "test/unit/transport/test_fragment.cpp"
+    "wire-format.md" = "test/unit/wire/test_wire.cpp"
+    "extensions.md" = "test/unit/wire/test_wire.cpp"
+    "reliability.md" = "test/unit/transport/test_reliable.cpp"
+    "security.md" = "test/unit/security/test_security.cpp"
+    "routing.md" = "test/unit/network/test_network.cpp"
+    "fragmentation.md" = "test/unit/transport/test_fragment.cpp"
 }
 
 foreach ($entry in $requiredProtocolRefs.GetEnumerator()) {
-    $file = Join-Path $RepoRoot $entry.Key
-    $content = Get-Content -Raw -Encoding UTF8 $file
-    if ($content -notmatch [regex]::Escape($entry.Value)) {
-        Add-Failure "$($entry.Key) does not reference $($entry.Value)"
+    if (-not (Test-Path -PathType Leaf (Join-Path $RepoRoot $entry.Value))) {
+        Add-Failure "Missing protocol test source $($entry.Value)"
+    }
+    foreach ($language in @("en", "zh")) {
+        $page = "docs/$language/reference/protocol/v3/$($entry.Key)"
+        $file = Join-Path $RepoRoot $page
+        if (-not (Test-Path -PathType Leaf $file)) {
+            Add-Failure "Missing protocol page $page"
+            continue
+        }
+        $content = Get-Content -Raw -Encoding UTF8 $file
+        if ($content -notmatch [regex]::Escape($entry.Value)) {
+            Add-Failure "$page does not reference $($entry.Value)"
+        }
     }
 }
 

@@ -3,8 +3,8 @@
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 TEST(XglWireViewTest, AckRangesBorrowWireBytesWithoutAnOutputArray) {
     const uint8_t bytes[] = {42, 0, 0, 0, 250, 0, 0, 0, 2,
@@ -44,8 +44,8 @@ TEST(XglWireViewTest, BorrowsValidatedBytesAndRejectsEveryTruncation) {
     bytes[XGL_WIRE_BASE_HEADER_SIZE + 1] = 1;
     bytes[XGL_WIRE_BASE_HEADER_SIZE + 2] = 99;
     bytes[header.header_len] = 42;
-    xgb_serialize_u16_le(bytes + sizeof(bytes) - 2,
-                         xgcrc_crc16_modbus(bytes, sizeof(bytes) - 2));
+    xgl_serialize_u16_le(bytes + sizeof(bytes) - 2,
+                         xgl_crc16_modbus(bytes, sizeof(bytes) - 2));
     xgl_wire_frame_view_t view = {};
     xgl_wire_decode_status_t status = XGL_WIRE_DECODE_INVALID;
     ASSERT_EQ(xgl_wire_decode_frame(&view, bytes, sizeof(bytes), &status),
@@ -91,8 +91,8 @@ TEST(XglWireViewTest, DistinguishesHeaderCrcAndFrameCrcFailures) {
     header.target_id = 2;
     header.payload_len = 1;
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
-    xgb_serialize_u16_le(bytes + sizeof(bytes) - 2,
-                         xgcrc_crc16_modbus(bytes, sizeof(bytes) - 2));
+    xgl_serialize_u16_le(bytes + sizeof(bytes) - 2,
+                         xgl_crc16_modbus(bytes, sizeof(bytes) - 2));
     xgl_wire_frame_view_t view = {};
     xgl_wire_decode_status_t status;
     bytes[6] ^= 1;
@@ -132,18 +132,18 @@ TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
                                               XGL_WIRE_FLAG_AUTHENTICATED));
     EXPECT_EQ(buffer[6], 9U);
     EXPECT_EQ(buffer[7], 0x23U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&buffer[8]), 0x1234U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&buffer[10]), 0xABCDU);
-    EXPECT_EQ(xgb_deserialize_u32_le(&buffer[12]), 0x01020304U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&buffer[16]), 0xA0B0C0D0U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&buffer[20]), 0x3456U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&buffer[8]), 0x1234U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&buffer[10]), 0xABCDU);
+    EXPECT_EQ(xgl_deserialize_u32_le(&buffer[12]), 0x01020304U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&buffer[16]), 0xA0B0C0D0U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&buffer[20]), 0x3456U);
 
-    const uint16_t encoded_crc = xgb_deserialize_u16_le(&buffer[22]);
+    const uint16_t encoded_crc = xgl_deserialize_u16_le(&buffer[22]);
     uint8_t crc_input[XGL_WIRE_BASE_HEADER_SIZE] = {};
     memcpy(crc_input, buffer, sizeof(crc_input));
     crc_input[22] = 0;
     crc_input[23] = 0;
-    EXPECT_EQ(encoded_crc, xgcrc_crc16_modbus(crc_input, sizeof(crc_input)));
+    EXPECT_EQ(encoded_crc, xgl_crc16_modbus(crc_input, sizeof(crc_input)));
 }
 
 TEST(XglWireTest, DecodesHeaderAndRejectsCorruptedCrc) {
@@ -191,9 +191,8 @@ TEST(XglWireTest, RejectsPacketTypeOutsideProtocolRange) {
     header.packet_type = XGL_PACKET_TYPE_DATA;
     ASSERT_EQ(xgl_wire_encode_header(buffer, sizeof(buffer), &header), XGL_OK);
     buffer[4] = static_cast<uint8_t>(XGL_PACKET_TYPE_CLOSE + 1U);
-    xgb_serialize_u16_le(&buffer[22], 0U);
-    xgb_serialize_u16_le(&buffer[22],
-                         xgcrc_crc16_modbus(buffer, sizeof(buffer)));
+    xgl_serialize_u16_le(&buffer[22], 0U);
+    xgl_serialize_u16_le(&buffer[22], xgl_crc16_modbus(buffer, sizeof(buffer)));
 
     xgl_wire_header_t decoded = {};
     EXPECT_EQ(xgl_wire_decode_header(&decoded, buffer, sizeof(buffer)),
@@ -239,13 +238,13 @@ TEST(XglWireTest, EncodesAndDecodesAckRangeExtension) {
               XGL_OK);
 
     EXPECT_EQ(value_len, 17U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&value[0]), 0x01020304U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&value[4]), 250U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[0]), 0x01020304U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[4]), 250U);
     EXPECT_EQ(value[8], 2U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&value[9]), 0U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&value[11]), 3U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&value[13]), 2U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&value[15]), 1U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[9]), 0U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[11]), 3U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[13]), 2U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&value[15]), 1U);
 
     uint32_t largest_ack = 0;
     uint32_t ack_delay_us = 0;
@@ -275,7 +274,7 @@ TEST(XglWireTest, EncodesAndDecodesSackExtension) {
               XGL_OK);
 
     EXPECT_EQ(value_len, 7U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&value[0]), 0x0A0B0C0DU);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[0]), 0x0A0B0C0DU);
     EXPECT_EQ(value[4], sizeof(bitmap));
     EXPECT_EQ(memcmp(&value[5], bitmap, sizeof(bitmap)), 0);
 
@@ -301,9 +300,9 @@ TEST(XglWireTest, EncodesAndDecodesFragmentExtension) {
               XGL_OK);
 
     EXPECT_EQ(value_len, 12U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&value[0]), 0x01020304U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&value[4]), 0x00001000U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&value[8]), 0x00004000U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[0]), 0x01020304U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[4]), 0x00001000U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&value[8]), 0x00004000U);
 
     uint32_t message_id = 0;
     uint32_t fragment_offset = 0;
@@ -325,7 +324,7 @@ TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
                                           0x1020304050607080ULL, &session_len),
         XGL_OK);
     EXPECT_EQ(session_len, 12U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&session[0]), 0x01020304U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&session[0]), 0x01020304U);
     EXPECT_EQ(session[4], 0x80U);
     EXPECT_EQ(session[11], 0x10U);
 
@@ -344,7 +343,7 @@ TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
                   0x0102030405060708ULL, 16, &security_len),
               XGL_OK);
     EXPECT_EQ(security_len, 13U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&security[0]), 0xA0B0C0D0U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&security[0]), 0xA0B0C0D0U);
     EXPECT_EQ(security[12], 16U);
 
     uint32_t key_id = 0;
@@ -364,10 +363,10 @@ TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
                                               &route_len),
               XGL_OK);
     EXPECT_EQ(route_len, 10U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&route[0]), 0x1234U);
-    EXPECT_EQ(xgb_deserialize_u16_le(&route[2]), 0x5678U);
-    EXPECT_EQ(xgb_deserialize_u32_le(&route[4]), 0xCAFEBABEU);
-    EXPECT_EQ(xgb_deserialize_u16_le(&route[8]), 9U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&route[0]), 0x1234U);
+    EXPECT_EQ(xgl_deserialize_u16_le(&route[2]), 0x5678U);
+    EXPECT_EQ(xgl_deserialize_u32_le(&route[4]), 0xCAFEBABEU);
+    EXPECT_EQ(xgl_deserialize_u16_le(&route[8]), 9U);
 
     uint16_t previous_hop = 0;
     uint16_t next_hop = 0;
@@ -414,7 +413,7 @@ TEST(XglWireTest, RejectsV2WithoutAutomaticDowngrade) {
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
     bytes[2] = 2U;
     bytes[22] = bytes[23] = 0U;
-    xgb_serialize_u16_le(bytes + 22, xgcrc_crc16_modbus(bytes, sizeof(bytes)));
+    xgl_serialize_u16_le(bytes + 22, xgl_crc16_modbus(bytes, sizeof(bytes)));
     EXPECT_EQ(xgl_wire_decode_header(&header, bytes, sizeof(bytes)),
               XGL_ERR_INVALID_FRAME);
 }
@@ -454,11 +453,11 @@ TEST(XglWireTest, RejectsUnimplementedEncryptionFlagsAndTrafficClasses) {
         bytes[5] = unsupported_flags[i];
         bytes[7] = unsupported_classes[i];
         bytes[22] = bytes[23] = 0U;
-        xgb_serialize_u16_le(
-            bytes + 22U, xgcrc_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
-        xgb_serialize_u16_le(
+        xgl_serialize_u16_le(
+            bytes + 22U, xgl_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
+        xgl_serialize_u16_le(
             bytes + XGL_WIRE_BASE_HEADER_SIZE,
-            xgcrc_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
+            xgl_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
         EXPECT_EQ(xgl_wire_decode_header(&header, bytes, sizeof(bytes)),
                   XGL_ERR_INVALID_FRAME);
         xgl_wire_frame_view_t view = {};

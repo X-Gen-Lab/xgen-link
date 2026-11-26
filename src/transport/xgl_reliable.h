@@ -10,8 +10,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "internal/xgl_list.h"
 #include "wire/xgl_wire.h"
-#include "xgen/containers/list.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 
@@ -32,7 +32,7 @@ extern "C" {
  * \note            Contains packet data and retransmission state
  */
 typedef struct xgl_reliable_packet_s {
-    xgct_list_node_t node;                    /**< List node for queue */
+    xgl_list_node_t node;                     /**< List node for queue */
     struct xgl_reliable_packet_s* index_next; /**< Hash bucket link */
 
     /* Packet data */
@@ -76,12 +76,12 @@ typedef struct xgl_reliable_packet_s {
  * \note            Manages wait-ACK queue with timeout tracking
  */
 typedef struct {
-    xgct_list_t wait_ack_list; /**< List of packets waiting for ACK */
+    xgl_list_t wait_ack_list; /**< List of packets waiting for ACK */
     xgl_reliable_packet_t*
         index_buckets[XGL_RELIABLE_INDEX_BUCKETS]; /**< Packet lookup buckets */
-    const xgm_allocator_t* data_allocator;         /**< Owned payload storage */
-    const xgm_allocator_t* extensions_allocator; /**< Owned extension storage */
-    const xgm_allocator_t* allocator;            /**< Memory allocator */
+    const xgl_allocator_t* data_allocator;         /**< Owned payload storage */
+    const xgl_allocator_t* extensions_allocator; /**< Owned extension storage */
+    const xgl_allocator_t* allocator;            /**< Memory allocator */
 } xgl_reliable_queue_t;
 
 /*---------------------------------------------------------------------------*/
@@ -95,7 +95,7 @@ typedef struct {
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_reliable_init(xgl_reliable_queue_t* queue,
-                              const xgm_allocator_t* allocator);
+                              const xgl_allocator_t* allocator);
 
 /**
  * \brief           Destroy reliable transmission queue

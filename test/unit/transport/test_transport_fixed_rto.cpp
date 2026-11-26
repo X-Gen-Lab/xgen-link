@@ -4,9 +4,9 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_transport.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include <array>
 #include <gtest/gtest.h>
@@ -32,7 +32,7 @@ class XglTransportFixedRtoTest : public ::testing::Test {
     void SetUp() override {
         lower = {this, SendPacket};
         xgl_transport_config_t config = {};
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.local_id = 1U;
         config.max_retry_count = 3U;
         config.default_timeout_ms = 700U;

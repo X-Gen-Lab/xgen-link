@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.24)
 #-----------------------------------------------------------------------------
 
 project(xgl
-    VERSION 3.0.0
+    VERSION 4.0.0
     DESCRIPTION "xgen-link Protocol Stack"
     LANGUAGES C
 )
@@ -32,22 +32,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 #-----------------------------------------------------------------------------
 
 include(cmake/XglProfiles.cmake)
-if(XGL_PROFILE STREQUAL "boot" OR NOT PROJECT_IS_TOP_LEVEL)
-    set(XGL_HOST_DEFAULT OFF)
-else()
-    set(XGL_HOST_DEFAULT ON)
-endif()
 option(XGL_BUILD_TESTS "Build regression tests matching the selected profile" OFF)
-option(XGL_BUILD_EXAMPLES "Build examples" ${XGL_HOST_DEFAULT})
+option(XGL_BUILD_EXAMPLES "Build examples" OFF)
 option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
-option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" ${PROJECT_IS_TOP_LEVEL})
-option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" ${PROJECT_IS_TOP_LEVEL})
+option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" OFF)
+option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" OFF)
 if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
-option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" ${PROJECT_IS_TOP_LEVEL})
-option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" ${PROJECT_IS_TOP_LEVEL})
+option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" OFF)
+option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" OFF)
 if(NOT XGL_PROFILE STREQUAL "full")
     set(XGL_HEAP_DEFAULT OFF)
 else()
@@ -58,9 +53,8 @@ if(XGL_PROFILE STREQUAL "boot" AND XGL_ALLOW_FALLBACK_MALLOC)
     message(FATAL_ERROR "The boot profile requires XGL_ALLOW_FALLBACK_MALLOC=OFF")
 endif()
 xgl_finalize_build_config()
-option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" ${PROJECT_IS_TOP_LEVEL})
+option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" OFF)
 
-include(cmake/XglDependencies.cmake)
 if(XGL_BUILD_TESTS)
     enable_language(CXX)
 endif()
@@ -108,25 +102,15 @@ set_target_properties(xgl PROPERTIES
     EXPORT_PROPERTIES "XGL_PROFILE;XGL_BUILD_CONFIG_ID;XGL_CAPABILITIES")
 xgl_apply_build_contract(xgl)
 target_compile_features(xgl PUBLIC c_std_11)
-target_link_libraries(xgl PUBLIC xgm::allocator
-    PRIVATE ${XGL_PRIVATE_DEPENDENCIES})
-
 target_compile_options(xgl PRIVATE ${XGL_C_WARNINGS})
-if(XGL_ALLOW_FALLBACK_MALLOC)
-    if(NOT TARGET xgm::libc_allocator)
-        message(FATAL_ERROR "Heap compatibility requires xgm::libc_allocator; otherwise disable XGL_ALLOW_FALLBACK_MALLOC")
-    endif()
-    target_link_libraries(xgl PRIVATE xgm::libc_allocator)
-    target_compile_definitions(xgl PUBLIC XGL_ALLOW_FALLBACK_MALLOC=1)
-else()
-    target_compile_definitions(xgl PUBLIC XGL_ALLOW_FALLBACK_MALLOC=0)
-endif()
+target_compile_definitions(xgl PUBLIC
+    XGL_ALLOW_FALLBACK_MALLOC=$<BOOL:${XGL_ALLOW_FALLBACK_MALLOC}>)
 
 target_include_directories(xgl
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
-        $<INSTALL_INTERFACE:include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )

@@ -31,7 +31,7 @@ typedef struct {
     xgl_config_t config;
     xgl_route_item_t routes[2];
     xgl_handle_t handle;
-    alignas(xgm_max_align_t) uint8_t workspace[SIM_WORKSPACE_CAPACITY];
+    alignas(xgl_max_align_t) uint8_t workspace[SIM_WORKSPACE_CAPACITY];
 } sim_node_t;
 
 /**

@@ -11,7 +11,7 @@
 /** \brief           Explicit storage and observations owned by this consumer.
  */
 typedef struct {
-    alignas(xgm_max_align_t) uint8_t storage[16384];
+    alignas(xgl_max_align_t) uint8_t storage[16384];
     size_t allocations;
     size_t releases;
     size_t reads;
@@ -134,7 +134,7 @@ static int smoke_optional_runtime(const xgl_config_t* config,
  */
 int main(void) {
     static smoke_state_t state;
-    const xgm_allocator_t allocator = {
+    const xgl_allocator_t allocator = {
         .alloc = smoke_allocate, .free = smoke_release, .ctx = &state};
     xgl_phy_ops_t phy = {smoke_transmit, smoke_receive, &state};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 0U};

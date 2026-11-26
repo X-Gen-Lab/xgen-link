@@ -10,7 +10,7 @@ if(NOT CMAKE_CROSSCOMPILING OR NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
 endif()
 get_filename_component(XGL_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
-option(XGL_FOOTPRINT_LTO "Optimize protocol and foundation libraries across translation units" OFF)
+option(XGL_FOOTPRINT_LTO "Optimize protocol across translation units" OFF)
 option(XGL_FOOTPRINT_ADVANCED_API "Measure explicitly exercised advanced runtime APIs" OFF)
 if(XGL_FOOTPRINT_LTO)
     include(CheckIPOSupported)
@@ -47,18 +47,12 @@ find_program(XGL_ARM_OBJCOPY arm-none-eabi-objcopy REQUIRED)
 
 set(XGL_PROFILE boot CACHE STRING "" FORCE)
 set(XGL_ALLOW_FALLBACK_MALLOC OFF CACHE BOOL "" FORCE)
-set(XGM_BUILD_LIBC_ALLOCATOR OFF CACHE BOOL "" FORCE)
-foreach(prefix XGM XGCT XGB XGCRC XGS)
-    set(${prefix}_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-endforeach()
 foreach(option BUILD_TESTS BUILD_EXAMPLES BUILD_DOCS BUILD_FOOTPRINT_REPORT
         BUILD_STATIC_ANALYSIS_TARGET BUILD_SDK_CONSUMER_SMOKE
         BUILD_RELEASE_VALIDATION_TARGET BUILD_NOHEAP_SMOKE)
     set(XGL_${option} OFF CACHE BOOL "" FORCE)
 endforeach()
 
-include("${XGL_SOURCE_ROOT}/dev/Dependencies.cmake")
-xgl_dev_provide_components()
 add_subdirectory("${XGL_SOURCE_ROOT}" xgen-link)
 if(XGL_FOOTPRINT_ADVANCED_API AND NOT XGL_ENABLE_ADVANCED_RUNTIME)
     message(FATAL_ERROR "XGL_FOOTPRINT_ADVANCED_API requires XGL_ENABLE_ADVANCED_RUNTIME=ON")
@@ -69,9 +63,7 @@ endif()
 add_library(xgl_boot_layout OBJECT layout_probe.c)
 set_property(TARGET xgl_boot_layout PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 target_include_directories(xgl_boot_layout PRIVATE "${XGL_SOURCE_ROOT}/src")
-target_link_libraries(xgl_boot_layout PRIVATE xgl::xgl
-    xgm::pool xgm::size_class xgct::list xgct::bitset
-    xgb::bytes xgcrc::crc16)
+target_link_libraries(xgl_boot_layout PRIVATE xgl::xgl)
 target_compile_options(xgl_boot_layout PRIVATE -Wall -Wextra -Werror -Wpedantic)
 target_compile_definitions(xgl_boot_layout PRIVATE
     XGL_FOOTPRINT_FRAME_SIZE=${XGL_FOOTPRINT_FRAME_SIZE}U

@@ -8,7 +8,7 @@ try:
 except ModuleNotFoundError as error:
     if error.name != "xgen_quality":
         raise
-    print("Install the pinned xgen-quality package; see docs/zh/contributing/testing.md.",
+    print("Install the pinned xgen-quality package. See docs/zh/development/workflow.md.",
           file=sys.stderr)
     raise SystemExit(1) from error
 

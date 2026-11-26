@@ -28,13 +28,13 @@ transport_peer_has_pending_data(const xgl_transport_ctx_t* ctx,
         return true;
     }
     if (ctx->fragment_mgr != NULL) {
-        xgct_list_node_t* node;
-        XGCT_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
+        xgl_list_node_t* node;
+        XGL_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
             const xgl_reassembly_buffer_t* buffer =
                 /* Intrusive node membership is established by the owning list.
                  */
                 /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-                XGCT_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
+                XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
             if (buffer->source_id == peer->peer_id &&
                 buffer->connection_id == peer->connection_id &&
                 buffer->session_epoch == peer->session_epoch) {
@@ -140,7 +140,7 @@ transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
         return NULL;
     }
 
-    peer = (xgl_transport_peer_state_t*)xgm_alloc(
+    peer = (xgl_transport_peer_state_t*)xgl_alloc(
         ctx->memory.peer, sizeof(xgl_transport_peer_state_t));
     if (peer == NULL) {
         return NULL;
@@ -157,14 +157,14 @@ transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
 
     xgl_error_t err = xgl_window_init(&peer->tx_window, ctx->window_size);
     if (err != XGL_OK) {
-        xgm_free(ctx->memory.peer, peer);
+        xgl_free(ctx->memory.peer, peer);
         return NULL;
     }
 
     err = xgl_reliable_init(&peer->reliable_queue, ctx->memory.tx_packet);
     if (err != XGL_OK) {
         xgl_window_destroy(&peer->tx_window);
-        xgm_free(ctx->memory.peer, peer);
+        xgl_free(ctx->memory.peer, peer);
         return NULL;
     }
 
@@ -187,7 +187,7 @@ void transport_destroy_peers(xgl_transport_ctx_t* ctx) {
         xgl_transport_peer_state_t* next = peer->next;
         transport_clear_peer_data(ctx, peer);
         xgl_window_destroy(&peer->tx_window);
-        xgm_free(ctx->memory.peer, peer);
+        xgl_free(ctx->memory.peer, peer);
         peer = next;
     }
     ctx->peers = NULL;
@@ -231,7 +231,7 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
 #endif
             xgl_reliable_destroy(&peer->reliable_queue);
             xgl_window_destroy(&peer->tx_window);
-            xgm_free(ctx->memory.peer, peer);
+            xgl_free(ctx->memory.peer, peer);
             reclaimed++;
         } else {
             prev = &peer->next;
@@ -342,7 +342,7 @@ xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
             *link = peer->next;
             transport_clear_peer_data(ctx, peer);
             xgl_window_destroy(&peer->tx_window);
-            xgm_free(ctx->memory.peer, peer);
+            xgl_free(ctx->memory.peer, peer);
 #if XGL_FEATURE_ADVANCED_RUNTIME
             if (notify && ctx->scope_event_callback != NULL) {
                 ctx->scope_event_callback(handle, remote_id, connection_id,
@@ -464,12 +464,12 @@ xgl_error_t xgl_transport_get_resources(const xgl_transport_ctx_t* ctx,
          peer = peer->next) {
         resources->peer_count++;
         resources->failed_peers += peer->failed ? 1U : 0U;
-        xgct_list_node_t* node;
-        XGCT_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
+        xgl_list_node_t* node;
+        XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
             /* The reliable queue owns this intrusive record. */
             const xgl_reliable_packet_t* packet =
                 /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-                XGCT_LIST_ENTRY(node, xgl_reliable_packet_t, node);
+                XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
             resources->tx_packets++;
             resources->tx_payload_bytes += packet->data_len;
         }

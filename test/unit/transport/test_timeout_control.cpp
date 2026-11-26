@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 #include <gtest/gtest.h>
@@ -60,7 +60,7 @@ class XglTimeoutControlTest : public ::testing::Test {
         xgl_config_get_preset_boot(&config);
         config.protocol.ack_timeout_ms = 200U;
         config.features.peer_idle_timeout_ms = 0U;
-        config.memory.allocator = xgm_allocator_libc();
+        config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;
         instance = xgl_create(&config);

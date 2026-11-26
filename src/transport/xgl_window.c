@@ -7,7 +7,6 @@
 #include "transport/xgl_window.h"
 
 #include <string.h>
-#include <xgen/containers/bitset.h>
 
 /*---------------------------------------------------------------------------*/
 /* Public Functions                                                          */
@@ -71,8 +70,8 @@ void xgl_window_reset(xgl_sliding_window_t* window) {
         return;
     }
 
-    xgct_bitset_t bits = {window->ack_received, window->window_size};
-    xgct_bitset_clear_all(&bits);
+    const size_t bitmap_bytes = ((size_t)window->window_size + 7U) / 8U;
+    memset(window->ack_received, 0, bitmap_bytes);
     window->ack_head = 0U;
 
     window->send_base_packet_number = 0;
@@ -133,8 +132,9 @@ xgl_error_t xgl_window_mark_ack_packet_number(xgl_sliding_window_t* window,
     if (index >= window->window_size) {
         index -= window->window_size;
     }
-    xgct_bitset_t bits = {window->ack_received, window->window_size};
-    (void)xgct_bitset_set(&bits, index);
+    if (index < window->window_size) {
+        window->ack_received[index / 8U] |= (uint8_t)(1U << (index % 8U));
+    }
 
     return XGL_OK;
 }
@@ -145,10 +145,14 @@ uint8_t xgl_window_advance_base_packet_number(xgl_sliding_window_t* window) {
     }
 
     uint8_t advanced = 0U;
-    xgct_bitset_t bits = {window->ack_received, window->window_size};
     while (advanced < window->window_size &&
-           xgct_bitset_test(&bits, window->ack_head)) {
-        (void)xgct_bitset_clear(&bits, window->ack_head);
+           window->ack_head < window->window_size) {
+        uint8_t* byte = &window->ack_received[window->ack_head / 8U];
+        const uint8_t mask = (uint8_t)(1U << (window->ack_head % 8U));
+        if ((*byte & mask) == 0U) {
+            break;
+        }
+        *byte &= (uint8_t)~mask;
         ++window->ack_head;
         if (window->ack_head == window->window_size) {
             window->ack_head = 0U;

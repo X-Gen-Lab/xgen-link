@@ -109,8 +109,8 @@ static bool smoke_drain(xgl_handle_t handle, const smoke_endpoint_t* endpoint,
  * \brief           Exercise both instances without calling a system allocator.
  */
 int main(void) {
-    static alignas(xgm_max_align_t) uint8_t storage_a[16384];
-    static alignas(xgm_max_align_t) uint8_t storage_b[16384];
+    static alignas(xgl_max_align_t) uint8_t storage_a[16384];
+    static alignas(xgl_max_align_t) uint8_t storage_b[16384];
     smoke_endpoint_t a = {0};
     smoke_endpoint_t b = {0};
     a.remote = &b;

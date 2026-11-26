@@ -5,10 +5,10 @@
 
 #include <datalink/xgl_parser.h>
 #include <gtest/gtest.h>
+#include <wire/xgl_crc16.h>
 #include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_wire_bytes.h>
 
 #include <array>
 #include <cstring>
@@ -29,8 +29,8 @@ xgl_wire_header_t valid_header() {
 void refresh_header_crc(uint8_t* bytes) {
     bytes[22] = 0;
     bytes[23] = 0;
-    xgb_serialize_u16_le(bytes + 22,
-                         xgcrc_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
+    xgl_serialize_u16_le(bytes + 22,
+                         xgl_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
 }
 
 }  // namespace
@@ -404,7 +404,7 @@ TEST(XglCoverageWire, DecodedFrameClearsBorrowedPointersOnStructuralMismatch) {
     EXPECT_EQ(view.payload, nullptr);
     header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
     ASSERT_EQ(xgl_wire_encode_header(bytes, 64, &header), XGL_OK);
-    xgb_serialize_u16_le(bytes + 24, xgcrc_crc16_modbus(bytes, 24));
+    xgl_serialize_u16_le(bytes + 24, xgl_crc16_modbus(bytes, 24));
     ASSERT_EQ(xgl_wire_decode_frame(&view, bytes, 26, &status), XGL_OK);
     EXPECT_EQ(view.reliable, XGL_RELIABILITY_ACK_ELICITING);
 }

@@ -10,7 +10,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <xgen/memory/allocator.h>
+#ifdef __cplusplus
+#include <cstddef>
+#endif
 #include <xgl/xgl_config.h>
 
 #include "xgl/xgl_error.h"
@@ -230,12 +232,41 @@ typedef void (*xgl_error_callback_t)(xgl_handle_t handle, xgl_error_t error,
 /* Configuration Structure                                                   */
 /*---------------------------------------------------------------------------*/
 
+/** \brief           Storage type aligned for the target's scalar types. */
+#if defined(__cplusplus)
+typedef std::max_align_t xgl_max_align_t;
+#elif defined(_MSC_VER)
+/* The MSVC C11 headers omit max_align_t. */
+typedef union {
+    long double floating; /**< Maximum floating-point alignment. */
+    long long integer;    /**< Maximum integer alignment. */
+    void* pointer;        /**< Object pointer alignment. */
+} xgl_max_align_t;
+#else
+typedef max_align_t xgl_max_align_t;
+#endif
+
+/**
+ * \brief           Explicit synchronous allocation service
+ * \note            The descriptor and its context must outlive the instance.
+ *                  The alloc callback receives a nonzero size and returns a
+ *                  block aligned to xgl_max_align_t, or NULL on failure.
+ *                  The free callback receives live blocks from the same
+ *                  service, once per allocation. XGL skips zero-size requests
+ *                  and NULL releases.
+ */
+typedef struct {
+    void* ctx; /**< Borrowed context passed to both callbacks. */
+    void* (*alloc)(void* ctx, size_t size); /**< Allocate an aligned block. */
+    void (*free)(void* ctx, void* ptr);     /**< Release a live block. */
+} xgl_allocator_t;
+
 /**
  * \brief           Memory configuration
  */
 typedef struct {
     size_t rx_buffer_size; /**< RX buffer size in bytes */
-    const xgm_allocator_t*
+    const xgl_allocator_t*
         allocator; /**< Explicit allocator; NULL uses the API creation policy */
 } xgl_memory_config_t;
 

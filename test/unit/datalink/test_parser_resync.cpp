@@ -12,8 +12,8 @@
 #include <array>
 #include <gtest/gtest.h>
 #include <vector>
-#include <xgen/bytes/bytes.h>
-#include <xgen/crc/crc.h>
+#include <wire/xgl_crc16.h>
+#include <wire/xgl_wire_bytes.h>
 
 namespace {
 
@@ -32,8 +32,8 @@ std::vector<uint8_t> make_frame(const std::vector<uint8_t>& payload) {
     std::copy(payload.begin(), payload.end(),
               bytes.begin() + XGL_WIRE_BASE_HEADER_SIZE);
     const size_t crc_offset = bytes.size() - XGL_CRC16_SIZE;
-    xgb_serialize_u16_le(bytes.data() + crc_offset,
-                         xgcrc_crc16_modbus(bytes.data(), crc_offset));
+    xgl_serialize_u16_le(bytes.data() + crc_offset,
+                         xgl_crc16_modbus(bytes.data(), crc_offset));
     return bytes;
 }
 
@@ -170,7 +170,7 @@ TEST_F(XglParserResyncTest, MissingFinalCrcByteRetainsTheFollowingMagicPrefix) {
 
 TEST_F(XglParserResyncTest, MissingBothCrcBytesRetainsTheFollowingMagicPair) {
     auto truncated = make_frame({0x11U});
-    ASSERT_NE(xgb_deserialize_u16_le(truncated.data() + truncated.size() -
+    ASSERT_NE(xgl_deserialize_u16_le(truncated.data() + truncated.size() -
                                      XGL_CRC16_SIZE),
               0x5AA5U);
     truncated.resize(truncated.size() - XGL_CRC16_SIZE);

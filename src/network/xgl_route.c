@@ -1,24 +1,24 @@
 /**
  * \file            xgl_route.c
- * \brief           Fixed-capacity protocol routes with an optional core index
+ * \brief           Fixed-capacity protocol routes with an optional index
  * \author          X-Gen Lab
  */
 
 #include <network/xgl_route.h>
 
+#include "internal/xgl_allocator.h"
 #include <string.h>
-#include <xgen/memory/allocator.h>
 
 /**
  * \brief           Reserve all routes without runtime growth
  */
 xgl_error_t xgl_route_table_init(xgl_route_table_t* table, size_t capacity,
-                                 const xgm_allocator_t* allocator) {
+                                 const xgl_allocator_t* allocator) {
     if (table == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     memset(table, 0, sizeof(*table));
-    if (!xgm_allocator_is_valid(allocator) || capacity > UINT16_MAX ||
+    if (!xgl_allocator_is_valid(allocator) || capacity > UINT16_MAX ||
         capacity > SIZE_MAX / sizeof(*table->routes)) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -26,7 +26,7 @@ xgl_error_t xgl_route_table_init(xgl_route_table_t* table, size_t capacity,
     if (capacity == 0U) {
         return XGL_OK;
     }
-    table->routes = xgm_alloc(allocator, capacity * sizeof(*table->routes));
+    table->routes = xgl_alloc(allocator, capacity * sizeof(*table->routes));
     if (table->routes == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
@@ -35,17 +35,17 @@ xgl_error_t xgl_route_table_init(xgl_route_table_t* table, size_t capacity,
         xgl_route_table_destroy(table);
         return XGL_ERR_INVALID_PARAM;
     }
-    table->nodes = xgm_alloc(allocator, capacity * sizeof(*table->nodes));
-    xgct_hash_node_t** buckets = (xgct_hash_node_t**)xgm_alloc(
+    table->nodes = xgl_alloc(allocator, capacity * sizeof(*table->nodes));
+    xgl_route_index_node_t** buckets = (xgl_route_index_node_t**)xgl_alloc(
         allocator, XGL_ROUTE_TABLE_DEFAULT_SIZE * sizeof(*buckets));
     if (table->nodes == NULL || buckets == NULL) {
-        xgm_free(allocator, (void*)buckets);
+        xgl_free(allocator, (void*)buckets);
         xgl_route_table_destroy(table);
         return XGL_ERR_NO_MEMORY;
     }
-    if (xgct_hash_init(&table->index, buckets, XGL_ROUTE_TABLE_DEFAULT_SIZE,
-                       capacity) != XGS_OK) {
-        xgm_free(allocator, (void*)buckets);
+    if (!xgl_route_index_init(&table->index, buckets,
+                              XGL_ROUTE_TABLE_DEFAULT_SIZE, capacity)) {
+        xgl_free(allocator, (void*)buckets);
         xgl_route_table_destroy(table);
         return XGL_ERR_INVALID_PARAM;
     }
@@ -62,11 +62,11 @@ void xgl_route_table_destroy(xgl_route_table_t* table) {
         return;
     }
 #if XGL_FEATURE_ROUTE_INDEX
-    xgct_hash_clear(&table->index);
-    xgm_free(table->allocator, (void*)table->index.buckets);
-    xgm_free(table->allocator, table->nodes);
+    xgl_route_index_clear(&table->index);
+    xgl_free(table->allocator, (void*)table->index.buckets);
+    xgl_free(table->allocator, table->nodes);
 #endif
-    xgm_free(table->allocator, table->routes);
+    xgl_free(table->allocator, table->routes);
     memset(table, 0, sizeof(*table));
 }
 
@@ -79,8 +79,7 @@ xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
         return NULL;
     }
 #if XGL_FEATURE_ROUTE_INDEX
-    const xgct_hash_node_t* node = xgct_hash_find(&table->index, target_id);
-    return node != NULL ? node->value : NULL;
+    return xgl_route_index_find(&table->index, target_id);
 #else
     for (size_t i = 0U; i < table->route_count; ++i) {
         if (table->routes[i].target_id == target_id) {
@@ -110,9 +109,9 @@ xgl_error_t xgl_route_table_add(xgl_route_table_t* table, uint16_t target_id,
         }
         route = &table->routes[table->route_count];
 #if XGL_FEATURE_ROUTE_INDEX
-        xgct_hash_node_t* node = &table->nodes[table->route_count];
-        xgct_hash_node_init(node);
-        if (xgct_hash_insert(&table->index, node, target_id, route) != XGS_OK) {
+        xgl_route_index_node_t* node = &table->nodes[table->route_count];
+        *node = (xgl_route_index_node_t){0};
+        if (!xgl_route_index_insert(&table->index, node, target_id, route)) {
             return XGL_ERR_INVALID_PARAM;
         }
 #endif
@@ -137,16 +136,17 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
     }
     const size_t position = (size_t)(route - table->routes);
 #if XGL_FEATURE_ROUTE_INDEX
-    xgct_hash_clear(&table->index);
+    xgl_route_index_clear(&table->index);
 #endif
     --table->route_count;
     memmove(route, route + 1U,
             (table->route_count - position) * sizeof(*route));
 #if XGL_FEATURE_ROUTE_INDEX
     for (size_t i = 0U; i < table->route_count; ++i) {
-        xgct_hash_node_init(&table->nodes[i]);
-        (void)xgct_hash_insert(&table->index, &table->nodes[i],
-                               table->routes[i].target_id, &table->routes[i]);
+        table->nodes[i] = (xgl_route_index_node_t){0};
+        (void)xgl_route_index_insert(&table->index, &table->nodes[i],
+                                     table->routes[i].target_id,
+                                     &table->routes[i]);
     }
 #endif
     return XGL_OK;
@@ -177,7 +177,7 @@ xgl_error_t xgl_route_table_update_metric(const xgl_route_table_t* table,
 void xgl_route_table_clear(xgl_route_table_t* table) {
     if (table != NULL) {
 #if XGL_FEATURE_ROUTE_INDEX
-        xgct_hash_clear(&table->index);
+        xgl_route_index_clear(&table->index);
 #endif
         table->route_count = 0U;
     }
@@ -214,10 +214,10 @@ xgl_error_t xgl_route_table_load(xgl_route_table_t* table,
     }
 #if XGL_FEATURE_ROUTE_INDEX
     for (size_t i = 0U; i < count; ++i) {
-        xgct_hash_node_init(&table->nodes[i]);
-        if (xgct_hash_insert(&table->index, &table->nodes[i],
-                             table->routes[i].target_id,
-                             &table->routes[i]) != XGS_OK) {
+        table->nodes[i] = (xgl_route_index_node_t){0};
+        if (!xgl_route_index_insert(&table->index, &table->nodes[i],
+                                    table->routes[i].target_id,
+                                    &table->routes[i])) {
             xgl_route_table_clear(table);
             return XGL_ERR_INVALID_PARAM;
         }

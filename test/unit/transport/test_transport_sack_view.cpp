@@ -4,9 +4,9 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 
 #include <array>
 #include <gtest/gtest.h>
@@ -32,7 +32,7 @@ class XglTransportSackViewTest : public ::testing::Test {
         lower.ctx = this;
         lower.send = SendPacket;
         xgl_transport_config_t config = {};
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.max_peers = 1U;
         config.max_tx_packets = 4U;
         config.max_rx_buffered_packets = 4U;
@@ -131,6 +131,7 @@ class XglTransportSackViewTest : public ::testing::Test {
 
 }  // namespace
 
+#if XGL_BUILD_WINDOW_CAPACITY >= 4
 TEST_F(XglTransportSackViewTest, AcceptsTheExisting64ByteBitmapLimit) {
     std::array<uint8_t, 64> bitmap = {};
     bitmap[0] = 0x07;
@@ -207,3 +208,4 @@ TEST_F(XglTransportSackViewTest, ZeroLengthAckRangeCannotPartiallyAcknowledge) {
         XGL_ERR_INVALID_FRAME);
     ExpectUnchanged();
 }
+#endif

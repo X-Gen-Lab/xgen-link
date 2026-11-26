@@ -4,9 +4,9 @@
  * \author          X-Gen Lab
  */
 
+#include "internal/xgl_allocator.h"
 #include <internal/xgl_diagnostics.h>
 #include <string.h>
-#include <xgen/memory/allocator.h>
 
 #include "xgl_network_internal.h"
 
@@ -110,7 +110,7 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         return err;
     }
 
-    uint8_t* forward_buf = (uint8_t*)xgm_alloc(ctx->allocator, frame_len);
+    uint8_t* forward_buf = (uint8_t*)xgl_alloc(ctx->allocator, frame_len);
     if (forward_buf == NULL) {
         xgl_network_count_rx_drop(ctx);
 #if XGL_FEATURE_STATISTICS
@@ -124,7 +124,7 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     err = network_rewrite_forward_frame(ctx, frame_buf, frame_len, metadata,
                                         forward_buf);
     if (err != XGL_OK) {
-        xgm_free(ctx->allocator, forward_buf);
+        xgl_free(ctx->allocator, forward_buf);
         return err;
     }
 
@@ -138,7 +138,7 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         };
         err = ctx->lower_layer->send(ctx->lower_layer->ctx, handle, &message);
     }
-    xgm_free(ctx->allocator, forward_buf);
+    xgl_free(ctx->allocator, forward_buf);
     if (err != XGL_OK) {
 #if XGL_FEATURE_STATISTICS
         if (ctx->stats != NULL) {

@@ -29,7 +29,7 @@ typedef struct {
 
 volatile footprint_observations_t xgl_boot_observations;
 _Alignas(
-    xgm_max_align_t) static uint8_t workspace[XGL_FOOTPRINT_WORKSPACE_SIZE];
+    xgl_max_align_t) static uint8_t workspace[XGL_FOOTPRINT_WORKSPACE_SIZE];
 
 /** \brief           Exercise serialization without claiming a physical driver
  */

@@ -4,10 +4,10 @@
  * \author          X-Gen Lab
  */
 
+#include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
-#include <xgen/memory/libc_allocator.h>
 #include <xgl/xgl.h>
 
 #include <algorithm>
@@ -55,7 +55,7 @@ class XglTransportRxContract : public ::testing::Test {
     void SetUp() override {
         lower = {this, Send};
         xgl_transport_config_t config = {};
-        config.allocator = xgm_allocator_libc();
+        config.allocator = xgl_test_host_allocator();
         config.max_peers = 1U;
         config.max_tx_packets = 4U;
         config.max_rx_buffered_packets = 4U;
@@ -143,7 +143,7 @@ struct PublicReceiver {
     void Init() {
         xgl_config_t config = {};
         xgl_config_get_default(&config);
-        config.memory.allocator = xgm_allocator_libc();
+        config.memory.allocator = xgl_test_host_allocator();
         config.protocol.max_frame_size = 128U;
         config.memory.rx_buffer_size = 128U;
         config.route_table = &route;
@@ -283,6 +283,7 @@ TEST(XglTransportRxWireContract, StepReportsFeedbackFailureWithoutRedelivery) {
     EXPECT_EQ(receiver.feedback_attempts, 2U);
 }
 
+#if XGL_BUILD_WINDOW_CAPACITY >= 4
 TEST_F(XglTransportRxContract, ReservedNumberCannotCreateReceiveHistory) {
     EXPECT_EQ(Receive(UINT32_MAX, 0x41U), XGL_ERR_SEQUENCE_ERROR);
     EXPECT_EQ(context.peers, nullptr);
@@ -317,6 +318,7 @@ TEST_F(XglTransportRxContract, FeedbackFailureKeepsAcceptedHistory) {
     EXPECT_EQ(Receive(0U, 0x41U), XGL_OK);
     EXPECT_EQ(delivered.size(), 1U);
 }
+#endif
 
 #if XGL_FEATURE_OUT_OF_ORDER
 TEST_F(XglTransportRxContract, SackFailureRetainsOwnedPacket) {
