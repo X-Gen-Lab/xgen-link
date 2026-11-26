@@ -7,8 +7,8 @@
 ## 生产合同与职责
 
 - 生产 SDK 从根目录以 C11 构建静态库。源码集成和安装消费均使用 `xgl::xgl`，库、公开生成头及导出的 ABI、档位与资源身份必须匹配。C++17、GoogleTest 和 GoogleMock 只随主机测试启用。开发工具按选择显式准备。 [构建与消费](docs/zh/guides/build-and-consume.md)
-- CMake target 定义依赖和公开用法。档位、资源默认、版本及配置身份各有一个权威来源。产品在配置前确定工具链，Boot 和应用镜像使用独立构建目录及 SDK 前缀。多配置构建按配置分开产物和报告。 [编译档位](docs/zh/reference/profiles.md)
-- XGL 负责 Wire、组帧、路由、可靠状态和调用者工作区。产品负责 PHY、显式时间、单一执行者、可选认证服务及恢复策略。遵守回调上下文、借用截止、失败后的状态和资源限制。 [协议架构](docs/zh/explanation/architecture.md) · [移植](docs/zh/guides/porting.md)
+- CMake target 定义依赖和公开用法。档位、资源默认、版本及配置身份各有一个权威来源。产品在配置前确定工具链，Boot 和应用镜像使用独立构建目录及 SDK 前缀。多配置构建逐配置保存产物和验证报告。 [编译档位](docs/zh/reference/profiles.md)
+- XGL 负责 Wire、组帧、路由、可靠状态和工作区管理。产品负责 PHY、显式时间、可选认证服务及恢复策略。每个实例由单一执行者操作，或由产品统一串行化全部 API 调用。遵守回调上下文、借用期限、失败后的状态和资源限制。 [协议架构](docs/zh/explanation/architecture.md) · [移植](docs/zh/guides/porting.md)
 - Boot 优先静态存储、窄接口和编译期能力选择。涉及 workspace、热路径或资源裁剪时，按实际目标组合核对 Flash、RAM、栈和运行边界。
 
 ## 修改与清理
