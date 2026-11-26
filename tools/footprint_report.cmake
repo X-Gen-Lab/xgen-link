@@ -1,35 +1,22 @@
-if(NOT DEFINED XGL_TARGET_FILE)
-    message(FATAL_ERROR "XGL_TARGET_FILE is required")
-endif()
+foreach(argument IN ITEMS XGL_TARGET_FILE XGL_REPORT_FILE XGL_PROJECT_VERSION XGL_PROFILE XGL_BUILD_CONFIG)
+    if(NOT DEFINED ${argument})
+        message(FATAL_ERROR "${argument} is required")
+    endif()
+endforeach()
 
-if(NOT DEFINED XGL_REPORT_FILE)
-    message(FATAL_ERROR "XGL_REPORT_FILE is required")
+if(XGL_BUILD_CONFIG STREQUAL "")
+    set(XGL_BUILD_CONFIG "unspecified")
 endif()
 
 file(SIZE "${XGL_TARGET_FILE}" XGL_ARCHIVE_BYTES)
 get_filename_component(XGL_REPORT_DIR "${XGL_REPORT_FILE}" DIRECTORY)
 file(MAKE_DIRECTORY "${XGL_REPORT_DIR}")
 
-set(XGL_REPORT "")
-string(APPEND XGL_REPORT "xgen-link footprint report\n")
-string(APPEND XGL_REPORT "version: ${XGL_PROJECT_VERSION}\n")
-string(APPEND XGL_REPORT "archive: ${XGL_TARGET_FILE}\n")
-string(APPEND XGL_REPORT "archive_bytes: ${XGL_ARCHIVE_BYTES}\n")
-string(APPEND XGL_REPORT "\n")
-string(APPEND XGL_REPORT "preset_ram_bytes:\n")
-string(APPEND XGL_REPORT "  tiny: tx_pool=1024 rx_buffer=160\n")
-string(APPEND XGL_REPORT "  small: tx_pool=2048 rx_buffer=288\n")
-string(APPEND XGL_REPORT "  medium: tx_pool=4096 rx_buffer=544\n")
-string(APPEND XGL_REPORT "  large: tx_pool=8192 rx_buffer=1056\n")
-string(APPEND XGL_REPORT "\n")
-string(APPEND XGL_REPORT "explicit_stack_buffers_bytes:\n")
-string(APPEND XGL_REPORT "  datalink_tx_stack_buffer: 512\n")
-string(APPEND XGL_REPORT "  datalink_rx_chunk: 128\n")
-string(APPEND XGL_REPORT "  target_max_stack: measure with compiler stack-usage or RTOS high-water mark\n")
-string(APPEND XGL_REPORT "\n")
-string(APPEND XGL_REPORT "dynamic_allocation_count:\n")
-string(APPEND XGL_REPORT "  tracked_by: test/unit/api/test_footprint.cpp counting and tracking allocators\n")
-string(APPEND XGL_REPORT "  phases: init, runtime_tx, runtime_rx, reliable, fragment\n")
-string(APPEND XGL_REPORT "  report_note: run xgl_tests to validate init/destroy balance and tiny runtime TX allocation budget\n")
-
-file(WRITE "${XGL_REPORT_FILE}" "${XGL_REPORT}")
+file(WRITE "${XGL_REPORT_FILE}"
+    "xgen-link archive size report\n"
+    "version: ${XGL_PROJECT_VERSION}\n"
+    "profile: ${XGL_PROFILE}\n"
+    "configuration: ${XGL_BUILD_CONFIG}\n"
+    "archive: ${XGL_TARGET_FILE}\n"
+    "archive_bytes: ${XGL_ARCHIVE_BYTES}\n"
+)
