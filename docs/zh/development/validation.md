@@ -45,7 +45,7 @@ python tools/quality.py coverage --build-dir build/ci
 
 本地使用 CMake 时，运行 `cmake --build --preset ci --target xgl_release_validation` 构建并执行已注册的 CTest 用例，包含 SDK 搬移消费和无堆检查。该目标也执行已选的 Cppcheck 与静态库体积报告。
 
-使用 `boot-small-host-test` 的配置、构建和测试 preset 验证单窗口槽与固定 RTO。`asan` preset 会让 AddressSanitizer 和 UndefinedBehaviorSanitizer 的诊断使测试失败。记录实际执行的 profile、编译器和 sanitizer。工具和主机测试框架的版本来源见 `tools/quality.json` 与 `test/CMakeLists.txt`。
+使用 `boot-small-host-test` 的配置、构建和测试 preset 验证单窗口槽与固定 RTO。`asan` preset 会让 AddressSanitizer 和 UndefinedBehaviorSanitizer 的诊断使测试失败。SDK 冒烟测试也会将两个独立消费者链接到经过插桩的库并运行。记录实际执行的 profile、编译器和 sanitizer。工具和主机测试框架的版本来源见 `tools/quality.json` 与 `test/CMakeLists.txt`。
 
 ## 资源和产品验收
 

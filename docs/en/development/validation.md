@@ -45,7 +45,7 @@ python tools/quality.py coverage --build-dir build/ci
 
 For a local CMake check, `cmake --build --preset ci --target xgl_release_validation` builds and runs the registered CTest cases, including the relocated SDK and no-heap smoke tests. It also runs the selected Cppcheck and archive footprint targets.
 
-Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. Record the profiles, compiler and sanitizer runs that executed. Tool and framework versions are defined by `tools/quality.json` and `test/CMakeLists.txt`.
+Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. The SDK smoke test also links and runs both independent consumers against the instrumented library. Record the profiles, compiler and sanitizer runs that executed. Tool and framework versions are defined by `tools/quality.json` and `test/CMakeLists.txt`.
 
 ## Resources and product qualification
 
