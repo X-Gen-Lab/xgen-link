@@ -46,4 +46,4 @@ cmake --build --preset gcc-test
 ctest --preset gcc-test --no-tests=error
 ```
 
-Use `boot-host-test`, `embedded-lite-host-test` or `embedded-host-test` for the corresponding capabilities. C11 examples, no-heap checks, documentation, quality and release helpers each require explicit selection. See the [development workflow](../development/workflow.md) for the complete verification path.
+Use `boot-host-test`, `embedded-lite-host-test` or `embedded-host-test` for the corresponding capabilities. C11 examples, no-heap checks, documentation and release validation each require explicit selection. See the [development workflow](../development/workflow.md) for the complete verification path.

@@ -49,7 +49,6 @@ class ProfileBuilds(unittest.TestCase):
                    f"-DXGL_BUILD_TESTS={'ON' if tests else 'OFF'}",
                    f"-DXGL_BUILD_EXAMPLES={'ON' if examples else 'OFF'}",
                    "-DXGL_BUILD_DOCS=OFF",
-                   "-DXGL_BUILD_STATIC_ANALYSIS_TARGET=OFF",
                    "-DXGL_BUILD_FOOTPRINT_REPORT=OFF",
                    "-DXGL_BUILD_NOHEAP_SMOKE=ON",
                    "-DXGL_BUILD_SDK_CONSUMER_SMOKE=ON",

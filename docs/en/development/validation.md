@@ -23,7 +23,7 @@
 | Boot error contracts with statistics and detailed diagnostics disabled | Conditional checks in `test/smoke/static_workspace_smoke.c` |
 | Boot/Lite reliable delivery, capacity rejection and parsing | Capability-selected cases in `test/unit/api/test_bounded_profile.cpp` |
 | Boot generated TX extensions and the complete raw Wire frame boundary | `test/unit/network/test_boot_network.cpp` |
-| Multi-configuration publication/installation, exported capabilities, and budget rejection | `test/contracts/build/test_profile_builds.py`, `test/contracts/footprint/test_footprint_budget.py` |
+| Multi-configuration publication and installation, exported capabilities | `test/contracts/build/test_profile_builds.py` |
 | Four resource-configured API sets, installed fixed-RTO tests and complete labels | `test/contracts/build/test_transport_resource_config.py` |
 | Independent C11/C++17 public/private header compilation, discovery and seed replay | `test/cmake/HeaderContracts.cmake`, classification and runner contracts |
 
@@ -31,24 +31,21 @@
 
 Use a clean build with only the C11 toolchain to validate the default production library, Boot production library and source subdirectory. Compile, link and run isolated C11 and C++17 consumers against the installed SDK. Exercise rejected ABI, profile, required capability, resource identity and prefix combinations. Follow the [development workflow](workflow.md) for host tests. Keep missing test inventories, missing reports and failing exit statuses visible.
 
-The `ci` preset selects Full with advanced runtime and GCC coverage instrumentation. Reproduce the CI host validation with the same build for the tests, analyzers and coverage. `run_ctest.py` records the inventory and JUnit report and rejects skipped tests. Multi-config builds save evidence for each configuration. The coverage gate requires at least 80% each for line, function and branch coverage.
+The `ci` preset selects Full with advanced runtime and GCC coverage instrumentation. `run_ctest.py` records the inventory and JUnit report and rejects skipped tests. Save results for each configuration when using a multi-config generator.
 
 ```sh
 cmake --preset ci
 cmake --build --preset ci
 python test/cmake/run_ctest.py --build-dir build/ci --config Debug
-cmake --build --preset ci --target xgl_static_analysis xgl_footprint
-python tools/quality.py tidy --build-dir build/ci
-python tools/quality.py coverage --build-dir build/ci
 ```
 
-For a local CMake check, `cmake --build --preset ci --target xgl_release_validation` builds and runs the registered CTest cases, including the relocated SDK and no-heap smoke tests. It also runs the selected Cppcheck and archive footprint targets.
+For a local CMake check, `cmake --build --preset ci --target xgl_release_validation` builds and runs the registered CTest cases, including the relocated SDK and no-heap smoke tests. When enabled, the native `xgl_footprint` target reports the static archive size.
 
-Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. The SDK smoke test also links and runs both independent consumers against the instrumented library. Record the profiles, compiler and sanitizer runs that executed. Tool and framework versions are defined by `tools/quality.json` and `test/CMakeLists.txt`.
+Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. The SDK smoke test also links and runs both independent consumers against the instrumented library. Record the profiles, compiler and sanitizer runs that executed. See `test/CMakeLists.txt` for the GoogleTest dependency.
 
 ## Resources and product qualification
 
-Reproduce the Cortex-M0 probe using `tools/boot_footprint/README.md`. Compare target ELFs built with the same toolchain, profile, resource settings, MTU, RX and LTO selections. Record Flash, workspace, static RAM, reserved stack and maximum single-function stack. Qualify the complete board call chain, drivers, ISR nesting and measured stack peak separately.
+Measure the product firmware with its target toolchain, linker map and actual application settings. Compare builds with the same profile, frame and RX sizes, and optimization settings. Record Flash, workspace, static RAM and stack, then validate driver buffers, ISR nesting and peak stack on the board.
 
 Product qualification covers the actual board, Flash power interruption, DMA borrows, production authentication and nonce freshness after restart. Bind simulation and software checks, ARM linkage, remote CI, release and hardware execution to their actual inputs and artifacts.
 

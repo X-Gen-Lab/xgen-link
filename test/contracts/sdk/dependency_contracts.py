@@ -147,7 +147,7 @@ class StandaloneContracts(unittest.TestCase):
             'add_library(xgm::allocator INTERFACE IMPORTED)\n'
             f'add_subdirectory("{ARGS.link_source.as_posix()}" production)\n'
             'foreach(target IN ITEMS xgl_tests xgl_docs xgl_noheap xgl_footprint\n'
-            '        xgl_release_validation xgl_sdk_consumer_smoke xgl_static_analysis)\n'
+            '        xgl_release_validation xgl_sdk_consumer_smoke)\n'
             '  if(TARGET ${target})\n'
             '    message(FATAL_ERROR "Unexpected developer target: ${target}")\n'
             '  endif()\n'

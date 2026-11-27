@@ -48,4 +48,4 @@ scope 由远端节点、connection ID 和 epoch 标识。恢复时不能在旧 s
 
 只有 `requirements.size` 表示总字节数。`runtime_blocks` 是所有类别槽数之和；`runtime_block_size` 是最大槽位步长，两者相乘不能描述实际分区布局。
 
-ABI、profile、路由数、帧大小及全部容量都会影响 RAM。`tools/boot_footprint` 中的 Cortex-M0 工程导出目标布局常量，链接真实 API 路径，并输出 map、栈和堆符号报告。BSP、应用缓冲、ISR 嵌套及完整调用链栈须另外核算。
+ABI、profile、路由数、帧大小及全部容量都会影响 RAM。用产品工具链测量 workspace 并检查最终链接固件。核算 BSP、应用缓冲、ISR 嵌套和完整调用链所需的栈。

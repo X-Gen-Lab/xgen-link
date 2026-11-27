@@ -12,7 +12,6 @@ on:
       - cmake/XglVersion.cmake
       - Doxyfile
       - mkdocs.yml
-      - tools/docs_qa.ps1
       - .github/workflows/pages.yml
   pull_request:
     branches:
@@ -73,11 +72,7 @@ jobs:
             python -m pip show mkdocs mkdocs-material
             cmake --version
             doxygen --version
-            pwsh --version
           ) 2>&1 | tee build/docs-diagnostics/tool-versions.log
-
-      - name: Run documentation QA
-        run: pwsh -NoProfile -File tools/docs_qa.ps1 2>&1 | tee build/docs-diagnostics/qa.log
 
       - name: Build MkDocs and Doxygen
         run: |

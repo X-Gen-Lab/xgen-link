@@ -58,4 +58,4 @@ scoped 接收回调可返回 BUSY。若缓存中的乱序包已经由协议接�
 
 执行预算、pending 和 DMA owner 示例见[有界接收与运行](../explanation/runtime.md)。预算限制工作次数，不能替代完整 WCET 测量。旧 step 在扩展构建中使用无限候选和维护配额，不应在需要有界运行时混用。
 
-主机 GoogleTest 验证行为；每个 profile 的实际 ELF、栈、DMA cache 一致性、中断延时与产品内存预算需分别验收。启用宏但只调用旧 API 的 footprint 不等于扩展 API 完整调用图的成本。
+主机 GoogleTest 验证行为；每个 profile 的实际 ELF、栈、DMA cache 一致性、中断延时与产品内存预算需分别验收。测量时构建实际调用扩展 API 的产品固件。

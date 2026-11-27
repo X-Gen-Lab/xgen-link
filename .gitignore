@@ -13,14 +13,6 @@ cmake-build-*/
 *.swo
 *~
 
-# VS Code (keep settings, ignore user-specific)
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
-
 # Compiled files
 *.o
 *.obj

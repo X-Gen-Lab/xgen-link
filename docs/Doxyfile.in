@@ -1,4 +1,4 @@
-# Share the public-header validation policy with the quality runner.
+# Use the repository's public API validation policy when building the site.
 @INCLUDE               = "@XGL_SOURCE_DIRECTORY@/Doxyfile"
 PROJECT_NUMBER         = "@XGL_DOC_VERSION@"
 OUTPUT_DIRECTORY       = "@XGL_DOXYGEN_OUTPUT_DIR@"

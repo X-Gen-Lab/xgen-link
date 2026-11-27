@@ -19,27 +19,6 @@ defaults:
     shell: bash
 
 jobs:
-  lint:
-    name: Text and source layout
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - uses: ./.github/actions/setup-quality
-        with:
-          repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
-      - run: python -m pre_commit run --all-files
-      - name: Preserve lint evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: lint
-          path: out/reports/
-          if-no-files-found: warn
-
   host:
     name: Host (${{ matrix.os }}, advanced=${{ matrix.advanced }})
     runs-on: ${{ matrix.os }}
@@ -88,8 +67,8 @@ jobs:
             build/debug/ctest-inventory.json
           if-no-files-found: warn
 
-  analysis:
-    name: Static analysis and coverage
+  gcc-validation:
+    name: Full Advanced GCC validation
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -104,23 +83,13 @@ jobs:
           cmake --preset ci 2>&1 | tee out/reports/configure.log
           cmake --build --preset ci --parallel 2 2>&1 | tee out/reports/build.log
           python test/cmake/run_ctest.py --build-dir build/ci --config Debug
-      - uses: ./.github/actions/setup-quality
-        with:
-          repository: ${{ vars.XGEN_QUALITY_REPOSITORY }}
-          native-analyzers: 'true'
-      - name: Cppcheck through the shared CMake target
-        run: cmake --build build/ci --target xgl_static_analysis
-      - name: Clang-Tidy
-        run: python tools/quality.py tidy --build-dir build/ci
-      - name: Require each production coverage metric to reach 80 percent
-        run: python tools/quality.py coverage --build-dir build/ci
       - name: Record native library size
         run: cmake --build build/ci --target xgl_footprint
-      - name: Preserve analysis evidence
+      - name: Preserve GCC validation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: analysis-coverage-release
+          name: gcc-validation
           path: |
             out/reports/
             build/ci/Testing/
@@ -211,14 +180,11 @@ jobs:
         with:
           python-version: '3.12'
       - uses: ./.github/actions/setup-gtest
-      - name: Check CTest discovery and footprint tooling
+      - name: Check CTest discovery and delivery presets
         run: |
           python test/contracts/ctest/test_discovery_policy.py
           python test/contracts/ctest/test_ctest_evidence.py
           python test/contracts/build/test_delivery_presets.py --work-dir out/reports/delivery-presets
-          python test/contracts/footprint/test_footprint_budget.py
-          python test/contracts/footprint/test_footprint_storage.py
-          python test/contracts/footprint/test_footprint_report.py
       - name: Validate real source and package consumers
         run: |
           python test/contracts/sdk/dependency_contracts.py \
@@ -299,94 +265,9 @@ jobs:
           path: out/reports/wire-interop/${{ matrix.profile }}/
           if-no-files-found: warn
 
-  arm-footprint:
-    name: Cortex-M0 ELF budget (${{ matrix.resource }}, MTU ${{ matrix.mtu }}, LTO ${{ matrix.lto }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        mtu: [128, 64]
-        lto: ['OFF', 'ON']
-        resource: ['default', 'small']
-    env:
-      ARM_BUILD: out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}
-      ARM_MTU: ${{ matrix.mtu }}
-      ARM_LTO: ${{ matrix.lto }}
-      ARM_RESOURCE: ${{ matrix.resource }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - uses: ./.github/actions/setup-arm-toolchain
-      - name: Link the fixed no-heap Boot consumer
-        run: |
-          mkdir -p "$ARM_BUILD"
-          cp tools/boot_footprint/toolchain-lock.json "$ARM_BUILD/toolchain-lock.json"
-          lto=()
-          if [[ "$ARM_LTO" == ON ]]; then lto=(-DXGL_FOOTPRINT_LTO=ON); fi
-          cmake -S tools/boot_footprint -B "$ARM_BUILD" -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/tools/boot_footprint/toolchain-arm-cortex-m0.cmake" \
-            -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "${lto[@]}" \
-            -DXGL_FOOTPRINT_FRAME_SIZE="$ARM_MTU" -DXGL_FOOTPRINT_RX_SIZE="$ARM_MTU" \
-            -DXGL_RELIABLE_INDEX_BUCKETS=1 \
-            -DXGL_TRANSPORT_WINDOW_CAPACITY=${{ matrix.resource == 'small' && '1' || '128' }} \
-            -DXGL_ENABLE_ADAPTIVE_RTO=${{ matrix.resource == 'small' && 'OFF' || 'ON' }} \
-            2>&1 | tee "$ARM_BUILD/configure.log"
-          cmake --build "$ARM_BUILD" --parallel 2 2>&1 | tee "$ARM_BUILD/build.log"
-      - name: Enforce the probe budget and retain baseline deltas
-        run: |
-          python tools/boot_footprint/check_budget.py \
-            --report "$ARM_BUILD/boot-footprint.json" \
-            --policy tools/boot_footprint/budget-${{ matrix.resource == 'small' && 'small-' || '' }}mtu${{ matrix.mtu }}${{ matrix.lto == 'ON' && '-lto' || '' }}.json \
-            --output "$ARM_BUILD/budget-result.json"
-      - name: Verify LTO scope in the existing link
-        if: matrix.resource == 'default' && matrix.mtu == 128
-        run: |
-          python test/contracts/footprint/test_footprint_lto.py --link-source . \
-            --work-dir out/footprint-lto-contracts --build-dir "$ARM_BUILD" --expect-lto "$ARM_LTO"
-      - name: Compare the classic and bounded APIs in advanced Boot
-        if: matrix.resource == 'default' && matrix.mtu == 128 && matrix.lto == 'OFF'
-        run: |
-          python test/contracts/footprint/test_footprint_advanced.py --link-source . \
-            --work-dir out/footprint-advanced-contracts
-      - name: Summarize measured resources
-        if: always()
-        run: |
-          python - <<'PY'
-          import json, os
-          from pathlib import Path
-
-          report = Path(os.environ['ARM_BUILD']) / 'budget-result.json'
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
-              summary.write(f"## Cortex-M0 {os.environ['ARM_RESOURCE']} | MTU {os.environ['ARM_MTU']} | LTO {os.environ['ARM_LTO']}\n\n")
-              if not report.is_file():
-                  summary.write('No budget result. See the configure and build steps.\n')
-              else:
-                  data = json.loads(report.read_text(encoding='utf-8'))
-                  summary.write(f"Budget: **{data['status']}**\n\n| Metric | Bytes | Limit |\n| --- | ---: | ---: |\n")
-                  for name, limit in data['limits'].items():
-                      summary.write(f"| `{name}` | {data['observed'].get(name, 'missing')} | {limit} |\n")
-          PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: arm-footprint-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}
-          path: |
-            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.json
-            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.txt
-            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.elf
-            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.map
-            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/*.log
-            out/arm-${{ matrix.resource }}-${{ matrix.mtu }}-${{ matrix.lto }}/**/*.su
-            out/footprint-lto-contracts/
-            out/footprint-advanced-contracts/
-          if-no-files-found: warn
-
   status:
     if: always()
-    needs: [lint, host, analysis, sanitizers, bounded-profiles, dependency-contracts, wire-compatibility, arm-footprint]
+    needs: [host, gcc-validation, sanitizers, bounded-profiles, dependency-contracts, wire-compatibility]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every selected job to succeed

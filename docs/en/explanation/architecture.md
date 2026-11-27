@@ -43,4 +43,4 @@ Calls on one instance are serialized by the caller. Callbacks cannot reenter or 
 
 Production exports one `xgl::xgl` target. `cmake/XglVersion.cmake` supplies the version to the library and standalone docs. `XglProfiles.cmake` resolves the profile and resource identity, `XglSources.cmake` selects the production translation units by capability, and `XglLibrary.cmake` assembles the library with its matching configuration header. `XglInstall.cmake` exports the SDK and `XglDevelopment.cmake` registers the selected development checks.
 
-Protocol regression suites live under `test/unit/<layer>`, `test/integration`, and `test/property`. `test/smoke` contains the C11 fixtures, `test/interop` contains the cross-SDK Wire peers, and `test/contracts` groups build, SDK, CTest, and footprint checks. Test discovery preserves historical names and replay seeds.
+Protocol regression suites live under `test/unit/<layer>`, `test/integration`, and `test/property`. `test/smoke` contains the C11 fixtures, `test/interop` contains Wire v1 peer fixtures, and `test/contracts` groups build, SDK and CTest checks. Test discovery preserves historical names and replay seeds.

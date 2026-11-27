@@ -33,4 +33,4 @@ Callbacks cannot reenter or destroy the instance. Queue recovery for after retur
 
 A failed reliable scope requires explicit retirement and a new epoch. Close unauthenticated peers with `xgl_close_peer()` after coordinating stale-traffic draining. Close authenticated sessions through `xgl_close_security_session()` and install fresh trusted parameters.
 
-If failures appear only on hardware, compare the final linker map, call-stack depth, driver partial-send behavior, DMA lifetime, interrupt concurrency, and clock source. The generic footprint ELF proves linking and resource accounting, not board execution.
+If failures appear only on hardware, compare the final linker map, call-stack depth, driver partial-send behavior, DMA lifetime, interrupt concurrency, and clock source.

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Begin Wire v1 with the existing frame layout, CRC rules and active field assignments. Endpoints and relays accept version 1.
 - Remove protocol fragmentation, reassembly and their resource settings. Each DATA submission fits in one frame. Larger transfers use application-defined blocks.
 - Bump the SDK and configuration ABI to 5 and the advanced options descriptor to version 2.
+- Retire the repository tooling scripts, VS Code settings and their build hooks, including the Cortex-M0 footprint gate.
 
 ## SDK 4 development (historical)
 

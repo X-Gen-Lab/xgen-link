@@ -39,6 +39,6 @@ For a platform such as Nexus, keep the adapter in the product. Before TX returns
 
 ## Verification
 
-Exercise split frames, bursts, full RX rings, PHY backpressure, lost ACKs, clock wrap, and resource exhaustion on the real driver. Use the Cortex-M0 footprint consumer as a link-measurement reference; its startup and empty RX callback are not a board support package.
+Exercise split frames, bursts, full RX rings, PHY backpressure, lost ACKs, clock wrap, and resource exhaustion on the real driver.
 
 See the [relative-deadline guide](low-power.md) for low-power scheduling.

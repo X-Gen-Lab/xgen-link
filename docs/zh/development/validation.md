@@ -23,7 +23,7 @@
 | Boot 关闭统计和详细诊断时保留错误契约 | `test/smoke/static_workspace_smoke.c` 的条件分支 |
 | Boot/Lite 可靠交付、容量拒绝与 parser | `test/unit/api/test_bounded_profile.cpp` 的按能力测试 |
 | Boot 生成的 TX 扩展与 raw wire 的完整帧边界 | `test/unit/network/test_boot_network.cpp` |
-| 多配置发布/安装、导出能力与预算拒绝 | `test/contracts/build/test_profile_builds.py`、`test/contracts/footprint/test_footprint_budget.py` |
+| 多配置发布与安装、导出能力 | `test/contracts/build/test_profile_builds.py` |
 | 四组资源配置 API、固定 RTO 安装测试及标签完整性 | `test/contracts/build/test_transport_resource_config.py` |
 | 公开/私有头文件独立 C11/C++17 编译、逐例发现、种子回放 | `test/cmake/HeaderContracts.cmake`、分类与 runner 契约测试 |
 
@@ -31,24 +31,21 @@
 
 在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库和源码子目录。独立安装消费实际编译、链接并运行公开 C11 和 C++17 程序，覆盖 ABI、profile、必需能力、资源身份和前缀冲突。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。
 
-`ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。复现 CI 主机验证时，对同一个构建运行测试、分析器和覆盖率检查。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。多配置构建逐配置保存证据。行、函数和分支覆盖率均至少达到 80%。
+`ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。多配置构建逐配置保存结果。
 
 ```sh
 cmake --preset ci
 cmake --build --preset ci
 python test/cmake/run_ctest.py --build-dir build/ci --config Debug
-cmake --build --preset ci --target xgl_static_analysis xgl_footprint
-python tools/quality.py tidy --build-dir build/ci
-python tools/quality.py coverage --build-dir build/ci
 ```
 
-本地使用 CMake 时，运行 `cmake --build --preset ci --target xgl_release_validation` 构建并执行已注册的 CTest 用例，包含 SDK 搬移消费和无堆检查。该目标也执行已选的 Cppcheck 与静态库体积报告。
+本地使用 CMake 时，运行 `cmake --build --preset ci --target xgl_release_validation` 构建并执行已注册的 CTest 用例，包含 SDK 搬移消费和无堆检查。如启用了本机构建的 `xgl_footprint` 目标，可用它报告静态库文件大小。
 
-使用 `boot-small-host-test` 的配置、构建和测试 preset 验证单窗口槽与固定 RTO。`asan` preset 会让 AddressSanitizer 和 UndefinedBehaviorSanitizer 的诊断使测试失败。SDK 冒烟测试也会将两个独立消费者链接到经过插桩的库并运行。记录实际执行的 profile、编译器和 sanitizer。工具和主机测试框架的版本来源见 `tools/quality.json` 与 `test/CMakeLists.txt`。
+使用 `boot-small-host-test` 的配置、构建和测试 preset 验证单窗口槽与固定 RTO。`asan` preset 会让 AddressSanitizer 和 UndefinedBehaviorSanitizer 的诊断使测试失败。SDK 冒烟测试也会将两个独立消费者链接到经过插桩的库并运行。记录实际执行的 profile、编译器和 sanitizer。GoogleTest 依赖见 `test/CMakeLists.txt`。
 
 ## 资源和产品验收
 
-`tools/boot_footprint/README.md` 描述 Cortex-M0 探针复现方式。比较同工具链、profile、资源选项、MTU、RX 和 LTO 组合的目标 ELF。记录 Flash、workspace、静态 RAM、预留栈与最大单函数栈；板级完整调用链、驱动、ISR 叠加和实测栈峰值另外验证。
+用产品目标工具链、最终链接 map 和实际应用配置测量固件。比较时保持档位、帧与接收缓冲大小和优化选项一致。记录 Flash、workspace、静态 RAM 和栈空间，再在板上核对驱动缓冲、ISR 嵌套及栈峰值。
 
 真实板卡、Flash 断电、DMA 借用、生产认证和重启后 nonce 新鲜性由产品验收。模拟与软件检查、ARM 链接、远端 CI、发布和硬件执行各自关联实际提交与产物。
 

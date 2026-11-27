@@ -117,8 +117,7 @@
       "inherits": "gcc-coverage",
       "cacheVariables": {
         "XGL_PROFILE": "full",
-        "XGL_ENABLE_ADVANCED_RUNTIME": "ON",
-        "XGL_BUILD_STATIC_ANALYSIS_TARGET": "ON"
+        "XGL_ENABLE_ADVANCED_RUNTIME": "ON"
       }
     },
     {

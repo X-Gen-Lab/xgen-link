@@ -43,4 +43,4 @@ flowchart LR
 
 生产导出一个 `xgl::xgl` target。`cmake/XglVersion.cmake` 为库与独立文档提供版本，`XglProfiles.cmake` 解析档位与资源身份，`XglSources.cmake` 按能力列出生产编译单元，`XglLibrary.cmake` 组装带匹配配置头的库。`XglInstall.cmake` 导出 SDK，`XglDevelopment.cmake` 接入按需启用的开发检查。
 
-协议回归位于 `test/unit/<layer>`、`test/integration` 和 `test/property`。`test/smoke` 保存 C11 夹具，`test/interop` 保存 Wire v1 双端点夹具，`test/contracts` 按构建、安装、CTest 与资源报告区分验证对象。历史用例和回放种子由现有发现入口维护。
+协议回归位于 `test/unit/<layer>`、`test/integration` 和 `test/property`。`test/smoke` 保存 C11 夹具，`test/interop` 保存 Wire v1 双端点夹具，`test/contracts` 按构建、安装与 CTest 区分验证对象。历史用例和回放种子由现有发现入口维护。

@@ -50,4 +50,4 @@ A protocol no-heap claim does not cover application drivers or authentication pr
 
 Only `requirements.size` is the total byte count. `runtime_blocks` counts slots across all categories; `runtime_block_size` is the largest stride. Multiplying them does not describe the partitioned layout.
 
-ABI, profile, route count, frame size, and all capacities affect RAM. The Cortex-M0 probe in `tools/boot_footprint` generates target layout constants and links real API paths, with map, stack, and heap-symbol reports. Account separately for BSP memory, application buffers, ISR nesting, and total call-stack depth.
+ABI, profile, route count, frame size, and all capacities affect RAM. Use the product toolchain to measure workspace size and inspect the linked firmware. Account for BSP memory, application buffers, ISR nesting and total call-stack depth.

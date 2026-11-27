@@ -52,7 +52,6 @@ class TransportResourceConfig(unittest.TestCase):
                    "-DXGL_BUILD_DOCS=OFF", "-DXGL_BUILD_FOOTPRINT_REPORT=OFF",
                    "-DXGL_BUILD_NOHEAP_SMOKE=OFF", "-DXGL_BUILD_SDK_CONSUMER_SMOKE=OFF",
                    "-DXGL_BUILD_RELEASE_VALIDATION_TARGET=OFF",
-                   "-DXGL_BUILD_STATIC_ANALYSIS_TARGET=OFF",
                    f"-DXGL_RELIABLE_INDEX_BUCKETS={buckets}",
                    f"-DXGL_TRANSPORT_WINDOW_CAPACITY={capacity}",
                    f"-DXGL_ENABLE_ADAPTIVE_RTO={adaptive}",

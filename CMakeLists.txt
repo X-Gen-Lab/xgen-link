@@ -13,7 +13,6 @@ option(XGL_BUILD_EXAMPLES "Build examples" OFF)
 option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
 option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" OFF)
-option(XGL_BUILD_STATIC_ANALYSIS_TARGET "Build static analysis helper target" OFF)
 option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" OFF)
 option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" OFF)
 option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" OFF)
@@ -22,9 +21,6 @@ if(CMAKE_CROSSCOMPILING AND
    (XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE OR XGL_BUILD_SDK_CONSUMER_SMOKE))
     message(FATAL_ERROR
         "XGL_BUILD_TESTS, XGL_BUILD_NOHEAP_SMOKE and XGL_BUILD_SDK_CONSUMER_SMOKE require a separate native host build")
-endif()
-if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
 include(cmake/XglProfiles.cmake)

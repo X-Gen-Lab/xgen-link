@@ -1,6 +1,6 @@
 # 开发工作流
 
-使用 C11 生产构建和严格 C++17 主机测试。安装 `tools/quality.json` 固定提交的共享 `xgen-quality` 和该检查所需工具。配置及编译使用已准备的依赖。
+使用 C11 生产构建和严格 C++17 主机测试。配置前准备 CMake、所选编译器和测试依赖。
 
 ## 行为与回归
 
@@ -9,18 +9,16 @@
 从仓库根目录，按[构建与消费](../guides/build-and-consume.md)配置并构建主机测试，再执行：
 
 ```sh
-python tools/quality.py text
-python tools/quality.py format
-python tools/quality.py test --build-dir build/gcc-test
+ctest --preset gcc-test --no-tests=error
 ```
 
-共享运行器检查 CTest 清单和实际 JUnit。CI 主机任务用 `python test/cmake/run_ctest.py --build-dir build/debug --config Debug` 记录并核对全部 CTest 执行，无需安装共享质量工具。失败时保留首次错误和可复现命令。性质测试支持 `XGL_PROPERTY_SEED` 固定随机输入。
+CI 主机任务用 `python test/cmake/run_ctest.py --build-dir build/debug --config Debug` 保存并核对测试清单与 JUnit 结果。失败时保留首次错误和可复现命令。性质测试支持 `XGL_PROPERTY_SEED` 固定随机输入。
 
-合并验收以 `CI` 的 `status` 和 `Documentation` 的 `Build documentation site` 为门禁。部署复用同一次文档构建的站点产物。格式和分析任务从 `tools/quality.json` 读取质量工具来源和版本。
+CI 的 `status` 任务汇总主机测试、档位测试和 SDK 检查结果。文档工作流的 `Build documentation site` 任务生成经验证的部署产物。
 
-## 分析与文档
+## 文档
 
-使用实际编译数据库进行 Cppcheck 或 clang-tidy。显式准备工具，从根目录调用 `python tools/quality.py cppcheck --build-dir <dir>` 或 `python tools/quality.py tidy --build-dir <dir>`。诊断例外依[工程约定](../../standards.md)记载。文档检查使用[文档维护](documentation.md)中的独立入口。
+按[文档维护](documentation.md)运行独立 CMake 构建，验证双语站点及生成的公开 API 参考。
 
 ## 完成条件
 

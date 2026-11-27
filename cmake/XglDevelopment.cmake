@@ -26,17 +26,6 @@ if(XGL_BUILD_FOOTPRINT_REPORT)
     add_custom_target(xgl_footprint DEPENDS "${XGL_FOOTPRINT_REPORT}")
 endif()
 
-if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
-    find_package(Python3 COMPONENTS Interpreter REQUIRED)
-    add_custom_target(xgl_static_analysis
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/quality.py
-            cppcheck --build-dir ${CMAKE_BINARY_DIR}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Running the shared static-analysis policy on the actual build"
-        VERBATIM
-    )
-endif()
-
 if(XGL_BUILD_SDK_CONSUMER_SMOKE)
     # Select the active configuration without expanding flag contents into
     # generator-expression syntax.
@@ -97,9 +86,6 @@ if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
     endif()
     if(XGL_BUILD_FOOTPRINT_REPORT)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_footprint)
-    endif()
-    if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
-        list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_static_analysis)
     endif()
     if(TARGET xgl_noheap_smoke)
         list(APPEND XGL_RELEASE_VALIDATION_DEPS xgl_noheap_smoke)

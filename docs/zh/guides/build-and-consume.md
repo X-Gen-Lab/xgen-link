@@ -46,4 +46,4 @@ cmake --build --preset gcc-test
 ctest --preset gcc-test --no-tests=error
 ```
 
-使用 `boot-host-test`、`embedded-lite-host-test` 或 `embedded-host-test` 验证对应能力。C11 示例、无堆检查、文档、质量及发布辅助各自显式开启。完整验证流程见[开发工作流](../development/workflow.md)。
+使用 `boot-host-test`、`embedded-lite-host-test` 或 `embedded-host-test` 验证对应能力。C11 示例、无堆检查、文档及发布验证各自显式开启。完整验证流程见[开发工作流](../development/workflow.md)。

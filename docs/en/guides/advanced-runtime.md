@@ -58,4 +58,4 @@ Closing a security session retains its nonce-domain record; repeated installatio
 
 See [bounded receive and runtime](../explanation/runtime.md) for limits, pending and a DMA owner example. Work-count limits do not replace whole-step WCET measurements. Legacy step uses unlimited candidate and maintenance quotas in an advanced build; do not mix entries where bounded execution is required.
 
-Host GoogleTest verifies behavior. Profile ELFs, stack, DMA cache coherency, interrupt latency and product RAM budgets require separate validation. A footprint that enables the feature but calls only legacy APIs does not measure the complete advanced API call graph.
+Host GoogleTest verifies behavior. Profile ELFs, stack, DMA cache coherency, interrupt latency and product RAM budgets require separate validation. Measure the firmware with the advanced runtime APIs it uses.

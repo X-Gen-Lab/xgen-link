@@ -6,7 +6,7 @@ The Boot profile retains static workspaces, a single peer, at most one route and
 
 Choose a [build profile](../reference/profiles.md) and use `xgl_config_get_preset_boot()` to set the runtime configuration. Set the route, nodes, MTU, RX buffer and time budget. Query target size and alignment through `xgl_memory_requirements()`, provide static storage and initialize with `xgl_init_static()`. Derive payload limits by subtracting the actual header, TLVs and CRC.
 
-Compare equivalent Cortex-M0 probe ELFs and account for external PHY buffers, timing and call-chain stack. Set the runtime window and compiled window capacity separately. See [Validation](../development/validation.md) for resource evidence.
+Measure the target firmware and account for external PHY buffers, timing and call-chain stack. Set the runtime window and compiled window capacity separately. See [Validation](../development/validation.md) for resource evidence.
 
 ## Receive and commit
 
