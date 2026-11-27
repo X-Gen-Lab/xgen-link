@@ -140,55 +140,14 @@ xgl_error_t xgl_wire_decode_ext_metadata(const uint8_t* extensions,
                 }
                 metadata->has_security_ext = true;
                 break;
+            case 4U: /* Retired extension type, reserved in Wire v1. */
+                return XGL_ERR_INVALID_FRAME;
             default:
-                /* Skip unknown noncritical extensions in v3. */
+                /* Skip unassigned noncritical extensions. */
                 break;
         }
     }
     return (err == XGL_ERR_NOT_FOUND) ? XGL_OK : err;
-}
-
-/* Parameter order follows the documented protocol fields and units. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-xgl_error_t xgl_wire_encode_fragment_ext_value(
-    uint8_t* buffer, size_t buffer_size, uint32_t message_id,
-    uint32_t fragment_offset, uint32_t message_len, size_t* bytes_written) {
-    /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    if (buffer == NULL || bytes_written == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (buffer_size < XGL_FRAGMENT_EXT_VALUE_SIZE) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    xgl_serialize_u32_le(&buffer[0], message_id);
-    xgl_serialize_u32_le(&buffer[4], fragment_offset);
-    xgl_serialize_u32_le(&buffer[8], message_len);
-    *bytes_written = XGL_FRAGMENT_EXT_VALUE_SIZE;
-
-    return XGL_OK;
-}
-
-xgl_error_t xgl_wire_decode_fragment_ext_value(const uint8_t* buffer,
-                                               size_t buffer_size,
-                                               uint32_t* message_id,
-                                               uint32_t* fragment_offset,
-                                               uint32_t* message_len) {
-    if (buffer == NULL || message_id == NULL || fragment_offset == NULL ||
-        message_len == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (buffer_size != XGL_FRAGMENT_EXT_VALUE_SIZE) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    *message_id = xgl_deserialize_u32_le(&buffer[0]);
-    *fragment_offset = xgl_deserialize_u32_le(&buffer[4]);
-    *message_len = xgl_deserialize_u32_le(&buffer[8]);
-
-    return XGL_OK;
 }
 
 /* Parameter order follows the documented protocol fields and units. */

@@ -135,42 +135,22 @@ static bool plan_initialization(const xgl_config_t* config,
 }
 
 /**
- * \brief           Plan optional out-of-order and message retention classes
+ * \brief           Plan optional out-of-order storage
  */
-static bool plan_optional_resources(const xgl_config_t* config,
-                                    xgl_workspace_plan_t* plan) {
+static bool plan_rx_resources(const xgl_config_t* config,
+                              xgl_workspace_plan_t* plan) {
 #if XGL_FEATURE_OUT_OF_ORDER
     const size_t rx_count = config->features.max_rx_buffered_packets;
     const size_t payload_size = (size_t)config->protocol.max_frame_size -
                                 XGL_WIRE_BASE_HEADER_SIZE - XGL_CRC16_SIZE;
-    if (!set_resource(plan, XGL_RESOURCE_RX_PACKET,
-                      sizeof(xgl_transport_rx_buffered_packet_t), rx_count) ||
-        !set_resource(plan, XGL_RESOURCE_RX_PAYLOAD, payload_size, rx_count)) {
-        return false;
-    }
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    if (config->features.enable_fragmentation) {
-        const size_t peers = config->features.max_peers;
-        const size_t slots = config->features.max_reassembly_slots;
-        const size_t message_size = config->features.max_message_size;
-        size_t retained;
-        if (!add_size(slots, peers, &retained) ||
-            !set_resource(plan, XGL_RESOURCE_TX_EXTENSIONS,
-                          XGL_FRAGMENT_EXT_SIZE,
-                          config->features.max_tx_packets) ||
-            !set_resource(plan, XGL_RESOURCE_TX_MESSAGE, message_size, peers) ||
-            !set_resource(plan, XGL_RESOURCE_REASSEMBLY,
-                          sizeof(xgl_reassembly_buffer_t), slots) ||
-            !set_resource(plan, XGL_RESOURCE_REASSEMBLY_PAYLOAD, message_size,
-                          retained)) {
-            return false;
-        }
-    }
-#endif
+    return set_resource(plan, XGL_RESOURCE_RX_PACKET,
+                        sizeof(xgl_transport_rx_buffered_packet_t), rx_count) &&
+           set_resource(plan, XGL_RESOURCE_RX_PAYLOAD, payload_size, rx_count);
+#else
     (void)config;
     (void)plan;
     return true;
+#endif
 }
 
 /**
@@ -198,7 +178,7 @@ static xgl_error_t make_plan(const xgl_config_t* config,
          */
         !set_resource(plan, XGL_RESOURCE_SCRATCH,
                       config->protocol.max_frame_size, 1U) ||
-        !plan_optional_resources(config, plan)) {
+        !plan_rx_resources(config, plan)) {
         return XGL_ERR_INVALID_PARAM;
     }
     return XGL_OK;
@@ -217,12 +197,6 @@ static void bind_services(xgl_workspace_t* workspace) {
 #if XGL_FEATURE_OUT_OF_ORDER
     memory->rx_packet = &services[XGL_RESOURCE_RX_PACKET];
     memory->rx_payload = &services[XGL_RESOURCE_RX_PAYLOAD];
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    memory->tx_extensions = &services[XGL_RESOURCE_TX_EXTENSIONS];
-    memory->tx_message = &services[XGL_RESOURCE_TX_MESSAGE];
-    memory->reassembly = &services[XGL_RESOURCE_REASSEMBLY];
-    memory->reassembly_payload = &services[XGL_RESOURCE_REASSEMBLY_PAYLOAD];
 #endif
 }
 
@@ -261,26 +235,14 @@ xgl_error_t xgl_options_validate(const xgl_config_t* config,
     if (options == NULL || config == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    if (options->size != sizeof(*options) || options->version != 1U ||
+    if (options->size != sizeof(*options) ||
+        options->version != XGL_INSTANCE_OPTIONS_VERSION ||
         !config_abi_matches(options->config_size, options->config_abi,
                             options->build_config_id)) {
         return XGL_ERR_INVALID_VERSION;
     }
 #if XGL_FEATURE_ADVANCED_RUNTIME
-    if (options->reassembly_timeout_ms >= UINT32_C(0x80000000) ||
-        options->tx_lifetime_ms >= UINT32_C(0x80000000)) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-    if (!config->features.enable_fragmentation &&
-        (options->tx_message_slots != 0U || options->rx_message_slots != 0U ||
-         options->reassembly_timeout_ms != 0U)) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-    size_t rx_slots;
-    if (!add_size(config->features.max_peers,
-                  config->features.max_reassembly_slots, &rx_slots) ||
-        options->tx_message_slots > config->features.max_peers ||
-        options->rx_message_slots > rx_slots) {
+    if (options->tx_lifetime_ms >= UINT32_C(0x80000000)) {
         return XGL_ERR_INVALID_PARAM;
     }
     if (options->protect_installed_scopes) {
@@ -305,24 +267,7 @@ xgl_error_t xgl_options_validate(const xgl_config_t* config,
 }
 
 #if XGL_FEATURE_ADVANCED_RUNTIME
-#if XGL_FEATURE_FRAGMENTATION
-/* Resource identity precedes its validated slot count. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-/** \brief           Replace a slot count while retaining the exact pool stride.
- */
-static void resize_resource(xgl_workspace_plan_t* plan,
-                            xgl_workspace_resource_t resource, size_t count) {
-    /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    xgl_size_class_spec_t* spec = &plan->runtime[resource];
-    plan->requirements.size -= spec->block_size * (spec->block_count - count);
-    plan->requirements.runtime_blocks -= spec->block_count - count;
-    spec->block_count = count;
-}
-
-#endif
-
-/** \brief           Plan supported reductions without changing legacy defaults.
- */
+/** \brief           Validate policy and calculate the shared storage layout. */
 static xgl_error_t make_options_plan(const xgl_config_t* config,
                                      const xgl_instance_options_t* options,
                                      xgl_workspace_plan_t* plan) {
@@ -330,23 +275,7 @@ static xgl_error_t make_options_plan(const xgl_config_t* config,
     if (error != XGL_OK) {
         return error;
     }
-    error = make_plan(config, plan);
-    if (error != XGL_OK) {
-        return error;
-    }
-#if XGL_FEATURE_FRAGMENTATION
-    if (config->features.enable_fragmentation) {
-        if (options->tx_message_slots != 0U) {
-            resize_resource(plan, XGL_RESOURCE_TX_MESSAGE,
-                            options->tx_message_slots);
-        }
-        if (options->rx_message_slots != 0U) {
-            resize_resource(plan, XGL_RESOURCE_REASSEMBLY_PAYLOAD,
-                            options->rx_message_slots);
-        }
-    }
-#endif
-    return XGL_OK;
+    return make_plan(config, plan);
 }
 #endif
 
@@ -366,13 +295,6 @@ static void report_plan(const xgl_workspace_plan_t* plan,
 #if XGL_FEATURE_OUT_OF_ORDER
     result.rx_buffered_bytes = resource_bytes(plan, XGL_RESOURCE_RX_PACKET) +
                                resource_bytes(plan, XGL_RESOURCE_RX_PAYLOAD);
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    result.fragment_bytes =
-        resource_bytes(plan, XGL_RESOURCE_TX_EXTENSIONS) +
-        resource_bytes(plan, XGL_RESOURCE_TX_MESSAGE) +
-        resource_bytes(plan, XGL_RESOURCE_REASSEMBLY) +
-        resource_bytes(plan, XGL_RESOURCE_REASSEMBLY_PAYLOAD);
 #endif
     *report = result;
 }

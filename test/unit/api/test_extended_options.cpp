@@ -1,11 +1,10 @@
 /**
  * \file            test_extended_options.cpp
- * \brief           Versioned optional runtime and independent message storage
+ * \brief           Versioned optional runtime policy
  */
 
 #include "test_host_allocator.h"
 #include <algorithm>
-#include <array>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
@@ -150,25 +149,8 @@ TEST(XglExtendedOptions, DefaultOptionsPreserveMeasuredStorage) {
     ASSERT_EQ(xgl_memory_report_with_options(&config, &options, &extended),
               XGL_OK);
     EXPECT_EQ(legacy.requirements.size, extended.requirements.size);
-    EXPECT_EQ(legacy.fragment_bytes, extended.fragment_bytes);
+    EXPECT_EQ(legacy.requirements.alignment, extended.requirements.alignment);
 }
-
-#if XGL_FEATURE_FRAGMENTATION
-TEST(XglExtendedOptions, MessageSlotsAreIndependentFromPeerCapacity) {
-    xgl_config_t config = XGL_CONFIG_PRESET_SMALL;
-    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
-    options.tx_message_slots = 1U;
-    options.rx_message_slots = 2U;
-    xgl_memory_report_t legacy = {};
-    xgl_memory_report_t extended = {};
-    ASSERT_EQ(xgl_memory_report(&config, &legacy), XGL_OK);
-    ASSERT_EQ(xgl_memory_report_with_options(&config, &options, &extended),
-              XGL_OK);
-    EXPECT_EQ(legacy.requirements.size - extended.requirements.size, 5120U);
-    EXPECT_EQ(legacy.peer_bytes, extended.peer_bytes);
-    EXPECT_EQ(legacy.fragment_bytes - extended.fragment_bytes, 5120U);
-}
-#endif
 
 TEST(XglExtendedOptions, InvalidLifetimeDoesNotModifyReport) {
     xgl_config_t config;
@@ -203,10 +185,6 @@ TEST(XglExtendedOptions, InvalidDescriptorAndCapabilityPreserveOutputs) {
                   XGL_ERR_INVALID_VERSION);
         EXPECT_EQ(report.requirements.size, 123U);
     }
-    options = base;
-    options.reassembly_timeout_ms = 1U;
-    EXPECT_EQ(xgl_memory_report_with_options(&config, &options, &report),
-              XGL_ERR_INVALID_PARAM);
     options = base;
     options.protect_installed_scopes = true;
 #if XGL_FEATURE_AUTH
@@ -272,48 +250,6 @@ TEST(XglExtendedOptions, StaticAndOwnedInitializationUseTheSameOptions) {
     EXPECT_EQ(xgl_resources_get(handle, &snapshot), XGL_OK);
     xgl_destroy(handle);
 }
-
-#if XGL_FEATURE_FRAGMENTATION
-TEST(XglExtendedOptions, ReducedMessagePoolBackpressuresAndReusesItsSlot) {
-    xgl_config_t config = XGL_CONFIG_PRESET_SMALL;
-    config.protocol.window_size = 1U;
-    config.protocol.max_frame_size = 128U;
-    config.memory.rx_buffer_size = 128U;
-    xgl_test_use_host_allocator(&config);
-    xgl_phy_ops_t phy = {[](const uint8_t*, size_t, void*) { return XGL_OK; },
-                         [](uint8_t*, size_t* length, void*) {
-                             *length = 0U;
-                             return XGL_OK;
-                         },
-                         nullptr};
-    xgl_route_item_t routes[] = {{2U, &phy, 128U, 1000U, 1U},
-                                 {3U, &phy, 128U, 1000U, 1U}};
-    config.route_table = routes;
-    config.route_table_len = 2U;
-    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
-    options.tx_message_slots = 1U;
-    options.rx_message_slots = 2U;
-    xgl_handle_t handle = nullptr;
-    ASSERT_EQ(xgl_create_with_options(&config, &options, &handle), XGL_OK);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
-    std::array<uint8_t, 256> payload = {};
-    xgl_tx_data_t data = {};
-    data.target_id = 2U;
-    data.data = payload.data();
-    data.data_len = payload.size();
-    data.reliable = true;
-    EXPECT_EQ(xgl_send_at(handle, &data, 0U), XGL_OK);
-    data.target_id = 3U;
-    EXPECT_EQ(xgl_send_at(handle, &data, 1U), XGL_ERR_NO_MEMORY);
-    EXPECT_EQ(xgl_close_peer(handle, 2U, 0U, 0U), XGL_OK);
-    EXPECT_EQ(xgl_send_at(handle, &data, 2U), XGL_OK);
-    xgl_resource_snapshot_t snapshot = {};
-    ASSERT_EQ(xgl_resources_get(handle, &snapshot), XGL_OK);
-    EXPECT_EQ(snapshot.tx_message_bytes, payload.size());
-    EXPECT_EQ(snapshot.tx_packets, 1U);
-    xgl_destroy(handle);
-}
-#endif
 #else
 TEST(XglExtendedOptions, DisabledCapabilityIsExplicit) {
     xgl_config_t config;

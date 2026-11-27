@@ -21,15 +21,15 @@
     "xgl/xgl.h must not expose legacy 8-bit ACK manager in the production API"
 #endif
 
-#if defined(XGL_ATTR_RELIABLE_MASK) || defined(XGL_ATTR_FRAGMENT_MASK) ||      \
-    defined(XGL_ATTR_PRIORITY_MASK) || defined(XGL_ATTR_SESSION_MASK)
+#if defined(XGL_ATTR_RELIABLE_MASK) || defined(XGL_ATTR_PRIORITY_MASK) ||      \
+    defined(XGL_ATTR_SESSION_MASK)
 #error                                                                         \
-    "xgl/xgl.h must not expose v1 attribute-byte macros in the production API"
+    "xgl/xgl.h must not expose retired attribute-byte macros in the production API"
 #endif
 
 #if defined(XGL_PARSER_H) || defined(XGL_WINDOW_H) ||                          \
-    defined(XGL_RELIABLE_H) || defined(XGL_FRAGMENT_H) ||                      \
-    defined(XGL_HASHTABLE_H) || defined(XGCT_LIST_H)
+    defined(XGL_RELIABLE_H) || defined(XGL_HASHTABLE_H) ||                     \
+    defined(XGCT_LIST_H)
 #error                                                                         \
     "xgl/xgl.h must not expose internal protocol layer headers in the production API"
 #endif
@@ -97,7 +97,6 @@ TEST(XglTypesTest, ConfigPresets) {
               160); /* v2 header + 128 payload + CRC + padding */
     EXPECT_EQ(tiny.protocol.window_size, 2);
     EXPECT_EQ(tiny.protocol.max_frame_size, 128);
-    EXPECT_FALSE(tiny.features.enable_fragmentation);
 
     /* Test small preset */
     xgl_config_t small = XGL_CONFIG_PRESET_SMALL;
@@ -105,7 +104,6 @@ TEST(XglTypesTest, ConfigPresets) {
               288); /* v2 header + 256 payload + CRC + padding */
     EXPECT_EQ(small.protocol.window_size, 4);
     EXPECT_EQ(small.protocol.max_frame_size, 256);
-    EXPECT_TRUE(small.features.enable_fragmentation);
 
     /* Test medium preset */
     xgl_config_t medium = XGL_CONFIG_PRESET_MEDIUM;
@@ -113,7 +111,6 @@ TEST(XglTypesTest, ConfigPresets) {
               544); /* v2 header + 512 payload + CRC + padding */
     EXPECT_EQ(medium.protocol.window_size, 8);
     EXPECT_EQ(medium.protocol.max_frame_size, 512);
-    EXPECT_TRUE(medium.features.enable_fragmentation);
 
     /* Test large preset */
     xgl_config_t large = XGL_CONFIG_PRESET_LARGE;
@@ -121,7 +118,6 @@ TEST(XglTypesTest, ConfigPresets) {
               1056); /* v2 header + 1024 payload + CRC + padding */
     EXPECT_EQ(large.protocol.window_size, 16);
     EXPECT_EQ(large.protocol.max_frame_size, 1024);
-    EXPECT_TRUE(large.features.enable_fragmentation);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -192,10 +188,6 @@ TEST(XglTypesTest, TrafficClassBitDefinitions) {
     EXPECT_EQ(XGL_RELIABILITY_ACK_ELICITING, 0x40);
     EXPECT_EQ(XGL_RELIABILITY_ACK_ONLY, 0x80);
 
-    /* Test fragmentation bit */
-    EXPECT_EQ(XGL_TRAFFIC_FRAGMENTED_SHIFT, 5);
-    EXPECT_EQ(XGL_TRAFFIC_FRAGMENTED_MASK, 0x20);
-
     /* Test encryption class */
     EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_SHIFT, 3);
     EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_MASK, 0x18);
@@ -219,10 +211,6 @@ TEST(XglTypesTest, TrafficClassEncoding) {
     traffic_class_bits |= XGL_RELIABILITY_ACK_ELICITING;
     EXPECT_EQ(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK,
               XGL_RELIABILITY_ACK_ELICITING);
-
-    /* Set fragment */
-    traffic_class_bits |= XGL_TRAFFIC_FRAGMENTED_MASK;
-    EXPECT_NE(traffic_class_bits & XGL_TRAFFIC_FRAGMENTED_MASK, 0);
 
     /* Set priority 5 */
     traffic_class_bits |= (5 << XGL_TRAFFIC_PRIORITY_SHIFT);

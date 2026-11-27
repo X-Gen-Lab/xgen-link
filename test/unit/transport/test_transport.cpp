@@ -8,7 +8,6 @@
 #include <network/xgl_route.h>
 #include <transport/xgl_reliable.h>
 #include <transport/xgl_transport.h>
-#include <transport/xgl_transport_tx_internal.h>
 #include <transport/xgl_window.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
@@ -128,17 +127,12 @@ make_transport_config(xgl_packet_tx_endpoint_t* lower_layer,
     xgl_transport_config_t config = {};
     config.allocator = xgl_test_host_allocator();
     config.max_peers = 32;
-    config.max_message_size = 65535;
-    config.max_reassembly_slots = 8;
     config.max_tx_packets = 4096;
     config.max_rx_buffered_packets = 4096;
-    config.max_reassembly_bytes = 65535U * 8U;
-    config.max_tx_message_bytes = 65535U * 32U;
     config.local_id = 1;
     config.max_retry_count = 3;
     config.default_timeout_ms = 100;
     config.window_size = 1;
-    config.enable_fragmentation = false;
     config.max_frame_size = 128;
     config.lower_layer = lower_layer;
     config.stats = stats;
@@ -231,13 +225,8 @@ class TransportRegressionTest : public ::testing::Test {
         return XGL_OK;
     }
 
-    xgl_error_t Receive(uint32_t number, uint8_t byte, bool fragment = false,
-                        uint32_t offset = 0, uint32_t total = 2,
-                        size_t fragment_length = 1) {
-        std::vector<uint8_t> data(fragment_length, byte);
-        xgl_packet_data_t payload = {};
-        payload.data = data.data();
-        payload.data_len = data.size();
+    xgl_error_t Receive(uint32_t number, uint8_t byte) {
+        xgl_packet_data_t payload = {1U, &byte};
         xgl_packet_t packet = {};
         packet.source_id = 2;
         packet.target_id = 1;
@@ -245,21 +234,6 @@ class TransportRegressionTest : public ::testing::Test {
         packet.packet_number = number;
         packet.reliable = XGL_RELIABILITY_ACK_ELICITING;
         packet.data = &payload;
-        packet.fragment = fragment;
-        uint8_t value[16] = {}, extensions[20] = {};
-        size_t value_len = 0, extensions_len = 0;
-        if (fragment) {
-            if (xgl_wire_encode_fragment_ext_value(value, sizeof(value), 7,
-                                                   offset, total,
-                                                   &value_len) != XGL_OK ||
-                xgl_wire_encode_ext(extensions, sizeof(extensions),
-                                    XGL_WIRE_EXT_FRAGMENT, value, value_len,
-                                    &extensions_len) != XGL_OK) {
-                return XGL_ERR_INVALID_FRAME;
-            }
-            packet.extensions = extensions;
-            packet.extensions_len = extensions_len;
-        }
         return xgl_transport_receive(&ctx, nullptr, &packet);
     }
 
@@ -274,11 +248,10 @@ class TransportRegressionTest : public ::testing::Test {
         }
     }
 
-    void Init(uint8_t window = 4, bool fragments = false) {
+    void Init(uint8_t window = 4) {
         auto config = make_transport_config(&lower, &stats, &retries);
         config.window_size = window;
         config.max_retry_count = 1;
-        config.enable_fragmentation = fragments;
         config.rx_accept_callback = Accept;
         config.error_callback = Error;
         config.callback_user_data = this;
@@ -508,39 +481,6 @@ TEST_F(TransportRegressionTest,
     EXPECT_EQ(accepted_payloads[1], std::vector<uint8_t>({'b'}));
 }
 
-TEST_F(TransportRegressionTest,
-       CompleteMessageStaysOwnedUntilApplicationAccepts) {
-    Init(4, true);
-    accept_blocked = true;
-    ASSERT_EQ(Receive(0, 'b', true, 0), XGL_OK);
-    ASSERT_EQ(Receive(1, 'c', true, 1), XGL_OK);
-    ASSERT_NE(ctx.peers->rx_pending_message.data, nullptr);
-    EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 2U);
-    EXPECT_EQ(ctx.peers->rx_next_packet_number, 2U);
-    EXPECT_TRUE(accepted_payloads.empty());
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 101), XGL_OK);
-    ASSERT_NE(ctx.peers->rx_pending_message.data, nullptr);
-    accept_blocked = false;
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 102), XGL_OK);
-    EXPECT_EQ(ctx.peers->rx_pending_message.data, nullptr);
-    EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 0U);
-    ASSERT_EQ(accepted_payloads.size(), 1U);
-    EXPECT_EQ(accepted_payloads[0], std::vector<uint8_t>({'b', 'c'}));
-}
-
-TEST_F(TransportRegressionTest, ReliableReassemblyTimeoutFailsScopeAtTimeZero) {
-    Init(4, true);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 0), XGL_OK);
-    ASSERT_EQ(Receive(0, 'a', true, 0), XGL_OK);
-    uint32_t timeout = 0;
-    ASSERT_TRUE(xgl_transport_next_timeout(&ctx, 0, &timeout));
-    EXPECT_EQ(timeout, ctx.fragment_mgr->reassembly_timeout_ms);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, timeout), XGL_ERR_TIMEOUT);
-    EXPECT_TRUE(ctx.peers->failed);
-    EXPECT_EQ(xgl_fragment_get_reassembly_count(ctx.fragment_mgr), 0U);
-    EXPECT_EQ(Receive(1, 'b', true, 1), XGL_ERR_ACK_TIMEOUT);
-}
-
 TEST_F(TransportRegressionTest, ExplicitTimeZeroSchedulesRetransmission) {
     Init(1);
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 0), XGL_OK);
@@ -576,211 +516,6 @@ TEST_F(TransportRegressionTest,
     EXPECT_TRUE(xgl_transport_can_send_to(&ctx, 3, 0, 1));
 }
 
-TEST_F(TransportRegressionTest,
-       FragmentedMessageCrossesWindowOneAndOwnsCallerBytes) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    std::vector<uint8_t> original(64);
-    for (size_t i = 0; i < original.size(); ++i) {
-        original[i] = static_cast<uint8_t>(i);
-    }
-    auto input = original;
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.reliable = true;
-    tx.data = input.data();
-    tx.data_len = input.size();
-    tx.timeout_ms = 100;
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-    ASSERT_NE(ctx.peers->tx_message.data, nullptr);
-    EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
-    EXPECT_EQ(Send(), XGL_ERR_BUSY);
-    std::fill(input.begin(), input.end(), 0xFF);
-
-    LowerLayerSpy remote_spy;
-    xgl_packet_tx_endpoint_t remote_lower = {};
-    xgl_packet_tx_endpoint_init(&remote_lower, &remote_spy, spy_send);
-    xgl_layer_stats_t remote_stats = {};
-    xgl_transport_config_t config =
-        make_transport_config(&remote_lower, &remote_stats, nullptr);
-    config.local_id = 2;
-    config.window_size = 1;
-    config.enable_fragmentation = true;
-    config.rx_accept_callback = Accept;
-    config.callback_user_data = this;
-    xgl_transport_ctx_t remote = {};
-    ASSERT_EQ(xgl_transport_init(&remote, &config), XGL_OK);
-
-    size_t transmitted = 0, acknowledged = 0;
-    for (unsigned round = 0; round < 32; ++round) {
-        while (transmitted < spy.sent_packets.size()) {
-            auto packet = spy.sent_packets[transmitted];
-            xgl_packet_data_t payload = {};
-            payload.data = spy.sent_payloads[transmitted].data();
-            payload.data_len = spy.sent_payloads[transmitted].size();
-            packet.data = &payload;
-            packet.extensions = spy.sent_extensions[transmitted].data();
-            packet.extensions_len = spy.sent_extensions[transmitted].size();
-            EXPECT_EQ(xgl_transport_receive(&remote, nullptr, &packet), XGL_OK);
-            transmitted++;
-        }
-        while (acknowledged < remote_spy.sent_packets.size()) {
-            auto packet = remote_spy.sent_packets[acknowledged];
-            packet.extensions = remote_spy.sent_extensions[acknowledged].data();
-            packet.extensions_len =
-                remote_spy.sent_extensions[acknowledged].size();
-            EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
-            acknowledged++;
-        }
-        ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms), XGL_OK);
-        if (ctx.peers->tx_message.data == nullptr &&
-            xgl_reliable_is_empty(&ctx.peers->reliable_queue)) {
-            break;
-        }
-    }
-    EXPECT_EQ(ctx.peers->tx_message.data, nullptr);
-    EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
-    EXPECT_GT(ctx.peers->tx_window.next_packet_number, 1U);
-    ASSERT_EQ(accepted_payloads.size(), 1U);
-    EXPECT_EQ(accepted_payloads[0], original);
-    xgl_transport_destroy(&remote);
-}
-
-TEST_F(TransportRegressionTest,
-       AcceptedMessageRetriesPhyBusyWithoutLosingRemainder) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    spy.busy_data_attempts = 1;
-    const uint8_t payload[64] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.reliable = true;
-    tx.data = payload;
-    tx.data_len = sizeof(payload);
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-    ASSERT_NE(ctx.peers->tx_message.data, nullptr);
-    EXPECT_EQ(ctx.peers->tx_message_offset, 0U);
-    EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
-    uint32_t delay = 0;
-    ASSERT_TRUE(xgl_transport_next_timeout(&ctx, 100, &delay));
-    EXPECT_GT(delay, 0U);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100 + delay - 1U), XGL_OK);
-    EXPECT_EQ(ctx.peers->tx_message_offset, 0U);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100 + delay), XGL_OK);
-    EXPECT_GT(ctx.peers->tx_message_offset, 0U);
-    EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
-    EXPECT_EQ(Ack(0, 1), XGL_OK);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 100 + delay), XGL_OK);
-    EXPECT_EQ(ctx.peers->tx_window.next_packet_number, 2U);
-}
-
-TEST_F(TransportRegressionTest,
-       FailureAndResetReleaseAcceptedMessageAndInflightFragment) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    const uint8_t payload[64] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.reliable = true;
-    tx.data = payload;
-    tx.data_len = sizeof(payload);
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-    ASSERT_NE(ctx.peers->tx_message.data, nullptr);
-    xgl_packet_t reset = {};
-    reset.source_id = 2;
-    reset.packet_type = XGL_PACKET_TYPE_CONTROL;
-    reset.data_type = kTransportControlReset;
-    transport_fail_peer(&ctx, nullptr, ctx.peers, XGL_ERR_TX_FAILED);
-    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &reset), XGL_OK);
-    EXPECT_EQ(ctx.peers->tx_message.data, nullptr);
-    EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
-    EXPECT_TRUE(ctx.peers->failed);
-    EXPECT_EQ(Send(), XGL_ERR_ACK_TIMEOUT);
-}
-
-TEST_F(TransportRegressionTest,
-       FragmentedMessageLimitRejectsBeforeDataTransmission) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    ctx.max_message_size = 32;
-    const uint8_t payload[64] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.reliable = true;
-    tx.data = payload;
-    tx.data_len = sizeof(payload);
-    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_ERR_BUFFER_TOO_SMALL);
-    EXPECT_EQ(ctx.peers, nullptr);
-    EXPECT_EQ(spy.send_count, 0);
-}
-
-TEST_F(TransportRegressionTest,
-       AcceptedMessageReportsHardFailureAndReleasesOwnership) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    const uint8_t payload[64] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.reliable = true;
-    tx.data = payload;
-    tx.data_len = sizeof(payload);
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-    ASSERT_NE(ctx.peers->tx_message.data, nullptr);
-    spy.data_error = XGL_ERR_TX_FAILED;
-    EXPECT_EQ(Ack(0, 1), XGL_OK);
-    EXPECT_FALSE(ctx.peers->failed);
-    EXPECT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms),
-              XGL_ERR_TX_FAILED);
-    EXPECT_TRUE(ctx.peers->failed);
-    EXPECT_EQ(ctx.peers->tx_message.data, nullptr);
-    EXPECT_EQ(ctx.peers->tx_message_storage, nullptr);
-    EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
-    ASSERT_EQ(errors.size(), 1U);
-    EXPECT_EQ(errors[0], XGL_ERR_TX_FAILED);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 1000), XGL_OK);
-    EXPECT_EQ(errors.size(), 1U);
-    EXPECT_EQ(Send(), XGL_ERR_ACK_TIMEOUT);
-}
-
-TEST_F(TransportRegressionTest, RetryExhaustionAlsoReleasesUnsentMessageBytes) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    const uint8_t payload[64] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.reliable = true;
-    tx.timeout_ms = 100;
-    tx.data = payload;
-    tx.data_len = sizeof(payload);
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-    ASSERT_NE(ctx.peers->tx_message.data, nullptr);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 200), XGL_OK);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 400), XGL_ERR_ACK_TIMEOUT);
-    EXPECT_TRUE(ctx.peers->failed);
-    EXPECT_EQ(ctx.peers->tx_message_storage, nullptr);
-    EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
-    ASSERT_EQ(errors.size(), 1U);
-    EXPECT_EQ(errors[0], XGL_ERR_ACK_TIMEOUT);
-}
-
-TEST_F(TransportRegressionTest, InvalidFragmentIsNotAcknowledged) {
-    Init(1, true);
-    EXPECT_EQ(Receive(0, 'a', true, 2), XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(ctx.peers, nullptr);
-    EXPECT_EQ(spy.send_count, 0);
-    EXPECT_TRUE(accepted_payloads.empty());
-}
-
-TEST_F(TransportRegressionTest,
-       MessageLimitCannotExceedWireLengthRepresentation) {
-#if SIZE_MAX > UINT32_MAX
-    auto config = make_transport_config(&lower, &stats, &retries);
-    config.enable_fragmentation = true;
-    config.max_message_size = static_cast<size_t>(UINT32_MAX) + 1U;
-    EXPECT_EQ(xgl_transport_init(&ctx, &config), XGL_ERR_INVALID_PARAM);
-#endif
-}
-
 TEST_F(TransportRegressionTest, TimeoutCannotOverflowSignedReliableDuration) {
     Init();
     const uint8_t payload = 'a';
@@ -796,21 +531,12 @@ TEST_F(TransportRegressionTest, TimeoutCannotOverflowSignedReliableDuration) {
 }
 
 TEST_F(TransportRegressionTest,
-       RetransmissionHardFailureReleasesEntireAcceptedMessage) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    const uint8_t payload[64] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.reliable = true;
-    tx.timeout_ms = 100;
-    tx.data = payload;
-    tx.data_len = sizeof(payload);
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
+       RetransmissionHardFailureReleasesAcceptedPacket) {
+    Init(1);
+    ASSERT_EQ(Send(), XGL_OK);
     spy.data_error = XGL_ERR_TX_FAILED;
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 200), XGL_ERR_TX_FAILED);
     EXPECT_TRUE(ctx.peers->failed);
-    EXPECT_EQ(ctx.peers->tx_message_storage, nullptr);
     EXPECT_TRUE(xgl_reliable_is_empty(&ctx.peers->reliable_queue));
     ASSERT_EQ(errors.size(), 1U);
     EXPECT_EQ(errors[0], XGL_ERR_TX_FAILED);
@@ -838,35 +564,6 @@ TEST_F(TransportRegressionTest, RetransmissionBusyHasPositiveRetryDeadline) {
               XGL_OK);
     EXPECT_EQ(retries, 1U);
     EXPECT_FALSE(ctx.peers->failed);
-}
-
-TEST_F(TransportRegressionTest,
-       PartialFragmentOverlapCannotAcknowledgeUnstoredBytes) {
-    Init(1, true);
-    ASSERT_EQ(Receive(0, 'a', true, 0, 8, 4), XGL_OK);
-    ASSERT_EQ(spy.send_count, 1);
-    EXPECT_EQ(Receive(1, 'a', true, 2, 8, 4), XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(spy.send_count, 1);
-    EXPECT_EQ(ctx.peers->rx_next_packet_number, 1U);
-    ASSERT_EQ(Receive(1, 'b', true, 4, 8, 4), XGL_OK);
-    ASSERT_EQ(accepted_payloads.size(), 1U);
-    EXPECT_EQ(accepted_payloads[0],
-              std::vector<uint8_t>({'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b'}));
-}
-
-TEST_F(TransportRegressionTest,
-       CoveredFragmentMustMatchOwnedBytesBeforeAcknowledgement) {
-    Init(1, true);
-    ASSERT_EQ(Receive(0, 'a', true, 0, 8, 4), XGL_OK);
-    EXPECT_EQ(Receive(1, 'z', true, 1, 8, 2), XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(ctx.peers->rx_next_packet_number, 1U);
-    EXPECT_EQ(spy.send_count, 1);
-    EXPECT_EQ(Receive(1, 'a', true, 1, 8, 2), XGL_OK);
-    EXPECT_EQ(ctx.peers->rx_next_packet_number, 2U);
-    ASSERT_EQ(Receive(2, 'b', true, 4, 8, 4), XGL_OK);
-    ASSERT_EQ(accepted_payloads.size(), 1U);
-    EXPECT_EQ(accepted_payloads[0],
-              std::vector<uint8_t>({'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b'}));
 }
 
 TEST_F(TransportRegressionTest,
@@ -1962,12 +1659,15 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     xgl_transport_destroy(&ctx);
 }
 
-TEST(XglTransportTest, SendPlanUsesRouteMtuAndAuthBudget) {
+TEST(XglTransportTest, SingleFrameSendHonorsRouteMtuAndAuthBudget) {
+    LowerLayerSpy spy;
+    xgl_packet_tx_endpoint_t lower = {};
+    xgl_packet_tx_endpoint_init(&lower, &spy, spy_send);
     xgl_layer_stats_t stats = {};
     uint64_t tx_retries = 0;
     xgl_transport_ctx_t ctx;
     xgl_transport_config_t config =
-        make_transport_config(nullptr, &stats, &tx_retries);
+        make_transport_config(&lower, &stats, &tx_retries);
     config.max_frame_size = 128;
     config.auth_tag_len = 8;
 
@@ -1980,199 +1680,26 @@ TEST(XglTransportTest, SendPlanUsesRouteMtuAndAuthBudget) {
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
 
-    const uint8_t payload[] = {'p', 'i', 'n', 'g'};
+    constexpr size_t payload_budget =
+        80U - XGL_WIRE_BASE_HEADER_SIZE - XGL_DATA_TYPE_EXT_SIZE -
+        XGL_SECURITY_EXT_SIZE - 8U - XGL_CRC16_SIZE;
+    const uint8_t payload[payload_budget + 1U] = {};
     xgl_tx_data_t tx_data = {};
     tx_data.target_id = 2;
     tx_data.data_type = 7;
     tx_data.data = payload;
     tx_data.data_len = sizeof(payload);
-    tx_data.reliable = false;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 100;
+    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(spy.send_count, 0);
 
-    xgl_transport_send_plan_t plan = {};
-    ASSERT_EQ(transport_build_send_plan(&ctx, &tx_data, &plan), XGL_OK);
-
-    EXPECT_EQ(plan.fragment_payload_budget,
-              80U - XGL_WIRE_BASE_HEADER_SIZE - XGL_DATA_TYPE_EXT_SIZE -
-                  XGL_SECURITY_EXT_SIZE - 8U - XGL_CRC16_SIZE);
-    EXPECT_FALSE(plan.needs_fragmentation);
-    EXPECT_EQ(plan.fragment_count, 1U);
+    tx_data.data_len = payload_budget;
+    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
+    ASSERT_EQ(spy.send_count, 1);
+    EXPECT_EQ(spy.sent_payloads.back().size(), payload_budget);
 
     xgl_transport_destroy(&ctx);
     xgl_route_table_destroy(&route_table);
-}
-
-TEST(XglTransportTest, SendPlanAccountsForFragmentExtensionBudget) {
-    xgl_layer_stats_t stats = {};
-    uint64_t tx_retries = 0;
-    xgl_transport_ctx_t ctx;
-    xgl_transport_config_t config =
-        make_transport_config(nullptr, &stats, &tx_retries);
-    config.enable_fragmentation = true;
-    config.max_frame_size = 48;
-
-    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
-
-    const uint8_t payload[40] = {};
-    xgl_tx_data_t tx_data = {};
-    tx_data.target_id = 2;
-    tx_data.data_type = 1;
-    tx_data.data = payload;
-    tx_data.data_len = sizeof(payload);
-    tx_data.reliable = false;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 100;
-
-    xgl_transport_send_plan_t plan = {};
-    ASSERT_EQ(transport_build_send_plan(&ctx, &tx_data, &plan), XGL_OK);
-
-    EXPECT_TRUE(plan.needs_fragmentation);
-    EXPECT_EQ(plan.fragment_payload_budget, 5U);
-    EXPECT_EQ(plan.fragment_count, 8U);
-
-    xgl_transport_destroy(&ctx);
-}
-
-TEST(XglTransportTest, FragmentedSendUsesFragmentExtensionNotPayloadPrefix) {
-    LowerLayerSpy spy;
-    xgl_packet_tx_endpoint_t lower_layer = {};
-    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
-
-    xgl_layer_stats_t stats = {};
-    uint64_t tx_retries = 0;
-    xgl_transport_ctx_t ctx;
-    xgl_transport_config_t config =
-        make_transport_config(&lower_layer, &stats, &tx_retries);
-    config.enable_fragmentation = true;
-    config.max_frame_size = 48;
-
-    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
-
-    const uint8_t payload[] = {
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
-        'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1',
-        '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd'};
-    xgl_tx_data_t tx_data = {};
-    tx_data.target_id = 2;
-    tx_data.data_type = 1;
-    tx_data.data = payload;
-    tx_data.data_len = sizeof(payload);
-    tx_data.reliable = false;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 100;
-
-    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
-    ASSERT_GT(spy.sent_packets.size(), 1U);
-    ASSERT_EQ(spy.sent_packets.size(), spy.sent_extensions.size());
-    ASSERT_EQ(spy.sent_packets.size(), spy.sent_payloads.size());
-
-    size_t observed_payload_bytes = 0;
-    for (size_t i = 0; i < spy.sent_packets.size(); ++i) {
-        EXPECT_TRUE(spy.sent_packets[i].fragment);
-        ASSERT_FALSE(spy.sent_extensions[i].empty());
-        xgl_wire_ext_cursor_t cursor = {};
-        ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
-                                           spy.sent_extensions[i].data(),
-                                           spy.sent_extensions[i].size()),
-                  XGL_OK);
-        xgl_wire_ext_t ext = {};
-        ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
-        EXPECT_EQ(ext.type, XGL_WIRE_EXT_FRAGMENT);
-
-        uint32_t message_id = 0;
-        uint32_t fragment_offset = 0;
-        uint32_t message_len = 0;
-        ASSERT_EQ(
-            xgl_wire_decode_fragment_ext_value(ext.value, ext.len, &message_id,
-                                               &fragment_offset, &message_len),
-            XGL_OK);
-        EXPECT_EQ(message_len, sizeof(payload));
-        ASSERT_LT(fragment_offset, sizeof(payload));
-        ASSERT_FALSE(spy.sent_payloads[i].empty());
-        EXPECT_EQ(spy.sent_payloads[i][0], payload[fragment_offset]);
-        observed_payload_bytes += spy.sent_payloads[i].size();
-    }
-
-    EXPECT_EQ(observed_payload_bytes, sizeof(payload));
-    xgl_transport_destroy(&ctx);
-}
-
-TEST(XglTransportTest, FragmentReceiveUsesFragmentExtensionMetadata) {
-    RxTracker tracker;
-    xgl_layer_stats_t stats = {};
-    uint64_t tx_retries = 0;
-    xgl_transport_ctx_t ctx;
-    xgl_transport_config_t config =
-        make_transport_config(nullptr, &stats, &tx_retries);
-    config.enable_fragmentation = true;
-    config.rx_callback = spy_receive;
-    config.callback_user_data = &tracker;
-
-    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
-
-    const uint8_t first_payload[] = {'A', 'B'};
-    const uint8_t second_payload[] = {'C', 'D'};
-    uint8_t first_ext_value[12] = {};
-    uint8_t second_ext_value[12] = {};
-    uint8_t first_ext[14] = {};
-    uint8_t second_ext[14] = {};
-    size_t value_len = 0;
-    size_t first_ext_len = 0;
-    size_t second_ext_len = 0;
-    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(first_ext_value,
-                                                 sizeof(first_ext_value), 99, 0,
-                                                 4, &value_len),
-              XGL_OK);
-    ASSERT_EQ(xgl_wire_encode_ext(first_ext, sizeof(first_ext),
-                                  XGL_WIRE_EXT_FRAGMENT, first_ext_value,
-                                  value_len, &first_ext_len),
-              XGL_OK);
-    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(second_ext_value,
-                                                 sizeof(second_ext_value), 99,
-                                                 2, 4, &value_len),
-              XGL_OK);
-    ASSERT_EQ(xgl_wire_encode_ext(second_ext, sizeof(second_ext),
-                                  XGL_WIRE_EXT_FRAGMENT, second_ext_value,
-                                  value_len, &second_ext_len),
-              XGL_OK);
-
-    xgl_packet_data_t first_data = {};
-    first_data.data_len = sizeof(first_payload);
-    first_data.data = first_payload;
-    xgl_packet_t first_packet = {};
-    first_packet.source_id = 2;
-    first_packet.target_id = 1;
-    first_packet.connection_id = 7;
-    first_packet.packet_number = 10;
-    first_packet.session_epoch = 3;
-    first_packet.packet_type = XGL_PACKET_TYPE_DATA;
-    first_packet.flags =
-        XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
-    first_packet.data_type = 1;
-    first_packet.fragment = true;
-    first_packet.data = &first_data;
-    first_packet.extensions = first_ext;
-    first_packet.extensions_len = first_ext_len;
-
-    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &first_packet), XGL_OK);
-    EXPECT_EQ(tracker.receive_count, 0);
-
-    xgl_packet_data_t second_data = {};
-    second_data.data_len = sizeof(second_payload);
-    second_data.data = second_payload;
-    xgl_packet_t second_packet = first_packet;
-    second_packet.packet_number = 11;
-    second_packet.data = &second_data;
-    second_packet.extensions = second_ext;
-    second_packet.extensions_len = second_ext_len;
-
-    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &second_packet), XGL_OK);
-    EXPECT_EQ(tracker.receive_count, 1);
-    EXPECT_EQ(stats.rx_packets, 1U);
-    EXPECT_EQ(stats.rx_bytes, 4U);
-
-    xgl_transport_destroy(&ctx);
 }
 
 TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {
@@ -2263,206 +1790,6 @@ TEST(XglTransportTest, ReliableSendUsesIndependentWindowsPerConnectionScope) {
     EXPECT_EQ(spy.sent_packets[1].session_epoch, 100U);
     EXPECT_EQ(spy.sent_packets[3].connection_id, 22U);
     EXPECT_EQ(spy.sent_packets[3].session_epoch, 200U);
-
-    xgl_transport_destroy(&ctx);
-}
-
-TEST(XglTransportTest,
-     ReliableFragmentTimeoutRetransmitsWithFragmentExtension) {
-    LowerLayerSpy spy;
-    xgl_packet_tx_endpoint_t lower_layer = {};
-    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
-
-    xgl_layer_stats_t stats = {};
-    uint64_t tx_retries = 0;
-    xgl_transport_ctx_t ctx;
-    xgl_transport_config_t config =
-        make_transport_config(&lower_layer, &stats, &tx_retries);
-    config.enable_fragmentation = true;
-    config.max_frame_size = 48;
-    config.window_size = 8;
-
-    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
-
-    const uint8_t payload[] = {
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
-        'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1',
-        '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd'};
-    xgl_tx_data_t tx_data = {};
-    tx_data.target_id = 2;
-    tx_data.data_type = 1;
-    tx_data.data = payload;
-    tx_data.data_len = sizeof(payload);
-    tx_data.reliable = true;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 100;
-
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx_data), XGL_OK);
-    ASSERT_GT(spy.sent_packets.size(), 2U);
-    ASSERT_FALSE(spy.sent_extensions[1].empty());
-    const std::vector<uint8_t> first_fragment_ext = spy.sent_extensions[1];
-    const std::vector<uint8_t> first_fragment_payload = spy.sent_payloads[1];
-    const uint32_t first_fragment_packet_number =
-        spy.sent_packets[1].packet_number;
-
-    xgl_transport_peer_state_t* peer = find_peer(&ctx, 2);
-    ASSERT_NE(peer, nullptr);
-    xgl_list_node_t* node = nullptr;
-    XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
-        xgl_reliable_packet_t* packet =
-            XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        packet->send_timestamp = 200;
-    }
-    xgl_reliable_packet_t* queued = xgl_reliable_find_packet_number(
-        &peer->reliable_queue, first_fragment_packet_number, 2);
-    ASSERT_NE(queued, nullptr);
-    queued->send_timestamp = 100;
-
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 201), XGL_OK);
-    ASSERT_EQ(tx_retries, 1U);
-    ASSERT_FALSE(spy.sent_extensions.back().empty());
-
-    EXPECT_EQ(spy.sent_extensions.back(), first_fragment_ext);
-    EXPECT_EQ(spy.sent_payloads.back(), first_fragment_payload);
-    EXPECT_TRUE(spy.last_packet.fragment);
-    EXPECT_EQ(spy.last_packet.flags & XGL_WIRE_FLAG_HAS_EXTENSIONS,
-              XGL_WIRE_FLAG_HAS_EXTENSIONS);
-
-    xgl_wire_ext_cursor_t cursor = {};
-    ASSERT_EQ(xgl_wire_ext_cursor_init(&cursor,
-                                       spy.sent_extensions.back().data(),
-                                       spy.sent_extensions.back().size()),
-              XGL_OK);
-    xgl_wire_ext_t ext = {};
-    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
-    EXPECT_EQ(ext.type, XGL_WIRE_EXT_FRAGMENT);
-
-    xgl_transport_destroy(&ctx);
-}
-
-TEST(XglTransportTest, ResetClearsOnlyMatchingFragmentReassemblyScope) {
-    LowerLayerSpy spy;
-    xgl_packet_tx_endpoint_t lower_layer = {};
-    xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
-
-    xgl_layer_stats_t stats = {};
-    uint64_t tx_retries = 0;
-    RxTracker rx_tracker;
-    xgl_transport_ctx_t ctx;
-    xgl_transport_config_t config =
-        make_transport_config(&lower_layer, &stats, &tx_retries);
-    config.enable_fragmentation = true;
-    config.rx_callback = spy_receive;
-    config.callback_user_data = &rx_tracker;
-
-    ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
-
-    const uint8_t peer2_part[] = {'a', 'b'};
-    const uint8_t peer3_part[] = {'x', 'y'};
-    const uint8_t peer3_tail[] = {'z', 'w'};
-
-    uint8_t peer2_ext_value[12] = {};
-    size_t peer2_ext_value_len = 0;
-    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(peer2_ext_value,
-                                                 sizeof(peer2_ext_value), 10, 0,
-                                                 4, &peer2_ext_value_len),
-              XGL_OK);
-    uint8_t peer2_ext[16] = {};
-    size_t peer2_ext_len = 0;
-    ASSERT_EQ(xgl_wire_encode_ext(peer2_ext, sizeof(peer2_ext),
-                                  XGL_WIRE_EXT_FRAGMENT, peer2_ext_value,
-                                  peer2_ext_value_len, &peer2_ext_len),
-              XGL_OK);
-
-    uint8_t peer3_ext_value[12] = {};
-    size_t peer3_ext_value_len = 0;
-    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(peer3_ext_value,
-                                                 sizeof(peer3_ext_value), 20, 0,
-                                                 4, &peer3_ext_value_len),
-              XGL_OK);
-    uint8_t peer3_ext[16] = {};
-    size_t peer3_ext_len = 0;
-    ASSERT_EQ(xgl_wire_encode_ext(peer3_ext, sizeof(peer3_ext),
-                                  XGL_WIRE_EXT_FRAGMENT, peer3_ext_value,
-                                  peer3_ext_value_len, &peer3_ext_len),
-              XGL_OK);
-
-    xgl_packet_data_t peer2_data = {};
-    peer2_data.data_len = sizeof(peer2_part);
-    peer2_data.data = peer2_part;
-    xgl_packet_t peer2_packet = {};
-    peer2_packet.packet_type = XGL_PACKET_TYPE_DATA;
-    peer2_packet.source_id = 2;
-    peer2_packet.target_id = 1;
-    peer2_packet.connection_id = 11;
-    peer2_packet.session_epoch = 100;
-    peer2_packet.data_type = 1;
-    peer2_packet.fragment = true;
-    peer2_packet.data = &peer2_data;
-    peer2_packet.extensions = peer2_ext;
-    peer2_packet.extensions_len = peer2_ext_len;
-    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &peer2_packet), XGL_OK);
-
-    xgl_packet_data_t peer3_data = {};
-    peer3_data.data_len = sizeof(peer3_part);
-    peer3_data.data = peer3_part;
-    xgl_packet_t peer3_packet = {};
-    peer3_packet.packet_type = XGL_PACKET_TYPE_DATA;
-    peer3_packet.source_id = 3;
-    peer3_packet.target_id = 1;
-    peer3_packet.connection_id = 22;
-    peer3_packet.session_epoch = 200;
-    peer3_packet.data_type = 1;
-    peer3_packet.fragment = true;
-    peer3_packet.data = &peer3_data;
-    peer3_packet.extensions = peer3_ext;
-    peer3_packet.extensions_len = peer3_ext_len;
-    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &peer3_packet), XGL_OK);
-    ASSERT_EQ(xgl_fragment_get_reassembly_count(ctx.fragment_mgr), 2U);
-
-    xgl_packet_data_t reset_data = {};
-    reset_data.data_len = 0;
-    reset_data.data = nullptr;
-    xgl_packet_t reset_packet = {};
-    reset_packet.source_id = 2;
-    reset_packet.target_id = 1;
-    reset_packet.connection_id = 11;
-    reset_packet.session_epoch = 100;
-    reset_packet.packet_type = XGL_PACKET_TYPE_CONTROL;
-    reset_packet.data_type = kTransportControlReset;
-    reset_packet.data = &reset_data;
-    transport_fail_peer(&ctx, nullptr,
-                        find_peer_scope_for_test(&ctx, 2, 11, 100),
-                        XGL_ERR_TIMEOUT);
-    ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &reset_packet), XGL_OK);
-    EXPECT_EQ(xgl_fragment_get_reassembly_count(ctx.fragment_mgr), 1U);
-
-    uint8_t peer3_tail_ext_value[12] = {};
-    size_t peer3_tail_ext_value_len = 0;
-    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(
-                  peer3_tail_ext_value, sizeof(peer3_tail_ext_value), 20, 2, 4,
-                  &peer3_tail_ext_value_len),
-              XGL_OK);
-    uint8_t peer3_tail_ext[16] = {};
-    size_t peer3_tail_ext_len = 0;
-    ASSERT_EQ(xgl_wire_encode_ext(peer3_tail_ext, sizeof(peer3_tail_ext),
-                                  XGL_WIRE_EXT_FRAGMENT, peer3_tail_ext_value,
-                                  peer3_tail_ext_value_len,
-                                  &peer3_tail_ext_len),
-              XGL_OK);
-
-    xgl_packet_data_t peer3_tail_data = {};
-    peer3_tail_data.data_len = sizeof(peer3_tail);
-    peer3_tail_data.data = peer3_tail;
-    peer3_packet.extensions = peer3_tail_ext;
-    peer3_packet.extensions_len = peer3_tail_ext_len;
-    peer3_packet.data = &peer3_tail_data;
-
-    EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &peer3_packet), XGL_OK);
-    ASSERT_EQ(rx_tracker.receive_count, 1);
-    ASSERT_EQ(rx_tracker.payloads.size(), 1U);
-    EXPECT_EQ(rx_tracker.payloads[0],
-              std::vector<uint8_t>({'x', 'y', 'z', 'w'}));
 
     xgl_transport_destroy(&ctx);
 }
@@ -2733,42 +2060,6 @@ TEST_F(TransportRegressionTest,
     EXPECT_EQ(accepted_payloads.size(), 3U);
 }
 
-TEST_F(TransportRegressionTest, PendingTxMessageBudgetIsSharedAndReleased) {
-    Init(1, true);
-    ctx.max_frame_size = 48;
-    ctx.max_tx_message_bytes = 40;
-    const uint8_t data[40] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.data = data;
-    tx.data_len = sizeof(data);
-    tx.reliable = true;
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-    EXPECT_EQ(ctx.tx_message_bytes, sizeof(data));
-    tx.target_id = 3;
-    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_ERR_NO_MEMORY);
-    auto* owner = find_peer_scope_for_test(&ctx, 2, 0, 0);
-    transport_fail_peer(&ctx, nullptr, owner, XGL_ERR_TX_FAILED);
-    EXPECT_EQ(ctx.tx_message_bytes, 0U);
-    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-}
-
-TEST_F(TransportRegressionTest, CompletedMessageRetainsReassemblyByteBudget) {
-    Init(4, true);
-    ASSERT_EQ(xgl_fragment_set_limits(ctx.fragment_mgr, 2, 2), XGL_OK);
-    accept_blocked = true;
-    blocked_byte = 'a';
-    ASSERT_EQ(Receive(0, 'a', true, 0), XGL_OK);
-    ASSERT_EQ(Receive(1, 'b', true, 1), XGL_OK);
-    EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 2U);
-    EXPECT_NE(ctx.peers->rx_pending_message.data, nullptr);
-    accept_blocked = false;
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 101), XGL_OK);
-    EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 0U);
-    EXPECT_EQ(accepted_payloads,
-              (std::vector<std::vector<uint8_t>>{{'a', 'b'}}));
-}
-
 TEST_F(TransportRegressionTest, TypedBoundaryOnlyExposesReceive) {
     Init();
     xgl_packet_rx_endpoint_t iface = {};
@@ -2800,25 +2091,16 @@ TEST_F(TransportRegressionTest, DelayedOldAckCannotCompleteNewEpoch) {
 
 TEST_F(TransportRegressionTest,
        ExplicitCloseCancelsOnceAndReusesBoundedPeerSlot) {
-    Init(1, true);
+    Init(1);
     ctx.max_peers = 1;
-    ctx.max_frame_size = 64;
-    const uint8_t payload[80] = {};
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.data = payload;
-    tx.data_len = sizeof(payload);
-    tx.reliable = true;
-    tx.connection_id = 11;
-    tx.session_epoch = 100;
-    ASSERT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_OK);
-    ASSERT_GT(ctx.tx_message_bytes, 0U);
+    ASSERT_EQ(Send(11, 100), XGL_OK);
+    ASSERT_NE(ctx.peers, nullptr);
+    ASSERT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
     EXPECT_EQ(xgl_transport_close_scope(&ctx, nullptr, 2, 11, 99),
               XGL_ERR_NOT_FOUND);
     EXPECT_TRUE(errors.empty());
     ASSERT_EQ(xgl_transport_close_scope(&ctx, nullptr, 2, 11, 100), XGL_OK);
     EXPECT_EQ(ctx.peers, nullptr);
-    EXPECT_EQ(ctx.tx_message_bytes, 0U);
     EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_CANCELLED}));
     EXPECT_EQ(xgl_transport_close_scope(&ctx, nullptr, 2, 11, 100),
               XGL_ERR_NOT_FOUND);
@@ -2979,15 +2261,6 @@ TEST_F(TransportRegressionTest,
     EXPECT_EQ(Receive(100, 'a'), XGL_ERR_WINDOW_FULL);
     EXPECT_EQ(ctx.peers, nullptr);
     EXPECT_TRUE(accepted_payloads.empty());
-    EXPECT_EQ(Send(1, 1), XGL_OK);
-}
-
-TEST_F(TransportRegressionTest, RejectedFirstFragmentReleasesPeerReservation) {
-    Init(4, true);
-    ctx.max_peers = 1;
-    EXPECT_EQ(Receive(0, 'a', true, 4, 2), XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(ctx.peers, nullptr);
-    EXPECT_EQ(ctx.fragment_mgr->current_reassembly_bytes, 0U);
     EXPECT_EQ(Send(1, 1), XGL_OK);
 }
 

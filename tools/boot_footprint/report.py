@@ -78,13 +78,15 @@ def generate_layout(args):
         "links", "window", "tx_packets", "scratch_blocks", "ack_bytes",
         "wire_header_bytes", "wire_crc_bytes", "rx_chunk_bytes", "window_pool_blocks",
         "resource_config_id", "compiled_window_capacity", "reliable_bucket_count",
-        "adaptive_rto",
+        "adaptive_rto", "config_abi_version",
     )
     if len(data) != len(names) * 4:
         raise ValueError("Unexpected target layout section size")
     values = dict(zip(names, struct.unpack("<" + "I" * len(names), data)))
-    if values["magic"] != 0x58474C42 or values["format_version"] != 6:
+    if values["magic"] != 0x58474C42 or values["format_version"] != 7:
         raise ValueError("Unsupported target layout format or endianness")
+    if values["config_abi_version"] == 0:
+        raise ValueError("Invalid SDK configuration ABI")
     if values["window_pool_blocks"] != 0:
         raise ValueError("The inline window must not reserve an external pool")
     if values["compiled_window_capacity"] not in (1, 8, 16, 32, 64, 128) or (
@@ -219,6 +221,7 @@ def report_elf(args):
         "workspace_bytes": layout["workspace_bytes"],
         "layout_format_version": layout["format_version"],
         "window_pool_blocks": layout["window_pool_blocks"],
+        "config_abi_version": layout["config_abi_version"],
         "resource_config_id": layout["resource_config_id"],
         "compiled_window_capacity": layout["compiled_window_capacity"],
         "reliable_bucket_count": layout["reliable_bucket_count"],

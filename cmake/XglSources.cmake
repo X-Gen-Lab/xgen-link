@@ -51,14 +51,6 @@ list(APPEND XGL_SOURCES
     src/network/xgl_network.c
 )
 
-if(XGL_FEATURE_FRAGMENTATION)
-    list(APPEND XGL_SOURCES
-        src/transport/xgl_fragment.c
-        src/transport/xgl_fragment_range.c
-        src/transport/xgl_fragment_reassembly.c
-    )
-endif()
-
 list(APPEND XGL_SOURCES
     # Transport Layer
     src/transport/xgl_reliable.c
@@ -80,10 +72,6 @@ list(APPEND XGL_SOURCES
     src/transport/xgl_transport_rx_delivery.c
     src/transport/xgl_transport_tx.c
 )
-
-if(XGL_FEATURE_FRAGMENTATION)
-    list(APPEND XGL_SOURCES src/transport/xgl_transport_tx_message.c)
-endif()
 
 list(APPEND XGL_SOURCES src/transport/xgl_window.c)
 if(XGL_FEATURE_ROUTE_INDEX)

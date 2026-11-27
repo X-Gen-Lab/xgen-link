@@ -427,7 +427,7 @@ TEST_F(XglDatalinkTest, EnforcesCompiledFrameCapOnEveryFrameIngressAndEgress) {
         xgl_frame_t frame = {};
         ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
 
-        /* A frame outside this library's cap can still be valid wire v3. */
+        /* A frame outside this library's cap can still be valid Wire v1. */
         size_t written = 0;
         ASSERT_EQ(
             xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &written),

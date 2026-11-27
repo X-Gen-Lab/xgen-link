@@ -42,12 +42,12 @@ class FootprintStorage(unittest.TestCase):
 
     def fixture(self):
         # Target ABI fixture; this is not a claim about the current ELF size.
-        return [0x58474C42, 6, 4, 8, 512, 20, 40, 104, 72, 204, 20, 76,
-                128, 128, 1, 1, 1, 1, 1, 1, 1, 24, 2, 32, 0, 67081, 1, 1, 0]
+        return [0x58474C42, 7, 4, 8, 512, 20, 40, 104, 72, 204, 20, 76,
+                128, 128, 1, 1, 1, 1, 1, 1, 1, 24, 2, 32, 0, 67081, 1, 1, 0, 5]
 
     def test_inline_bitmap_does_not_create_an_independent_runtime_block(self):
         layout = self.decode(self.fixture())
-        self.assertEqual(layout["format_version"], 6)
+        self.assertEqual(layout["format_version"], 7)
         self.assertEqual(layout["window_pool_blocks"], 0)
         self.assertEqual(layout["runtime_partitions"]["window"],
                          {"block_bytes": 0, "blocks": 0, "bytes": 0})
@@ -73,6 +73,7 @@ class FootprintStorage(unittest.TestCase):
         self.assertEqual(layout["compiled_window_capacity"], 1)
         self.assertEqual(layout["reliable_bucket_count"], 1)
         self.assertEqual(layout["adaptive_rto"], 0)
+        self.assertEqual(layout["config_abi_version"], 5)
 
     def test_budget_rejects_different_transport_resources(self):
         policy = {"schema_version": 1, "compiler_version": "15.2.1",

@@ -1,3 +1,3 @@
 # Page moved
 
-See the [current documentation](../reference/protocol/v3/wire-format.md).
+See the [current documentation](../reference/protocol/v1/wire-format.md).

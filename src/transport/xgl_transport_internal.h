@@ -47,15 +47,10 @@ transport_retry_delay_ms(const xgl_transport_ctx_t* ctx) {
 /**
  * \brief           Query whether a peer can accept another application send
  * \param[in]       peer: Peer state
- * \return          true if no failed or pending message blocks its window
+ * \return          true if the active peer's window allows another packet
  */
 static inline bool
 transport_peer_can_send(const xgl_transport_peer_state_t* peer) {
-#if XGL_FEATURE_FRAGMENTATION
-    if (peer->tx_message.data != NULL) {
-        return false;
-    }
-#endif
     return !peer->failed && peer->tx_window.next_packet_number != UINT32_MAX &&
            xgl_window_can_send_packet_number(&peer->tx_window);
 }
@@ -129,8 +124,7 @@ xgl_transport_peer_state_t* transport_find_rx_peer(xgl_transport_ctx_t* ctx,
 xgl_transport_peer_state_t*
 transport_get_or_create_rx_peer(xgl_transport_ctx_t* ctx,
                                 const xgl_packet_t* packet);
-bool transport_peer_can_reclaim(const xgl_transport_ctx_t* ctx,
-                                const xgl_transport_peer_state_t* peer);
+bool transport_peer_can_reclaim(const xgl_transport_peer_state_t* peer);
 /**
  * \brief           Query the earliest unused-scope reclaim deadline
  * \param[in]       ctx: Transport configuration
@@ -148,36 +142,26 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
 void transport_count_send_error(xgl_transport_ctx_t* ctx);
 
 /**
- * \brief           Check message size and exact terminal scope without mutation
- * \param[in]       ctx: Transport state and configured message limit
+ * \brief           Check exact terminal scope without mutation
+ * \param[in]       ctx: Transport state
  * \param[in]       target_id: Remote DATA destination
  * \param[in]       connection_id: Exact connection identity
  * \param[in]       session_epoch: Exact session epoch
- * \param[in]       data_len: Application message length
- * \return          XGL_OK or a message-size or terminal-scope error
+ * \return          XGL_OK or a terminal-scope error
  */
 xgl_error_t transport_check_data_tx_policy(const xgl_transport_ctx_t* ctx,
                                            uint16_t target_id,
                                            uint32_t connection_id,
-                                           uint32_t session_epoch,
-                                           size_t data_len);
+                                           uint32_t session_epoch);
 
-/** \brief           Enforce message size and scope lifetime before actual TX.
- */
+/** \brief           Enforce scope lifetime and terminal state before TX. */
 xgl_error_t transport_prepare_data_tx(xgl_transport_ctx_t* ctx,
                                       xgl_handle_t handle, uint16_t target_id,
                                       uint32_t connection_id,
-                                      uint32_t session_epoch, size_t data_len);
+                                      uint32_t session_epoch);
 
 void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                          xgl_transport_peer_state_t* peer, xgl_error_t error);
-#if XGL_FEATURE_FRAGMENTATION
-void transport_clear_tx_message(xgl_transport_ctx_t* ctx,
-                                xgl_transport_peer_state_t* peer);
-xgl_error_t transport_pump_tx_message(xgl_transport_ctx_t* ctx,
-                                      xgl_handle_t handle,
-                                      xgl_transport_peer_state_t* peer);
-#endif
 
 xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
                                    xgl_handle_t handle, uint16_t target_id,

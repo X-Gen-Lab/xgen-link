@@ -4,7 +4,7 @@ Start with the reader's task and use the [site index](../index.md) to select a c
 
 ## Content and translation
 
-Edit the canonical Chinese page first, then review the matching English path. Check that state names, API names, failure semantics, values and units agree. Put field and layout rules in the wire v3 reference. Put declarations and calling context in public-header Doxygen comments. Keep a single authority for each rule and link to it from navigation, diagrams and other pages.
+Edit the canonical Chinese page first, then review the matching English path. Check that state names, API names, failure semantics, values and units agree. Put field and layout rules in the Wire v1 reference. Put declarations and calling context in public-header Doxygen comments. Keep a single authority for each rule and link to it from navigation, diagrams and other pages.
 
 Take complete examples from maintained runnable programs and tests. Identify omitted initialization, configuration and cleanup in fragments. The site build renders documents without executing Markdown commands. Keep navigation pages for published URLs and validate both paths. Pin historical validation and failed attempts to their original revisions.
 

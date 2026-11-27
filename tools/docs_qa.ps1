@@ -121,7 +121,6 @@ $requiredProtocolRefs = @{
     "reliability.md" = "test/unit/transport/test_reliable.cpp"
     "security.md" = "test/unit/security/test_security.cpp"
     "routing.md" = "test/unit/network/test_network.cpp"
-    "fragmentation.md" = "test/unit/transport/test_fragment.cpp"
 }
 
 foreach ($entry in $requiredProtocolRefs.GetEnumerator()) {
@@ -129,7 +128,7 @@ foreach ($entry in $requiredProtocolRefs.GetEnumerator()) {
         Add-Failure "Missing protocol test source $($entry.Value)"
     }
     foreach ($language in @("en", "zh")) {
-        $page = "docs/$language/reference/protocol/v3/$($entry.Key)"
+        $page = "docs/$language/reference/protocol/v1/$($entry.Key)"
         $file = Join-Path $RepoRoot $page
         if (-not (Test-Path -PathType Leaf $file)) {
             Add-Failure "Missing protocol page $page"

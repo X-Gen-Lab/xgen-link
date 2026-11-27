@@ -4,10 +4,10 @@ profile 定义编译能力上限，preset 在上限内提供显式运行容量�
 
 ## 编译档位
 
-| 档位 | 认证 | 分片 / 转发 / 乱序 | libc 默认值 |
+| 档位 | 认证 | 转发 / 乱序 | libc 默认值 |
 | --- | --- | --- | --- |
 | boot | 不支持 | 不支持 | 关闭 |
-| embedded-lite | 不支持 | 分片、乱序 | 关闭 |
+| embedded-lite | 不支持 | 乱序 | 关闭 |
 | embedded | 支持，4 个会话槽 | 支持 | 关闭 |
 | full | 支持，16 个会话槽 | 支持 | 开启 |
 
@@ -19,12 +19,12 @@ profile 定义编译能力上限，preset 在上限内提供显式运行容量�
 
 ## 运行容量
 
-| 预设 | MTU | 窗口 | Peer | 保留 TX | 保留 RX | 消息字节 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| boot | 128 | 1 | 1 | 1 | 0 | 禁用 |
-| tiny | 128 | 2 | 1 | 2 | 2 | 禁用 |
-| small | 256 | 4 | 2 | 4 | 4 | 1024 |
-| medium | 512 | 8 | 8 | 16 | 16 | 4096 |
-| large / production | 1024 | 16 | 16 | 64 | 64 | 16384 |
+| 预设 | MTU | 窗口 | Peer | 保留 TX | 保留 RX |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| boot | 128 | 1 | 1 | 1 | 0 |
+| tiny | 128 | 2 | 1 | 2 | 2 |
+| small | 256 | 4 | 2 | 4 | 4 |
+| medium | 512 | 8 | 8 | 16 | 16 |
+| large / production | 1024 | 16 | 16 | 64 | 64 |
 
-Production 还要求认证 provider，并在流量开始前显式安装可信会话。共享消息预算与重组槽限制同时生效；查阅 `xgl_feature_config_t`，使用 `xgl_memory_requirements()` 测量实际配置。预设名称不是实测 MCU RAM/Flash 保证。
+Production 还要求认证 provider，并在流量开始前显式安装可信会话。各数据包均需要放进一帧。查阅 `xgl_feature_config_t`，使用 `xgl_memory_requirements()` 测量实际配置。预设名称不是实测 MCU RAM/Flash 保证。

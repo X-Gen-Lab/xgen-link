@@ -4,10 +4,10 @@ A profile is a compile-time capability ceiling. A preset supplies explicit runti
 
 ## Profiles
 
-| Profile | Authentication | Fragments / forwarding / out-of-order | libc fallback default |
+| Profile | Authentication | Forwarding / out-of-order | libc fallback default |
 | --- | --- | --- | --- |
 | boot | No | No | Off |
-| embedded-lite | No | Fragmentation and out-of-order | Off |
+| embedded-lite | No | Out-of-order only | Off |
 | embedded | Yes, 4 session slots | Yes | Off |
 | full | Yes, 16 session slots | Yes | On |
 
@@ -19,12 +19,12 @@ A profile is a compile-time capability ceiling. A preset supplies explicit runti
 
 ## Runtime limits
 
-| Preset | MTU | Window | Peers | Retained TX | Retained RX | Message bytes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| boot | 128 | 1 | 1 | 1 | 0 | Disabled |
-| tiny | 128 | 2 | 1 | 2 | 2 | Disabled |
-| small | 256 | 4 | 2 | 4 | 4 | 1024 |
-| medium | 512 | 8 | 8 | 16 | 16 | 4096 |
-| large / production | 1024 | 16 | 16 | 64 | 64 | 16384 |
+| Preset | MTU | Window | Peers | Retained TX | Retained RX |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| boot | 128 | 1 | 1 | 1 | 0 |
+| tiny | 128 | 2 | 1 | 2 | 2 |
+| small | 256 | 4 | 2 | 4 | 4 |
+| medium | 512 | 8 | 8 | 16 | 16 |
+| large / production | 1024 | 16 | 16 | 64 | 64 |
 
-Production additionally requires an authentication provider and explicit trusted sessions before traffic. The shared message budgets and reassembly slots also apply; inspect `xgl_feature_config_t` and query `xgl_memory_requirements()` for the actual selected configuration. A preset name is not a measured MCU RAM/Flash guarantee.
+Production additionally requires an authentication provider and explicit trusted sessions before traffic. Inspect `xgl_feature_config_t` and query `xgl_memory_requirements()` for the actual selected configuration. A preset name is not a measured MCU RAM/Flash guarantee.

@@ -13,7 +13,7 @@
 | 现象或状态 | 检查项 |
 | --- | --- |
 | `XGL_ERR_WINDOW_FULL` | Peer 在途窗口；继续 step 接收 ACK |
-| `XGL_ERR_NO_MEMORY` | Peer/全局包/消息/重组容量及接纳预算 |
+| `XGL_ERR_NO_MEMORY` | Peer、全局 TX 和乱序 RX 的容量及接纳预算 |
 | `XGL_ERR_BUSY` | PHY、应用接纳，或 peer 已有待推进消息 |
 | `XGL_ERR_ROUTE_NOT_FOUND` | 目标与固定路由配置 |
 | `XGL_ERR_BUFFER_TOO_SMALL` | Workspace、RX cache、完整帧开销或消息上限 |

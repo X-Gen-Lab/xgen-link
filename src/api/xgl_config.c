@@ -37,15 +37,15 @@
  * \brief           Get default configuration
  * \details         Uses the profile default with the compiled frame limit.
  */
-void xgl_config_get_default(xgl_config_t* config) {
+void xgl_config_get_default_v5(xgl_config_t* config) {
     /* Validate parameter */
     if (config == NULL) {
         return;
     }
 
     /* Select defaults that are supported by the compiled profile. */
-#if !XGL_FEATURE_FRAGMENTATION
-    xgl_config_get_preset_boot(config);
+#if XGL_BUILD_PROFILE_BOOT
+    xgl_config_get_preset_boot_v5(config);
 #else
     xgl_config_t default_config = XGL_CONFIG_PRESET_MEDIUM;
     if (default_config.protocol.window_size > XGL_BUILD_WINDOW_CAPACITY) {
@@ -64,7 +64,7 @@ void xgl_config_get_default(xgl_config_t* config) {
  * \brief           Configure the bounded single-peer boot transport
  * \param[out]      config: Destination configuration, or NULL
  */
-void xgl_config_get_preset_boot(xgl_config_t* config) {
+void xgl_config_get_preset_boot_v5(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
@@ -80,10 +80,9 @@ void xgl_config_get_preset_boot(xgl_config_t* config) {
 
 /**
  * \brief           Get tiny configuration preset
- * \details         Fixed small capacities without fragmentation. Query exact
- *                  workspace bytes with xgl_memory_report() for the ABI.
+ * \details         Query exact workspace bytes with xgl_memory_report().
  */
-void xgl_config_get_preset_tiny(xgl_config_t* config) {
+void xgl_config_get_preset_tiny_v5(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
@@ -94,10 +93,10 @@ void xgl_config_get_preset_tiny(xgl_config_t* config) {
 
 /**
  * \brief           Get small configuration preset
- * \details         Bounded capacities including fragmentation support. Query
- *                  workspace bytes before selecting a device memory budget.
+ * \details         Query workspace bytes before selecting a device memory
+ *                  budget.
  */
-void xgl_config_get_preset_small(xgl_config_t* config) {
+void xgl_config_get_preset_small_v5(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
@@ -108,11 +107,9 @@ void xgl_config_get_preset_small(xgl_config_t* config) {
 
 /**
  * \brief           Get medium configuration preset
- * \details         Increased bounded message and peer capacities.
- *                  Includes fragmentation. Compression is reserved and not
- *                  implemented in the current release.
+ * \details         Increased bounded packet and peer capacities.
  */
-void xgl_config_get_preset_medium(xgl_config_t* config) {
+void xgl_config_get_preset_medium_v5(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
@@ -127,7 +124,7 @@ void xgl_config_get_preset_medium(xgl_config_t* config) {
  *                  guarantee. Encryption is not implemented in the current
  * release.
  */
-void xgl_config_get_preset_large(xgl_config_t* config) {
+void xgl_config_get_preset_large_v5(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
@@ -140,7 +137,7 @@ void xgl_config_get_preset_large(xgl_config_t* config) {
  * \brief           Get production configuration preset
  * \details         Production profile requires authentication provider wiring.
  */
-void xgl_config_get_preset_production(xgl_config_t* config) {
+void xgl_config_get_preset_production_v5(xgl_config_t* config) {
     if (config == NULL) {
         return;
     }
@@ -160,7 +157,7 @@ void xgl_config_get_preset_production(xgl_config_t* config) {
  * \param[out]      frame_size: Required bytes for one ordinary ACK_RANGE
  * \return          True when the wire encoder accepts the base frame
  * \note            The base ACK exceeds HELLO and one-byte DATA overhead.
- *                  Optional SESSION, DATA_TYPE and FRAGMENT extensions are
+ *                  Optional SESSION and DATA_TYPE extensions are
  *                  measured separately for each actual transmission.
  */
 static bool config_measure_required_auth_frame(size_t tag_len,
@@ -197,7 +194,7 @@ static bool config_measure_required_auth_frame(size_t tag_len,
  *                  Returns specific error codes for different validation
  * failures
  */
-xgl_error_t xgl_config_validate(const xgl_config_t* config) {
+xgl_error_t xgl_config_validate_v5(const xgl_config_t* config) {
     /* Check for NULL pointer */
     if (config == NULL) {
         return XGL_ERR_NULL_POINTER;
@@ -224,22 +221,6 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
         return XGL_ERR_INVALID_PARAM;
     }
 #endif
-    if (config->features.enable_fragmentation &&
-        (config->features.max_message_size == 0U ||
-         config->features.max_reassembly_slots == 0U ||
-         config->features.max_reassembly_bytes == 0U ||
-         config->features.max_tx_message_bytes == 0U ||
-         config->features.max_message_size >
-             config->features.max_reassembly_bytes)) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#if SIZE_MAX > UINT32_MAX
-    if (config->features.enable_fragmentation &&
-        config->features.max_message_size > UINT32_MAX) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#endif
-
     /* Validate protocol parameters */
     if (config->protocol.ack_timeout_ms < XGL_MIN_ACK_TIMEOUT_MS ||
         config->protocol.ack_timeout_ms > XGL_MAX_ACK_TIMEOUT_MS) {
@@ -275,11 +256,6 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
 
 #if !XGL_FEATURE_AUTH
     if (config->auth_required) {
-        return XGL_ERR_UNSUPPORTED;
-    }
-#endif
-#if !XGL_FEATURE_FRAGMENTATION
-    if (config->features.enable_fragmentation) {
         return XGL_ERR_UNSUPPORTED;
     }
 #endif

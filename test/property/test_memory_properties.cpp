@@ -35,7 +35,6 @@ struct WorkspaceEndpoint {
     std::vector<uint8_t> incoming;
     std::vector<uint8_t> delivered;
     size_t deliveries = 0U;
-    bool busy = false;
 };
 
 /**
@@ -75,18 +74,15 @@ static xgl_error_t workspace_accept(xgl_handle_t, uint16_t, uint8_t,
                                     const uint8_t* data, size_t size,
                                     void* ctx) {
     auto* endpoint = static_cast<WorkspaceEndpoint*>(ctx);
-    if (endpoint->busy) {
-        return XGL_ERR_BUSY;
-    }
     endpoint->delivered.assign(data, data + size);
     ++endpoint->deliveries;
     return XGL_OK;
 }
 
 /**
- * \brief           Verify window capacity, ACK recycling and fragment retention
+ * \brief           Verify window capacity and ACK recycling
  */
-static void verify_static_workspace(bool fragmentation) {
+TEST(XglMemoryProperties, StaticWindowResourcesAreRecycledWithoutBackend) {
     WorkspaceEndpoint a, b;
     a.remote = &b;
     b.remote = &a;
@@ -107,11 +103,6 @@ static void verify_static_workspace(bool fragmentation) {
     config_a.features.max_peers = 1U;
     config_a.features.max_tx_packets = 2U;
     config_a.features.max_rx_buffered_packets = 1U;
-    config_a.features.enable_fragmentation = fragmentation;
-    config_a.features.max_message_size = 320U;
-    config_a.features.max_reassembly_slots = 1U;
-    config_a.features.max_reassembly_bytes = 320U;
-    config_a.features.max_tx_message_bytes = 320U;
     config_a.route_table = &route_a;
     config_a.route_table_len = 1U;
     config_a.rx_accept_callback = workspace_accept;
@@ -126,7 +117,7 @@ static void verify_static_workspace(bool fragmentation) {
     const size_t words = (required.size + sizeof(xgl_max_align_t) - 1U) /
                          sizeof(xgl_max_align_t);
     std::vector<xgl_max_align_t> storage_a(words), storage_b(words);
-    std::vector<uint8_t> payload(fragmentation ? 300U : 1U, 0x65U);
+    const std::vector<uint8_t> payload{0x65U};
     xgl_tx_data_t tx{};
     tx.target_id = 2U;
     tx.data = payload.data();
@@ -145,21 +136,13 @@ static void verify_static_workspace(bool fragmentation) {
                                   &receiver),
                   XGL_OK);
         ASSERT_EQ(xgl_send_at(sender, &tx, 0U), XGL_OK);
-        if (!fragmentation) {
-            ASSERT_EQ(xgl_send_at(sender, &tx, 0U), XGL_OK);
-            EXPECT_EQ(xgl_send_at(sender, &tx, 0U), XGL_ERR_WINDOW_FULL);
-        } else {
-            EXPECT_EQ(xgl_send_at(sender, &tx, 0U), XGL_ERR_BUSY);
-        }
-        b.busy = fragmentation;
+        ASSERT_EQ(xgl_send_at(sender, &tx, 0U), XGL_OK);
+        EXPECT_EQ(xgl_send_at(sender, &tx, 0U), XGL_ERR_WINDOW_FULL);
         for (uint32_t tick = 0U; tick < 200U; ++tick) {
-            if (tick == 8U) {
-                b.busy = false;
-            }
             (void)xgl_step(receiver, tick, &budget);
             (void)xgl_step(sender, tick, &budget);
         }
-        EXPECT_EQ(b.deliveries, (cycle + 1U) * (fragmentation ? 1U : 2U));
+        EXPECT_EQ(b.deliveries, (cycle + 1U) * 2U);
         EXPECT_EQ(b.delivered, payload);
         xgl_destroy(sender);
         xgl_destroy(receiver);
@@ -167,16 +150,6 @@ static void verify_static_workspace(bool fragmentation) {
         b.incoming.clear();
     }
 }
-
-TEST(XglMemoryProperties, StaticWindowResourcesAreRecycledWithoutBackend) {
-    verify_static_workspace(false);
-}
-
-#if XGL_FEATURE_FRAGMENTATION
-TEST(XglMemoryProperties, StaticFragmentsCrossWindowsAndRetainBusyDelivery) {
-    verify_static_workspace(true);
-}
-#endif
 
 /* Feature: x-gen-link, Property 7: Custom Allocator Usage */
 TEST(XglMemoryProperties, CustomAllocatorUsage) {

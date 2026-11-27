@@ -163,7 +163,7 @@ static void transport_release_rejected_scope(xgl_transport_ctx_t* ctx,
         return;
     }
     xgl_transport_peer_state_t* peer = transport_find_rx_peer(ctx, packet);
-    if (peer != NULL && transport_peer_can_reclaim(ctx, peer)) {
+    if (peer != NULL && transport_peer_can_reclaim(peer)) {
         (void)xgl_transport_close_scope(ctx, handle, peer->peer_id,
                                         peer->connection_id,
                                         peer->session_epoch);
@@ -214,30 +214,6 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_NULL_POINTER;
     }
 
-#if XGL_FEATURE_FRAGMENTATION
-    if (ctx->enable_fragmentation && data_len > ctx->max_message_size) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-#endif
-
-    xgl_error_t err;
-#if XGL_FEATURE_FRAGMENTATION
-    transport_rx_fragment_t fragment;
-#endif
-    if (packet->fragment) {
-#if XGL_FEATURE_FRAGMENTATION
-        if (ctx->fragment_mgr == NULL) {
-            return XGL_ERR_INVALID_FRAME;
-        }
-        err = transport_decode_rx_fragment(ctx, packet, &fragment);
-        if (err != XGL_OK) {
-            return err;
-        }
-#else
-        return XGL_ERR_INVALID_FRAME;
-#endif
-    }
-
     /* No application can take responsibility for these bytes. Reject before
      * reliable ordering can cache or acknowledge them. */
     if (!transport_has_rx_handler(ctx)) {
@@ -258,27 +234,9 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     if (rx_peer != NULL && transport_expire_tx(ctx, handle, rx_peer)) {
         return XGL_ERR_TIMEOUT;
     }
-#if XGL_FEATURE_FRAGMENTATION && XGL_FEATURE_OUT_OF_ORDER
-    if (transport_expire_rx_buffered_fragments(ctx, handle, rx_peer)) {
-        return XGL_ERR_TIMEOUT;
-    }
 #endif
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    if (packet->fragment) {
-        err = transport_validate_rx_fragment_scope(ctx, rx_peer, packet,
-                                                   &fragment);
-        if (err != XGL_OK) {
-            return err;
-        }
-#if XGL_FEATURE_ADVANCED_RUNTIME
-        if (transport_expire_rx_fragment(ctx, handle, rx_peer, packet,
-                                         &fragment)) {
-            return XGL_ERR_TIMEOUT;
-        }
-#endif
-    }
-#endif
+
+    xgl_error_t err;
     if (packet->reliable == XGL_RELIABILITY_ACK_ELICITING) {
         err = transport_check_feedback(ctx, packet);
         if (err != XGL_OK) {
@@ -310,18 +268,9 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         packet->reliable == XGL_RELIABILITY_ACK_ELICITING) {
         return transport_drain_rx_buffered(ctx, handle, rx_peer, NULL);
     }
-
 #endif
 
-#if XGL_FEATURE_FRAGMENTATION
-    if (packet->fragment) {
-        err = transport_deliver_rx_fragment(ctx, handle, rx_peer, packet, data,
-                                            data_len, &fragment);
-    } else
-#endif
-    {
-        err = transport_deliver_packet(ctx, handle, packet, data, data_len);
-    }
+    err = transport_deliver_packet(ctx, handle, packet, data, data_len);
     if (err != XGL_OK) {
         transport_release_rejected_scope(ctx, handle, packet, scope_was_absent);
         return err;

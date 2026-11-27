@@ -55,9 +55,12 @@ class FootprintAdvanced(unittest.TestCase):
                          "ON" if advanced_api else "OFF")
         self.assertEqual(report["forbidden_heap_symbols"], [])
         self.assertEqual(report["unresolved_symbols"], [])
-        symbols = self.execute("arm-none-eabi-nm", "--defined-only", binary / "xgl_boot_probe.elf")
+        self.assertEqual(report["config_abi_version"], 5)
+        output = self.execute("arm-none-eabi-nm", "--defined-only", binary / "xgl_boot_probe.elf")
+        symbols = {line.split()[-1] for line in output.splitlines() if line.strip()}
+        self.assertNotIn("xgl_resources_get", symbols)
         for symbol in ("xgl_init_static_with_options", "xgl_memory_report_with_options",
-                       "xgl_step_bounded", "xgl_resources_get"):
+                       "xgl_step_bounded", "xgl_resources_get_v5"):
             self.assertEqual(symbol in symbols, advanced_api, symbol)
 
     def test_enabled_library_does_not_claim_advanced_api_coverage(self):

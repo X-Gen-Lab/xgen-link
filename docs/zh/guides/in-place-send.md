@@ -10,7 +10,7 @@
 | `xgl_send_zerocopy_scoped_at()` | 通过 `xgl_tx_zerocopy_request_t` 指定 connection ID 与 session epoch |
 | `xgl_send_zerocopy_layout()` | 查询指定作用域请求的精确载荷偏移与完整帧大小 |
 
-两个发送 API 均只支持单帧非可靠发送。`reliable=true` 返回 `XGL_ERR_INVALID_PARAM`，`timeout_ms` 不参与处理。可靠或分片消息使用 `xgl_send_at()`。认证发送要求已为选定的目标、connection ID 与 session epoch 安装可信会话。
+两个发送 API 均只支持单帧非可靠发送。`reliable=true` 返回 `XGL_ERR_INVALID_PARAM`，`timeout_ms` 不参与处理。可靠发送使用 `xgl_send_at()`。认证发送要求已为选定的目标、connection ID 与 session epoch 安装可信会话。
 
 ## 缓冲布局
 
@@ -70,6 +70,6 @@ xgl_error_t send_scoped_example(xgl_handle_t handle, uint32_t now_ms) {
 
 ## 失败处理
 
-检查返回值。本地成功不能证明远端交付，失败也可能已经修改头部与尾部。认证发送一旦预留安全序号，后续 provider 或 PHY 失败不会回退该序号；重试应再次调用 API，不能重放之前序列化的帧。详见[安全机制](../reference/protocol/v3/security.md)。
+检查返回值。本地成功不能证明远端交付，失败也可能已经修改头部与尾部。认证发送一旦预留安全序号，后续 provider 或 PHY 失败不会回退该序号；重试应再次调用 API，不能重放之前序列化的帧。详见[安全机制](../reference/protocol/v1/security.md)。
 
 调用、查询与重试均遵循实例串行化规则。布局查询和基础描述符校验阶段的拒绝不构成发送尝试；进入统一 network 发送路径后的错误按[统计契约](../reference/statistics.md)计数，不能只凭返回错误码判断失败阶段。

@@ -10,7 +10,7 @@ The zero-copy send APIs build a single unreliable frame in caller-owned writable
 | `xgl_send_zerocopy_scoped_at()` | `xgl_tx_zerocopy_request_t` selects an explicit connection ID and session epoch |
 | `xgl_send_zerocopy_layout()` | Queries the exact payload offset and complete frame size for the scoped request |
 
-Both send APIs support only single-frame, unreliable transmission. `reliable=true` is rejected with `XGL_ERR_INVALID_PARAM`, and `timeout_ms` is ignored. Use `xgl_send_at()` for reliable or fragmented messages. Authenticated sending requires a trusted session installed for the selected target, connection ID and session epoch.
+Both send APIs support only single-frame, unreliable transmission. `reliable=true` is rejected with `XGL_ERR_INVALID_PARAM`, and `timeout_ms` is ignored. Use `xgl_send_at()` for reliable DATA. Authenticated sending requires a trusted session installed for the selected target, connection ID and session epoch.
 
 ## Buffer Layout
 
@@ -70,6 +70,6 @@ The caller may reuse storage after either send API returns. All callbacks borrow
 
 ## Failure Handling
 
-Check the returned status. A local success is not evidence of remote delivery. A failure can leave the header and trailer modified. Once an authenticated send reserves a security sequence, later provider or PHY failure does not roll it back; retry through the API instead of replaying the previously serialized bytes. See [Security](../reference/protocol/v3/security.md).
+Check the returned status. A local success is not evidence of remote delivery. A failure can leave the header and trailer modified. Once an authenticated send reserves a security sequence, later provider or PHY failure does not roll it back; retry through the API instead of replaying the previously serialized bytes. See [Security](../reference/protocol/v1/security.md).
 
 Calls, queries and retries must follow the instance's serialization rules. A layout query or rejection during basic descriptor validation is not a transmission attempt. Errors after entering the common network send path are counted according to the [statistics contract](../reference/statistics.md); the returned error code alone does not identify which validation stage failed.

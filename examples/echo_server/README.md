@@ -2,7 +2,7 @@
 
 Two nodes exchange one reliable message and verify the returned application bytes.
 
-This is a deterministic host simulation using wire v3. The nodes, configuration,
+This is a deterministic host simulation using wire v1. The nodes, configuration,
 routes, PHY descriptors, application contexts, and static workspaces remain at
 fixed addresses until `xgl_destroy()` returns. No protocol heap allocation is
 needed. `common/sim_link.h` shares a bounded byte-ring PHY; TX copies bytes before

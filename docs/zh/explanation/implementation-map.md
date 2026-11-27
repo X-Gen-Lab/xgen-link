@@ -12,9 +12,7 @@
 | ACK 原子校验与应用 | `src/transport/xgl_transport_ack.c` |
 | 期限汇总与周期处理 | `src/transport/xgl_transport_runtime.c` |
 | 生产重传路径 | `src/transport/xgl_transport_runtime.c` |
-| 自有消息推进 | `src/transport/xgl_transport_tx_message.c` |
 | 接收排序与保留投递 | `src/transport/xgl_transport_rx.c`、`xgl_transport_rx_delivery.c` |
-| 分片覆盖与重组 | `src/transport/xgl_fragment_*.c` |
 | 路由查找、本地投递与转发 | `src/network/` |
 | 规范帧布局与 TLV | `src/wire/` |
 | 方向性会话状态与认证 | `src/security/` |
@@ -32,4 +30,4 @@ Datalink 源码按入口、发送、接收和 parser 划分。接收文件集中
 
 ## 验证边界
 
-单元测试覆盖 ACK 校验、scope 隔离、取消、自有载荷生命周期与容量拒绝。Transport 属性测试经过生产重传路径。静态工作区属性测试在有界资源服务上验证跨窗口分片和接收背压。Wire/security 测试断言字节布局、nonce/AAD 构造与重放行为。SDK/profile 冒烟构建独立于内部单元夹具，检查安装后的公开 API。
+单元测试覆盖 ACK 校验、scope 隔离、取消、自有载荷生命周期与容量拒绝。Transport 属性测试经过生产重传路径。静态工作区属性测试在有界资源服务上验证容量边界和接收背压。Wire/security 测试断言字节布局、nonce/AAD 构造与重放行为。SDK/profile 冒烟构建独立于内部单元夹具，检查安装后的公开 API。

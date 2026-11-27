@@ -6,13 +6,12 @@ Every instance owns one bounded workspace. Private fixed pools manage the protoc
 
 `xgl_memory_requirements()` validates the configuration and returns exact `size` and `alignment`. The layout includes the instance, pool descriptors, initialization objects, and all runtime slots.
 
-`xgl_memory_report()` explains the same plan without allocating: management, initialization, peers, windows, reliable records and payloads, frame scratch, buffered RX, and fragmentation. Category bytes include alignment and sum exactly to `report.requirements.size`. Failure leaves the report unchanged. Its inline entry checks the consumer's configuration ABI and compiled profile identity.
+`xgl_memory_report()` explains the same plan without allocating: management, initialization, peers, windows, reliable records and payloads, frame scratch and buffered RX. Category bytes include alignment and sum exactly to `report.requirements.size`. Failure leaves the report unchanged. Its inline entry checks the consumer's configuration ABI and compiled profile identity.
 
 ```c
 xgl_memory_report_t report;
 if (xgl_memory_report(&config, &report) == XGL_OK) {
     /* Reserve report.requirements.size at report.requirements.alignment. */
-    /* report.fragment_bytes is reserved storage, not the admission budget. */
 }
 ```
 
@@ -29,18 +28,15 @@ After preparation, init, sends, receive processing, and cleanup use only the wor
 | Peer and window | One peer object and window storage per peer capacity |
 | Reliable TX | Separate packet and payload slots per global TX capacity |
 | Frame scratch | One complete-frame scratch slot for synchronous, non-reentrant I/O |
-| Out-of-order RX | A record and a slot for payload plus extensions per RX capacity |
-| Fragmented TX | One maximum-message slot per peer; extension slots per TX capacity |
-| Reassembly | One descriptor per reassembly slot |
-| Retained RX messages | Maximum-message slots for reassembly slots plus peers |
+| Out-of-order RX | A record with decoded scope and packet metadata, plus a fixed payload slot per RX capacity |
+
+Out-of-order payload slots use the configured frame payload upper bound. TLVs are validated during frame decoding. The retained packet keeps only the decoded metadata needed for later delivery.
 
 Each category has its own fixed pool. A small payload cannot consume a peer or control-record reservation. Freed slots are reusable with no heap fallback or runtime expansion.
 
-Fragment byte budgets are shared admission limits, not variable-size arenas. The fixed reservations include completed RX messages retained while the application is busy. These conservative reservations may exceed the configured concurrent byte budget.
-
 ## Capacity and Failure
 
-Window capacity is per peer; TX and out-of-order capacity are global. Exhaustion yields a bounded failure or deferred work, not an automatic resize. Reliable fragmented messages can exceed the packet window: retained message bytes feed later packets as ACKs release slots.
+Window capacity is per peer; TX and out-of-order capacity are global. Exhaustion yields a bounded failure or deferred work, not an automatic resize.
 
 A scope is identified by remote node, connection ID, and epoch. Recovery must not silently restart sequence numbers within an old scope. Close the old scope, drain old unauthenticated traffic, and use a new epoch; authenticated recovery closes the trusted session and installs fresh trusted parameters. See [Send API](../guides/send.md).
 

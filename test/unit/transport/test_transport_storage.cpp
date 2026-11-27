@@ -116,7 +116,7 @@ class XglTransportBufferedStorageTest : public ::testing::Test {
 
 } /* namespace */
 
-TEST_F(XglTransportBufferedStorageTest, PayloadAndUnknownTlvUseOneOwnedSpan) {
+TEST_F(XglTransportBufferedStorageTest, RetainsPayloadAndParsedMetadataOnly) {
     allocations.fail_call = 3U;
     ASSERT_EQ(Cache(1U), XGL_OK);
     EXPECT_EQ(allocations.calls, 2U);
@@ -125,18 +125,15 @@ TEST_F(XglTransportBufferedStorageTest, PayloadAndUnknownTlvUseOneOwnedSpan) {
     EXPECT_EQ(buffered->packet.connection_id, 7U);
     EXPECT_EQ(buffered->packet.session_epoch, 9U);
     EXPECT_EQ(buffered->packet.packet_number, 1U);
-    EXPECT_EQ(buffered->packet.extensions,
-              buffered->packet.data->data + payload.size());
+    EXPECT_EQ(buffered->packet.extensions, nullptr);
+    EXPECT_EQ(buffered->packet.extensions_len, 0U);
+    ASSERT_EQ(allocations.live.count(buffered->storage), 1U);
+    EXPECT_EQ(allocations.live.at(buffered->storage), payload.size());
 
     payload.fill(0U);
-    extensions.fill(0U);
     const std::array<uint8_t, 3> expected_payload = {0x11U, 0x22U, 0x33U};
-    const std::array<uint8_t, 4> expected_tlv = {0x7EU, 0x02U, 0xA5U, 0x5AU};
     EXPECT_EQ(std::memcmp(buffered->packet.data->data, expected_payload.data(),
                           expected_payload.size()),
-              0);
-    EXPECT_EQ(std::memcmp(buffered->packet.extensions, expected_tlv.data(),
-                          expected_tlv.size()),
               0);
     transport_clear_rx_buffered(&context, &peer);
     EXPECT_EQ(allocations.releases, 2U);

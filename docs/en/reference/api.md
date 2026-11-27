@@ -10,13 +10,13 @@ Use `<xgl/xgl.h>`. Installed headers include the generated profile and ABI const
 
 Use `xgl_create_with_error(&config, &handle)` to diagnose reservation failures: it returns configuration, ABI, backend or allocation errors. Allocation failure returns `XGL_ERR_NO_MEMORY`; every failure clears the handle. Success still only reserves storage and requires `xgl_init()`. The original pointer-returning `xgl_create()` remains compatible and uses the same implementation. The corresponding `_checked` entry accepts the consumer configuration size, ABI and build identity explicitly across compilation boundaries.
 
-`xgl_memory_report()` returns the same requirements with a breakdown by resource category, without allocating or changing an instance. Category bytes include padding and sum to the exact workspace size. Admission byte limits can be smaller than reserved pool storage; see [Resource Model](../explanation/resource-model.md).
+`xgl_memory_report()` returns the same requirements with a breakdown by resource category, without allocating or changing an instance. Category bytes include padding and sum to the exact workspace size. See [Resource Model](../explanation/resource-model.md).
 
 The configuration and referenced PHY/provider/callback objects are borrowed until destruction. Keep their addresses stable and do not modify them while the instance exists. All operations on an instance are serialized by the caller; callbacks must not reenter it.
 
 ## Send and scheduling
 
-`xgl_send_at(handle, &tx, now_ms)` accepts a borrowed payload during the call and retains reliable data in bounded protocol storage. `xgl_send_zerocopy_at()` uses caller frame storage for unreliable single-frame sends; it does not permit an asynchronous PHY to retain that address.
+`xgl_send_at(handle, &tx, now_ms)` accepts one frame's worth of borrowed payload during the call and retains reliable DATA in bounded protocol storage. `xgl_send_zerocopy_at()` uses caller frame storage for unreliable single-frame sends; it does not permit an asynchronous PHY to retain that address.
 
 The legacy zero-copy request always uses connection/epoch zero. `xgl_send_zerocopy_scoped_at()` accepts a separate compatible request with an explicit scope. `xgl_send_zerocopy_layout()` measures exact headroom and total storage without allocating, transmitting or consuming authentication state. See [Send API](../guides/send.md) for preparation and lifetime rules.
 
@@ -30,4 +30,4 @@ The legacy zero-copy request always uses connection/epoch zero. `xgl_send_zeroco
 
 `xgl_stats_get()` / `xgl_stats_reset()` require exclusive instance access. `xgl_error_string()` translates the protocol error domain. `xgl_version_string()` and `xgl_version_int()` report the linked SDK version.
 
-See [migration](../guides/migration.md) and [security](protocol/v3/security.md).
+See [migration](../guides/migration.md) and [security](protocol/v1/security.md).

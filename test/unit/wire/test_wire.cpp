@@ -113,7 +113,7 @@ TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     header.packet_type = XGL_PACKET_TYPE_DATA;
     header.flags = XGL_WIRE_FLAG_ACK_ELICITING | XGL_WIRE_FLAG_AUTHENTICATED;
     header.ttl = 9;
-    header.traffic_class = 0x23;
+    header.traffic_class = 0x43;
     header.source_id = 0x1234;
     header.target_id = 0xABCD;
     header.connection_id = 0x01020304;
@@ -125,13 +125,12 @@ TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
 
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
-    EXPECT_EQ(buffer[2], XGL_WIRE_VERSION);
+    EXPECT_EQ(buffer[2], 1U);
     EXPECT_EQ(buffer[3], XGL_WIRE_BASE_HEADER_SIZE);
     EXPECT_EQ(buffer[4], XGL_PACKET_TYPE_DATA);
-    EXPECT_EQ(buffer[5], static_cast<uint8_t>(XGL_WIRE_FLAG_ACK_ELICITING |
-                                              XGL_WIRE_FLAG_AUTHENTICATED));
+    EXPECT_EQ(buffer[5], 0x11U);
     EXPECT_EQ(buffer[6], 9U);
-    EXPECT_EQ(buffer[7], 0x23U);
+    EXPECT_EQ(buffer[7], 0x43U);
     EXPECT_EQ(xgl_deserialize_u16_le(&buffer[8]), 0x1234U);
     EXPECT_EQ(xgl_deserialize_u16_le(&buffer[10]), 0xABCDU);
     EXPECT_EQ(xgl_deserialize_u32_le(&buffer[12]), 0x01020304U);
@@ -290,32 +289,6 @@ TEST(XglWireTest, EncodesAndDecodesSackExtension) {
     EXPECT_EQ(memcmp(decoded_bitmap, bitmap, sizeof(bitmap)), 0);
 }
 
-TEST(XglWireTest, EncodesAndDecodesFragmentExtension) {
-    uint8_t value[16] = {};
-    size_t value_len = 0;
-
-    ASSERT_EQ(xgl_wire_encode_fragment_ext_value(value, sizeof(value),
-                                                 0x01020304U, 0x00001000U,
-                                                 0x00004000U, &value_len),
-              XGL_OK);
-
-    EXPECT_EQ(value_len, 12U);
-    EXPECT_EQ(xgl_deserialize_u32_le(&value[0]), 0x01020304U);
-    EXPECT_EQ(xgl_deserialize_u32_le(&value[4]), 0x00001000U);
-    EXPECT_EQ(xgl_deserialize_u32_le(&value[8]), 0x00004000U);
-
-    uint32_t message_id = 0;
-    uint32_t fragment_offset = 0;
-    uint32_t message_len = 0;
-    ASSERT_EQ(xgl_wire_decode_fragment_ext_value(value, value_len, &message_id,
-                                                 &fragment_offset,
-                                                 &message_len),
-              XGL_OK);
-    EXPECT_EQ(message_id, 0x01020304U);
-    EXPECT_EQ(fragment_offset, 0x00001000U);
-    EXPECT_EQ(message_len, 0x00004000U);
-}
-
 TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
     uint8_t session[16] = {};
     size_t session_len = 0;
@@ -411,11 +384,15 @@ TEST(XglWireTest, RejectsV2WithoutAutomaticDowngrade) {
     header.source_id = 1U;
     header.target_id = 2U;
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
-    bytes[2] = 2U;
-    bytes[22] = bytes[23] = 0U;
-    xgl_serialize_u16_le(bytes + 22, xgl_crc16_modbus(bytes, sizeof(bytes)));
-    EXPECT_EQ(xgl_wire_decode_header(&header, bytes, sizeof(bytes)),
-              XGL_ERR_INVALID_FRAME);
+    for (const uint8_t version : {2U, 3U}) {
+        SCOPED_TRACE(static_cast<unsigned>(version));
+        bytes[2] = version;
+        bytes[22] = bytes[23] = 0U;
+        xgl_serialize_u16_le(bytes + 22,
+                             xgl_crc16_modbus(bytes, sizeof(bytes)));
+        EXPECT_EQ(xgl_wire_decode_header(&header, bytes, sizeof(bytes)),
+                  XGL_ERR_INVALID_FRAME);
+    }
 }
 
 TEST(XglWireTest, RejectsInvalidExtensionLength) {
@@ -429,12 +406,16 @@ TEST(XglWireTest, RejectsInvalidExtensionLength) {
     EXPECT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_ERR_INVALID_FRAME);
 }
 
-TEST(XglWireTest, RejectsUnimplementedEncryptionFlagsAndTrafficClasses) {
-    const uint8_t unsupported_flags[] = {XGL_WIRE_FLAG_ENCRYPTED, 0U, 0U, 0U};
-    const uint8_t unsupported_classes[] = {0U, XGL_TRAFFIC_ENCRYPTION_AES128,
+TEST(XglWireTest, RejectsUnsupportedFlagsAndTrafficClasses) {
+    const uint8_t unsupported_flags[] = {
+        XGL_WIRE_FLAG_ENCRYPTED, 0U, 0U, 0U, 0x04U, 0U};
+    const uint8_t unsupported_classes[] = {0U,
+                                           XGL_TRAFFIC_ENCRYPTION_AES128,
                                            XGL_TRAFFIC_ENCRYPTION_CHACHA20,
-                                           XGL_TRAFFIC_ENCRYPTION_MASK};
-    for (size_t i = 0; i < 4U; ++i) {
+                                           XGL_TRAFFIC_ENCRYPTION_MASK,
+                                           0U,
+                                           0x20U};
+    for (size_t i = 0; i < sizeof(unsupported_flags); ++i) {
         xgl_wire_header_t header = {};
         header.version = XGL_WIRE_VERSION;
         header.header_len = XGL_WIRE_BASE_HEADER_SIZE;

@@ -1,6 +1,6 @@
 # Integrate Boot
 
-The Boot profile retains static workspaces, a single peer, at most one route and one packet per window. It supports reliable unicast with application-defined blocks. Other profiles provide authentication, forwarding, fragmentation, out-of-order buffering, statistics and detailed diagnostics.
+The Boot profile retains static workspaces, a single peer, at most one route and one packet per window. It supports reliable unicast with application-defined blocks. Other profiles provide authentication, forwarding, out-of-order buffering, statistics and detailed diagnostics.
 
 ## Select resources
 

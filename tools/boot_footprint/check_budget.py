@@ -26,7 +26,8 @@ def audit(report, policy):
                 raise ValueError(f"Invalid resource policy {field}")
             if type(report.get(field)) is not bool or report[field] != configuration[field]:
                 violations.append(f"Report {field} does not match the selected policy")
-    for field in ("resource_config_id", "compiled_window_capacity", "reliable_bucket_count"):
+    for field in ("config_abi_version", "resource_config_id",
+                  "compiled_window_capacity", "reliable_bucket_count"):
         if field in configuration:
             expected = configuration[field]
             if type(expected) is not int or expected <= 0:

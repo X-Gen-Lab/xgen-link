@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Begin Wire v1 with the existing frame layout, CRC rules and active field assignments. Endpoints and relays accept version 1.
+- Remove protocol fragmentation, reassembly and their resource settings. Each DATA submission fits in one frame. Larger transfers use application-defined blocks.
+- Bump the SDK and configuration ABI to 5 and the advanced options descriptor to version 2.
+
+## SDK 4 development (historical)
+
 - Build the production SDK from the repository root with a C11 toolchain. Protocol utilities are private to XGL. The public allocator is `xgl_allocator_t` and the configuration ABI is 4.
 - Keep wire v3 and the `xgl::xgl` consumption target.
 - Reorganize bilingual documentation by reader task and build the site without the production dependency graph.

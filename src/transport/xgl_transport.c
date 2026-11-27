@@ -39,29 +39,14 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
         return XGL_ERR_INVALID_PARAM;
     }
 
-#if SIZE_MAX > UINT32_MAX
-    if (config->enable_fragmentation && config->max_message_size > UINT32_MAX) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#endif
-
 #if XGL_FEATURE_OUT_OF_ORDER
     if (config->window_size > 1U && config->max_rx_buffered_packets == 0U) {
         return XGL_ERR_INVALID_PARAM;
     }
 #endif
-#if XGL_FEATURE_FRAGMENTATION
-    if (config->enable_fragmentation &&
-        (config->max_tx_message_bytes == 0U ||
-         config->max_reassembly_bytes == 0U || config->max_message_size == 0U ||
-         config->max_reassembly_slots == 0U)) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#endif
 
 #if XGL_FEATURE_ADVANCED_RUNTIME
-    if (config->reassembly_timeout_ms > INT32_MAX ||
-        config->tx_lifetime_ms > INT32_MAX) {
+    if (config->tx_lifetime_ms > INT32_MAX) {
         return XGL_ERR_INVALID_PARAM;
     }
 #endif
@@ -82,9 +67,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->window_size = config->window_size;
     ctx->max_peers = config->max_peers;
     ctx->default_timeout_ms = config->default_timeout_ms;
-#if XGL_FEATURE_FRAGMENTATION
-    ctx->enable_fragmentation = config->enable_fragmentation;
-#endif
     ctx->max_frame_size = config->max_frame_size;
     ctx->auth_tag_len = config->auth_tag_len;
     ctx->route_table = config->route_table;
@@ -105,12 +87,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->memory.tx_packet = config->allocator;
     ctx->memory.tx_payload = config->allocator;
     ctx->memory.scratch = config->allocator;
-#if XGL_FEATURE_FRAGMENTATION
-    ctx->memory.tx_extensions = config->allocator;
-    ctx->memory.tx_message = config->allocator;
-    ctx->memory.reassembly = config->allocator;
-    ctx->memory.reassembly_payload = config->allocator;
-#endif
 #if XGL_FEATURE_OUT_OF_ORDER
     ctx->memory.rx_packet = config->allocator;
     ctx->memory.rx_payload = config->allocator;
@@ -122,15 +98,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
             !xgl_allocator_is_valid(ctx->memory.tx_payload)) {
             return XGL_ERR_INVALID_PARAM;
         }
-#if XGL_FEATURE_FRAGMENTATION
-        if (config->enable_fragmentation &&
-            (!xgl_allocator_is_valid(ctx->memory.tx_extensions) ||
-             !xgl_allocator_is_valid(ctx->memory.tx_message) ||
-             !xgl_allocator_is_valid(ctx->memory.reassembly) ||
-             !xgl_allocator_is_valid(ctx->memory.reassembly_payload))) {
-            return XGL_ERR_INVALID_PARAM;
-        }
-#endif
 #if XGL_FEATURE_OUT_OF_ORDER
         if (config->max_rx_buffered_packets > 0U &&
             (!xgl_allocator_is_valid(ctx->memory.rx_packet) ||
@@ -140,45 +107,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 #endif
     }
     ctx->peer_idle_timeout_ms = config->peer_idle_timeout_ms;
-#if XGL_FEATURE_FRAGMENTATION
-    ctx->max_message_size = config->max_message_size;
-    ctx->max_reassembly_slots = config->max_reassembly_slots;
-#endif
-
-#if XGL_FEATURE_FRAGMENTATION
-    /* Initialize fragmentation manager if enabled */
-    if (config->enable_fragmentation) {
-        ctx->max_tx_message_bytes = config->max_tx_message_bytes;
-        size_t max_reassembly_bytes = config->max_reassembly_bytes;
-        ctx->fragment_mgr = &ctx->fragment_storage;
-        uint32_t reassembly_timeout = XGL_FRAGMENT_TIMEOUT_MS;
-#if XGL_FEATURE_ADVANCED_RUNTIME
-        if (config->reassembly_timeout_ms != 0U) {
-            reassembly_timeout = config->reassembly_timeout_ms;
-        }
-#endif
-        xgl_error_t err =
-            xgl_fragment_init(ctx->fragment_mgr, ctx->max_reassembly_slots,
-                              reassembly_timeout, ctx->memory.reassembly);
-        if (err != XGL_OK) {
-            ctx->fragment_mgr = NULL;
-            return err;
-        }
-        ctx->fragment_mgr->data_allocator = ctx->memory.reassembly_payload;
-        err = xgl_fragment_set_limits(ctx->fragment_mgr, ctx->max_message_size,
-                                      max_reassembly_bytes);
-        if (err != XGL_OK) {
-            xgl_fragment_destroy(ctx->fragment_mgr);
-            ctx->fragment_mgr = NULL;
-            return err;
-        }
-    }
-
-#else
-    if (config->enable_fragmentation) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-#endif
 
     return XGL_OK;
 }
@@ -192,15 +120,6 @@ void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
     }
 
     transport_destroy_peers(ctx);
-
-#if XGL_FEATURE_FRAGMENTATION
-    /* Destroy fragmentation manager after peer-owned pending deliveries. */
-    if (ctx->fragment_mgr) {
-        xgl_fragment_destroy(ctx->fragment_mgr);
-        ctx->fragment_mgr = NULL;
-    }
-
-#endif
 
     /* Clear context */
     memset(ctx, 0, sizeof(xgl_transport_ctx_t));

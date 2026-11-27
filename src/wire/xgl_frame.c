@@ -65,7 +65,6 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     } else {
         xgl_frame_set_reliability(&traffic_class_bits, params->reliable);
     }
-    xgl_frame_set_fragmented(&traffic_class_bits, params->fragment);
     xgl_frame_set_priority(&traffic_class_bits, params->priority);
 
     uint8_t flags = params->flags;
@@ -73,9 +72,6 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
         (uint8_t)(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK);
     if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
         flags |= XGL_WIRE_FLAG_ACK_ELICITING;
-    }
-    if ((traffic_class_bits & XGL_TRAFFIC_FRAGMENTED_MASK) != 0U) {
-        flags |= XGL_WIRE_FLAG_FRAGMENTED | XGL_WIRE_FLAG_HAS_EXTENSIONS;
     }
     if (params->extensions != NULL && params->extensions_len > 0U) {
         flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;

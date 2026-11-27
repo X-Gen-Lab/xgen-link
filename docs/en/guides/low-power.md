@@ -10,7 +10,7 @@ Parser deadlines participate in `xgl_next_timeout()` independently of the PHY po
 
 A step returns its first parser timeout, PHY, delivery or transport error while continuing to consume the received byte chunk and maintain transport. Malformed stream frames are discarded and reported through diagnostics; they do not stop parsing later frames. A successful PHY read alone does not imply successful application admission.
 
-ACK/SACK reception validates feedback and records ready work. DATA retries and further fragments run in transport maintenance after RX processing, possibly in that same step. Ready retransmissions and message pumping can yield a zero timeout; temporary PHY or resource backpressure schedules a positive retry delay. Maintenance returns its first hard error and continues other scopes. BUSY or NO_MEMORY while retrying retained work is normal backpressure and does not alone fail the step. Immediate RX admission and ACK-submission errors still propagate; an ACK failure does not revoke accepted bytes or receive history.
+ACK/SACK reception validates feedback and records ready work. DATA retries run in transport maintenance after RX processing, possibly in that same step. Ready retransmissions can yield a zero timeout, and temporary PHY or resource backpressure schedules a positive retry delay. Maintenance returns its first hard error and continues other scopes. BUSY or NO_MEMORY while retrying retained work is normal backpressure and does not alone fail the step. Immediate RX admission and ACK-submission errors still propagate; an ACK failure does not revoke accepted bytes or receive history.
 
 Each due link reads its PHY only once per step, also bounded by the compiled `XGL_DATALINK_RX_CHUNK_SIZE`. `AUTO` selects 32 bytes for Boot and 128 for other profiles. The runtime budget is an upper bound, not a request to drain that many bytes. When choosing a smaller chunk, recheck polls per complete frame, driver buffering and parser timeout; see [Datalink](../explanation/datalink.md).
 
@@ -49,6 +49,6 @@ Keep callback execution bounded. The RX byte budget does not bound user callback
 
 Use one monotonic 32-bit millisecond clock, with elapsed intervals below `2^31` milliseconds. Clock wrap is supported; resetting the clock while the instance remains active is not a supported recovery mechanism.
 
-Continue scheduling while packets, message pumping, or application-busy deliveries are pending. Respect backpressure and terminal scope failure; sleeping indefinitely after a failed send does not release retained resources.
+Continue scheduling while packets are awaiting feedback, retries, or application acceptance. Respect backpressure and terminal scope failure; sleeping indefinitely after a failed send does not release retained resources.
 
 Application-busy receive data does not create a continuously ready timer. When the application can accept data again, signal the owner task and drive another step. `xgl_next_timeout()` describes protocol deadlines, not application capacity recovery.

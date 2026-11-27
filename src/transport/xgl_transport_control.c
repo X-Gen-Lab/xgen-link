@@ -39,7 +39,6 @@ xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
                            .packet_type = XGL_PACKET_TYPE_CONTROL,
                            .data_type = control_type,
                            .reliable = XGL_RELIABILITY_NONE,
-                           .fragment = false,
                            .priority = 7,
                            .data = &packet_data,
                            .extensions = control_ext,
@@ -96,7 +95,7 @@ xgl_error_t transport_process_control_packet(xgl_transport_ctx_t* ctx,
     /* A duplicate HELLO cannot keep an unused reservation alive forever.
      * Accepted DATA, owned work and failed identities retain their normal
      * explicit lifecycle instead of becoming lease-reclaimable. */
-    if (!peer->hello_reserved && transport_peer_can_reclaim(ctx, peer)) {
+    if (!peer->hello_reserved && transport_peer_can_reclaim(peer)) {
         peer->hello_reserved = true;
         peer->hello_reserved_ms = transport_now(ctx);
     }

@@ -133,9 +133,10 @@ class ProfileBuilds(unittest.TestCase):
                      "--no-tests=error")
         config = (binary / "generated/xgl/xgl_build_config.h").read_text()
         for definition in ("XGL_BUILD_CONFIG_ID 304U", "XGL_FEATURE_AUTH 0",
-                           "XGL_FEATURE_FORWARDING 0", "XGL_FEATURE_FRAGMENTATION 1",
+                           "XGL_CONFIG_ABI_VERSION 5U", "XGL_FEATURE_FORWARDING 0",
                            "XGL_FEATURE_OUT_OF_ORDER 1"):
             self.assertIn("#define " + definition, config)
+        self.assertNotIn("XGL_FEATURE_FRAGMENTATION", config)
 
     def test_installed_lite_package_declares_and_checks_capabilities(self):
         binary = self.configure("lite-package", "embedded-lite")
@@ -163,12 +164,14 @@ class ProfileBuilds(unittest.TestCase):
         if ARGS.c_compiler:
             command.append(f"-DCMAKE_C_COMPILER={ARGS.c_compiler}")
         self.execute(*command, "-B", self.root / "capability-valid",
-                     "-DREQUESTED_CAPABILITIES=fragmentation;out_of_order")
-        rejected = self.execute(*command, "-B", self.root / "capability-invalid",
-                                "-DREQUESTED_CAPABILITIES=authentication",
-                                expected_success=False)
-        self.assertIn("Unsupported xgl capability: authentication",
-                      rejected.stdout + rejected.stderr)
+                     "-DREQUESTED_CAPABILITIES=out_of_order")
+        for capability in ("authentication", "fragmentation"):
+            with self.subTest(rejected_capability=capability):
+                rejected = self.execute(*command, "-B", self.root / f"capability-{capability}",
+                                        f"-DREQUESTED_CAPABILITIES={capability}",
+                                        expected_success=False)
+                self.assertIn(f"Unsupported xgl capability: {capability}",
+                              rejected.stdout + rejected.stderr)
 
 
 if __name__ == "__main__":

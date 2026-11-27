@@ -23,7 +23,7 @@ xgl_error_t result = xgl_send_at(handle, &tx, now_ms);
 
 `xgl_send_zerocopy_at()` 保持原请求结构布局，始终使用零 connection ID 和零 epoch。显式 scope 使用 `xgl_tx_zerocopy_request_t` 与 `xgl_send_zerocopy_scoped_at()`。两个入口都只支持非空、非可靠、单帧 payload；`reliable=true` 会被拒绝，`timeout_ms` 被忽略。它们不提供保留缓冲区的异步 DMA 或重传所有权。
 
-放置 payload 前先调用 `xgl_send_zerocopy_layout()`。查询忽略 `data.buffer`、`data.buffer_size` 和 `data.data_offset`，验证发送元数据、路由、完整帧 MTU、已安装的认证 scope，以及消息长度和终止 scope 策略。输出 `payload_offset` 与 `frame_size`，包含 DATA_TYPE、非零 SESSION、SECURITY、固定标签及末尾 CRC。查询不分配内存、不修改计数或安全序号、不调用 provider 或 PHY。查询失败会清零输出；查询成功不预留资源，发送时仍会验证当前状态。
+放置 payload 前先调用 `xgl_send_zerocopy_layout()`。查询忽略 `data.buffer`、`data.buffer_size` 和 `data.data_offset`，验证发送元数据、路由、完整帧 MTU、已安装的认证 scope，以及终止 scope 策略。输出 `payload_offset` 与 `frame_size`，包含 DATA_TYPE、非零 SESSION、SECURITY、固定标签及末尾 CRC。查询不分配内存、不修改计数或安全序号、不调用 provider 或 PHY。查询失败会清零输出；查询成功不预留资源，发送时仍会验证当前状态。
 
 ```c
 xgl_tx_zerocopy_request_t request = {0};
@@ -47,27 +47,23 @@ if (result == XGL_OK && layout.frame_size <= sizeof(frame_buffer)) {
 
 Network TX 包数及 payload 字节数只在下层提交成功后计入，普通、原地与转发路径保持一致。这些计数不证明远端交付。
 
-Boot 私有的 network 逻辑发送工作区最多容纳 32 字节扩展，足够同时组合一个 ACK_RANGE、SESSION 和 DATA_TYPE。更长的逻辑发送扩展列表会在提交 PHY 前被拒绝。该 profile 限制不改变 Wire v3：完整帧编解码仍支持 255 字节帧头，其他 profile 保留完整的 231 字节逻辑扩展工作区。
+Boot 私有的 network 逻辑发送工作区最多容纳 32 字节扩展，足够同时组合一个 ACK_RANGE、SESSION 和 DATA_TYPE。更长的逻辑发送扩展列表会在提交 PHY 前被拒绝。该 profile 限制不改变 Wire v1：完整帧编解码仍支持 255 字节帧头，其他 profile 保留完整的 231 字节逻辑扩展工作区。
 
 ## 可靠和非可靠发送
 
 可靠发送同时受单 peer 窗口和全局 TX 容量约束。持续调用 `xgl_step()` 以接收 ACK、推进重传并报告最终失败。
 
-普通发送的 `timeout_ms` 指定每个可靠包的初始 ACK 等待时间，不是整条消息的完成期限。零值使用当前 profile 支持的 RTT 估计，尚无估计时使用配置的 ACK 等待时间，配置值也为零则回退到内建默认值；重传可调整等待时间。非可靠普通发送不创建 ACK 计时器，两个零拷贝发送入口及布局查询都忽略该字段。
+普通发送的 `timeout_ms` 指定每个可靠包的初始 ACK 等待时间，应用事务有独立的完成期限。零值使用当前 profile 支持的 RTT 估计，尚无估计时使用配置的 ACK 等待时间，配置值也为零则回退到内建默认值；重传可调整等待时间。非可靠普通发送不创建 ACK 计时器，两个零拷贝发送入口及布局查询都忽略该字段。
 
 `reliable=true` 要求单播目标。广播目标 `0xFFFF` 会在分配 peer 或重传状态前以 `XGL_ERR_INVALID_PARAM` 拒绝。认证策略允许时，普通非可靠广播仍可通过显式路由发送。
 
 非可靠发送不提供 ACK/重试保证。PHY 返回成功只确认本地帧接纳。SDK 不提供公开的逐消息交付完成回调，需要区分远端处理结果时应设计应用层响应。
 
-## 分片
+## 应用分块
 
-启用 `enable_fragmentation` 时，`max_message_size` 是所有 DATA 发送入口和接收的单消息 payload 上限，单帧消息也受约束。普通发送、两个零拷贝发送入口及布局查询在超限时返回 `XGL_ERR_BUFFER_TOO_SMALL`。零拷贝仍只支持单帧，不会自动分片，因此还必须满足完整帧 MTU。
+每次 `xgl_send_at()` 提交一个 DATA 帧。按[线格式](../reference/protocol/v1/wire-format.md)计算载荷上限，计入完整路径 MTU、实际 TLV 和认证标签。超出一帧返回 `XGL_ERR_BUFFER_TOO_SMALL`，发生在创建 peer、发送 HELLO 和提交 PHY 之前。
 
-分片要求支持该能力的 profile，以及显式消息和重组预算。可靠消息的分片数可以超过窗口：每个 peer 保留一条消息，ACK 释放包槽后继续填充窗口。ACK 接收只释放这些槽位，transport 维护阶段执行后续 DATA 发送。临时 PHY 或资源背压会暂停推进。接纳时检查全部分片都能使用剩余可用 DATA 编号。不能因为尚未同步发出全部片段就重新提交消息。
-
-可靠分片的 `XGL_OK` 表示本地已接纳消息。接纳后的临时背压由协议持有数据并重试。同步提交遇到硬错误时，`xgl_send_at()` 返回原始错误。后续维护遇到硬错误时由 `xgl_step*()` 返回。两种硬错误都会终止对应 scope 并释放它持有的工作。此前交给 PHY 的片段仍可能到达对端。
-
-非可靠分片同步发送各片段，可能前面的片段已交给 PHY，后面才出错。重试整条应用消息不具备事务性。
+传输文件或固件时，应用定义块编号与写入位置，并让每个块装入一帧。可靠传输处理单块的丢包与重试，业务回执可以确认整批数据是否写入或生效。[可运行示例](../tutorials/examples.md)包含文件分块和固件写入确认。
 
 ## 接收接纳和回调
 
@@ -75,7 +71,7 @@ Boot 私有的 network 逻辑发送工作区最多容纳 32 字节扩展，足�
 
 本地 DATA 需要配置接收回调。Advanced 的 scoped 回调优先，其次是 accept 和 legacy 回调。全部缺失时，`xgl_step*()` 对本地 DATA 返回 `XGL_ERR_UNSUPPORTED`，DATA 不进入缓存或确认。纯发送端可以保持空的接收回调并处理 ACK 和 CONTROL。有意丢弃数据的产品应配置显式接纳回调。
 
-可靠包只有在应用接纳或进入协议自有的有界接收存储后才 ACK。因此完整分片消息可能已经 ACK，但仍在等待应用接纳；其字节继续保留并占用 RX 预算。需要继续 step 才能重试交付。
+顺序包在应用接纳后才发送 ACK；乱序包只有进入协议自有的有界缓存才可发送 SACK。若已缓存的包暂时无法交付，继续运行 step 可重新尝试。
 
 ACK/SACK 提交错误会返回，但不撤销已接纳字节或接收编号；重试相同入站 DATA 不会重复已经成功的应用交付。后续维护遇到 BUSY 或 NO_MEMORY 时保留自有数据，作为正常背压处理；应用硬错误则终止所属 scope，释放字节并只报告一次。应用容量恢复后应通知协议 owner，因为仅等待应用交付不会创建就绪超时。
 

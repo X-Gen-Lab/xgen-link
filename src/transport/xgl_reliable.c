@@ -63,11 +63,6 @@ static void reliable_free_packet(const xgl_reliable_queue_t* queue,
         packet->data = NULL;
     }
 
-    if (packet->extensions != NULL) {
-        xgl_free(queue->extensions_allocator, packet->extensions);
-        packet->extensions = NULL;
-    }
-
     xgl_free(queue->allocator, packet);
 }
 
@@ -91,38 +86,6 @@ xgl_reliable_find_packet_number(const xgl_reliable_queue_t* queue,
     return NULL;
 }
 
-xgl_error_t xgl_reliable_set_packet_extensions(
-    const xgl_reliable_queue_t* queue, xgl_reliable_packet_t* packet,
-    const uint8_t* extensions, size_t extensions_len) {
-    if (queue == NULL || packet == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (extensions == NULL && extensions_len > 0U) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    if (packet->extensions != NULL) {
-        xgl_free(queue->extensions_allocator, packet->extensions);
-        packet->extensions = NULL;
-        packet->extensions_len = 0U;
-    }
-
-    if (extensions_len == 0U) {
-        return XGL_OK;
-    }
-
-    packet->extensions =
-        (uint8_t*)xgl_alloc(queue->extensions_allocator, extensions_len);
-    if (packet->extensions == NULL) {
-        return XGL_ERR_NO_MEMORY;
-    }
-
-    memcpy(packet->extensions, extensions, extensions_len);
-    packet->extensions_len = extensions_len;
-    return XGL_OK;
-}
-
 /*---------------------------------------------------------------------------*/
 /* Reliable Queue Functions                                                  */
 /*---------------------------------------------------------------------------*/
@@ -144,7 +107,6 @@ xgl_error_t xgl_reliable_init(xgl_reliable_queue_t* queue,
     /* Store configuration */
     queue->allocator = allocator;
     queue->data_allocator = allocator;
-    queue->extensions_allocator = allocator;
 
     return XGL_OK;
 }

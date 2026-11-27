@@ -16,7 +16,7 @@
 
 ## 发送与调度
 
-`xgl_send_at(handle, &tx, now_ms)` 在调用期间借用 payload，并将可靠数据保留在有界协议存储中。`xgl_send_zerocopy_at()` 使用调用者帧存储进行非可靠单帧发送，不允许异步 PHY 保留该地址。
+`xgl_send_at(handle, &tx, now_ms)` 每次提交发送一个 DATA 帧，在调用期间借用 payload，并将可靠数据保留在有界协议存储中。`xgl_send_zerocopy_at()` 使用调用者帧存储进行非可靠单帧发送，不允许异步 PHY 保留该地址。
 
 原零拷贝请求始终使用零 connection/epoch。`xgl_send_zerocopy_scoped_at()` 接受独立且兼容的显式 scope 请求；`xgl_send_zerocopy_layout()` 查询精确头部空间和总容量，不分配、不发送、不消耗认证状态。准备与生命周期规则见[发送 API](../guides/send.md)。
 
@@ -30,4 +30,4 @@
 
 `xgl_stats_get()` / `xgl_stats_reset()` 要求独占实例访问。`xgl_error_string()` 解释协议错误域。`xgl_version_string()` / `xgl_version_int()` 报告已链接 SDK 的版本。
 
-参见[迁移指南](../guides/migration.md)与[安全](protocol/v3/security.md)。
+参见[迁移指南](../guides/migration.md)与[安全](protocol/v1/security.md)。

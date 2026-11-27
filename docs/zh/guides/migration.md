@@ -1,25 +1,19 @@
-# SDK 4 迁移
+# SDK 5 迁移
 
-SDK 4 直接从仓库根目录构建。清理旧构建缓存和安装前缀，然后按[构建与消费](build-and-consume.md)重新构建所有消费者，使用同一 profile 的库与生成头。
+SDK 5 使用配置 ABI 5 和 Wire v1。清理旧构建缓存和安装前缀，按[构建与消费](build-and-consume.md)重新构建产品，使用同一档位、资源组合的库与生成头，继续链接 `xgl::xgl`。
 
-## 构建与公开 ABI
+## 线上协议与应用
 
-继续链接 `xgl::xgl`。以 CMake 导出和 `xgl_build_config.h` 作为能力与身份入口。旧源码装配和基础组件来源参数应从产品脚本移除。产品仍可为自己的其他库选择基础组件版本。
+- **将链路上的端点和中继切换到 Wire v1。** 版本字段为 `1`，收发与转发按该版本校验。基本帧头布局、CRC 算法及有效的标志位和 TLV 编号见[线格式](../reference/protocol/v1/wire-format.md)。
+- **每次发送提交一个完整 DATA 帧。** 超出完整帧上限返回 `XGL_ERR_BUFFER_TOO_SMALL`。大数据改用[应用分块](send.md)，可参考文件传输与固件更新示例。接收 DATA 的实例需要配置接纳回调；纯发送端可使用空回调处理 ACK 和 CONTROL。
+- **核对可靠通信的[双向 MTU](../reference/protocol/v1/routing.md)。** 分别检查 DATA 路径和 ACK 回程。缺失本地反向路由或反馈预算不足时，接收端在接纳前报错。
 
-动态创建使用 XGL 公共头中的 `xgl_allocator_t`。按新描述符类型声明 `ctx`、`alloc`、`free`，回调成功时满足 `xgl_max_align_t` 对齐。适配旧分配器时建立一个新描述符并保持它及上下文活到销毁。使用类型匹配的回调和指针。
+## 配置与存储
 
-静态初始化仍从 `xgl_memory_requirements()` 获取实际需求。按新工具链和配置重新核对 RAM 容量、对齐与返回值。SDK 4 的 checked 入口校验配置大小、ABI 和构建身份。
+移除代码中的分片开关、整消息字节预算和重组槽配置，同时清理 CMake 的 `fragmentation` 组件请求，以及使用旧消息槽选项、重组超时、内存报告或资源快照字段的代码。`XGL_INSTANCE_OPTIONS_INIT` 初始化版本 2 的运行选项描述符，填写尺寸、版本和构建身份。带 scope 的回调、已安装 scope 的认证策略和可靠发送忙期选项继续可用。
 
-## 收发行为更新
+通过 `xgl_memory_requirements()` 或 `xgl_memory_report_with_options()` 重新测量实际所需存储及对齐。配置和回调上下文须活到销毁结束。动态创建继续使用公开的 `xgl_allocator_t`，分配器描述符和上下文也须活到销毁结束。Checked 入口校验配置大小、ABI 和构建身份。
 
-- 需要接收 DATA 的实例配置接纳回调。原来依靠空回调丢弃数据的产品改为显式接纳。纯发送端仍可使用空回调处理 ACK 和 CONTROL。
-- 检查 `xgl_send_at()` 的同步分片硬错误和 `xgl_step*()` 的维护错误。遇到终态时，已交给 PHY 的片段仍可能存在于链路上。按[发送与恢复合同](send.md)处理旧 scope 和业务重试。
-- Advanced 实际发送入口使用相同的 scope 期限判定。布局查询只用于准备空间，提交时重新判断期限。
-- 核对可靠通信的[双向 MTU](../reference/protocol/v3/routing.md)。缺失本地反向路由或反馈预算不足在接纳前报错。
-- 定制过编译帧长的生产者在配置库时设置 `-DXGL_DATALINK_MAX_FRAME_SIZE=<bytes>`，重新安装生成头和库，再重建消费者。
+定制编译帧长时，配置库的 `XGL_DATALINK_MAX_FRAME_SIZE`，然后重新安装生成头和库。发布检查见[互操作](../reference/protocol/v1/interoperability.md)与[验证](../development/validation.md)。
 
-## 线上兼容
-
-线上协议仍是 v3。两端都需支持所选 profile 所用的帧、扩展和认证策略。迁移步骤和测试见[互操作](../reference/protocol/v3/interoperability.md)及[验证](../development/validation.md)。
-
-旧 SDK 3 装配方式保存在[历史迁移指南](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/docs/zh/guide/modular-migration.md)。
+旧 SDK 4 的[迁移记录](https://github.com/X-Gen-Lab/xgen-link/blob/d775c8a2fbc2dabcfc2406034e5cdc43808954bd/docs/zh/guides/migration.md)和 SDK 3 的[历史装配指南](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/docs/zh/guide/modular-migration.md)保存在固定提交。

@@ -9,57 +9,31 @@
 #include <string.h>
 
 /**
- * \brief           Check for owned message data that prevents peer reclamation
- * \param[in]       ctx: Transport layer context
+ * \brief           Check for buffered DATA that prevents peer reclamation
  * \param[in]       peer: Peer state
- * \return          true if message data is still owned by the transport
+ * \return          true if the transport still owns buffered DATA
  */
 static bool
-transport_peer_has_pending_data(const xgl_transport_ctx_t* ctx,
-                                const xgl_transport_peer_state_t* peer) {
+transport_peer_has_buffered_data(const xgl_transport_peer_state_t* peer) {
 #if XGL_FEATURE_OUT_OF_ORDER
-    if (peer->rx_buffered != NULL) {
-        return true;
-    }
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    if (peer->rx_pending_message.data != NULL ||
-        peer->tx_message.data != NULL) {
-        return true;
-    }
-    if (ctx->fragment_mgr != NULL) {
-        xgl_list_node_t* node;
-        XGL_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
-            const xgl_reassembly_buffer_t* buffer =
-                /* Intrusive node membership is established by the owning list.
-                 */
-                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-                XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
-            if (buffer->source_id == peer->peer_id &&
-                buffer->connection_id == peer->connection_id &&
-                buffer->session_epoch == peer->session_epoch) {
-                return true;
-            }
-        }
-    }
-#endif
-    (void)ctx;
+    return peer->rx_buffered != NULL;
+#else
     (void)peer;
     return false;
+#endif
 }
 
-bool transport_peer_can_reclaim(const xgl_transport_ctx_t* ctx,
-                                const xgl_transport_peer_state_t* peer) {
+bool transport_peer_can_reclaim(const xgl_transport_peer_state_t* peer) {
     return !peer->failed && peer->tx_window.next_packet_number == 0U &&
            !peer->rx_has_packet_number_state &&
            xgl_reliable_is_empty(&peer->reliable_queue) &&
-           !transport_peer_has_pending_data(ctx, peer);
+           !transport_peer_has_buffered_data(peer);
 }
 
 bool transport_peer_reclaim_timeout(const xgl_transport_ctx_t* ctx,
                                     const xgl_transport_peer_state_t* peer,
                                     uint32_t now_ms, uint32_t* timeout_ms) {
-    if (!transport_peer_can_reclaim(ctx, peer)) {
+    if (!transport_peer_can_reclaim(peer)) {
         return false;
     }
 
@@ -169,9 +143,6 @@ transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
     }
 
     peer->reliable_queue.data_allocator = ctx->memory.tx_payload;
-#if XGL_FEATURE_FRAGMENTATION
-    peer->reliable_queue.extensions_allocator = ctx->memory.tx_extensions;
-#endif
     peer->next = ctx->peers;
     ctx->peers = peer;
     return peer;
@@ -259,15 +230,6 @@ static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
 #endif
 #if XGL_FEATURE_OUT_OF_ORDER
     transport_clear_rx_buffered(ctx, peer);
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-    transport_clear_pending_message(ctx, peer);
-    transport_clear_tx_message(ctx, peer);
-    if (ctx->fragment_mgr != NULL) {
-        (void)xgl_fragment_clear_reassembly_scope(
-            ctx->fragment_mgr, peer->peer_id, peer->connection_id,
-            peer->session_epoch);
-    }
 #else
     (void)ctx;
 #endif
@@ -329,7 +291,7 @@ xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
             peer->session_epoch == session_epoch) {
             bool cancelled = !peer->failed &&
                              (!xgl_reliable_is_empty(&peer->reliable_queue) ||
-                              transport_peer_has_pending_data(ctx, peer));
+                              transport_peer_has_buffered_data(peer));
 #if XGL_FEATURE_ADVANCED_RUNTIME
             const bool notify =
                 !peer->failed && (cancelled || peer->hello_reserved ||
@@ -431,11 +393,6 @@ void transport_notify_tx_drained(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     if (!peer->tx_busy || !xgl_reliable_is_empty(&peer->reliable_queue)) {
         return;
     }
-#if XGL_FEATURE_FRAGMENTATION
-    if (peer->tx_message.data != NULL) {
-        return;
-    }
-#endif
     peer->tx_busy = false;
     if (ctx->scope_event_callback != NULL) {
         ctx->scope_event_callback(handle, peer->peer_id, peer->connection_id,
@@ -481,20 +438,7 @@ xgl_error_t xgl_transport_get_resources(const xgl_transport_ctx_t* ctx,
             resources->rx_buffered_bytes += packet->packet_data.data_len;
         }
 #endif
-#if XGL_FEATURE_FRAGMENTATION
-        resources->pending_rx_messages +=
-            peer->rx_pending_message.data != NULL ? 1U : 0U;
-#endif
     }
-#if XGL_FEATURE_FRAGMENTATION
-    resources->tx_message_bytes = ctx->tx_message_bytes;
-    if (ctx->fragment_mgr != NULL) {
-        resources->reassembly_slots =
-            xgl_fragment_get_reassembly_count(ctx->fragment_mgr);
-        resources->reassembly_bytes =
-            ctx->fragment_mgr->current_reassembly_bytes;
-    }
-#endif
     return XGL_OK;
 }
 #endif

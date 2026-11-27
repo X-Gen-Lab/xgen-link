@@ -13,7 +13,7 @@ Keep the configuration and referenced objects alive. `xgl_create()` reserves sto
 | Symptom/status | Check |
 | --- | --- |
 | `XGL_ERR_WINDOW_FULL` | Peer in-flight window; keep stepping to receive ACKs |
-| `XGL_ERR_NO_MEMORY` | Peer/global packet/message/reassembly capacity and admission budgets |
+| `XGL_ERR_NO_MEMORY` | Peer and packet pool capacity |
 | `XGL_ERR_BUSY` | PHY, application admission, or an already pending peer message |
 | `XGL_ERR_ROUTE_NOT_FOUND` | Target and fixed route configuration |
 | `XGL_ERR_BUFFER_TOO_SMALL` | Workspace, RX cache, full frame overhead, or message limit |

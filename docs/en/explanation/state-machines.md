@@ -32,7 +32,7 @@ stateDiagram-v2
     Failed --> [*]: release retained storage
 ```
 
-An accepted fragmented message additionally owns its unsent tail. Window exhaustion pauses its pump; ACK or later step advances it. Application BUSY can retain an accepted receive packet or complete message. Temporary backpressure is not permission to drop acknowledged bytes.
+When the application reports BUSY, the protocol keeps any out-of-order packets it has already accepted into its receive buffer. ACKs release TX window capacity.
 
 ## Security Lifecycle
 

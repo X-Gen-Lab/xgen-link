@@ -5,7 +5,6 @@
 
 #include "xgl_transport_internal.h"
 #include "xgl_transport_rx_internal.h"
-#include <internal/xgl_diagnostics.h>
 
 /** \brief           Start at the rotating owner only during bounded work. */
 static xgl_transport_peer_state_t*
@@ -85,14 +84,10 @@ static xgl_error_t transport_retransmit_reliable_packet(
                            .packet_number = rel_packet->packet_number,
                            .session_epoch = rel_packet->session_epoch,
                            .packet_type = rel_packet->packet_type,
-                           .flags = rel_packet->flags,
                            .data_type = rel_packet->data_type,
                            .reliable = XGL_RELIABILITY_ACK_ELICITING,
-                           .fragment = rel_packet->fragment,
                            .priority = rel_packet->priority,
-                           .data = &packet_data,
-                           .extensions = rel_packet->extensions,
-                           .extensions_len = rel_packet->extensions_len};
+                           .data = &packet_data};
 
     xgl_error_t err = transport_submit_packet(ctx, handle, &packet);
     if (err == XGL_ERR_BUSY || err == XGL_ERR_NO_MEMORY) {
@@ -194,36 +189,6 @@ static xgl_error_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
     return first_error;
 }
 
-#if XGL_FEATURE_FRAGMENTATION
-/** \brief           Current maintenance ownership for detached expirations. */
-typedef struct {
-    xgl_transport_ctx_t* ctx;
-    xgl_handle_t handle;
-    uint32_t unreliable_timeouts;
-} transport_fragment_expiration_t;
-
-/**
- * \brief           Fail only scopes owning admitted reliable fragment bytes
- * \param[in]       buffer: Expired message detached from active reassembly
- * \param[in]       user_data: Current synchronous maintenance context
- */
-static void transport_expire_fragment(const xgl_reassembly_buffer_t* buffer,
-                                      void* user_data) {
-    transport_fragment_expiration_t* expiration = user_data;
-    if (!buffer->reliable) {
-        expiration->unreliable_timeouts++;
-        return;
-    }
-    xgl_transport_peer_state_t* peer =
-        transport_find_peer_scope(expiration->ctx, buffer->source_id,
-                                  buffer->connection_id, buffer->session_epoch);
-    if (peer != NULL && !peer->failed) {
-        transport_fail_peer(expiration->ctx, expiration->handle, peer,
-                            XGL_ERR_TIMEOUT);
-    }
-}
-#endif
-
 /**
  * \brief           Periodic transport layer processing
  */
@@ -238,8 +203,7 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #if XGL_FEATURE_OUT_OF_ORDER
     xgl_error_t transient_feedback_error = XGL_OK;
 #endif
-#if XGL_FEATURE_FRAGMENTATION || XGL_FEATURE_OUT_OF_ORDER ||                   \
-    XGL_FEATURE_ADVANCED_RUNTIME
+#if XGL_FEATURE_OUT_OF_ORDER || XGL_FEATURE_ADVANCED_RUNTIME
     for (xgl_transport_peer_state_t* peer = transport_first_work_peer(ctx);
          peer != NULL; peer = transport_next_work_peer(ctx, peer)) {
         if (peer->failed) {
@@ -252,16 +216,8 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
             }
             continue;
         }
-#if XGL_FEATURE_FRAGMENTATION && XGL_FEATURE_OUT_OF_ORDER
-        if (transport_expire_rx_buffered_fragments(ctx, handle, peer)) {
-            if (first_error == XGL_OK) {
-                first_error = XGL_ERR_TIMEOUT;
-            }
-            continue;
-        }
-#endif
         if (ctx->work != NULL) {
-            /* Rotation must arbitrate all TX work, not only message tails. */
+            /* Keep retries in the rotating peer order during bounded work. */
             xgl_error_t retry_error = transport_process_retransmission_queue(
                 ctx, peer, handle, current_time_ms);
             if (first_error == XGL_OK) {
@@ -270,23 +226,6 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
             if (peer->failed) {
                 continue;
             }
-        }
-#endif
-#if XGL_FEATURE_FRAGMENTATION
-        xgl_error_t error = transport_pump_tx_message(ctx, handle, peer);
-        if (first_error == XGL_OK) {
-            first_error = error;
-        }
-        if (peer->failed) {
-            continue;
-        }
-        error = transport_drain_pending_message(ctx, handle, peer);
-        if (error != XGL_OK) {
-            if (error != XGL_ERR_BUSY && error != XGL_ERR_NO_MEMORY &&
-                first_error == XGL_OK) {
-                first_error = error;
-            }
-            continue;
         }
 #endif
 #if XGL_FEATURE_OUT_OF_ORDER
@@ -319,33 +258,6 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         }
 #if XGL_FEATURE_ADVANCED_RUNTIME
     }
-#endif
-
-#if XGL_FEATURE_FRAGMENTATION
-    if (ctx->fragment_mgr) {
-        transport_fragment_expiration_t expiration = {ctx, handle, 0U};
-        uint32_t timeout_count = xgl_fragment_process_timeouts_scoped(
-            ctx->fragment_mgr, current_time_ms, transport_expire_fragment,
-            &expiration);
-        if (timeout_count > 0) {
-            if (first_error == XGL_OK) {
-                first_error = XGL_ERR_TIMEOUT;
-            }
-            if (expiration.unreliable_timeouts > 0U && ctx->error_callback) {
-                ctx->error_callback(
-                    handle, XGL_ERR_TIMEOUT,
-                    XGL_ERROR_MESSAGE("Fragment reassembly timeout"),
-                    ctx->callback_user_data);
-            }
-
-#if XGL_FEATURE_STATISTICS
-            if (ctx->stats != NULL) {
-                ctx->stats->rx_dropped += timeout_count;
-            }
-#endif
-        }
-    }
-
 #endif
 
     /* Reclaim idle peer states */
@@ -382,7 +294,7 @@ static void transport_take_timeout(uint32_t now_ms, uint32_t start_ms,
 }
 
 /**
- * \brief           Collect reliable, peer-idle and reassembly deadlines
+ * \brief           Collect reliable transmission and peer-idle deadlines
  * \param[in]       ctx: Transport layer context
  * \param[in]       now_ms: Current time
  * \param[out]      timeout_ms: Remaining delay; zero means due now
@@ -395,10 +307,6 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
     }
     bool active = false;
     *timeout_ms = 0U;
-#if XGL_FEATURE_FRAGMENTATION
-    const bool has_tx_capacity =
-        transport_tx_packet_count(ctx) < ctx->max_tx_packets;
-#endif
     for (const xgl_transport_peer_state_t* peer = ctx->peers; peer != NULL;
          peer = peer->next) {
 #if XGL_FEATURE_ADVANCED_RUNTIME
@@ -406,21 +314,6 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
             transport_take_timeout(now_ms, peer->tx_started_ms,
                                    ctx->tx_lifetime_ms, &active, timeout_ms);
         }
-#if XGL_FEATURE_FRAGMENTATION && XGL_FEATURE_OUT_OF_ORDER
-        if (ctx->fragment_mgr != NULL &&
-            ctx->fragment_mgr->reassembly_timeout_ms != 0U) {
-            for (const xgl_transport_rx_buffered_packet_t* buffered =
-                     peer->rx_buffered;
-                 buffered != NULL; buffered = buffered->next) {
-                if (buffered->packet.fragment) {
-                    transport_take_timeout(
-                        now_ms, buffered->received_at_ms,
-                        ctx->fragment_mgr->reassembly_timeout_ms, &active,
-                        timeout_ms);
-                }
-            }
-        }
-#endif
 #endif
         xgl_list_node_t* node;
         XGL_LIST_FOR_EACH(&peer->reliable_queue.wait_ack_list, node) {
@@ -447,18 +340,6 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
             transport_take_timeout(now_ms, start, interval, &active,
                                    timeout_ms);
         }
-#if XGL_FEATURE_FRAGMENTATION
-        if (peer->tx_message.data != NULL && peer->tx_message_retry_pending) {
-            transport_take_timeout(now_ms, peer->tx_message_retry_started_ms,
-                                   transport_retry_delay_ms(ctx), &active,
-                                   timeout_ms);
-        } else if (peer->tx_message.data != NULL && !peer->failed &&
-                   xgl_window_can_send_packet_number(&peer->tx_window) &&
-                   has_tx_capacity) {
-            active = true;
-            *timeout_ms = 0U;
-        }
-#endif
         uint32_t reclaim_timeout;
         if (transport_peer_reclaim_timeout(ctx, peer, now_ms,
                                            &reclaim_timeout)) {
@@ -468,22 +349,6 @@ bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
             active = true;
         }
     }
-#if XGL_FEATURE_FRAGMENTATION
-    if (ctx->fragment_mgr != NULL) {
-        xgl_list_node_t* node;
-        XGL_LIST_FOR_EACH(&ctx->fragment_mgr->reassembly_list, node) {
-            const xgl_reassembly_buffer_t* buffer =
-                /* Intrusive node membership is established by the owning list.
-                 */
-                /* NOLINTNEXTLINE(bugprone-casting-through-void) */
-                XGL_LIST_ENTRY(node, xgl_reassembly_buffer_t, node);
-            if (buffer->received_bytes > 0U && buffer->timeout_ms != 0U) {
-                transport_take_timeout(now_ms, buffer->first_fragment_time,
-                                       buffer->timeout_ms, &active, timeout_ms);
-            }
-        }
-    }
-#endif
     return active;
 }
 

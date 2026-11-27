@@ -14,8 +14,7 @@
 
 /* Boot emits one ACK range, SESSION and optional DATA_TYPE. This logical TX
  * workspace does not constrain the wire decoder or serialized frame ingress. */
-#if !XGL_FEATURE_AUTH && !XGL_FEATURE_FORWARDING &&                            \
-    !XGL_FEATURE_FRAGMENTATION && !XGL_FEATURE_OUT_OF_ORDER
+#if !XGL_FEATURE_AUTH && !XGL_FEATURE_FORWARDING && !XGL_FEATURE_OUT_OF_ORDER
 #define XGL_NETWORK_TX_EXT_CAPACITY 32U
 #else
 #define XGL_NETWORK_TX_EXT_CAPACITY (UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE)
@@ -175,7 +174,6 @@ static xgl_error_t network_build_tx_frame(xgl_network_ctx_t* ctx,
         .payload_len = packet->data->data_len,
         .reliable = packet->reliable,
         .reliability_class = network_reliability_class(packet),
-        .fragment = packet->fragment,
         .priority = packet->priority,
         .ttl = XGL_DEFAULT_TTL};
 

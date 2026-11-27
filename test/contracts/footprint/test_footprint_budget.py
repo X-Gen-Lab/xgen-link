@@ -21,7 +21,8 @@ class FootprintBudget(unittest.TestCase):
         self.policy = {
             "schema_version": 1,
             "compiler_version": "15.2.1",
-            "configuration": {"profile": "boot", "frame_bytes": 128, "lto": False},
+            "configuration": {"profile": "boot", "frame_bytes": 128, "lto": False,
+                              "config_abi_version": 5},
             "baseline": {"flash_bytes": 15692, "workspace_bytes": 1168},
             "limits": {"flash_bytes": 15692, "workspace_bytes": 1168},
         }
@@ -29,6 +30,7 @@ class FootprintBudget(unittest.TestCase):
             "compiler": "arm-none-eabi-gcc 15.2.1",
             "build_parameters": {"XGL_PROFILE": "boot"},
             "frame_bytes": 128,
+            "config_abi_version": 5,
             "lto": False,
             "flash_bytes": 15500,
             "workspace_bytes": 1160,
@@ -101,6 +103,20 @@ class FootprintBudget(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0,
                                         f"{field} accepted {actual!r}")
                 self.policy["configuration"].pop(field)
+
+    def test_rejects_missing_or_mismatched_config_abi(self):
+        for version in (None, 4, "5", True):
+            with self.subTest(config_abi_version=version):
+                report = copy.deepcopy(self.report)
+                if version is None:
+                    report.pop("config_abi_version")
+                else:
+                    report["config_abi_version"] = version
+                result, output = self.run_policy(report)
+                self.assertNotEqual(result.returncode, 0)
+                audit = json.loads(output.read_text())
+                self.assertTrue(any("config_abi_version" in item
+                                    for item in audit["violations"]))
 
     def test_accepts_matching_optional_runtime_identity(self):
         for enabled in (False, True):

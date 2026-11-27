@@ -191,7 +191,6 @@ class XglNetworkMultihopTest : public ::testing::Test {
             node->config.protocol.max_frame_size = 256U;
             node->config.protocol.window_size = 1U;
             node->config.protocol.ack_timeout_ms = 100U;
-            node->config.features.enable_fragmentation = false;
             node->config.rx_accept_callback = Node::accept;
             node->config.error_callback = Node::error;
             node->config.callback_user_data = node;

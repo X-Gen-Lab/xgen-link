@@ -101,12 +101,6 @@ typedef struct {
 /** Packet carries acknowledgement information and no application payload. */
 #define XGL_RELIABILITY_ACK_ONLY 0x80
 
-/** Traffic-class bit position used to mark fragmented packets. */
-#define XGL_TRAFFIC_FRAGMENTED_SHIFT 5
-
-/** Traffic-class mask used to mark fragmented packets. */
-#define XGL_TRAFFIC_FRAGMENTED_MASK 0x20
-
 /** Reserved encryption-class bit position. */
 #define XGL_TRAFFIC_ENCRYPTION_SHIFT 3
 
@@ -372,21 +366,14 @@ typedef struct {
  * \brief           Feature flags configuration
  */
 typedef struct {
-    bool enable_fragmentation; /**< Enable packet fragmentation */
     bool
         enable_compression; /**< Reserved; rejected until codec path is wired */
     bool enable_encryption; /**< Reserved; rejected until codec path is wired */
     size_t max_tx_packets;  /**< Total retained reliable packets */
     size_t max_rx_buffered_packets; /**< Total retained out-of-order packets */
-    size_t max_reassembly_bytes;   /**< Shared incomplete/completed RX budget */
-    size_t max_tx_message_bytes;   /**< Shared pending message copy budget */
-    uint32_t peer_idle_timeout_ms; /**< Idle peer reclaim timeout; 0 = disabled
-                                      (default 60000) */
-    uint8_t
-        max_reassembly_slots; /**< Max concurrent fragment reassembly slots */
-    uint16_t max_peers;       /**< Peer/scope capacity; must be nonzero */
-    size_t max_message_size;  /**< Per-message TX/RX byte limit when
-                                 fragmentation is enabled */
+    uint32_t peer_idle_timeout_ms;  /**< Idle peer reclaim timeout; 0 = disabled
+                                       (default 60000) */
+    uint16_t max_peers;             /**< Peer/scope capacity; must be nonzero */
 } xgl_feature_config_t;
 
 /**
@@ -445,7 +432,10 @@ typedef struct {
  * \param[in]       data: Borrowed payload valid only during this call
  * \param[in]       length: Payload bytes
  * \param[in]       user_data: Application context
- * \return          XGL_OK when accepted; BUSY/NO_MEMORY retain reliable input
+ * \return          XGL_OK when accepted; BUSY/NO_MEMORY defer acceptance.
+ *                  Reliable input already retained for reordering stays owned
+ *                  by the instance. Other reliable input relies on sender
+ * retry.
  */
 typedef xgl_error_t (*xgl_rx_scoped_fn)(xgl_handle_t handle,
                                         const xgl_rx_info_t* info,
@@ -478,22 +468,17 @@ typedef void (*xgl_scope_event_fn)(xgl_handle_t handle, uint16_t remote_id,
 /**
  * \brief           Versioned optional instance policy, borrowed until destroy
  * \note            Initialize with XGL_INSTANCE_OPTIONS_INIT. Requires the
- *                  advanced_runtime build capability. Zero capacities retain
- *                  legacy storage. Scope callbacks cannot reenter the instance.
+ *                  advanced_runtime build capability. Scope callbacks cannot
+ *                  reenter the instance.
  */
 typedef struct {
     size_t size;              /**< Exact descriptor size */
-    uint32_t version;         /**< Descriptor version, currently one */
+    uint32_t version;         /**< XGL_INSTANCE_OPTIONS_VERSION */
     size_t config_size;       /**< Consumer xgl_config_t size */
     uint32_t config_abi;      /**< Consumer configuration ABI */
     uint32_t build_config_id; /**< Consumer compiled resource identity */
     uint32_t
-        reassembly_timeout_ms; /**< Absolute partial-message limit; 0 = 5000 */
-    uint32_t
         tx_lifetime_ms; /**< Reliable TX busy-period limit; 0 = unlimited */
-    size_t tx_message_slots; /**< Whole TX message slots; 0 = max_peers */
-    size_t
-        rx_message_slots; /**< Shared partial/complete RX slots; 0 = legacy */
     bool protect_installed_scopes;       /**< Require authenticated RX/TX for
                                             installed scopes */
     xgl_rx_scoped_fn rx_scoped_callback; /**< Overrides legacy RX callbacks */
@@ -502,16 +487,16 @@ typedef struct {
     void* user_data;          /**< Borrowed callback context */
 } xgl_instance_options_t;
 
+/** \brief           Version of the optional instance policy descriptor. */
+#define XGL_INSTANCE_OPTIONS_VERSION 2U
+
 /** \brief           Compatible C11/C++17 initializer for optional policy. */
 #define XGL_INSTANCE_OPTIONS_INIT                                              \
     {sizeof(xgl_instance_options_t),                                           \
-     1U,                                                                       \
+     XGL_INSTANCE_OPTIONS_VERSION,                                             \
      sizeof(xgl_config_t),                                                     \
      XGL_CONFIG_ABI_VERSION,                                                   \
      XGL_BUILD_CONFIG_ID,                                                      \
-     0U,                                                                       \
-     0U,                                                                       \
-     0U,                                                                       \
      0U,                                                                       \
      false,                                                                    \
      NULL,                                                                     \
@@ -540,13 +525,8 @@ typedef struct {
     size_t failed_peers;        /**< Terminal scopes requiring explicit close */
     size_t tx_packets;          /**< Retained reliable records */
     size_t tx_payload_bytes;    /**< Retained packet payload bytes */
-    size_t tx_message_bytes;    /**< Whole messages with unsent bytes */
     size_t rx_buffered_packets; /**< Out-of-order retained packets */
     size_t rx_buffered_bytes;   /**< Out-of-order payload bytes */
-    size_t reassembly_slots;    /**< Active partial messages */
-    size_t reassembly_bytes; /**< Charged partial and completed message bytes */
-    size_t pending_rx_messages; /**< Completed messages awaiting application
-                                   capacity */
 } xgl_resource_snapshot_t;
 
 /*---------------------------------------------------------------------------*/
@@ -626,11 +606,11 @@ typedef struct {
     bool reliable;       /**< Enable reliable transmission */
     uint8_t priority; /**< Wire priority (0-7); no local priority scheduling */
     uint32_t timeout_ms; /**< Initial packet ACK timeout in ms; 0 selects
-                            RTT/config. Not a whole-message deadline. */
+                            RTT/config. */
     uint32_t
         connection_id; /**< Connection scope for peer state (0 = default) */
-    uint32_t session_epoch; /**< Session epoch for replay/peer/fragment
-                               isolation (0 = default) */
+    uint32_t session_epoch; /**< Session epoch for replay and peer isolation
+                               (0 = default) */
     uint8_t compression_id; /**< Reserved; must be zero until implemented */
 } xgl_tx_data_t;
 
@@ -693,17 +673,12 @@ typedef struct {
             /* max_frame_size */ 128,                                          \
         }, /* features */                                                      \
         {                                                                      \
-            /* enable_fragmentation */ false,                                  \
             /* enable_compression */ false,                                    \
             /* enable_encryption */ false,                                     \
             /* max_tx_packets */ 2,                                            \
             /* max_rx_buffered_packets */ 2,                                   \
-            /* max_reassembly_bytes */ 0,                                      \
-            /* max_tx_message_bytes */ 0,                                      \
             /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_reassembly_slots */ 2,                                      \
             /* max_peers */ 1,                                                 \
-            /* max_message_size */ 0,                                          \
         },                                                                     \
         /* auth_required */ false,                                             \
         /* auth_provider */ NULL,                                              \
@@ -733,17 +708,12 @@ typedef struct {
             /* max_frame_size */ 256,                                          \
         }, /* features */                                                      \
         {                                                                      \
-            /* enable_fragmentation */ true,                                   \
             /* enable_compression */ false,                                    \
             /* enable_encryption */ false,                                     \
             /* max_tx_packets */ 4,                                            \
             /* max_rx_buffered_packets */ 4,                                   \
-            /* max_reassembly_bytes */ 2048,                                   \
-            /* max_tx_message_bytes */ 2048,                                   \
             /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_reassembly_slots */ 4,                                      \
             /* max_peers */ 2,                                                 \
-            /* max_message_size */ 1024,                                       \
         },                                                                     \
         /* auth_required */ false,                                             \
         /* auth_provider */ NULL,                                              \
@@ -773,17 +743,12 @@ typedef struct {
             /* max_frame_size */ 512,                                          \
         }, /* features */                                                      \
         {                                                                      \
-            /* enable_fragmentation */ true,                                   \
             /* enable_compression */ false,                                    \
             /* enable_encryption */ false,                                     \
             /* max_tx_packets */ 16,                                           \
             /* max_rx_buffered_packets */ 16,                                  \
-            /* max_reassembly_bytes */ 16384,                                  \
-            /* max_tx_message_bytes */ 16384,                                  \
             /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_reassembly_slots */ 8,                                      \
             /* max_peers */ 8,                                                 \
-            /* max_message_size */ 4096,                                       \
         },                                                                     \
         /* auth_required */ false,                                             \
         /* auth_provider */ NULL,                                              \
@@ -813,17 +778,12 @@ typedef struct {
             /* max_frame_size */ 1024,                                         \
         }, /* features */                                                      \
         {                                                                      \
-            /* enable_fragmentation */ true,                                   \
             /* enable_compression */ false,                                    \
             /* enable_encryption */ false,                                     \
             /* max_tx_packets */ 64,                                           \
             /* max_rx_buffered_packets */ 64,                                  \
-            /* max_reassembly_bytes */ 131072,                                 \
-            /* max_tx_message_bytes */ 131072,                                 \
             /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_reassembly_slots */ 16,                                     \
             /* max_peers */ 16,                                                \
-            /* max_message_size */ 16384,                                      \
         },                                                                     \
         /* auth_required */ false,                                             \
         /* auth_provider */ NULL,                                              \
@@ -856,17 +816,12 @@ typedef struct {
             /* max_frame_size */ 1024,                                         \
         }, /* features */                                                      \
         {                                                                      \
-            /* enable_fragmentation */ true,                                   \
             /* enable_compression */ false,                                    \
             /* enable_encryption */ false,                                     \
             /* max_tx_packets */ 64,                                           \
             /* max_rx_buffered_packets */ 64,                                  \
-            /* max_reassembly_bytes */ 131072,                                 \
-            /* max_tx_message_bytes */ 131072,                                 \
             /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_reassembly_slots */ 16,                                     \
             /* max_peers */ 16,                                                \
-            /* max_message_size */ 16384,                                      \
         },                                                                     \
         /* auth_required */ true,                                              \
         /* auth_provider */ NULL,                                              \

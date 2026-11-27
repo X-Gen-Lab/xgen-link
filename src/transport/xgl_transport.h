@@ -10,19 +10,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "internal/xgl_packet.h"
+#include "internal/xgl_protocol_io.h"
+#include "internal/xgl_protocol_memory.h"
+#include "network/xgl_route.h"
 #include "transport/xgl_reliable.h"
 #include "transport/xgl_rtt.h"
 #include "transport/xgl_window.h"
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
-#if XGL_FEATURE_FRAGMENTATION
-#include "transport/xgl_fragment.h"
-#endif
-#include "internal/xgl_packet.h"
-#include "internal/xgl_protocol_io.h"
-#include "internal/xgl_protocol_memory.h"
-#include "network/xgl_route.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,10 +49,6 @@ typedef struct xgl_transport_rx_buffered_packet_s {
     xgl_packet_t packet;           /**< Cached packet metadata */
     xgl_packet_data_t packet_data; /**< Cached packet data view */
     uint8_t* storage; /**< Owned contiguous payload and TLV bytes */
-#if XGL_FEATURE_ADVANCED_RUNTIME && XGL_FEATURE_FRAGMENTATION
-    uint32_t
-        received_at_ms; /**< First admission, retained across RX ordering */
-#endif
 } xgl_transport_rx_buffered_packet_t;
 #endif
 
@@ -94,23 +87,6 @@ typedef struct xgl_transport_peer_state_s {
         rx_buffered;           /**< Out-of-order RX packets */
     uint8_t rx_buffered_count; /**< Number of buffered RX packets */
 #endif
-#if XGL_FEATURE_FRAGMENTATION
-    uint8_t* tx_message_storage; /**< Owned message allocation */
-    xgl_tx_data_t tx_message;    /**< Owned message; data is NULL when idle */
-    size_t tx_message_offset;    /**< Next unsent message byte */
-    size_t
-        tx_fragment_payload_size;  /**< Fixed payload budget for this message */
-    uint32_t tx_message_id;        /**< Stable message ID across windows */
-    bool tx_message_retry_pending; /**< Waiting for a local-capacity retry */
-    uint32_t
-        tx_message_retry_started_ms; /**< Retry delay start; zero is valid */
-    xgl_fragment_message_t rx_pending_message; /**< Owned completed RX bytes */
-    uint8_t rx_pending_message_type;
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    xgl_rx_info_t
-        rx_pending_info; /**< Identity retained with complete RX data */
-#endif
-#endif
 } xgl_transport_peer_state_t;
 
 /* NOLINTEND(clang-analyzer-optin.performance.Padding) */
@@ -139,30 +115,14 @@ typedef struct xgl_transport_ctx_s {
 #endif
     uint32_t current_time_ms;    /**< Caller-provided runtime clock */
     uint32_t default_timeout_ms; /**< Default timeout in milliseconds */
-#if XGL_FEATURE_FRAGMENTATION
-    bool enable_fragmentation; /**< Enable fragmentation support */
-#endif
-    uint16_t max_frame_size; /**< Maximum frame size */
+    uint16_t max_frame_size;     /**< Maximum frame size */
     uint8_t auth_tag_len; /**< Authentication tag length reserved per frame */
     xgl_route_table_t*
         route_table; /**< Optional route table for route MTU lookup */
     uint32_t
         peer_idle_timeout_ms; /**< Unused peer reclaim timeout; 0 = disabled */
-#if XGL_FEATURE_FRAGMENTATION
-    size_t max_message_size; /**< Maximum accepted fragmented message bytes */
-    size_t max_tx_message_bytes; /**< Aggregate pending TX message budget */
-    size_t tx_message_bytes;     /**< Currently owned TX message bytes */
-    uint32_t next_message_id;    /**< Next outbound fragmented-message ID */
-    uint8_t
-        max_reassembly_slots; /**< Max concurrent fragment reassembly slots */
-#endif
 
     /* Transport components */
-#if XGL_FEATURE_FRAGMENTATION
-    xgl_fragment_manager_t fragment_storage; /**< In-place reassembly manager */
-    xgl_fragment_manager_t*
-        fragment_mgr; /**< Fragmentation manager (optional) */
-#endif
     xgl_transport_peer_state_t*
         peers; /**< Peer-specific reliable transport state */
 
@@ -211,7 +171,6 @@ typedef struct {
     uint8_t max_retry_count;     /**< Maximum retry count */
     uint32_t default_timeout_ms; /**< Default timeout in milliseconds */
     uint8_t window_size;         /**< Sliding window size */
-    bool enable_fragmentation;   /**< Enable fragmentation support */
     uint16_t max_frame_size;     /**< Maximum frame size */
     uint8_t auth_tag_len; /**< Authentication tag length reserved per frame */
     xgl_route_table_t*
@@ -228,23 +187,13 @@ typedef struct {
     const xgl_allocator_t* allocator; /**< Required allocator service */
     uint32_t
         peer_idle_timeout_ms; /**< Unused peer reclaim timeout; 0 = disabled */
-    uint8_t max_reassembly_slots; /**< Max concurrent fragment reassembly slots
-                                     (required when fragmentation is enabled) */
-    uint16_t max_peers;           /**< Explicit live peer capacity */
-    size_t max_message_size;      /**< Maximum accepted message bytes when
-                                     fragmentation is enabled */
+    uint16_t max_peers;       /**< Explicit live peer capacity */
     const xgl_protocol_memory_t*
         memory;                     /**< NULL uses the explicit allocator */
     size_t max_tx_packets;          /**< Explicit global capacity */
     size_t max_rx_buffered_packets; /**< Explicit global capacity */
-    size_t max_reassembly_bytes; /**< Required aggregate RX message budget when
-                                    enabled */
-    size_t max_tx_message_bytes; /**< Required aggregate TX message budget when
-                                    enabled */
 #if XGL_FEATURE_ADVANCED_RUNTIME
-    uint32_t
-        reassembly_timeout_ms; /**< Zero selects the legacy 5000 ms limit */
-    uint32_t tx_lifetime_ms;   /**< Zero leaves the TX busy period unlimited */
+    uint32_t tx_lifetime_ms; /**< Zero leaves the TX busy period unlimited */
     xgl_rx_scoped_fn rx_scoped_callback;
     xgl_scope_event_fn scope_event_callback;
     void* extended_user_data;
@@ -321,7 +270,7 @@ xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
  * \param[in]       handle: Protocol instance handle
  * \param[in]       tx_data: Transmission data
  * \return          XGL_OK on success, error code otherwise
- * \note            Handles fragmentation, reliable transmission, and routing
+ * \note            Validates one DATA frame and tracks reliable transmission.
  */
 xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                const xgl_tx_data_t* tx_data);
@@ -332,7 +281,7 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
  * \param[in]       handle: Protocol instance handle
  * \param[in]       packet: Packet from network layer (contains metadata)
  * \return          XGL_OK on success, error code otherwise
- * \note            Processes ACKs, handles reassembly, and delivers to
+ * \note            Processes ACKs and delivers DATA to
  *                  application
  * \note            Payload data should be in packet->data for receive path
  */

@@ -189,7 +189,6 @@ class XglNetworkTest : public ::testing::Test {
         params.payload_len = std::strlen(payload);
         params.reliable = true;
         params.reliability_class = XGL_RELIABILITY_NONE;
-        params.fragment = false;
         params.priority = 0;
         params.ttl = ttl;
         EXPECT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
@@ -1405,7 +1404,6 @@ TEST_F(XglNetworkTest, FrameMetadataDecodesTransportPacketSemantics) {
     params.payload = payload;
     params.payload_len = sizeof(payload);
     params.reliable = true;
-    params.fragment = true;
     params.priority = 5;
     params.ttl = 3;
     ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
@@ -1430,7 +1428,6 @@ TEST_F(XglNetworkTest, FrameMetadataDecodesTransportPacketSemantics) {
     EXPECT_EQ(metadata.data_type, data_type);
     EXPECT_EQ(metadata.session_epoch, 0x01020304U);
     EXPECT_EQ(metadata.reliable, XGL_RELIABILITY_ACK_ELICITING);
-    EXPECT_EQ(metadata.fragment, 1U);
     EXPECT_EQ(metadata.priority, 5U);
     ASSERT_EQ(metadata.payload_len, sizeof(payload));
     EXPECT_EQ(std::vector<uint8_t>(metadata.payload,

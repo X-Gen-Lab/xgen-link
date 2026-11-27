@@ -431,7 +431,6 @@ TEST(XglFrameProperties, ParserByteByByteRobustness) {
         params.payload = payload.data();
         params.payload_len = payload_len;
         params.reliable = false;
-        params.fragment = false;
         params.priority = 0;
         xgl_error_t err = xgl_frame_build(&frame, &params);
         ASSERT_EQ(err, XGL_OK);

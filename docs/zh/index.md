@@ -9,7 +9,7 @@ XGen Link 为嵌入式系统提供 C11 通信协议、显式有界存储与可�
 | 配置容量和硬件接口 | [配置](guides/configuration.md)、[移植](guides/porting.md) |
 | 接入 Boot 传输 | [Boot 接入](guides/boot.md) |
 | 了解架构及资源 | [架构](explanation/architecture.md)、[资源模型](explanation/resource-model.md) |
-| 查 API 与协议 | [公开 API](reference/api.md)、[wire v3](reference/protocol/v3/index.md) |
+| 查 API 与协议 | [公开 API](reference/api.md)、[Wire v1](reference/protocol/v1/index.md) |
 | 开发和验证 | [开发工作流](development/workflow.md)、[验证](development/validation.md) |
 
 [English](../en/index.md)

@@ -35,7 +35,9 @@ class RunnerContracts(unittest.TestCase):
         )
         tests = json.loads(result.stdout)["tests"]
         cases = [case for case in tests if "." in case["name"]]
-        self.assertGreaterEqual(len(cases), 510)
+        baseline = BASELINE.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(baseline), 473)
+        self.assertGreaterEqual(len(cases), len(baseline))
         self.assertNotIn("xgl_tests", {case["name"] for case in tests})
         labels_seen = set()
         for case in cases:
@@ -45,8 +47,6 @@ class RunnerContracts(unittest.TestCase):
             self.assertTrue({"unit", "integration"}.intersection(labels), case["name"])
             labels_seen.update(labels)
         self.assertTrue({"unit", "integration", "property"}.issubset(labels_seen))
-        baseline = BASELINE.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(len(baseline), 510)
         self.assertFalse(set(baseline) - {case["name"] for case in cases})
 
     def test_compilation_uses_standard_cpp17(self):

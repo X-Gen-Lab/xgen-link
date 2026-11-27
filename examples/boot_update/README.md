@@ -1,6 +1,6 @@
 # Boot update host simulation
 
-This example exercises a bounded firmware-transfer application with wire v3 and
+This example exercises a bounded firmware-transfer application with wire v1 and
 static protocol workspaces. It contains no MCU Flash driver, RTOS dependency,
 heap allocation, signature verification, or secure-boot claim.
 

@@ -125,7 +125,7 @@ typedef struct {
 /**
  * \brief           Exact reserved bytes by ownership and resource category
  * \note            Category bytes include alignment and sum to
- * requirements.size. Admission budgets do not change fixed pool reservations.
+ * requirements.size.
  */
 typedef struct {
     xgl_memory_requirements_t requirements; /**< Complete storage contract */
@@ -137,7 +137,6 @@ typedef struct {
     size_t tx_payload_bytes;     /**< Reserved reliable payload copies */
     size_t scratch_bytes;        /**< Synchronous frame scratch storage */
     size_t rx_buffered_bytes;    /**< Out-of-order records, payload and TLVs */
-    size_t fragment_bytes;       /**< Message storage and reassembly records */
 } xgl_memory_report_t;
 
 /**
@@ -263,47 +262,74 @@ const char* xgl_version_string(void);
  */
 uint32_t xgl_version_int(void);
 
+/** \cond ABI_SYMBOLS */
+/* Layout-dependent exports carry the SDK ABI in their symbol names. */
+void xgl_config_get_default_v5(xgl_config_t* config);
+void xgl_config_get_preset_boot_v5(xgl_config_t* config);
+void xgl_config_get_preset_tiny_v5(xgl_config_t* config);
+void xgl_config_get_preset_small_v5(xgl_config_t* config);
+void xgl_config_get_preset_medium_v5(xgl_config_t* config);
+void xgl_config_get_preset_large_v5(xgl_config_t* config);
+void xgl_config_get_preset_production_v5(xgl_config_t* config);
+xgl_error_t xgl_config_validate_v5(const xgl_config_t* config);
+
+/** \endcond */
+
 /**
  * \brief           Select defaults supported by the compiled profile
  * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
-void xgl_config_get_default(xgl_config_t* config);
+static inline void xgl_config_get_default(xgl_config_t* config) {
+    xgl_config_get_default_v5(config);
+}
 
 /**
  * \brief           Select one peer, one TX slot, and 128-byte frames
  * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
-void xgl_config_get_preset_boot(xgl_config_t* config);
+static inline void xgl_config_get_preset_boot(xgl_config_t* config) {
+    xgl_config_get_preset_boot_v5(config);
+}
 
 /**
  * \brief           Select the tiny bounded protocol configuration
  * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
-void xgl_config_get_preset_tiny(xgl_config_t* config);
+static inline void xgl_config_get_preset_tiny(xgl_config_t* config) {
+    xgl_config_get_preset_tiny_v5(config);
+}
 
 /**
  * \brief           Select the small bounded protocol configuration
  * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
-void xgl_config_get_preset_small(xgl_config_t* config);
+static inline void xgl_config_get_preset_small(xgl_config_t* config) {
+    xgl_config_get_preset_small_v5(config);
+}
 
 /**
  * \brief           Select the medium bounded protocol configuration
  * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
-void xgl_config_get_preset_medium(xgl_config_t* config);
+static inline void xgl_config_get_preset_medium(xgl_config_t* config) {
+    xgl_config_get_preset_medium_v5(config);
+}
 
 /**
  * \brief           Select the large bounded protocol configuration
  * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
-void xgl_config_get_preset_large(xgl_config_t* config);
+static inline void xgl_config_get_preset_large(xgl_config_t* config) {
+    xgl_config_get_preset_large_v5(config);
+}
 
 /**
  * \brief           Select authenticated defaults; a provider must be supplied
  * \param[out]      config: Configuration to overwrite; NULL is ignored
  */
-void xgl_config_get_preset_production(xgl_config_t* config);
+static inline void xgl_config_get_preset_production(xgl_config_t* config) {
+    xgl_config_get_preset_production_v5(config);
+}
 
 /**
  * \brief           Validate configuration and the compiled capability ceiling
@@ -311,19 +337,20 @@ void xgl_config_get_preset_production(xgl_config_t* config);
  * \return          XGL_OK, NULL_POINTER, INVALID_PARAM, UNSUPPORTED, or
  *                  BUFFER_TOO_SMALL when RX storage is smaller than the MTU
  */
-xgl_error_t xgl_config_validate(const xgl_config_t* config);
+static inline xgl_error_t xgl_config_validate(const xgl_config_t* config) {
+    return xgl_config_validate_v5(config);
+}
 
 /**
- * \brief           Submit data at the caller's monotonic millisecond time
+ * \brief           Submit one DATA frame at the caller's monotonic time
  * \param[in]       handle: Initialized instance
  * \param[in]       tx_data: Payload and addressing borrowed during this call
  * \param[in]       now_ms: Same clock used by xgl_step(), wrapping modulo 2^32
  * \return          XGL_OK when accepted, or validation/capacity/driver error
  * \note            Reliable data is copied to bounded protocol-owned storage.
  *                  Successful submission describes local acceptance.
- * \note            A synchronous hard error after accepting a fragmented
- *                  message terminates its scope and returns the original
- *                  error. Previously submitted frames may still arrive.
+ * \note            A payload that exceeds the frame budget returns
+ *                  XGL_ERR_BUFFER_TOO_SMALL.
  */
 xgl_error_t xgl_send_at(xgl_handle_t handle, const xgl_tx_data_t* tx_data,
                         uint32_t now_ms);
@@ -348,7 +375,7 @@ xgl_error_t xgl_send_zerocopy_at(xgl_handle_t handle,
  * \param[in]       request: Scope and send metadata; buffer, buffer_size and
  *                  data_offset are ignored, data_len must be nonzero
  * \param[out]      layout: Exact headroom and frame size, cleared on failure
- * \return          XGL_OK or an argument, message-limit, route, MTU, security
+ * \return          XGL_OK or an argument, route, MTU, security
  *                  or terminal-scope error
  * \note            Does not call the provider or PHY, reserve storage or
  * consume a security sequence. An authenticated scope must already be
@@ -484,7 +511,7 @@ xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats);
 xgl_error_t xgl_stats_reset(xgl_handle_t handle);
 
 /**
- * \brief           Measure independent message storage with versioned policy
+ * \brief           Validate versioned instance policy and measure storage
  * \param[in]       config: Immutable instance configuration
  * \param[in]       options: Initialized versioned policy
  * \param[out]      report: Exact reservation, unchanged on failure
@@ -538,14 +565,22 @@ xgl_error_t xgl_step_bounded(xgl_handle_t handle, uint32_t now_ms,
                              const xgl_execution_limits_t* limits,
                              xgl_execution_result_t* result);
 
+/** \cond ABI_SYMBOLS */
+xgl_error_t xgl_resources_get_v5(xgl_handle_t handle,
+                                 xgl_resource_snapshot_t* snapshot);
+
+/** \endcond */
+
 /**
  * \brief           Inspect currently owned resources without allocation
  * \param[in]       handle: Caller-serialized initialized instance
  * \param[out]      snapshot: Current resource counts, unchanged on error
  * \return          XGL_OK, argument error, or UNSUPPORTED if disabled
  */
-xgl_error_t xgl_resources_get(xgl_handle_t handle,
-                              xgl_resource_snapshot_t* snapshot);
+static inline xgl_error_t xgl_resources_get(xgl_handle_t handle,
+                                            xgl_resource_snapshot_t* snapshot) {
+    return xgl_resources_get_v5(handle, snapshot);
+}
 
 #ifdef __cplusplus
 }
