@@ -207,7 +207,7 @@ class XglNetworkMultihopTest : public ::testing::Test {
     }
 
     void Start(bool authenticated = false, uint32_t connection = 0U,
-               uint32_t epoch = 0U) {
+               uint32_t epoch = 0U, uint64_t reverse_initial_seq = 0U) {
         for (Node* node : {&a, &b, &c}) {
             node->config.route_table = node->routes.data();
             node->config.route_table_len = node->routes.size();
@@ -222,8 +222,8 @@ class XglNetworkMultihopTest : public ::testing::Test {
         }
         if (authenticated) {
             const auto tx = test_session_config(3U, connection, epoch);
-            const auto rx =
-                test_session_config(1U, connection, epoch, 7U, true);
+            auto rx = test_session_config(1U, connection, epoch, 7U, true);
+            rx.tx_initial_seq = reverse_initial_seq;
             ASSERT_EQ(xgl_install_security_session(a.handle, &tx), XGL_OK);
             ASSERT_EQ(xgl_install_security_session(c.handle, &rx), XGL_OK);
         }
@@ -395,6 +395,26 @@ TEST_F(XglNetworkMultihopTest, AuthenticatedReverseRouteFitsAtExactFrameSize) {
     ASSERT_EQ(c.deliveries.size(), 1U);
     ASSERT_EQ(c_phy.frames.size(), 1U);
     EXPECT_EQ(c_phy.frames[0].size(), 86U);
+}
+
+TEST_F(XglNetworkMultihopTest, ReverseFeedbackPreflightChecksSequenceCapacity) {
+    ASSERT_NO_FATAL_FAILURE(Start(true, 7U, 9U, UINT64_MAX));
+    xgl_packet_t incoming = {};
+    incoming.source_id = 1U;
+    incoming.connection_id = 7U;
+    incoming.session_epoch = 9U;
+    const auto& transport = c.handle->layers.transport_ctx;
+
+    EXPECT_EQ(transport_check_feedback(&transport, &incoming), XGL_OK);
+    EXPECT_TRUE(authentication.signed_inputs.empty());
+    ASSERT_EQ(Send(c, 1U, 0U, false, nullptr, 7U, 9U), XGL_OK);
+    ASSERT_EQ(authentication.signed_inputs.size(), 1U);
+    EXPECT_EQ(authentication.signed_inputs[0].fields.security_seq, UINT64_MAX);
+
+    EXPECT_EQ(transport_check_feedback(&transport, &incoming),
+              XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(authentication.signed_inputs.size(), 1U);
+    EXPECT_EQ(c_phy.attempts, 1U);
 }
 
 TEST_F(XglNetworkMultihopTest, BusyAcknowledgmentPreservesAcceptedData) {

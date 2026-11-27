@@ -218,17 +218,22 @@ static xgl_error_t network_measure_egress_frame(const xgl_network_ctx_t* ctx,
 #if XGL_FEATURE_AUTH
 /* Parameter order follows the documented protocol scope. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-static xgl_error_t network_scope_tag_len(const xgl_network_ctx_t* ctx,
-                                         uint16_t target_id,
-                                         uint32_t connection_id,
-                                         uint32_t session_epoch,
-                                         size_t* tag_len) {
+static xgl_error_t network_check_scope_tag(const xgl_network_ctx_t* ctx,
+                                           uint16_t target_id,
+                                           uint32_t connection_id,
+                                           uint32_t session_epoch,
+                                           size_t* tag_len) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    const xgl_security_ctx_t* security = ctx->security;
-    return xgl_security_frame_tag_len(
+    xgl_security_ctx_t* security = ctx->security;
+    xgl_error_t error = xgl_security_frame_tag_len(
         xgl_security_scope_requires_auth(security, target_id, connection_id,
                                          session_epoch),
         security != NULL ? security->provider : NULL, 0U, tag_len);
+    if (error != XGL_OK || *tag_len == 0U) {
+        return error;
+    }
+    return xgl_security_check_tx_scope(security, target_id, connection_id,
+                                       session_epoch);
 }
 #endif
 
@@ -244,9 +249,9 @@ xgl_error_t xgl_network_check_feedback(void* network,
 
     size_t tag_len = 0U;
 #if XGL_FEATURE_AUTH
-    const xgl_error_t error =
-        network_scope_tag_len(ctx, received->source_id, received->connection_id,
-                              received->session_epoch, &tag_len);
+    const xgl_error_t error = network_check_scope_tag(
+        ctx, received->source_id, received->connection_id,
+        received->session_epoch, &tag_len);
     if (error != XGL_OK) {
         return error;
     }
@@ -502,18 +507,10 @@ xgl_network_zerocopy_layout(xgl_network_ctx_t* ctx,
     size_t tag_len = 0U;
 #if XGL_FEATURE_AUTH
     xgl_error_t error =
-        network_scope_tag_len(ctx, data->target_id, request->connection_id,
-                              request->session_epoch, &tag_len);
+        network_check_scope_tag(ctx, data->target_id, request->connection_id,
+                                request->session_epoch, &tag_len);
     if (error != XGL_OK) {
         return error;
-    }
-    if (tag_len != 0U) {
-        error = xgl_security_check_tx_scope(ctx->security, data->target_id,
-                                            request->connection_id,
-                                            request->session_epoch);
-        if (error != XGL_OK) {
-            return error;
-        }
     }
 #endif
     size_t extensions_len =
