@@ -64,14 +64,9 @@ xgl_error_t xgl_close_peer(xgl_handle_t handle, uint16_t remote_id,
         return XGL_ERR_NOT_INITIALIZED;
     }
 #if XGL_FEATURE_AUTH
-    const xgl_security_ctx_t* security = &handle->security;
-    for (size_t i = 0U; i < XGL_SECURITY_SESSION_CAPACITY; ++i) {
-        const xgl_security_session_t* session = &security->sessions[i];
-        if (session->active && session->config.remote_id == remote_id &&
-            session->config.connection_id == connection_id &&
-            session->config.session_epoch == session_epoch) {
-            return XGL_ERR_INVALID_PARAM;
-        }
+    if (xgl_security_session_is_active(&handle->security, remote_id,
+                                       connection_id, session_epoch)) {
+        return XGL_ERR_INVALID_PARAM;
     }
 #endif
     return xgl_transport_close_scope(&handle->layers.transport_ctx, handle,

@@ -15,7 +15,7 @@ A profile is a compile-time capability ceiling. A preset supplies explicit runti
 
 `XGL_TRANSPORT_WINDOW_CAPACITY` can be 1, 8, 16, 32, 64 or 128, with default 128. `XGL_RELIABLE_INDEX_BUCKETS` can be 1, 2, 4, 8, 16 or 32. Defaults are 1 for Boot, 8 for Embedded Lite and 32 otherwise. `XGL_DATALINK_RX_CHUNK_SIZE` can be 16, 32, 64 or 128 bytes, with defaults 32 for Boot and 128 otherwise. Adaptive RTO defaults on and advanced runtime defaults off.
 
-The generated header and installed target record profile, resource selection and build identity. Check the actual exports and keep application macros consistent with the SDK. Boot requires libc fallback to be off.
+`XGL_DATALINK_MAX_FRAME_SIZE` selects the producer's complete-frame ceiling from 64 to 2048 bytes and defaults to 2048. The instance MTU must fit this ceiling. The generated header and installed target record profile, resource selection and build identity. Check the actual exports and keep application macros consistent with the SDK. Boot requires libc fallback to be off.
 
 ## Runtime limits
 

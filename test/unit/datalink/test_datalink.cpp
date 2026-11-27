@@ -409,6 +409,63 @@ TEST_F(XglDatalinkTest, SendFrameNullPointer) {
     EXPECT_EQ(xgl_datalink_send(&ctx, nullptr, &frame), XGL_ERR_NULL_POINTER);
 }
 
+TEST_F(XglDatalinkTest, EnforcesCompiledFrameCapOnEveryFrameIngressAndEgress) {
+    constexpr size_t overhead = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE;
+    const size_t sizes[] = {XGL_DATALINK_MAX_FRAME_SIZE,
+                            XGL_DATALINK_MAX_FRAME_SIZE + 1U};
+    for (const size_t frame_size : sizes) {
+        SCOPED_TRACE(frame_size);
+        const bool oversized = frame_size > XGL_DATALINK_MAX_FRAME_SIZE;
+        const xgl_error_t tx_result =
+            oversized ? XGL_ERR_BUFFER_TOO_SMALL : XGL_OK;
+        std::vector<uint8_t> buffer(frame_size, 0xA5);
+        xgl_frame_params_t params = {};
+        params.source_id = SOURCE_ID;
+        params.target_id = TARGET_ID;
+        params.payload = buffer.data() + XGL_WIRE_BASE_HEADER_SIZE;
+        params.payload_len = frame_size - overhead;
+        xgl_frame_t frame = {};
+        ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+
+        /* A frame outside this library's cap can still be valid wire v3. */
+        size_t written = 0;
+        ASSERT_EQ(
+            xgl_frame_serialize(buffer.data(), buffer.size(), &frame, &written),
+            XGL_OK);
+        ASSERT_EQ(written, frame_size);
+        xgl_wire_frame_view_t view;
+        ASSERT_EQ(xgl_wire_decode_frame(&view, buffer.data(), written, nullptr),
+                  XGL_OK);
+        const xgl_error_t rx_result =
+            oversized ? XGL_ERR_INVALID_FRAME : XGL_OK;
+        EXPECT_EQ(xgl_datalink_process_frame(&ctx, buffer.data(), written),
+                  rx_result);
+        std::vector<uint8_t> cache(frame_size);
+        xgl_parser_t parser = {};
+        ASSERT_EQ(xgl_parser_init(&parser, cache.data(), cache.size()), XGL_OK);
+        EXPECT_EQ(xgl_datalink_consume_span(&ctx, &parser, buffer.data(),
+                                            written, 0U),
+                  rx_result);
+
+        if (oversized) {
+            EXPECT_CALL(mock_phy, tx(_, _, _)).Times(0);
+        } else {
+            EXPECT_CALL(mock_phy, tx(_, frame_size, _))
+                .Times(3)
+                .WillRepeatedly(Return(XGL_OK));
+        }
+        EXPECT_EQ(xgl_datalink_send(&ctx, &phy_ops, &frame), tx_result);
+        EXPECT_EQ(xgl_datalink_send_inplace(&ctx, &phy_ops, &frame,
+                                            buffer.data(), buffer.size(),
+                                            XGL_WIRE_BASE_HEADER_SIZE),
+                  tx_result);
+        EXPECT_EQ(
+            xgl_datalink_send_raw(&ctx, &phy_ops, buffer.data(), buffer.size()),
+            tx_result);
+        EXPECT_TRUE(::testing::Mock::VerifyAndClearExpectations(&mock_phy));
+    }
+}
+
 TEST_F(XglDatalinkTest, InplaceCapacityPrecedesPayloadAddressValidation) {
     const uint8_t payload = 0x35;
     xgl_frame_params_t params = {};

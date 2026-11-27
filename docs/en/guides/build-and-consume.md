@@ -21,6 +21,8 @@ target_link_libraries(my_application PRIVATE xgl::xgl)
 
 Set `CMAKE_PREFIX_PATH` to the SDK install prefix when configuring the consumer. Installed packages accept `COMPONENTS` for compiled capabilities. All profiles support `wire` and `reliable`. Compile and run the actual consumer after it configures successfully.
 
+Repeat a lookup in the same CMake scope using the already bound SDK prefix. To switch prefixes, configure a fresh consumer build so the archive and headers of `xgl::xgl` both come from the selected SDK.
+
 ## Compiled resource options
 
 The bare-metal Boot example configuration uses `cmake --preset boot` with Ninja. For a compiled capacity of one window slot and fixed RTO, choose the resources explicitly in a separate build directory:
@@ -32,7 +34,7 @@ cmake -S . -B build/boot-small -G Ninja -DXGL_PROFILE=boot \
 cmake --build build/boot-small
 ```
 
-See [Build profiles](../reference/profiles.md) for the resource identity and window, reliable index, read chunk and advanced runtime options. For real hardware, also select the cross compiler and the application capacities.
+See [Build profiles](../reference/profiles.md) for the resource identity and window, reliable index, frame ceiling, read chunk and advanced runtime options. For real hardware, also select the cross compiler and the application capacities.
 
 ## Host validation
 

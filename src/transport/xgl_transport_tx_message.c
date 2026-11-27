@@ -279,12 +279,11 @@ xgl_error_t transport_send_fragmented(xgl_transport_ctx_t* ctx,
     }
     if (err != XGL_OK) {
         transport_fail_peer(ctx, handle, peer, err);
-        return XGL_OK;
+        return err;
     }
     peer->tx_message_offset = length;
     if (length == peer->tx_message.data_len) {
         transport_clear_tx_message(ctx, peer);
     }
-    (void)transport_pump_tx_message(ctx, handle, peer);
-    return XGL_OK;
+    return transport_pump_tx_message(ctx, handle, peer);
 }

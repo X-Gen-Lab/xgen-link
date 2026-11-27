@@ -77,7 +77,8 @@ struct AuthenticationLedger {
     static xgl_error_t sign(const xgl_auth_input_t* input, uint8_t* tag,
                             size_t capacity, size_t* length, void* user) {
         auto& self = *static_cast<AuthenticationLedger*>(user);
-        if (capacity < 4U) {
+        const size_t tag_size = self.provider.tag_len;
+        if (capacity < tag_size || tag_size < 4U) {
             return XGL_ERR_BUFFER_TOO_SMALL;
         }
         self.signed_inputs.push_back(
@@ -87,7 +88,8 @@ struct AuthenticationLedger {
         self.signed_inputs.back().fields.payload = nullptr;
         xgl_serialize_u32_le(tag,
                              static_cast<uint32_t>(self.signed_inputs.size()));
-        *length = 4U;
+        std::memset(tag + 4U, 0, tag_size - 4U);
+        *length = tag_size;
         return XGL_OK;
     }
 
@@ -98,7 +100,10 @@ struct AuthenticationLedger {
             ++self.verified_by_target[input->target_id];
         }
         *valid = false;
-        if (length != 4U) {
+        if (length != self.provider.tag_len || length < 4U ||
+            !std::all_of(
+                tag + 4U, tag + length,
+                [](uint8_t byte) { return byte == 0U; })) {
             return XGL_OK;
         }
         const uint32_t id = xgl_deserialize_u32_le(tag);
@@ -201,7 +206,8 @@ class XglNetworkMultihopTest : public ::testing::Test {
         }
     }
 
-    void Start(bool authenticated = false) {
+    void Start(bool authenticated = false, uint32_t connection = 0U,
+               uint32_t epoch = 0U, uint64_t reverse_initial_seq = 0U) {
         for (Node* node : {&a, &b, &c}) {
             node->config.route_table = node->routes.data();
             node->config.route_table_len = node->routes.size();
@@ -215,8 +221,9 @@ class XglNetworkMultihopTest : public ::testing::Test {
             ASSERT_EQ(xgl_init(node->handle), XGL_OK);
         }
         if (authenticated) {
-            const auto tx = test_session_config(3U);
-            const auto rx = test_session_config(1U, 0U, 0U, 7U, true);
+            const auto tx = test_session_config(3U, connection, epoch);
+            auto rx = test_session_config(1U, connection, epoch, 7U, true);
+            rx.tx_initial_seq = reverse_initial_seq;
             ASSERT_EQ(xgl_install_security_session(a.handle, &tx), XGL_OK);
             ASSERT_EQ(xgl_install_security_session(c.handle, &rx), XGL_OK);
         }
@@ -260,7 +267,8 @@ class XglNetworkMultihopTest : public ::testing::Test {
 #endif
 
     xgl_error_t Send(Node& source, uint16_t target, uint32_t now,
-                     bool reliable = true, const Bytes* data = nullptr) {
+                     bool reliable = true, const Bytes* data = nullptr,
+                     uint32_t connection = 0U, uint32_t epoch = 0U) {
         const Bytes& bytes = data != nullptr ? *data : payload;
         xgl_tx_data_t request = {};
         request.target_id = target;
@@ -269,7 +277,25 @@ class XglNetworkMultihopTest : public ::testing::Test {
         request.data_len = bytes.size();
         request.reliable = reliable;
         request.timeout_ms = 100U;
+        request.connection_id = connection;
+        request.session_epoch = epoch;
         return xgl_send_at(source.handle, &request, now);
+    }
+
+    void DeliverDataToC(uint32_t now, xgl_error_t expected) {
+        /* Deliver the real sender's DATA without its preceding HELLO so this
+         * receive is responsible for any peer admission at C. */
+        ASSERT_FALSE(a_phy.frames.empty());
+        const Bytes& frame = a_phy.frames.back();
+        ASSERT_EQ(b_to_c.delegate.tx(frame.data(), frame.size(),
+                                     b_to_c.delegate.user_data),
+                  XGL_OK);
+        xgl_error_t result = XGL_OK;
+        for (uint32_t elapsed = 0U; elapsed < 32U && result == XGL_OK;
+             ++elapsed) {
+            result = xgl_step(c.handle, now + elapsed, &budget);
+        }
+        EXPECT_EQ(result, expected);
     }
 
     void DeliverAndAcknowledge(uint32_t now) {
@@ -333,6 +359,76 @@ TEST_F(XglNetworkMultihopTest, ReliableDataAndReverseAckReleaseSenderWindow) {
     ASSERT_EQ(c.deliveries.size(), 2U);
     ASSERT_EQ(xgl_step(a.handle, 1000U, &budget), XGL_OK);
     EXPECT_EQ(a_phy.frames.size(), 3U);
+}
+
+TEST_F(XglNetworkMultihopTest, MissingReverseRouteRejectsBeforeAdmission) {
+    c.routes[0].target_id = 2U;
+    ASSERT_NO_FATAL_FAILURE(Start());
+    ASSERT_EQ(Send(a, 3U, 0U), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(DeliverDataToC(1U, XGL_ERR_ROUTE_NOT_FOUND));
+    EXPECT_TRUE(c.deliveries.empty());
+    EXPECT_EQ(c.handle->layers.transport_ctx.peers, nullptr);
+    EXPECT_EQ(c_phy.attempts, 0U);
+}
+
+TEST_F(XglNetworkMultihopTest,
+       NarrowAuthenticatedReverseRouteRejectsBeforeAdmission) {
+    authentication.provider.tag_len = 16U;
+    c.routes[0].max_frame_size = 85U;
+    ASSERT_NO_FATAL_FAILURE(Start(true, 7U, 9U));
+    ASSERT_EQ(Send(a, 3U, 0U, true, nullptr, 7U, 9U), XGL_OK);
+    const size_t signed_before = authentication.signed_inputs.size();
+    ASSERT_NO_FATAL_FAILURE(DeliverDataToC(1U, XGL_ERR_BUFFER_TOO_SMALL));
+    EXPECT_TRUE(c.deliveries.empty());
+    EXPECT_EQ(c.handle->layers.transport_ctx.peers, nullptr);
+    EXPECT_EQ(c_phy.attempts, 0U);
+    EXPECT_EQ(authentication.signed_inputs.size(), signed_before);
+    EXPECT_EQ(authentication.verified_by_target[3], 1U);
+}
+
+TEST_F(XglNetworkMultihopTest, AuthenticatedReverseRouteFitsAtExactFrameSize) {
+    authentication.provider.tag_len = 16U;
+    c.routes[0].max_frame_size = 86U;
+    ASSERT_NO_FATAL_FAILURE(Start(true, 7U, 9U));
+    ASSERT_EQ(Send(a, 3U, 0U, true, nullptr, 7U, 9U), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(DeliverDataToC(1U, XGL_OK));
+    ASSERT_EQ(c.deliveries.size(), 1U);
+    ASSERT_EQ(c_phy.frames.size(), 1U);
+    EXPECT_EQ(c_phy.frames[0].size(), 86U);
+}
+
+TEST_F(XglNetworkMultihopTest, ReverseFeedbackPreflightChecksSequenceCapacity) {
+    ASSERT_NO_FATAL_FAILURE(Start(true, 7U, 9U, UINT64_MAX));
+    xgl_packet_t incoming = {};
+    incoming.source_id = 1U;
+    incoming.connection_id = 7U;
+    incoming.session_epoch = 9U;
+    const auto& transport = c.handle->layers.transport_ctx;
+
+    EXPECT_EQ(transport_check_feedback(&transport, &incoming), XGL_OK);
+    EXPECT_TRUE(authentication.signed_inputs.empty());
+    ASSERT_EQ(Send(c, 1U, 0U, false, nullptr, 7U, 9U), XGL_OK);
+    ASSERT_EQ(authentication.signed_inputs.size(), 1U);
+    EXPECT_EQ(authentication.signed_inputs[0].fields.security_seq, UINT64_MAX);
+
+    EXPECT_EQ(transport_check_feedback(&transport, &incoming),
+              XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(authentication.signed_inputs.size(), 1U);
+    EXPECT_EQ(c_phy.attempts, 1U);
+}
+
+TEST_F(XglNetworkMultihopTest, BusyAcknowledgmentPreservesAcceptedData) {
+    ASSERT_NO_FATAL_FAILURE(Start());
+    ASSERT_EQ(Send(a, 3U, 0U), XGL_OK);
+    c_phy.next_error = XGL_ERR_BUSY;
+    ASSERT_NO_FATAL_FAILURE(DeliverDataToC(1U, XGL_ERR_BUSY));
+    EXPECT_EQ(c.deliveries.size(), 1U);
+    EXPECT_EQ(c_phy.attempts, 1U);
+    EXPECT_TRUE(c_phy.frames.empty());
+    ASSERT_NO_FATAL_FAILURE(DeliverDataToC(35U, XGL_OK));
+    EXPECT_EQ(c.deliveries.size(), 1U);
+    EXPECT_EQ(c_phy.attempts, 2U);
+    EXPECT_EQ(c_phy.frames.size(), 1U);
 }
 
 TEST_F(XglNetworkMultihopTest,
@@ -456,6 +552,24 @@ TEST_F(XglNetworkMultihopTest, BroadcastIsLocalDeliveryWithoutFlooding) {
 }
 
 #if XGL_FEATURE_ADVANCED_RUNTIME
+TEST_F(XglNetworkMultihopTest,
+       ReverseFeedbackBudgetUsesExactAuthenticationScope) {
+    authentication.provider.tag_len = 16U;
+    c.routes[0].max_frame_size = 85U;
+    ASSERT_NO_FATAL_FAILURE(StartScoped(true, true, 7U, 9U));
+
+    ASSERT_EQ(Send(a, 3U, 0U, true, nullptr, 8U, 9U), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(DeliverDataToC(1U, XGL_OK));
+    ASSERT_EQ(c.deliveries.size(), 1U);
+    ASSERT_EQ(c_phy.frames.size(), 1U);
+    EXPECT_EQ(c_phy.frames[0].size(), 55U);
+
+    ASSERT_EQ(Send(a, 3U, 35U, true, nullptr, 7U, 9U), XGL_OK);
+    ASSERT_NO_FATAL_FAILURE(DeliverDataToC(36U, XGL_ERR_BUFFER_TOO_SMALL));
+    EXPECT_EQ(c.deliveries.size(), 1U);
+    EXPECT_EQ(c_phy.attempts, 1U);
+}
+
 TEST_F(XglNetworkMultihopTest,
        InstalledScopeProtectsHelloDataRetryAndReverseAcknowledgment) {
     ASSERT_NO_FATAL_FAILURE(StartScoped());

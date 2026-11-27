@@ -7,6 +7,7 @@
 | Wire v3, TLV, CRC, unaligned spans | `test/unit/wire/test_wire.cpp`, `test/unit/datalink/test_parser.cpp`, frame properties |
 | Length overflow, borrowed SACK, failure-view clearing, and raw/stream agreement | `test/unit/wire/test_frame.cpp`, `test_wire_sack_view.cpp`, `test_wire_rx_contracts.cpp`, `test/unit/transport/test_transport_sack_view.cpp` |
 | Fixed routes and authenticated forwarding | `test/unit/network/test_route.cpp`, `test/unit/network/test_network.cpp` |
+| Local feedback egress, reverse MTU and PHY backpressure | `test/integration/test_network_multihop.cpp` |
 | Exact scope, atomic ACK, RX retention, retry, RESET and close | `test/unit/transport/test_transport.cpp`, transport properties |
 | Side-effect-free RX/TX rejection, deferred fast retry, terminal errors and unique storage ownership | `test_transport_rx_contracts.cpp`, `test_transport_tx_contracts.cpp`, `test_transport_runtime_contracts.cpp`, `test_transport_storage.cpp` (all under `test/unit/transport/`) |
 | Fragment budgets, overlaps, timeout, messages larger than a window | `test/unit/transport/test_fragment.cpp`, memory properties |
@@ -29,9 +30,9 @@
 
 ## Build and installation
 
-Use a clean build with only the C11 toolchain to validate the default production library, Boot production library, source subdirectory and isolated installed consumer. Compile, link and run real public C consumers. Exercise rejected ABI, profile and required capability combinations. Follow the [development workflow](workflow.md) for host tests. Keep missing test inventories, missing reports and failing exit statuses visible.
+Use a clean build with only the C11 toolchain to validate the default production library, Boot production library and source subdirectory. Compile, link and run isolated C11 and C++17 consumers against the installed SDK. Exercise rejected ABI, profile, required capability, resource identity and prefix combinations. Follow the [development workflow](workflow.md) for host tests. Keep missing test inventories, missing reports and failing exit statuses visible.
 
-The `ci` preset selects Full with advanced runtime and GCC coverage instrumentation. Reproduce the CI host validation with the same build for the tests, analyzers and coverage. `run_ctest.py` records the inventory and JUnit report and rejects skipped tests. The coverage gate requires at least 80% each for line, function and branch coverage.
+The `ci` preset selects Full with advanced runtime and GCC coverage instrumentation. Reproduce the CI host validation with the same build for the tests, analyzers and coverage. `run_ctest.py` records the inventory and JUnit report and rejects skipped tests. Multi-config builds save evidence for each configuration. The coverage gate requires at least 80% each for line, function and branch coverage.
 
 ```sh
 cmake --preset ci
@@ -44,7 +45,7 @@ python tools/quality.py coverage --build-dir build/ci
 
 For a local CMake check, `cmake --build --preset ci --target xgl_release_validation` builds and runs the registered CTest cases, including the relocated SDK and no-heap smoke tests. It also runs the selected Cppcheck and archive footprint targets.
 
-Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. Record the profiles, compiler and sanitizer runs that executed. Tool and framework versions are defined by `tools/quality.json` and `test/CMakeLists.txt`.
+Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. The SDK smoke test also links and runs both independent consumers against the instrumented library. Record the profiles, compiler and sanitizer runs that executed. Tool and framework versions are defined by `tools/quality.json` and `test/CMakeLists.txt`.
 
 ## Resources and product qualification
 

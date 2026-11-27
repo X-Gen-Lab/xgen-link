@@ -10,6 +10,14 @@ Dynamic creation uses `xgl_allocator_t` from the XGL public headers. Declare `ct
 
 Static initialization still measures storage through `xgl_memory_requirements()`. Recheck RAM, alignment and status under the new toolchain and configuration. The SDK 4 checked entry points validate configuration size, ABI and build identity.
 
+## Send and receive behavior changes
+
+- Install an acceptance callback where the instance needs to receive DATA. Products that previously discarded DATA with empty callbacks can install an explicit accept-and-discard callback. Send-only endpoints can still process ACK and CONTROL with empty callbacks.
+- Check `xgl_send_at()` for synchronous fragmented-send failures and `xgl_step*()` for maintenance failures. If the scope fails, fragments already accepted by the PHY may still be in transit. Follow the [send and recovery contract](send.md) for closing the old scope and retrying application work.
+- Advanced send operations use the same scope deadline. A layout query prepares storage and the actual send checks the deadline again.
+- Check the [MTU in both directions](../reference/protocol/v3/routing.md) for reliable traffic. A missing local reverse route or insufficient feedback capacity is reported before acceptance.
+- For a custom compiled frame ceiling, set `-DXGL_DATALINK_MAX_FRAME_SIZE=<bytes>` when configuring the library. Install the resulting header and library together, then rebuild consumers.
+
 ## Wire compatibility
 
 The wire version remains v3. Both endpoints must support the frames, extensions and authentication policy in use. See [Interoperability](../reference/protocol/v3/interoperability.md) and [Validation](../development/validation.md).

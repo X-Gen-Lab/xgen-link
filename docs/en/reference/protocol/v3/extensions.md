@@ -19,7 +19,7 @@ Values use little-endian integers. ROUTE and TIMESTAMP identifiers are reserved.
 
 The first ACK range has gap zero and begins at `largest_ack`; length is a positive packet count. Later ranges skip their gap plus the interval boundary before describing lower numbers. Invalid ranges, underflow and future numbers reject the entire ACK before queue, window or RTT mutation.
 
-SACK bit `i` describes `base + i`. Numbers below base are cumulatively acknowledged. Set bits mean the receiver owns the corresponding bytes; missing bits can drive retransmission. The current sender emits at most eight bitmap bytes. Boot can consume ACK forms supported by the transport even when out-of-order buffering is compiled out.
+SACK bit `i` describes `base + i`. A set bit confirms that the receiver owns those bytes. Records below `base` await explicit acknowledgement. Gaps within the reported range can trigger fast retransmission. An all-zero bitmap only hints at fast retransmission of `base`. The current sender emits at most eight bitmap bytes. Boot can consume ACK forms supported by the transport even when out-of-order buffering is compiled out.
 
 ## Composition
 
@@ -29,4 +29,4 @@ Verification: `test/unit/wire/test_wire.cpp`.
 
 ## Reserved payload transforms
 
-Compression and payload encryption are reserved capabilities. A configuration that selects them, or a send with a nonzero compression ID, returns `XGL_ERR_UNSUPPORTED`. For the authentication tag, see [Security](security.md). Applications that transform messages agree on a business payload format and check the encoded length before submission.
+Compression and payload encryption are reserved capabilities. Enabling either in the configuration returns `XGL_ERR_INVALID_PARAM`. A send with nonzero `compression_id` returns `XGL_ERR_UNSUPPORTED`. For the authentication tag, see [Security](security.md). Applications that transform messages agree on a business payload format and check the encoded length before submission.

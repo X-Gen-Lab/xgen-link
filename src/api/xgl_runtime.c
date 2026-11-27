@@ -54,6 +54,31 @@ static inline void include_timeout(uint32_t candidate, uint32_t* next,
     }
 }
 
+/** \brief           Collect transport and link deadlines for the chosen policy.
+ */
+static bool instance_next_timeout(const struct xgl_instance* instance,
+                                  uint32_t now_ms, bool include_polling,
+                                  uint32_t receive_timeout_ms,
+                                  uint32_t* delay_ms) {
+    uint32_t next = 0U;
+    bool found = xgl_transport_next_timeout(&instance->layers.transport_ctx,
+                                            now_ms, &next);
+    for (size_t i = 0U; i < instance->link_count; ++i) {
+        const xgl_instance_link_t* link = &instance->links[i];
+        if (include_polling) {
+            include_timeout(poll_timeout(link, now_ms), &next, &found);
+        }
+        uint32_t remaining;
+        if (parser_timeout(link, now_ms, receive_timeout_ms, &remaining)) {
+            include_timeout(remaining, &next, &found);
+        }
+    }
+    if (found) {
+        *delay_ms = next;
+    }
+    return found;
+}
+
 /**
  * \brief           Include every link using the most recent step policy
  */
@@ -62,22 +87,8 @@ bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
     if (handle == NULL || !handle->initialized || delay_ms == NULL) {
         return false;
     }
-    uint32_t next = 0U;
-    bool found = xgl_transport_next_timeout(&handle->layers.transport_ctx,
-                                            now_ms, &next);
-    for (size_t i = 0; i < handle->link_count; ++i) {
-        const xgl_instance_link_t* link = &handle->links[i];
-        include_timeout(poll_timeout(link, now_ms), &next, &found);
-        uint32_t remaining;
-        if (parser_timeout(link, now_ms, handle->parser_timeout_ms,
-                           &remaining)) {
-            include_timeout(remaining, &next, &found);
-        }
-    }
-    if (found) {
-        *delay_ms = next;
-    }
-    return found;
+    return instance_next_timeout(handle, now_ms, true,
+                                 handle->parser_timeout_ms, delay_ms);
 }
 
 /**
@@ -90,24 +101,8 @@ bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
         budget == NULL || budget->receive_timeout_ms >= UINT32_C(0x80000000)) {
         return false;
     }
-    uint32_t next = 0U;
-    bool found = xgl_transport_next_timeout(&handle->layers.transport_ctx,
-                                            now_ms, &next);
-    for (size_t i = 0; i < handle->link_count; ++i) {
-        const xgl_instance_link_t* link = &handle->links[i];
-        if (budget->rx_bytes != 0U) {
-            include_timeout(poll_timeout(link, now_ms), &next, &found);
-        }
-        uint32_t remaining;
-        if (parser_timeout(link, now_ms, budget->receive_timeout_ms,
-                           &remaining)) {
-            include_timeout(remaining, &next, &found);
-        }
-    }
-    if (found) {
-        *delay_ms = next;
-    }
-    return found;
+    return instance_next_timeout(handle, now_ms, budget->rx_bytes != 0U,
+                                 budget->receive_timeout_ms, delay_ms);
 }
 
 /**

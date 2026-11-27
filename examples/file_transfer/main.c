@@ -3,13 +3,16 @@
  * \brief           Reliable fixed-block transfer using bounded host storage
  * \author          X-Gen Lab
  */
-#include <wire/xgl_crc16.h>
-
 #include <stdio.h>
 
 #include "../common/sim_link.h"
+
 #define FILE_BYTES  1024U
-#define BLOCK_BYTES 64U
+#define BLOCK_BYTES (SIM_TYPED_PAYLOAD_CAPACITY >= 64U ? 64U : 32U)
+
+_Static_assert(BLOCK_BYTES <= SIM_TYPED_PAYLOAD_CAPACITY &&
+                   FILE_BYTES % BLOCK_BYTES == 0U,
+               "The file must fit in whole single-frame blocks");
 
 typedef struct {
     uint8_t bytes[FILE_BYTES];
@@ -87,9 +90,8 @@ int main(void) {
     }
     bool complete = application.used == sizeof(source) &&
                     memcmp(source, application.bytes, sizeof(source)) == 0;
-    printf("Fixed-block transfer: %s, CRC16=%04X (not authentication)\n",
-           complete ? "PASS" : "FAIL",
-           (unsigned)xgl_crc16_modbus(application.bytes, application.used));
+    printf("Fixed-block transfer: %s (%zu bytes received)\n",
+           complete ? "PASS" : "FAIL", application.used);
     xgl_destroy(sender.handle);
     xgl_destroy(receiver.handle);
     return complete ? 0 : 4;

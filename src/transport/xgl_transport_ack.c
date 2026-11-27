@@ -13,6 +13,12 @@ typedef struct {
     uint32_t next_high;
 } ack_ranges_t;
 
+typedef struct {
+    xgl_wire_sack_view_t view;
+    size_t highest_set;
+    bool has_set;
+} ack_sack_t;
+
 /**
  * \brief           Initialize a bounded cursor over an ACK range extension
  * \param[out]      cursor: Range cursor
@@ -115,24 +121,16 @@ static void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
     (void)xgl_reliable_remove_owned(&peer->reliable_queue, packet);
 }
 
-/**
- * \brief           Validate all ACK ranges before mutating the owning peer
- * \param[in,out]   ctx: Transport context
- * \param[in,out]   peer: Exact owner selected by the validated packet scope
- * \param[in]       ext: Borrowed, structurally validated ACK range extension
- * \return          XGL_OK or a range/sequence validation error
- */
-static xgl_error_t transport_process_ack_range(xgl_transport_ctx_t* ctx,
-                                               xgl_transport_peer_state_t* peer,
-                                               const xgl_wire_ext_t* ext) {
-    ack_ranges_t ranges;
-    xgl_error_t err = ack_ranges_init(&ranges, ext);
+static xgl_error_t ack_ranges_validate(ack_ranges_t* ranges,
+                                       const xgl_wire_ext_t* ext,
+                                       uint32_t next_packet_number) {
+    xgl_error_t err = ack_ranges_init(ranges, ext);
     if (err != XGL_OK) {
         return err;
     }
     uint32_t low, high;
-    while ((err = ack_ranges_next(&ranges, &low, &high)) == XGL_OK) {
-        if (high >= peer->tx_window.next_packet_number) {
+    while ((err = ack_ranges_next(ranges, &low, &high)) == XGL_OK) {
+        if (high >= next_packet_number) {
             return XGL_ERR_SEQUENCE_ERROR;
         }
     }
@@ -140,13 +138,20 @@ static xgl_error_t transport_process_ack_range(xgl_transport_ctx_t* ctx,
         return err;
     }
 
+    ranges->index = 0U;
+    ranges->next_high = ranges->view.largest_ack;
+    return XGL_OK;
+}
+
+/** \brief           Apply fully validated ranges to their owning peer. */
+static void transport_apply_ack_ranges(xgl_transport_ctx_t* ctx,
+                                       xgl_transport_peer_state_t* peer,
+                                       ack_ranges_t* ranges) {
     /* Peer admission appends strictly increasing packet numbers. Walk that
-     * queue backwards with the descending ranges, without rescanning either.
-     * Complete validation above remains separate from all mutations. */
+     * queue backwards with the descending ranges, without rescanning either. */
     uint32_t now = transport_now(ctx);
-    ranges.index = 0U;
-    ranges.next_high = ranges.view.largest_ack;
-    bool has_range = ack_ranges_next(&ranges, &low, &high) == XGL_OK;
+    uint32_t low, high;
+    bool has_range = ack_ranges_next(ranges, &low, &high) == XGL_OK;
     xgl_list_node_t* node = peer->reliable_queue.wait_ack_list.tail;
     while (node != NULL && has_range) {
         xgl_list_node_t* previous = node->prev;
@@ -155,7 +160,7 @@ static xgl_error_t transport_process_ack_range(xgl_transport_ctx_t* ctx,
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
         while (has_range && packet->packet_number < low) {
-            has_range = ack_ranges_next(&ranges, &low, &high) == XGL_OK;
+            has_range = ack_ranges_next(ranges, &low, &high) == XGL_OK;
         }
         if (has_range && packet->packet_number <= high) {
             transport_acknowledge_packet(ctx, peer, packet, now);
@@ -164,7 +169,6 @@ static xgl_error_t transport_process_ack_range(xgl_transport_ctx_t* ctx,
     }
     (void)xgl_window_advance_base_packet_number(&peer->tx_window);
     peer->last_active_ms = now;
-    return XGL_OK;
 }
 
 static bool transport_sack_bit_is_set(const uint8_t* bitmap, size_t bit_index) {
@@ -183,52 +187,56 @@ static void transport_schedule_fast_retry(xgl_reliable_packet_t* packet) {
     }
 }
 
-static xgl_error_t transport_process_sack_value(
-    xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
-    uint16_t source_id, const uint8_t* value, size_t value_len) {
-    if (ctx == NULL || peer == NULL || value == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    xgl_wire_sack_view_t view;
-    xgl_error_t err = xgl_wire_decode_sack_view(value, value_len, &view);
+static xgl_error_t ack_sack_validate(ack_sack_t* sack,
+                                     const xgl_wire_ext_t* ext,
+                                     uint32_t next_packet_number) {
+    xgl_wire_sack_view_t* view = &sack->view;
+    xgl_error_t err = xgl_wire_decode_sack_view(ext->value, ext->len, view);
     if (err != XGL_OK) {
         return err;
     }
     /* Preserve the receive bound formerly imposed by the copied bitmap. */
-    if (view.bitmap_len > 64U) {
+    if (view->bitmap_len > 64U) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-    if (view.bitmap_len == 0U) {
+    if (view->bitmap_len == 0U) {
         return XGL_ERR_INVALID_FRAME;
     }
 
-    size_t remaining = view.bitmap_len;
-    while (remaining > 0U && view.bitmap[remaining - 1U] == 0U) {
+    size_t remaining = view->bitmap_len;
+    while (remaining > 0U && view->bitmap[remaining - 1U] == 0U) {
         --remaining;
     }
-    const bool has_set = remaining != 0U;
-    size_t highest_set = 0U;
-    if (has_set) {
-        highest_set = (remaining - 1U) * 8U;
-        uint8_t byte = view.bitmap[remaining - 1U];
+    sack->has_set = remaining != 0U;
+    sack->highest_set = 0U;
+    if (sack->has_set) {
+        sack->highest_set = (remaining - 1U) * 8U;
+        uint8_t byte = view->bitmap[remaining - 1U];
         while (byte > 1U) {
             byte >>= 1U;
-            highest_set++;
+            sack->highest_set++;
         }
     }
     /* Validate the complete claimed range before acknowledgements or retries.
      */
-    if (view.base_packet >= peer->tx_window.next_packet_number ||
-        (has_set && highest_set >= peer->tx_window.next_packet_number -
-                                       view.base_packet)) {
+    if (view->base_packet >= next_packet_number ||
+        (sack->has_set &&
+         sack->highest_set >= next_packet_number - view->base_packet)) {
         return XGL_ERR_SEQUENCE_ERROR;
     }
-    if (!has_set) {
+    return XGL_OK;
+}
+
+/** \brief           Apply a fully validated bitmap to its owning peer. */
+static void transport_apply_sack(xgl_transport_ctx_t* ctx,
+                                 xgl_transport_peer_state_t* peer,
+                                 const ack_sack_t* sack) {
+    const uint32_t base_packet = sack->view.base_packet;
+    if (!sack->has_set) {
         xgl_reliable_packet_t* missing = xgl_reliable_find_packet_number(
-            &peer->reliable_queue, view.base_packet, source_id);
+            &peer->reliable_queue, base_packet, peer->peer_id);
         transport_schedule_fast_retry(missing);
-        return XGL_OK;
+        return;
     }
 
     uint32_t now = transport_now(ctx);
@@ -240,10 +248,10 @@ static xgl_error_t transport_process_sack_value(
         xgl_reliable_packet_t* packet =
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        if (packet->packet_number >= view.base_packet) {
-            size_t bit = packet->packet_number - view.base_packet;
-            if (bit <= highest_set &&
-                transport_sack_bit_is_set(view.bitmap, bit)) {
+        if (packet->packet_number >= base_packet) {
+            size_t bit = packet->packet_number - base_packet;
+            if (bit <= sack->highest_set &&
+                transport_sack_bit_is_set(sack->view.bitmap, bit)) {
                 transport_acknowledge_packet(ctx, peer, packet, now);
             }
         }
@@ -255,14 +263,12 @@ static xgl_error_t transport_process_sack_value(
         xgl_reliable_packet_t* packet =
             /* NOLINTNEXTLINE(bugprone-casting-through-void) */
             XGL_LIST_ENTRY(node, xgl_reliable_packet_t, node);
-        if (packet->target_id == source_id &&
-            packet->packet_number >= view.base_packet &&
-            packet->packet_number - view.base_packet <= highest_set) {
+        if (packet->target_id == peer->peer_id &&
+            packet->packet_number >= base_packet &&
+            packet->packet_number - base_packet <= sack->highest_set) {
             transport_schedule_fast_retry(packet);
         }
     }
-
-    return XGL_OK;
 }
 
 /**
@@ -276,7 +282,6 @@ static xgl_error_t transport_process_sack_value(
 xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
                                          xgl_handle_t handle,
                                          const xgl_packet_t* packet) {
-    (void)handle;
     if (packet->packet_type != XGL_PACKET_TYPE_ACK) {
         return XGL_ERR_INVALID_FRAME;
     }
@@ -322,21 +327,32 @@ xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
         return XGL_ERR_INVALID_FRAME;
     }
 
+    union {
+        ack_ranges_t ranges;
+        ack_sack_t sack;
+    } feedback;
+
+    const bool is_range = acknowledgement.type == XGL_WIRE_EXT_ACK_RANGE;
+    const uint32_t next_packet_number = peer->tx_window.next_packet_number;
+    validation = is_range
+                     ? ack_ranges_validate(&feedback.ranges, &acknowledgement,
+                                           next_packet_number)
+                     : ack_sack_validate(&feedback.sack, &acknowledgement,
+                                         next_packet_number);
+    if (validation != XGL_OK) {
+        return validation;
+    }
 #if XGL_FEATURE_ADVANCED_RUNTIME
     if (transport_expire_tx(ctx, handle, peer)) {
         return XGL_ERR_TIMEOUT;
     }
+#else
+    (void)handle;
 #endif
-    xgl_error_t err;
-    if (acknowledgement.type == XGL_WIRE_EXT_ACK_RANGE) {
-        err = transport_process_ack_range(ctx, peer, &acknowledgement);
+    if (is_range) {
+        transport_apply_ack_ranges(ctx, peer, &feedback.ranges);
     } else {
-        err = transport_process_sack_value(ctx, peer, packet->source_id,
-                                           acknowledgement.value,
-                                           acknowledgement.len);
-    }
-    if (err != XGL_OK) {
-        return err;
+        transport_apply_sack(ctx, peer, &feedback.sack);
     }
 #if XGL_FEATURE_ADVANCED_RUNTIME
     transport_notify_tx_drained(ctx, handle, peer);

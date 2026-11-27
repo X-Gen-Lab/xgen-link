@@ -22,7 +22,7 @@ This map identifies protocol owners. Public applications include `<xgl/xgl.h>`; 
 
 ## Internal Interfaces
 
-`xgl_protocol_io.h` defines four directional endpoints: packet TX/RX and frame TX/RX. Each stores only a context and its corresponding callback. Transport provides packet RX, network provides packet TX and frame RX, and datalink provides frame TX. The instance binds them statically. A TX endpoint cannot contain a receive callback, and layers need no access to the private instance layout.
+`xgl_protocol_io.h` defines four directional endpoints for packet and frame TX/RX. Transport provides packet RX, Network provides packet TX and frame RX, and Datalink provides frame TX. The instance binds them statically. Packet TX also provides a read-only check of the feedback egress. The typed endpoints pass borrowed data synchronously.
 
 `xgl_packet.h` contains borrowed protocol views. `xgl_protocol_memory.h` describes resource-class services without implementing an allocator. Peers, pending acknowledgements, payloads and encoding scratch retain separate capacities and lifetimes. Sharing an allocator interface does not justify merging their budgets or adding an implicit shared heap fallback.
 

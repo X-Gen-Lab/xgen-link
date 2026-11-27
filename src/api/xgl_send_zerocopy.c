@@ -20,9 +20,9 @@ static xgl_error_t send_zerocopy_scope(xgl_handle_t handle,
     if (error != XGL_OK) {
         return error;
     }
-    error = transport_check_data_tx_policy(&handle->layers.transport_ctx,
-                                           data->target_id, connection_id,
-                                           session_epoch, data->data_len);
+    error = transport_prepare_data_tx(&handle->layers.transport_ctx, handle,
+                                      data->target_id, connection_id,
+                                      session_epoch, data->data_len);
     if (error != XGL_OK) {
         return error;
     }

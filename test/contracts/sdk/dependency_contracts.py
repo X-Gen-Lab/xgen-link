@@ -105,17 +105,18 @@ class StandaloneContracts(unittest.TestCase):
         executable = binary / name
         self.run_command(executable if executable.is_file() else executable.with_suffix(".exe"))
 
-    def new_consumer(self, name, language, selection, *, include_consumer=True):
+    def new_consumer(self, name, language, selection, *, include_consumer=True, source_build=False):
         source = self.work / name
         source.mkdir()
         suffix = "c" if language == "C" else "cpp"
+        languages = "C CXX" if source_build and language == "CXX" else language
         fixture = f"consumer.{suffix}"
         shutil.copyfile(FIXTURES / "consumer.c", source / fixture)
         shutil.copyfile(FIXTURES / "VerifySdkPrefix.cmake",
                         source / "VerifySdkPrefix.cmake")
         (source / "CMakeLists.txt").write_text(
             "cmake_minimum_required(VERSION 3.24)\n"
-            f"project(xgl_consumer {language})\n"
+            f"project(xgl_consumer {languages})\n"
             "set(CMAKE_C_STANDARD 11)\nset(CMAKE_C_STANDARD_REQUIRED ON)\n"
             "set(CMAKE_C_EXTENSIONS OFF)\n"
             "set(CMAKE_CXX_STANDARD 17)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n"
@@ -129,6 +130,9 @@ class StandaloneContracts(unittest.TestCase):
              'target_link_libraries(consumer PRIVATE xgl::xgl)\n'
              'if(FORCE_STALE_HEADER_ABI)\n'
              '  target_compile_definitions(consumer PRIVATE XGL_CONFIG_ABI_VERSION=3)\nendif()\n'
+             'if(DEFINED FORCE_FRAME_CEILING)\n'
+             '  target_compile_definitions(consumer PRIVATE '
+             'XGL_DATALINK_MAX_FRAME_SIZE=${FORCE_FRAME_CEILING})\nendif()\n'
              'if(FORCE_STALE_TARGET_ABI)\n'
              '  add_library(legacy_abi INTERFACE)\n'
              '  set_property(TARGET legacy_abi PROPERTY INTERFACE_XGL_CONFIG_ABI_VERSION 3)\n'
@@ -138,8 +142,7 @@ class StandaloneContracts(unittest.TestCase):
         return source
 
     def test_subdirectory_defaults_do_not_add_developer_targets(self):
-        source = self.new_consumer(
-            "parent", "C",
+        integration = (
             'add_library(xgs::status INTERFACE IMPORTED)\n'
             'add_library(xgm::allocator INTERFACE IMPORTED)\n'
             f'add_subdirectory("{ARGS.link_source.as_posix()}" production)\n'
@@ -149,10 +152,62 @@ class StandaloneContracts(unittest.TestCase):
             '    message(FATAL_ERROR "Unexpected developer target: ${target}")\n'
             '  endif()\n'
             'endforeach()')
-        binary = self.work / "parent-build"
-        self.configure(source, binary, "-DCMAKE_CXX_COMPILER=unavailable")
-        self.build(binary)
-        self.executable(binary, "consumer")
+        for language in ("C", "CXX"):
+            with self.subTest(language=language):
+                source = self.new_consumer(f"parent-{language}", language, integration,
+                                           source_build=True)
+                binary = self.work / f"parent-{language}-build"
+                options = ("-DCMAKE_CXX_COMPILER=unavailable",) if language == "C" else ()
+                self.configure(source, binary, *options)
+                self.build(binary)
+                self.executable(binary, "consumer")
+
+    def test_compiled_frame_ceiling_identifies_the_sdk(self):
+        for value in ("63", "2049", "064", "invalid"):
+            with self.subTest(invalid=value):
+                result = self.configure(ARGS.link_source, self.work / f"invalid-ceiling-{value}",
+                                        f"-DXGL_DATALINK_MAX_FRAME_SIZE={value}", succeeds=False)
+                self.assertIn("XGL_DATALINK_MAX_FRAME_SIZE must be a decimal integer", result)
+
+        build_ids = set()
+        resource_ids = set()
+        for value in (2048, 512, 64):
+            with self.subTest(ceiling=value):
+                binary = self.work / f"ceiling-{value}"
+                self.configure(ARGS.link_source, binary, "-DXGL_PROFILE=full",
+                               f"-DXGL_DATALINK_MAX_FRAME_SIZE={value}")
+                self.build(binary)
+                prefix = self.work / f"ceiling-{value}-sdk"
+                self.run_command("cmake", "--install", binary, "--prefix", prefix)
+                header = (prefix / "include/xgl/xgl_build_config.h").read_text(encoding="utf-8")
+                self.assertIn(f"#define XGL_DATALINK_MAX_FRAME_SIZE {value}U\n", header)
+                for macro, values in (("XGL_BUILD_CONFIG_ID", build_ids),
+                                      ("XGL_RESOURCE_CONFIG_ID", resource_ids)):
+                    definition = next(line for line in header.splitlines()
+                                      if line.startswith(f"#define {macro} "))
+                    identity = int(definition.split()[-1].rstrip("U"))
+                    self.assertNotIn(identity, values)
+                    values.add(identity)
+                    if value == 2048:
+                        self.assertEqual(identity, 303 if macro == "XGL_BUILD_CONFIG_ID" else 8043)
+                consumer = self.new_consumer(
+                    f"ceiling-{value}-consumer", "C",
+                    'find_package(xgl 4 CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+                    + VERIFY_PREFIX
+                    + 'get_target_property(ceiling xgl::xgl XGL_DATALINK_MAX_FRAME_SIZE)\n'
+                      'if(NOT ceiling STREQUAL xgl_DATALINK_MAX_FRAME_SIZE OR\n'
+                      '    NOT ceiling STREQUAL EXPECTED_CEILING)\n'
+                      '  message(FATAL_ERROR "Package has the wrong frame ceiling")\nendif()\n')
+                installed = self.work / f"ceiling-{value}-consumer-build"
+                options = (f"-DXGL_SDK_PREFIX={prefix.as_posix()}", f"-DEXPECTED_CEILING={value}")
+                self.configure(consumer, installed, *options, f"-DFORCE_FRAME_CEILING={value}")
+                self.build(installed)
+                self.executable(installed, "consumer")
+                if value == 512:
+                    conflict = self.work / "consumer-ceiling-conflict"
+                    self.configure(consumer, conflict, *options, "-DFORCE_FRAME_CEILING=2048")
+                    self.assertIn("XGL_DATALINK_MAX_FRAME_SIZE conflicts",
+                                  self.build(conflict, succeeds=False))
 
     def test_offline_source_and_relocated_sdk_reject_foreign_abi(self):
         if ARGS.deny_network:
@@ -195,6 +250,9 @@ for family in (socket.AF_INET, socket.AF_INET6):
 
         boot = f'-DBOOT_PREFIX={prefixes["boot"].as_posix()}'
         full = f'-DFULL_PREFIX={prefixes["full"].as_posix()}'
+        other_prefix = self.work / "same-identity-full"
+        shutil.copytree(prefixes["full"], other_prefix)
+        other_full = f"-DOTHER_FULL_PREFIX={other_prefix.as_posix()}"
         cases = (
             (
                 "required-then-full",
@@ -230,13 +288,34 @@ for family in (socket.AF_INET, socket.AF_INET6):
                 '    PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n',
                 "xgl::xgl conflicts with the requested SDK resource identity",
             ),
+            (
+                "same-prefix-again",
+                'find_package(xgl 4 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
+                'find_package(xgl 4 CONFIG REQUIRED COMPONENTS wire reliable\n'
+                '    PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
+                'set(XGL_SDK_PREFIX "${FULL_PREFIX}")\n' + VERIFY_PREFIX,
+                None,
+            ),
+            (
+                "later-different-prefix",
+                'find_package(xgl 4 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
+                'unset(xgl_DIR CACHE)\n'
+                'find_package(xgl 4 CONFIG REQUIRED PATHS "${OTHER_FULL_PREFIX}" NO_DEFAULT_PATH)\n',
+                "xgl::xgl already comes from another SDK configuration",
+            ),
+            (
+                "later-lookup-after-source",
+                f'add_subdirectory("{ARGS.link_source.as_posix()}" production)\n'
+                'find_package(xgl 4 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n',
+                "xgl::xgl already comes from a source build or an untracked package",
+            ),
         )
         for name, selection, diagnostic in cases:
             with self.subTest(component_selection=name):
                 consumer = self.new_consumer(
                     name, "C", selection, include_consumer=diagnostic is None)
                 binary = self.work / (name + "-build")
-                output = self.configure(consumer, binary, boot, full,
+                output = self.configure(consumer, binary, boot, full, other_full,
                                         succeeds=diagnostic is None)
                 if diagnostic is None:
                     self.build(binary)

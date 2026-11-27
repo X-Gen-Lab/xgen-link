@@ -1,6 +1,8 @@
 # Fixed-block file transfer
 
-Transfer a 1024-byte in-memory file in sixteen reliable 64-byte application blocks.
+Transfer a 1024-byte in-memory file in sixteen reliable 64-byte application
+blocks with the default build. With a smaller compiled frame ceiling, the
+example uses 32-byte blocks if a 64-byte block cannot fit in one frame.
 
 This is a deterministic host simulation using wire v3. The nodes, configuration,
 routes, PHY descriptors, application contexts, and static workspaces remain at
@@ -23,9 +25,8 @@ execution context. The loop passes an explicit `uint32_t` millisecond clock to
 The sender submits the next block when its one-packet transport window is free.
 `XGL_OK` from send means the protocol owns a retransmission copy and accepted the
 submission; it does not prove peer receipt. The receiver copies each accepted
-ordered block into bounded storage. The program checks all received bytes and
-prints the core CRC16/MODBUS result. CRC is an accidental-corruption check, not
-an authentication mechanism.
+ordered block into bounded storage. The example uses the public SDK. It checks
+the received length, compares every byte with the source and prints the result.
 
 This example intentionally uses application block boundaries and does not need
 protocol fragmentation. See `../boot_update` for delayed Flash acceptance,

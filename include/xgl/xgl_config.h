@@ -17,9 +17,4 @@
     "Configure XGL_DATALINK_RX_CHUNK_SIZE through CMake, not a consumer macro"
 #endif
 
-/** \brief           Absolute accepted serialized frame size, including CRC. */
-#ifndef XGL_DATALINK_MAX_FRAME_SIZE
-#define XGL_DATALINK_MAX_FRAME_SIZE 2048U
-#endif
-
 #endif /* XGL_CONFIG_H */

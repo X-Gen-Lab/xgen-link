@@ -142,6 +142,14 @@ static size_t security_find_index(const xgl_security_ctx_t* ctx,
     return XGL_SECURITY_SESSION_CAPACITY;
 }
 
+bool xgl_security_session_is_active(const xgl_security_ctx_t* ctx,
+                                    uint16_t remote_id, uint32_t connection_id,
+                                    uint32_t session_epoch) {
+    const size_t index =
+        security_find_index(ctx, remote_id, connection_id, session_epoch);
+    return index < XGL_SECURITY_SESSION_CAPACITY && ctx->sessions[index].active;
+}
+
 /** \brief           Find mutable state for an exact installed association. */
 static xgl_security_session_t* security_find(xgl_security_ctx_t* ctx,
                                              uint16_t remote_id,

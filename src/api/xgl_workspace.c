@@ -27,6 +27,16 @@ typedef struct {
     xgl_memory_requirements_t requirements;
 } xgl_workspace_plan_t;
 
+/* Keep the checked entry points in agreement on the consumer's ABI identity. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+static bool config_abi_matches(size_t config_size, uint32_t abi_version,
+                               uint32_t build_config_id) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    return config_size == sizeof(xgl_config_t) &&
+           abi_version == XGL_CONFIG_ABI_VERSION &&
+           build_config_id == XGL_BUILD_CONFIG_ID;
+}
+
 /**
  * \brief           Add protocol partition sizes without unsigned overflow
  */
@@ -145,10 +155,7 @@ static bool plan_optional_resources(const xgl_config_t* config,
         const size_t slots = config->features.max_reassembly_slots;
         const size_t message_size = config->features.max_message_size;
         size_t retained;
-        if (message_size == 0U || slots == 0U ||
-            config->features.max_reassembly_bytes == 0U ||
-            config->features.max_tx_message_bytes == 0U ||
-            !add_size(slots, peers, &retained) ||
+        if (!add_size(slots, peers, &retained) ||
             !set_resource(plan, XGL_RESOURCE_TX_EXTENSIONS,
                           XGL_FRAGMENT_EXT_SIZE,
                           config->features.max_tx_packets) ||
@@ -174,10 +181,6 @@ static xgl_error_t make_plan(const xgl_config_t* config,
     xgl_error_t error = xgl_config_validate(config);
     if (error != XGL_OK) {
         return error;
-    }
-    if (config->features.max_peers == 0U ||
-        config->features.max_tx_packets == 0U) {
-        return XGL_ERR_INVALID_PARAM;
     }
     memset(plan, 0, sizeof(*plan));
     if (!plan_initialization(config, plan) ||
@@ -230,9 +233,7 @@ xgl_error_t
 xgl_memory_requirements_checked(const xgl_config_t* config, size_t config_size,
                                 uint32_t abi_version, uint32_t build_config_id,
                                 xgl_memory_requirements_t* requirements) {
-    if (config_size != sizeof(xgl_config_t) ||
-        abi_version != XGL_CONFIG_ABI_VERSION ||
-        build_config_id != XGL_BUILD_CONFIG_ID) {
+    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
         return XGL_ERR_INVALID_VERSION;
     }
     if (requirements == NULL) {
@@ -261,9 +262,8 @@ xgl_error_t xgl_options_validate(const xgl_config_t* config,
         return XGL_ERR_NULL_POINTER;
     }
     if (options->size != sizeof(*options) || options->version != 1U ||
-        options->config_size != sizeof(*config) ||
-        options->config_abi != XGL_CONFIG_ABI_VERSION ||
-        options->build_config_id != XGL_BUILD_CONFIG_ID) {
+        !config_abi_matches(options->config_size, options->config_abi,
+                            options->build_config_id)) {
         return XGL_ERR_INVALID_VERSION;
     }
 #if XGL_FEATURE_ADVANCED_RUNTIME
@@ -382,9 +382,7 @@ xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
                                       size_t config_size, uint32_t abi_version,
                                       uint32_t build_config_id,
                                       xgl_memory_report_t* report) {
-    if (config_size != sizeof(xgl_config_t) ||
-        abi_version != XGL_CONFIG_ABI_VERSION ||
-        build_config_id != XGL_BUILD_CONFIG_ID) {
+    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
         return XGL_ERR_INVALID_VERSION;
     }
     if (report == NULL) {
@@ -447,6 +445,62 @@ static xgl_error_t prepare_storage(const xgl_config_t* config,
     return XGL_OK;
 }
 
+/** \brief           Reserve and prepare one workspace from the same plan. */
+static xgl_error_t reserve_storage(const xgl_config_t* config,
+                                   const xgl_workspace_plan_t* plan,
+                                   xgl_handle_t* handle) {
+    const xgl_allocator_t* allocator = config->memory.allocator;
+#if XGL_ALLOW_FALLBACK_MALLOC
+    if (allocator == NULL) {
+        allocator = xgl_allocator_libc();
+    }
+#endif
+    if (!xgl_allocator_is_valid(allocator)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    void* storage = xgl_alloc(allocator, plan->requirements.size);
+    if (storage == NULL) {
+        return XGL_ERR_NO_MEMORY;
+    }
+    xgl_error_t error = prepare_storage(
+        config, plan, storage, plan->requirements.size, allocator, handle);
+    if (error != XGL_OK) {
+        xgl_free(allocator, storage);
+    }
+    return error;
+}
+
+/** \brief           Reserve one workspace through the selected backend. */
+xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
+                                          size_t config_size,
+                                          uint32_t abi_version,
+                                          uint32_t build_config_id,
+                                          xgl_handle_t* handle) {
+    if (handle == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *handle = NULL;
+    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
+        return XGL_ERR_INVALID_VERSION;
+    }
+    xgl_workspace_plan_t plan;
+    xgl_error_t error = make_plan(config, &plan);
+    if (error != XGL_OK) {
+        return error;
+    }
+    return reserve_storage(config, &plan, handle);
+}
+
+/** \brief           Preserve the legacy pointer-only reservation result. */
+xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
+                                uint32_t abi_version,
+                                uint32_t build_config_id) {
+    xgl_handle_t handle;
+    (void)xgl_create_with_error_checked(config, config_size, abi_version,
+                                        build_config_id, &handle);
+    return handle;
+}
+
 /**
  * \brief           Prepare bounded pools and an uninitialized protocol instance
  * \param[in]       config: Immutable configuration borrowed until destruction
@@ -488,9 +542,7 @@ xgl_error_t xgl_init_static_checked(const xgl_config_t* config,
         return XGL_ERR_NULL_POINTER;
     }
     *handle = NULL;
-    if (config_size != sizeof(xgl_config_t) ||
-        abi_version != XGL_CONFIG_ABI_VERSION ||
-        build_config_id != XGL_BUILD_CONFIG_ID) {
+    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
         return XGL_ERR_INVALID_VERSION;
     }
     xgl_handle_t prepared;
@@ -538,24 +590,8 @@ xgl_error_t xgl_create_with_options(const xgl_config_t* config,
     if (error != XGL_OK) {
         return error;
     }
-    const xgl_allocator_t* allocator = config->memory.allocator;
-#if XGL_ALLOW_FALLBACK_MALLOC
-    if (allocator == NULL) {
-        allocator = xgl_allocator_libc();
-    }
-#endif
-    if (!xgl_allocator_is_valid(allocator)) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-    void* storage = xgl_alloc(allocator, plan.requirements.size);
-    if (storage == NULL) {
-        return XGL_ERR_NO_MEMORY;
-    }
-    error = prepare_storage(config, &plan, storage, plan.requirements.size,
-                            allocator, handle);
-    if (error != XGL_OK) {
-        xgl_free(allocator, storage);
-    } else {
+    error = reserve_storage(config, &plan, handle);
+    if (error == XGL_OK) {
         (*handle)->options = options;
     }
     return error;

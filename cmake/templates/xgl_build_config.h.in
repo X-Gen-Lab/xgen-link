@@ -23,6 +23,16 @@
 #error "xgl headers and target have different compiled resource identities"
 #endif
 #define XGL_BUILD_RX_CHUNK_SIZE @XGL_BUILD_RX_CHUNK_SIZE@U
+
+#if defined(XGL_DATALINK_MAX_FRAME_SIZE) && \
+    XGL_DATALINK_MAX_FRAME_SIZE != @XGL_DATALINK_MAX_FRAME_SIZE@U
+#error "XGL_DATALINK_MAX_FRAME_SIZE conflicts with the compiled protocol"
+#endif
+#ifndef XGL_DATALINK_MAX_FRAME_SIZE
+/** \brief Largest complete serialized frame, including its CRC, in bytes. */
+#define XGL_DATALINK_MAX_FRAME_SIZE @XGL_DATALINK_MAX_FRAME_SIZE@U
+#endif
+
 #if defined(XGL_CONFIG_ABI_VERSION) && XGL_CONFIG_ABI_VERSION != @XGL_CONFIG_ABI_VERSION@U
 #error "XGL_CONFIG_ABI_VERSION conflicts with the compiled protocol"
 #endif

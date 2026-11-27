@@ -28,6 +28,8 @@ Select the temporary PHY read chunk through CMake `XGL_DATALINK_RX_CHUNK_SIZE`: 
 
 The effective frame must fit the configured protocol limit and route MTU, including the 24-byte base header, extensions, payload, authentication tag if enabled, and 2-byte CRC. `memory.rx_buffer_size` must be at least `protocol.max_frame_size`.
 
+The producer CMake option `XGL_DATALINK_MAX_FRAME_SIZE` selects a ceiling of 64–2048 bytes, defaulting to 2048. The instance MTU must be between 64 bytes and that ceiling. A route may declare a larger physical MTU. Both limits apply on send. `xgl_config_get_default()` fits its default MTU to the ceiling. After choosing a named preset, check and adjust `protocol.max_frame_size` for the build. Setting the RX storage to the same MTU avoids extra reservation. For reliable traffic, also check the [reverse feedback budget](../reference/protocol/v3/routing.md).
+
 ## Explicit Capacities
 
 | Configuration field | Bound |

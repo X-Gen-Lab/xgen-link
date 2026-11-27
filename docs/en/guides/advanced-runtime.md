@@ -33,6 +33,8 @@ Nonzero intervals must be below `2^31` ms. The TX busy period starts when the fi
 
 A scope with an expired TX busy period terminates before new DATA delivery; receiving before maintenance cannot extend its lifetime. Reassembly time starts at the first admitted fragment, including a cached and SACKed out-of-order fragment. Filling an earlier packet gap, entering reassembly, duplicates and later fragments do not restart it. Expired reliable fragments fail their scope; unreliable expiry releases only the corresponding message.
 
+Ordinary and in-place sends check the busy period before submission. After semantic validation, a valid ACK checks expiry before applying feedback. The layout query prepares buffer space. The actual send checks the deadline again.
+
 Protocol drain does not prove remote motor execution, Flash persistence or business success. Use a request ID and application response where business confirmation is required. Closing a peer is a local lifecycle operation; remote notification, reset and retry policy belong to the application.
 
 A scoped receive callback can return BUSY. A completed message retains its connection/epoch until the owner retries after capacity returns. The application needs a wakeup mechanism; protocol timers cannot detect changing application capacity. All callbacks are synchronous and must not reenter or destroy the instance.

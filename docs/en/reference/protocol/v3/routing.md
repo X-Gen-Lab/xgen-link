@@ -18,7 +18,7 @@ Packet identity is separate from egress selection. Private route updates do not 
 
 ## Forwarding
 
-Forwarding is compiled out of Boot. An enabled forwarder validates the complete frame, requires a destination route, checks the outgoing full-frame MTU and rejects TTL values that cannot survive another hop. It obtains bounded scratch, decrements TTL, rewrites the header CRC and final CRC, then synchronously transmits the frame.
+Embedded and Full support forwarding. A forwarder validates the complete frame, requires a destination route, checks the outgoing full-frame MTU and rejects TTL values that cannot survive another hop. It obtains bounded scratch, decrements TTL, rewrites the header CRC and final CRC, then synchronously transmits the frame.
 
 The end-to-end authentication tag and authenticated payload remain unchanged. TTL and header CRC are canonicalized out of AAD; forwarding does not install local trust or claim that the destination tag was verified. A locally addressed authenticated frame is verified before transport delivery.
 
@@ -27,6 +27,8 @@ The normal datalink-to-network endpoint requires a validated borrowed view and h
 Failed lower-layer submission preserves its original error, such as `XGL_ERR_BUSY`, and releases scratch. The relay does not promise queuing or automatic retry; endpoint transport owns reliability. The return value is authoritative for the operation. Error callbacks report selected events and do not cover every error return.
 
 Relays do not refragment or negotiate path MTU. Senders must respect the path bottleneck. Reliable A-to-B-to-C delivery also needs a route at C with destination A and egress through B for the ACK; a route only to neighbor B is insufficient. RX views carry no ingress PHY, and destination lookup is not source authorization.
+
+Before delivering or retaining reliable local DATA, the receiver checks its reverse egress and feedback frame budget. A missing route returns `XGL_ERR_ROUTE_NOT_FOUND`. Insufficient egress capacity returns `XGL_ERR_BUFFER_TOO_SMALL`. For authenticated feedback, the preflight checks the reverse session for an available security sequence and returns `XGL_ERR_SEQUENCE_ERROR` if it is exhausted. The check does not consume a sequence. The budget includes a nonzero epoch and the outgoing authentication tag. A single-range ACK with a nonzero epoch and a 16-byte tag needs 86 bytes. PHY backpressure after admission preserves receive history so retransmission can trigger feedback again. Validate every hop separately for forward DATA and reverse feedback.
 
 ## Broadcast and Reliability
 

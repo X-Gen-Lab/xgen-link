@@ -8,7 +8,7 @@ SDK 4 与 SDK 3 共用 wire v3。对端需使用同一线上版本。SDK 版本�
 
 ## 复现新旧端点
 
-仓库中的 `test/interop/README.md` 给出固定的 SDK 3 修订及依赖准备方式。`test/interop/interop_peer.c` 是两个端点共用的 C 夹具，分别链接已安装的 SDK 3 和当前生产库。`test/interop/test_wire_interop.py` 通过标准流转发实际帧。
+仓库中的 `test/interop/README.md` 给出固定的 SDK 3 修订及依赖准备方式。`test/interop/interop_peer.c` 是两个端点共用的 C 夹具。CI 分别链接已安装的 SDK 3 和当前安装 SDK，夹具也支持从当前源码构建。`test/interop/test_wire_interop.py` 通过标准流转发实际帧。
 
 从仓库根目录执行。独立夹具由 C11 工具链构建。以下命令分别用 `boot` 和 `full` 运行一次。
 

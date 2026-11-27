@@ -15,7 +15,7 @@ profile 定义编译能力上限，preset 在上限内提供显式运行容量�
 
 `XGL_TRANSPORT_WINDOW_CAPACITY` 可选 1、8、16、32、64、128，默认 128。`XGL_RELIABLE_INDEX_BUCKETS` 可选 1、2、4、8、16、32，按 profile 默认为 Boot 1、Embedded Lite 8、其余 32。`XGL_DATALINK_RX_CHUNK_SIZE` 可选 16、32、64、128 字节，默认 Boot 32、其余 128。自适应 RTO 默认开启；高级运行时默认关闭。
 
-生成头与安装目标记录 profile、资源组合和构建身份。消费时检查实际导出，避免用消费者宏覆盖已选择的资源。Boot 要求关闭 libc fallback。
+`XGL_DATALINK_MAX_FRAME_SIZE` 是生产者选择的完整帧上限，默认 2048 字节，可选 64–2048 字节。实例 MTU 必须适应该上限。生成头与安装目标记录 profile、资源组合和构建身份。消费时检查实际导出，避免用消费者宏覆盖已选择的资源。Boot 要求关闭 libc fallback。
 
 ## 运行容量
 

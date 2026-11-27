@@ -65,10 +65,16 @@ class ProfileBuilds(unittest.TestCase):
         return binary
 
     def test_examples_follow_compiled_forwarding_capability(self):
-        for profile, forwarding in (("boot", False), ("embedded-lite", False),
-                                    ("embedded", True), ("full", True)):
-            with self.subTest(profile=profile):
-                binary = self.configure("examples-" + profile, profile, examples=True)
+        for profile, forwarding, frame_size in (
+                ("boot", False, None), ("embedded-lite", False, None),
+                ("embedded", True, None), ("full", True, None), ("full", True, 64)):
+            with self.subTest(profile=profile, frame_size=frame_size):
+                name = f"examples-{profile}"
+                options = []
+                if frame_size is not None:
+                    name += f"-frame{frame_size}"
+                    options.append(f"-DXGL_DATALINK_MAX_FRAME_SIZE={frame_size}")
+                binary = self.configure(name, profile, *options, examples=True)
                 self.execute("cmake", "--build", binary, "--parallel", "2")
                 listing = json.loads(self.execute("ctest", "--test-dir", binary,
                                                  "--show-only=json-v1").stdout)

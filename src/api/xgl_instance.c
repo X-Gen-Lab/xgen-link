@@ -226,62 +226,6 @@ cleanup:
 }
 
 /**
- * \brief           Reserve one complete workspace through an explicit backend
- * \details         The immutable configuration is borrowed until destruction.
- *                  Protocol initialization is deferred to xgl_init().
- */
-xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
-                                          size_t config_size,
-                                          uint32_t abi_version,
-                                          uint32_t build_config_id,
-                                          xgl_handle_t* handle) {
-    if (handle == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    *handle = NULL;
-    xgl_memory_requirements_t requirements;
-    xgl_error_t err = xgl_memory_requirements_checked(
-        config, config_size, abi_version, build_config_id, &requirements);
-    if (err != XGL_OK) {
-        return err;
-    }
-
-    const xgl_allocator_t* allocator = config->memory.allocator;
-#if XGL_ALLOW_FALLBACK_MALLOC
-    if (allocator == NULL) {
-        allocator = xgl_allocator_libc();
-    }
-#endif
-    if (!xgl_allocator_is_valid(allocator)) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    void* storage = xgl_alloc(allocator, requirements.size);
-    if (storage == NULL) {
-        return XGL_ERR_NO_MEMORY;
-    }
-    err = xgl_workspace_prepare(config, storage, requirements.size, allocator,
-                                handle);
-    if (err != XGL_OK) {
-        xgl_free(allocator, storage);
-        return err;
-    }
-    return XGL_OK;
-}
-
-/**
- * \brief           Preserve the legacy pointer-only reservation result
- */
-xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
-                                uint32_t abi_version,
-                                uint32_t build_config_id) {
-    xgl_handle_t handle;
-    (void)xgl_create_with_error_checked(config, config_size, abi_version,
-                                        build_config_id, &handle);
-    return handle;
-}
-
-/**
  * \brief           Release protocol resources and an owned workspace exactly
  * once
  */

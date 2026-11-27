@@ -7,7 +7,7 @@ add_executable(echo_server
 )
 
 target_link_libraries(echo_server
-    PRIVATE xgl
+    PRIVATE xgl::xgl
 )
 
 if(XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE)

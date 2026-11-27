@@ -12,6 +12,7 @@ set(XGL_DEFAULT_WINDOW_CAPACITY 128)
 set(XGL_DEFAULT_FALLBACK_MALLOC 0)
 set(XGL_DEFAULT_ADAPTIVE_RTO 1)
 set(XGL_DEFAULT_ADVANCED_RUNTIME 0)
+set(XGL_DEFAULT_MAX_FRAME_SIZE 2048)
 if(XGL_PROFILE STREQUAL "boot")
     set(XGL_FEATURE_AUTH 0)
     set(XGL_FEATURE_ROUTE_INDEX 0)
@@ -73,6 +74,15 @@ xgl_resolve_capacity(XGL_RELIABLE_INDEX_BUCKETS XGL_RELIABLE_BUCKET_COUNT
 xgl_resolve_capacity(XGL_TRANSPORT_WINDOW_CAPACITY XGL_BUILD_WINDOW_CAPACITY
     "${XGL_DEFAULT_WINDOW_CAPACITY}" XGL_WINDOW_CAPACITIES "Compiled private window capacity")
 
+set(XGL_DATALINK_MAX_FRAME_SIZE "${XGL_DEFAULT_MAX_FRAME_SIZE}" CACHE STRING
+    "Maximum complete serialized frame size in bytes")
+if(NOT XGL_DATALINK_MAX_FRAME_SIZE MATCHES "^[1-9][0-9]*$" OR
+   XGL_DATALINK_MAX_FRAME_SIZE LESS 64 OR
+   XGL_DATALINK_MAX_FRAME_SIZE GREATER XGL_DEFAULT_MAX_FRAME_SIZE)
+    message(FATAL_ERROR
+        "XGL_DATALINK_MAX_FRAME_SIZE must be a decimal integer from 64 to ${XGL_DEFAULT_MAX_FRAME_SIZE}")
+endif()
+
 function(xgl_resolve_switch option_name resolved_name default_value description)
     option(${option_name} "${description}" "${default_value}")
     string(TOUPPER "${${option_name}}" selected)
@@ -121,6 +131,9 @@ function(xgl_finalize_build_config generated_dir)
     math(EXPR profile_code "${XGL_PROFILE_CONFIG_ID} - 300")
     math(EXPR XGL_RESOURCE_CONFIG_ID
         "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * (${heap_code} + 2 * ${XGL_FEATURE_ADVANCED_RUNTIME})))))")
+    # Preserve the existing low 14 bits and all identities at the default ceiling.
+    math(EXPR XGL_RESOURCE_CONFIG_ID
+        "${XGL_RESOURCE_CONFIG_ID} + 16384 * (${XGL_DEFAULT_MAX_FRAME_SIZE} - ${XGL_DATALINK_MAX_FRAME_SIZE})")
 
     set(XGL_BUILD_CONFIG_ID "${XGL_PROFILE_CONFIG_ID}")
     if(NOT (XGL_RELIABLE_BUCKET_COUNT EQUAL XGL_DEFAULT_BUCKET_COUNT AND
@@ -128,7 +141,8 @@ function(xgl_finalize_build_config generated_dir)
             XGL_FEATURE_ADAPTIVE_RTO EQUAL XGL_DEFAULT_ADAPTIVE_RTO AND
             XGL_BUILD_RX_CHUNK_SIZE EQUAL XGL_DEFAULT_RX_CHUNK_SIZE AND
             heap_code EQUAL XGL_DEFAULT_FALLBACK_MALLOC AND
-            XGL_FEATURE_ADVANCED_RUNTIME EQUAL XGL_DEFAULT_ADVANCED_RUNTIME))
+            XGL_FEATURE_ADVANCED_RUNTIME EQUAL XGL_DEFAULT_ADVANCED_RUNTIME AND
+            XGL_DATALINK_MAX_FRAME_SIZE EQUAL XGL_DEFAULT_MAX_FRAME_SIZE))
         math(EXPR XGL_BUILD_CONFIG_ID "65536 + ${XGL_RESOURCE_CONFIG_ID}")
     endif()
     configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/templates/xgl_build_config.h.in"

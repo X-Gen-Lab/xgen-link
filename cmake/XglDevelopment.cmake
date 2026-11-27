@@ -38,26 +38,48 @@ if(XGL_BUILD_STATIC_ANALYSIS_TARGET)
 endif()
 
 if(XGL_BUILD_SDK_CONSUMER_SMOKE)
+    # Select the active configuration without expanding flag contents into
+    # generator-expression syntax.
+    set(sdk_smoke_linker_flags
+        "$<TARGET_PROPERTY:xgl_sdk_consumer_smoke,XGL_LINKER_FLAGS>")
+    set(sdk_smoke_config_linker_flags
+        "$<TARGET_PROPERTY:xgl_sdk_consumer_smoke,XGL_LINKER_FLAGS_$<UPPER_CASE:$<CONFIG>>>")
     add_custom_target(xgl_sdk_consumer_smoke
         COMMAND ${CMAKE_COMMAND}
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
             -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke/$<CONFIG>
             -D XGL_BUILD_CONFIG=$<CONFIG>
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
+            "-DXGL_CONSUMER_LINKER_FLAGS=${sdk_smoke_linker_flags}"
+            "-DXGL_CONSUMER_CONFIG_LINKER_FLAGS=${sdk_smoke_config_linker_flags}"
             -P ${PROJECT_SOURCE_DIR}/test/contracts/sdk/sdk_consumer_smoke.cmake
         DEPENDS xgl
         COMMENT "Validating installed xgl CMake package with a consumer project"
         VERBATIM
     )
-endif()
+    set_property(TARGET xgl_sdk_consumer_smoke PROPERTY XGL_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS}")
+    get_property(sdk_smoke_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+    if(sdk_smoke_multi_config)
+        set(sdk_smoke_configurations ${CMAKE_CONFIGURATION_TYPES})
+    else()
+        set(sdk_smoke_configurations ${CMAKE_BUILD_TYPE})
+    endif()
+    foreach(configuration IN LISTS sdk_smoke_configurations)
+        string(TOUPPER "${configuration}" configuration_upper)
+        set_property(TARGET xgl_sdk_consumer_smoke
+            PROPERTY "XGL_LINKER_FLAGS_${configuration_upper}"
+            "${CMAKE_EXE_LINKER_FLAGS_${configuration_upper}}")
+    endforeach()
 
-if(XGL_BUILD_SDK_CONSUMER_SMOKE)
     add_test(NAME xgl_sdk_consumer_smoke
         COMMAND ${CMAKE_COMMAND}
             -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}
             -D XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest/$<CONFIG>
             -D XGL_BUILD_CONFIG=$<CONFIG>
             -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
+            "-DXGL_CONSUMER_LINKER_FLAGS=${sdk_smoke_linker_flags}"
+            "-DXGL_CONSUMER_CONFIG_LINKER_FLAGS=${sdk_smoke_config_linker_flags}"
             -P ${PROJECT_SOURCE_DIR}/test/contracts/sdk/sdk_consumer_smoke.cmake
     )
     set_tests_properties(xgl_sdk_consumer_smoke PROPERTIES

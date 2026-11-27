@@ -65,13 +65,15 @@ When `enable_fragmentation` is enabled, `max_message_size` limits the applicatio
 
 Fragmentation requires a supporting profile and explicit message/reassembly budgets. A reliable message can span more fragments than the window: one retained message per peer feeds the window as ACKs free packet slots. ACK reception releases those slots; the transport maintenance phase performs further DATA transmission. Temporary PHY/resource backpressure pauses the pump. Admission checks that every fragment fits the remaining usable DATA numbers. Do not resubmit a message merely because not all fragments were emitted synchronously.
 
-For reliable fragmented sends, `XGL_OK` means message admission. A later hard failure can be reported through the error callback, including during the initial call. Terminal failure releases retained work and fails that scope.
+For reliable fragmented sends, `XGL_OK` means local message admission. The protocol retains work and retries after temporary backpressure. A synchronous hard submission error is returned by `xgl_send_at()`. A hard error during later maintenance is returned by `xgl_step*()`. Either hard error fails the scope and releases its owned work. Fragments already accepted by the PHY may still arrive.
 
 Unreliable fragmentation sends fragments synchronously. An error can occur after earlier fragments have reached the PHY; retrying the entire application message is not transactional.
 
 ## Receive Admission and Callbacks
 
 Prefer `rx_accept_callback`: return `XGL_OK` after consuming or copying the payload, or `XGL_ERR_BUSY` for temporary backpressure. `rx_callback`, if used instead, cannot refuse delivery.
+
+Local DATA requires a receive callback. The Advanced scoped callback takes precedence, followed by the accept and legacy callbacks. With all three absent, `xgl_step*()` returns `XGL_ERR_UNSUPPORTED` for local DATA before retention or acknowledgement. A send-only endpoint can leave these callbacks empty and still process ACK and CONTROL. To accept and discard DATA, install an explicit acceptance callback.
 
 A reliable packet is ACKed only after application acceptance or admission into owned bounded receive storage. A completed fragmented message may therefore already be ACKed while waiting for the application; its bytes remain retained and charged to the RX budget. Keep stepping to retry delivery.
 

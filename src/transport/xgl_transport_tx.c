@@ -12,20 +12,34 @@
 #include <internal/xgl_diagnostics.h>
 #include <string.h>
 
-static uint16_t
-transport_effective_max_frame_size(const xgl_transport_ctx_t* ctx,
-                                   uint16_t target_id) {
-    uint16_t max_frame_size = ctx->max_frame_size;
+static bool transport_data_fits_message_limit(const xgl_transport_ctx_t* ctx,
+                                              size_t data_len) {
+#if XGL_FEATURE_FRAGMENTATION
+    return !ctx->enable_fragmentation || data_len <= ctx->max_message_size;
+#else
+    (void)ctx;
+    (void)data_len;
+    return true;
+#endif
+}
 
-    if (ctx->route_table != NULL) {
-        const xgl_route_item_t* route =
-            xgl_route_table_lookup(ctx->route_table, target_id);
-        if (route != NULL && route->max_frame_size < max_frame_size) {
-            max_frame_size = route->max_frame_size;
-        }
+static xgl_error_t
+transport_tx_scope_status(const xgl_transport_peer_state_t* peer) {
+    return peer != NULL && peer->failed ? XGL_ERR_ACK_TIMEOUT : XGL_OK;
+}
+
+static xgl_error_t
+transport_check_active_tx_scope(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
+                                xgl_transport_peer_state_t* peer) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (peer != NULL && transport_expire_tx(ctx, handle, peer)) {
+        return XGL_ERR_TIMEOUT;
     }
-
-    return max_frame_size;
+#else
+    (void)ctx;
+    (void)handle;
+#endif
+    return transport_tx_scope_status(peer);
 }
 
 /* Parameter order follows the documented protocol fields and units. */
@@ -36,16 +50,27 @@ xgl_error_t transport_check_data_tx_policy(const xgl_transport_ctx_t* ctx,
                                            uint32_t session_epoch,
                                            size_t data_len) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
-#if XGL_FEATURE_FRAGMENTATION
-    if (ctx->enable_fragmentation && data_len > ctx->max_message_size) {
+    if (!transport_data_fits_message_limit(ctx, data_len)) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-#else
-    (void)data_len;
-#endif
-    const xgl_transport_peer_state_t* peer =
-        transport_find_peer_scope(ctx, target_id, connection_id, session_epoch);
-    return peer != NULL && peer->failed ? XGL_ERR_ACK_TIMEOUT : XGL_OK;
+    return transport_tx_scope_status(transport_find_peer_scope(
+        ctx, target_id, connection_id, session_epoch));
+}
+
+/* Parameter order follows the documented protocol fields and units. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+xgl_error_t transport_prepare_data_tx(xgl_transport_ctx_t* ctx,
+                                      xgl_handle_t handle, uint16_t target_id,
+                                      uint32_t connection_id,
+                                      uint32_t session_epoch, size_t data_len) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    if (!transport_data_fits_message_limit(ctx, data_len)) {
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
+    return transport_check_active_tx_scope(
+        ctx, handle,
+        transport_find_peer_scope(ctx, target_id, connection_id,
+                                  session_epoch));
 }
 
 xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
@@ -56,13 +81,11 @@ xgl_error_t transport_build_send_plan(const xgl_transport_ctx_t* ctx,
     }
 
     memset(plan, 0, sizeof(*plan));
-    uint16_t max_frame_size =
-        transport_effective_max_frame_size(ctx, tx_data->target_id);
-    size_t app_extensions_len =
-        (tx_data->data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
-    if (tx_data->session_epoch != 0U) {
-        app_extensions_len += XGL_SESSION_EXT_SIZE;
-    }
+    const xgl_route_item_t* route =
+        xgl_route_table_lookup(ctx->route_table, tx_data->target_id);
+    size_t max_frame_size = xgl_route_frame_limit(route, ctx->max_frame_size);
+    size_t app_extensions_len = xgl_wire_packet_extension_size(
+        tx_data->data_type, tx_data->session_epoch);
 
     size_t base_budget = 0U;
     if (!xgl_frame_payload_budget(max_frame_size, 0U, ctx->auth_tag_len,
@@ -228,16 +251,9 @@ static xgl_error_t transport_prepare_reliable_send(
                                       tx_data->connection_id,
                                       tx_data->session_epoch);
     *created = false;
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    if (*peer != NULL && transport_expire_tx(ctx, handle, *peer)) {
-        return XGL_ERR_TIMEOUT;
-    }
-#else
-    (void)handle;
-#endif
-
-    if (*peer != NULL && (*peer)->failed) {
-        return XGL_ERR_ACK_TIMEOUT;
+    xgl_error_t status = transport_check_active_tx_scope(ctx, handle, *peer);
+    if (status != XGL_OK) {
+        return status;
     }
     if (!tx_data->reliable) {
         *peer = NULL;
@@ -325,12 +341,9 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_INVALID_PARAM;
     }
 
-#if XGL_FEATURE_FRAGMENTATION
-    if (ctx->enable_fragmentation &&
-        tx_data->data_len > ctx->max_message_size) {
+    if (!transport_data_fits_message_limit(ctx, tx_data->data_len)) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
-#endif
 
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         if (ctx->error_callback != NULL) {
