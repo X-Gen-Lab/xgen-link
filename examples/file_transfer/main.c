@@ -6,8 +6,13 @@
 #include <stdio.h>
 
 #include "../common/sim_link.h"
+
 #define FILE_BYTES  1024U
-#define BLOCK_BYTES 64U
+#define BLOCK_BYTES (SIM_TYPED_PAYLOAD_CAPACITY >= 64U ? 64U : 32U)
+
+_Static_assert(BLOCK_BYTES <= SIM_TYPED_PAYLOAD_CAPACITY &&
+                   FILE_BYTES % BLOCK_BYTES == 0U,
+               "The file must fit in whole single-frame blocks");
 
 typedef struct {
     uint8_t bytes[FILE_BYTES];

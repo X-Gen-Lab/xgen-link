@@ -11,10 +11,20 @@
 
 #include "../common/sim_link.h"
 
-#define IMAGE_BYTES       512U
-#define FLASH_BLOCK_BYTES 64U
-#define BLOCK_TYPE        7U
-#define COMMIT_TYPE       8U
+#define IMAGE_BYTES          512U
+#define FLASH_OFFSET_BYTES   4U
+#define FLASH_BLOCK_CAPACITY (SIM_TYPED_PAYLOAD_CAPACITY - FLASH_OFFSET_BYTES)
+#define FLASH_BLOCK_BYTES                                                      \
+    (FLASH_BLOCK_CAPACITY >= 64U   ? 64U                                       \
+     : FLASH_BLOCK_CAPACITY >= 32U ? 32U                                       \
+                                   : 16U)
+#define BLOCK_TYPE  7U
+#define COMMIT_TYPE 8U
+
+_Static_assert(FLASH_OFFSET_BYTES + FLASH_BLOCK_BYTES <=
+                       SIM_TYPED_PAYLOAD_CAPACITY &&
+                   IMAGE_BYTES % FLASH_BLOCK_BYTES == 0U,
+               "The image must fit in whole single-frame blocks");
 
 typedef struct {
     uint8_t flash[IMAGE_BYTES];
@@ -42,7 +52,7 @@ typedef struct {
  * \param[in]       handle: Callback instance, unused
  * \param[in]       source: Host identifier
  * \param[in]       type: Block message type
- * \param[in]       data: Little-endian offset followed by exactly 64 bytes
+ * \param[in]       data: Little-endian offset followed by one image block
  * \param[in]       length: Fixed block message length
  * \param[in,out]   context: Bounded Flash staging slot
  * \return          BUSY until the slot is available, OK after copying ownership
@@ -53,7 +63,7 @@ static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
     (void)handle;
     flash_app_t* app = context;
     if (source != 1U || type != BLOCK_TYPE ||
-        length != 4U + FLASH_BLOCK_BYTES) {
+        length != FLASH_OFFSET_BYTES + FLASH_BLOCK_BYTES) {
         return XGL_ERR_INVALID_PARAM;
     }
     if (app->staging || (int32_t)(app->now - app->ready_at) < 0) {
@@ -64,7 +74,7 @@ static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
     if (offset != app->committed || offset > IMAGE_BYTES - FLASH_BLOCK_BYTES) {
         return XGL_ERR_INVALID_PARAM;
     }
-    memcpy(app->staged, data + 4U, FLASH_BLOCK_BYTES);
+    memcpy(app->staged, data + FLASH_OFFSET_BYTES, FLASH_BLOCK_BYTES);
     app->staging = true;
     app->ready_at = app->now + 20U;
     if (!app->dropped_ack) {
@@ -202,9 +212,10 @@ int main(void) {
         /* At most one block is submitted until the device confirms Flash
          * commit. */
         if (submitted == host_app.confirmed && submitted < IMAGE_BYTES) {
-            uint8_t block[4U + FLASH_BLOCK_BYTES];
+            uint8_t block[FLASH_OFFSET_BYTES + FLASH_BLOCK_BYTES];
             xgl_serialize_u32_le(block, (uint32_t)submitted);
-            memcpy(block + 4U, image + submitted, FLASH_BLOCK_BYTES);
+            memcpy(block + FLASH_OFFSET_BYTES, image + submitted,
+                   FLASH_BLOCK_BYTES);
             const xgl_tx_data_t tx = {.target_id = 2U,
                                       .data_type = BLOCK_TYPE,
                                       .data = block,

@@ -1,6 +1,8 @@
 # Fixed-block file transfer
 
-Transfer a 1024-byte in-memory file in sixteen reliable 64-byte application blocks.
+Transfer a 1024-byte in-memory file in sixteen reliable 64-byte application
+blocks with the default build. With a smaller compiled frame ceiling, the
+example uses 32-byte blocks if a 64-byte block cannot fit in one frame.
 
 This is a deterministic host simulation using wire v3. The nodes, configuration,
 routes, PHY descriptors, application contexts, and static workspaces remain at

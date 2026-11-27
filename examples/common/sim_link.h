@@ -14,6 +14,14 @@
 #define SIM_CHANNEL_CAPACITY   2048U
 #define SIM_WORKSPACE_CAPACITY 16384U
 
+#define SIM_FRAME_SIZE                                                         \
+    (XGL_DATALINK_MAX_FRAME_SIZE < 128U ? XGL_DATALINK_MAX_FRAME_SIZE : 128U)
+
+/* Simulated DATA uses a nonzero type, epoch zero and no authentication. */
+#define SIM_TYPED_PAYLOAD_CAPACITY                                             \
+    (SIM_FRAME_SIZE - XGL_FRAME_HEADER_SIZE - XGL_DATA_TYPE_EXT_SIZE -         \
+     XGL_CRC16_SIZE)
+
 typedef struct {
     uint8_t bytes[SIM_CHANNEL_CAPACITY];
     size_t head;
@@ -94,8 +102,12 @@ static inline void sim_prepare(sim_node_t* node, uint16_t id) {
     xgl_config_t tiny = XGL_CONFIG_PRESET_TINY;
     node->config = tiny;
     node->config.source_id = id;
+    node->config.protocol.max_frame_size = SIM_FRAME_SIZE;
     node->config.protocol.window_size = 1U;
     node->config.protocol.ack_timeout_ms = 100U;
+    if (node->config.memory.rx_buffer_size > XGL_DATALINK_MAX_FRAME_SIZE) {
+        node->config.memory.rx_buffer_size = XGL_DATALINK_MAX_FRAME_SIZE;
+    }
     node->config.features.max_peers = 1U;
     node->config.route_table = node->routes;
 }
@@ -109,7 +121,8 @@ static inline void sim_prepare(sim_node_t* node, uint16_t id) {
  */
 static inline void sim_route(sim_node_t* node, size_t index, uint16_t target,
                              xgl_phy_ops_t* phy) {
-    node->routes[index] = (xgl_route_item_t){target, phy, 128U, 1000U, 1U};
+    node->routes[index] = (xgl_route_item_t){
+        target, phy, node->config.protocol.max_frame_size, 1000U, 1U};
     node->config.route_table_len = index + 1U;
 }
 

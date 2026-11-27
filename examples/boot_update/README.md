@@ -8,12 +8,16 @@ The application protocol has two messages:
 
 | Data type | Payload | Meaning |
 | --- | --- | --- |
-| 7 | little-endian 32-bit offset plus 64 image bytes | Submit one fixed block |
+| 7 | little-endian 32-bit offset plus one image block | Submit one fixed block |
 | 8 | little-endian 32-bit committed byte count | Device confirms simulated Flash commit |
+
+The default build uses 64 image bytes per block. For a smaller compiled frame
+ceiling, the example uses the largest of 64, 32, or 16 image bytes that fit in one
+frame with the offset and wire overhead. Both simulated peers use the same size.
 
 The device begins with a 25 ms erase delay. Its receive admission callback returns
 `XGL_ERR_BUSY` until Flash can accept a staging copy. Accepted data is copied into
-one 64-byte staging slot. The main loop completes a simulated write after 20 ms
+one block-sized staging slot. The main loop completes a simulated write after 20 ms
 and sends the commit notification outside the callback. The host keeps at most
 one uncommitted application block in flight and waits for that notification before
 submitting the next one. The transport window may still be full until its ACK
@@ -21,7 +25,7 @@ arrives; the host handles that status without losing the pending block.
 
 The PHY deliberately drops the first ACK after a block is accepted. The host
 retransmits, transport suppresses duplicate application delivery, and the device
-sends another ACK. The program requires exactly eight Flash writes, at least one
+sends another ACK. The program requires one Flash write per image block, at least one
 BUSY result and retransmission, one dropped ACK, matching image bytes, and a
 matching core CRC16/MODBUS checksum before printing PASS. A successful send means
 submission was accepted, not that Flash has committed it. Protocol failures are
