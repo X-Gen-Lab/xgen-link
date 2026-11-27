@@ -71,6 +71,33 @@ class CTestEvidenceTests(unittest.TestCase):
         self.assertEqual(case.get("name"), "fresh")
         self.assertEqual(case.get("status"), "run")
 
+    def test_multi_config_reports_survive_sequential_runs(self):
+        source = self.build / "source"
+        source.mkdir()
+        (source / "CMakeLists.txt").write_text(
+            'cmake_minimum_required(VERSION 3.24)\nproject(ctest_fixture NONE)\n'
+            'enable_testing()\n'
+            'add_test(NAME check_config COMMAND "${CMAKE_COMMAND}" -E echo "$<CONFIG>")\n',
+            encoding="utf-8",
+        )
+        binary = self.build / "multi"
+        subprocess.run(
+            ["cmake", "-S", source, "-B", binary, "-G", "Ninja Multi-Config"],
+            check=True, capture_output=True, timeout=30,
+        )
+        for configuration in ("Debug", "Release"):
+            subprocess.run(
+                [sys.executable, RUNNER, "--build-dir", binary, "--config", configuration],
+                check=True, capture_output=True, timeout=30,
+            )
+        for configuration in ("Debug", "Release"):
+            with self.subTest(configuration=configuration):
+                directory = binary / "test-results" / configuration
+                inventory = json.loads((directory / "ctest-inventory.json").read_bytes())
+                self.assertEqual(inventory["tests"][0]["command"][-1], configuration)
+                case = ET.parse(directory / "ctest.xml").find(".//testcase/system-out")
+                self.assertEqual(case.text.strip(), configuration)
+
 
 if __name__ == "__main__":
     unittest.main()

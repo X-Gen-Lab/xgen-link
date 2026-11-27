@@ -270,11 +270,20 @@ jobs:
           PROFILE: ${{ matrix.profile }}
         run: |
           build="build/wire-interop-$PROFILE"
+          library="build/wire-sdk4-$PROFILE"
+          prefix="$PWD/$library/install"
           fixture="out/reports/wire-interop/$PROFILE"
           work="$RUNNER_TEMP/xgl-interop-$PROFILE"
           mkdir -p "$fixture"
           git rev-parse HEAD > "$fixture/sdk4-revision.txt"
-          cmake -S test/interop -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DXGL_PROFILE="$PROFILE" 2>&1 | tee "$fixture/configure.log"
+          cmake -S . -B "$library" -G Ninja -DCMAKE_BUILD_TYPE=Release -DXGL_PROFILE="$PROFILE" \
+            2>&1 | tee "$fixture/sdk4-configure.log"
+          cmake --build "$library" --parallel 2 2>&1 | tee "$fixture/sdk4-build.log"
+          cmake --install "$library" --prefix "$prefix" 2>&1 | tee "$fixture/sdk4-install.log"
+          version=$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' "$library/CMakeCache.txt")
+          cmake -S test/interop -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DXGL_PROFILE="$PROFILE" -DXGL_INTEROP_SDK_PREFIX="$prefix" \
+            -DXGL_INTEROP_SDK_VERSION="$version" 2>&1 | tee "$fixture/configure.log"
           cmake --build "$build" --target xgl_interop_peer --parallel 2 2>&1 | tee "$fixture/build.log"
           python test/interop/build_wire_interop_legacy.py --work-dir "$work" --profile "$PROFILE" --fetch 2>&1 | tee "$fixture/sdk3.log"
           python test/interop/test_wire_interop.py "$work/sdk3-$PROFILE/xgl_interop_peer" "$build/xgl_interop_peer" \

@@ -162,6 +162,13 @@ xgl_error_t transport_check_data_tx_policy(const xgl_transport_ctx_t* ctx,
                                            uint32_t session_epoch,
                                            size_t data_len);
 
+/** \brief           Enforce message size and scope lifetime before actual TX.
+ */
+xgl_error_t transport_prepare_data_tx(xgl_transport_ctx_t* ctx,
+                                      xgl_handle_t handle, uint16_t target_id,
+                                      uint32_t connection_id,
+                                      uint32_t session_epoch, size_t data_len);
+
 void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                          xgl_transport_peer_state_t* peer, xgl_error_t error);
 #if XGL_FEATURE_FRAGMENTATION
@@ -186,6 +193,10 @@ xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                xgl_handle_t handle, uint32_t packet_number,
                                uint16_t source_id, uint32_t connection_id,
                                uint32_t session_epoch);
+/** \brief           Check deterministic local feedback egress before RX
+ * admission. */
+xgl_error_t transport_check_feedback(const xgl_transport_ctx_t* ctx,
+                                     const xgl_packet_t* received);
 xgl_error_t transport_send_sack(const xgl_transport_ctx_t* ctx,
                                 xgl_handle_t handle,
                                 const xgl_transport_peer_state_t* peer,

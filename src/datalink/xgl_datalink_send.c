@@ -99,6 +99,10 @@ static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,
         datalink_count_tx_error(ctx);
         return err;
     }
+    if (layout.frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
+        datalink_count_tx_error(ctx);
+        return XGL_ERR_BUFFER_TOO_SMALL;
+    }
     const bool owned = buffer == NULL;
     if (!owned && capacity < layout.frame_len) {
         return XGL_ERR_BUFFER_TOO_SMALL;
@@ -178,6 +182,10 @@ xgl_error_t xgl_datalink_send_raw(xgl_datalink_ctx_t* ctx, xgl_phy_ops_t* phy,
 
     if (phy->tx == NULL || frame_len == 0U) {
         return XGL_ERR_INVALID_PARAM;
+    }
+    if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE) {
+        datalink_count_tx_error(ctx);
+        return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
     xgl_error_t err = phy->tx(frame_buffer, frame_len, phy->user_data);

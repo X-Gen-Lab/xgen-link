@@ -27,7 +27,7 @@
 #define XGL_MIN_WINDOW_SIZE    1     /**< Minimum window size */
 #define XGL_MAX_WINDOW_SIZE    32    /**< Maximum window size */
 #define XGL_MIN_FRAME_SIZE     64    /**< Minimum frame size */
-#define XGL_MAX_FRAME_SIZE     2048  /**< Maximum frame size */
+#define XGL_MAX_ROUTE_MTU      2048  /**< Maximum physical route MTU */
 
 /*---------------------------------------------------------------------------*/
 /* Configuration API                                                         */
@@ -35,9 +35,7 @@
 
 /**
  * \brief           Get default configuration
- * \details         Fills configuration structure with sensible defaults
- *                  Uses medium preset as default (suitable for most
- * applications)
+ * \details         Uses the profile default with the compiled frame limit.
  */
 void xgl_config_get_default(xgl_config_t* config) {
     /* Validate parameter */
@@ -48,7 +46,6 @@ void xgl_config_get_default(xgl_config_t* config) {
     /* Select defaults that are supported by the compiled profile. */
 #if !XGL_FEATURE_FRAGMENTATION
     xgl_config_get_preset_boot(config);
-    return;
 #else
     xgl_config_t default_config = XGL_CONFIG_PRESET_MEDIUM;
     if (default_config.protocol.window_size > XGL_BUILD_WINDOW_CAPACITY) {
@@ -58,6 +55,9 @@ void xgl_config_get_default(xgl_config_t* config) {
     /* Copy to output */
     memcpy(config, &default_config, sizeof(xgl_config_t));
 #endif
+    if (config->protocol.max_frame_size > XGL_DATALINK_MAX_FRAME_SIZE) {
+        config->protocol.max_frame_size = XGL_DATALINK_MAX_FRAME_SIZE;
+    }
 }
 
 /**
@@ -258,7 +258,7 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     }
 
     if (config->protocol.max_frame_size < XGL_MIN_FRAME_SIZE ||
-        config->protocol.max_frame_size > XGL_MAX_FRAME_SIZE) {
+        config->protocol.max_frame_size > XGL_DATALINK_MAX_FRAME_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -349,7 +349,7 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
 
         /* Check max frame size */
         if (route->max_frame_size < XGL_MIN_FRAME_SIZE ||
-            route->max_frame_size > XGL_MAX_FRAME_SIZE) {
+            route->max_frame_size > XGL_MAX_ROUTE_MTU) {
             return XGL_ERR_INVALID_PARAM;
         }
 

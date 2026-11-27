@@ -14,7 +14,7 @@ A completely covered repeated range must contain identical bytes. A partially ov
 
 A reliable submission that requires fragmentation owns one bounded copy of the complete application message per peer. Fragments enter that peer's reliable queue only as its window and the global TX-record budget permit. ACK processing releases records; transport maintenance in the same or a later step continues the unsent tail, including a one-packet window. ACK reception itself does not synchronously pump DATA. Every fragment has its own reliable DATA number; retransmission retains that number and fragment metadata. Admission rejects a message whose complete fragment count exceeds the remaining usable DATA numbers.
 
-The complete-message copy is released once all fragments have entered owned reliable records. Local BUSY or temporary memory pressure retains an accepted message and schedules a bounded retry. A hard error or retry exhaustion terminates the scope, releases its owned data and reports failure. Successful submission means acceptance, not completion at the remote application.
+The complete-message copy is released once all fragments have entered owned reliable records. Local BUSY or temporary memory pressure retains an accepted message and schedules a bounded retry. A hard error or retry exhaustion terminates the scope and releases its owned data. The send or maintenance call that encounters a hard error returns it. Fragments already accepted by the PHY may still arrive. Successful submission means local admission. The application protocol reports remote processing results.
 
 ## Receive Ownership and Failure
 

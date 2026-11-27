@@ -2546,6 +2546,7 @@ TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
 
 TEST(XglTransportTest, PeerIdleTimeoutRetainsReceiveDuplicateHistory) {
     LowerLayerSpy spy;
+    RxTracker tracker;
     xgl_packet_tx_endpoint_t lower_layer = {};
     xgl_packet_tx_endpoint_init(&lower_layer, &spy, spy_send);
 
@@ -2555,6 +2556,8 @@ TEST(XglTransportTest, PeerIdleTimeoutRetainsReceiveDuplicateHistory) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.peer_idle_timeout_ms = 1000;
+    config.rx_callback = spy_receive;
+    config.callback_user_data = &tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
 
@@ -2584,6 +2587,7 @@ TEST(XglTransportTest, PeerIdleTimeoutRetainsReceiveDuplicateHistory) {
     EXPECT_EQ(peer->rx_next_packet_number, 1U);
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
     EXPECT_EQ(peer->rx_next_packet_number, 1U);
+    EXPECT_EQ(tracker.receive_count, 1);
 
     xgl_transport_destroy(&ctx);
 }

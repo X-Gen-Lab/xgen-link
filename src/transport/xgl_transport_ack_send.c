@@ -11,6 +11,22 @@
 #define XGL_TRANSPORT_SACK_PREFIX_SIZE 5U
 #define XGL_TRANSPORT_SACK_BITMAP_SIZE 8U
 
+_Static_assert(XGL_TRANSPORT_SACK_PREFIX_SIZE +
+                       XGL_TRANSPORT_SACK_BITMAP_SIZE <=
+                   XGL_TRANSPORT_ACK_VALUE_SIZE,
+               "Feedback preflight must cover the largest generated SACK");
+
+xgl_error_t transport_check_feedback(const xgl_transport_ctx_t* ctx,
+                                     const xgl_packet_t* received) {
+    if (ctx->lower_layer == NULL || ctx->lower_layer->check_feedback == NULL) {
+        return XGL_OK;
+    }
+    /* One ACK range is mandatory and covers the largest generated SACK. */
+    return ctx->lower_layer->check_feedback(ctx->lower_layer->ctx, received,
+                                            XGL_WIRE_EXT_HEADER_SIZE +
+                                                XGL_TRANSPORT_ACK_VALUE_SIZE);
+}
+
 /**
  * \brief           Submit a borrowed ACK extension with a shared packet header
  * \param[in]       ctx: Transport context

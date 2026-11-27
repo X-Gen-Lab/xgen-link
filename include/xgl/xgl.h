@@ -308,7 +308,8 @@ void xgl_config_get_preset_production(xgl_config_t* config);
 /**
  * \brief           Validate configuration and the compiled capability ceiling
  * \param[in]       config: Configuration to validate without modifying it
- * \return          XGL_OK, NULL_POINTER, INVALID_PARAM, or UNSUPPORTED
+ * \return          XGL_OK, NULL_POINTER, INVALID_PARAM, UNSUPPORTED, or
+ *                  BUFFER_TOO_SMALL when RX storage is smaller than the MTU
  */
 xgl_error_t xgl_config_validate(const xgl_config_t* config);
 
@@ -319,7 +320,10 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config);
  * \param[in]       now_ms: Same clock used by xgl_step(), wrapping modulo 2^32
  * \return          XGL_OK when accepted, or validation/capacity/driver error
  * \note            Reliable data is copied to bounded protocol-owned storage.
- *                  Successful submission does not mean remote delivery.
+ *                  Successful submission describes local acceptance.
+ * \note            A synchronous hard error after accepting a fragmented
+ *                  message terminates its scope and returns the original
+ *                  error. Previously submitted frames may still arrive.
  */
 xgl_error_t xgl_send_at(xgl_handle_t handle, const xgl_tx_data_t* tx_data,
                         uint32_t now_ms);
@@ -384,6 +388,8 @@ xgl_send_zerocopy_scoped_at(xgl_handle_t handle,
  * \note            Retained transport work that encounters BUSY/NO_MEMORY
  *                  remains owned for retry and is not a maintenance error.
  *                  Immediate receive or ACK transmission errors are returned.
+ * \note            Local DATA requires a receive callback. Reliable DATA also
+ *                  requires a usable local feedback route before acceptance.
  */
 xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
                      const xgl_work_budget_t* budget);

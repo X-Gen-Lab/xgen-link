@@ -139,16 +139,24 @@ class XglTransportAdvancedTest : public ::testing::Test {
         return xgl_transport_receive(&ctx, nullptr, &packet);
     }
 #endif
-    xgl_error_t Ack(uint16_t source, uint32_t number) {
+    xgl_error_t Ack(uint16_t source, uint32_t number, bool selective = false) {
         std::array<uint8_t, 32> value = {}, ext = {};
         size_t value_len = 0U, ext_len = 0U;
         const xgl_wire_ack_range_t range = {0U, 1U};
-        if (xgl_wire_encode_ack_range_ext_value(value.data(), value.size(),
-                                                number, 0U, &range, 1U,
-                                                &value_len) != XGL_OK)
+        const uint8_t bitmap = 1U;
+        xgl_error_t error =
+            selective
+                ? xgl_wire_encode_sack_ext_value(value.data(), value.size(),
+                                                 number, &bitmap, 1U,
+                                                 &value_len)
+                : xgl_wire_encode_ack_range_ext_value(value.data(),
+                                                      value.size(), number, 0U,
+                                                      &range, 1U, &value_len);
+        if (error != XGL_OK)
             return XGL_ERR_INVALID_FRAME;
-        if (xgl_wire_encode_ext(ext.data(), ext.size(), XGL_WIRE_EXT_ACK_RANGE,
-                                value.data(), value_len, &ext_len) != XGL_OK)
+        uint8_t type = selective ? XGL_WIRE_EXT_SACK : XGL_WIRE_EXT_ACK_RANGE;
+        if (xgl_wire_encode_ext(ext.data(), ext.size(), type, value.data(),
+                                value_len, &ext_len) != XGL_OK)
             return XGL_ERR_INVALID_FRAME;
         xgl_packet_t packet = {};
         packet.source_id = source;
@@ -180,6 +188,23 @@ TEST_F(XglTransportAdvancedTest, BusyPeriodExpiresEvenWithZeroTransmitBudget) {
     ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(events[0], XGL_SCOPE_FAILED);
     EXPECT_EQ(errors[0], XGL_ERR_TIMEOUT);
+}
+
+TEST_F(XglTransportAdvancedTest, InvalidAckDoesNotTriggerLifetimeTransition) {
+    Init(250U);
+    ASSERT_EQ(Send(), XGL_OK);
+    ctx.current_time_ms = 250U;
+    EXPECT_EQ(Ack(2U, 1U), XGL_ERR_SEQUENCE_ERROR);
+    EXPECT_EQ(Ack(2U, 1U, true), XGL_ERR_SEQUENCE_ERROR);
+    ASSERT_NE(ctx.peers, nullptr);
+    EXPECT_FALSE(ctx.peers->failed);
+    EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
+    EXPECT_TRUE(events.empty());
+    EXPECT_EQ(Ack(2U, 0U), XGL_ERR_TIMEOUT);
+    EXPECT_TRUE(ctx.peers->failed);
+    EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 0U);
+    EXPECT_EQ(events, (std::vector<xgl_scope_event_t>{XGL_SCOPE_FAILED}));
+    EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_TIMEOUT}));
 }
 
 TEST_F(XglTransportAdvancedTest,

@@ -28,6 +28,8 @@ Failed lower-layer submission preserves its original error, such as `XGL_ERR_BUS
 
 Relays do not refragment or negotiate path MTU. Senders must respect the path bottleneck. Reliable A-to-B-to-C delivery also needs a route at C with destination A and egress through B for the ACK; a route only to neighbor B is insufficient. RX views carry no ingress PHY, and destination lookup is not source authorization.
 
+Before delivering or retaining reliable local DATA, the receiver checks its reverse egress and feedback frame budget. A missing route returns `XGL_ERR_ROUTE_NOT_FOUND`. Insufficient egress capacity returns `XGL_ERR_BUFFER_TOO_SMALL`. The budget includes a nonzero epoch and the outgoing authentication tag. A single-range ACK with a nonzero epoch and a 16-byte tag needs 86 bytes. PHY backpressure after admission preserves receive history so retransmission can trigger feedback again. Validate every hop separately for forward DATA and reverse feedback.
+
 ## Broadcast and Reliability
 
 Broadcast uses node `0xFFFF`. Plain unreliable broadcast is available when the authentication policy allows it. Reliable broadcast submission returns `XGL_ERR_INVALID_PARAM` before creating transport ownership; a received broadcast that requests acknowledgement returns `XGL_ERR_INVALID_FRAME` before changing peer history or sending feedback. It cannot consume the same source's unicast DATA number. The authentication implementation supports unicast associations only; no group reliable-delivery or group-authentication protocol is provided. Capacity and feature compatibility between peers are configured by the application; route discovery does not negotiate transport windows or trusted epochs.

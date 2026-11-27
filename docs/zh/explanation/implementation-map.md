@@ -22,7 +22,7 @@
 
 ## 内部接口
 
-`xgl_protocol_io.h` 分别定义 packet TX/RX 和 frame TX/RX 四种单向端点，每种只有 context 与对应方向的回调。Transport 提供 packet RX，network 提供 packet TX 与 frame RX，datalink 提供 frame TX；实例负责静态绑定。类型系统不允许给 TX 端点填写 receive 槽位，也不要求各层访问实例的私有布局。
+`xgl_protocol_io.h` 分别定义 packet TX/RX 和 frame TX/RX 四种单向端点。Transport 提供 packet RX，Network 提供 packet TX 与 frame RX，Datalink 提供 frame TX。实例静态绑定端点，packet TX 还提供对反向反馈出口的只读预检。各层通过有类型的端口交换同步借用数据。
 
 `xgl_packet.h` 包含借用的协议视图。`xgl_protocol_memory.h` 描述资源类别服务，不实现分配器；peer、等待确认记录、载荷与临时编码空间仍保持各自的容量和生命周期。不能仅因使用相同 allocator 接口就合并预算或引入共享堆回退。
 

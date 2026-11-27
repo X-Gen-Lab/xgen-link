@@ -151,6 +151,13 @@ TEST_F(XglRouteTest, AddRouteWithNullPhy) {
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
 
+TEST_F(XglRouteTest, AddRouteRejectsReservedDestinationWithoutUsingSlot) {
+    EXPECT_EQ(xgl_route_table_add(&route_table, 0U, &phy_ops, MAX_FRAME_SIZE,
+                                  READ_FREQ_HZ, METRIC_DEFAULT),
+              XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(route_table.route_count, 0U);
+}
+
 TEST_F(XglRouteTest, AddDuplicateRouteUpdates) {
     /* Add initial route */
     xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, 256, 100, 1);
@@ -171,28 +178,28 @@ TEST_F(XglRouteTest, AddDuplicateRouteUpdates) {
 }
 
 TEST_F(XglRouteTest, FullRouteTableRejectsGrowthAndRetainsExistingRoutes) {
-    for (uint16_t i = 0; i < 4; ++i) {
+    for (uint16_t i = 1; i <= 4; ++i) {
         ASSERT_EQ(xgl_route_table_add(&route_table, i, &phy_ops, MAX_FRAME_SIZE,
                                       READ_FREQ_HZ, METRIC_DEFAULT),
                   XGL_OK);
     }
     const auto* storage = route_table.routes;
-    EXPECT_EQ(xgl_route_table_add(&route_table, 4, &phy_ops, MAX_FRAME_SIZE,
+    EXPECT_EQ(xgl_route_table_add(&route_table, 5, &phy_ops, MAX_FRAME_SIZE,
                                   READ_FREQ_HZ, METRIC_DEFAULT),
               XGL_ERR_QUEUE_FULL);
     EXPECT_EQ(route_table.routes, storage);
     EXPECT_EQ(route_table.route_count, 4U);
     EXPECT_EQ(route_table.route_capacity, 4U);
-    for (uint16_t i = 0; i < 4; ++i) {
+    for (uint16_t i = 1; i <= 4; ++i) {
         ASSERT_NE(xgl_route_table_lookup(&route_table, i), nullptr);
     }
     ASSERT_EQ(xgl_route_table_remove(&route_table, 1), XGL_OK);
-    ASSERT_EQ(xgl_route_table_add(&route_table, 4, &phy_ops, 128, 100, 1),
+    ASSERT_EQ(xgl_route_table_add(&route_table, 5, &phy_ops, 128, 100, 1),
               XGL_OK);
     EXPECT_EQ(route_table.routes, storage);
     EXPECT_EQ(route_table.route_count, 4U);
     EXPECT_EQ(xgl_route_table_lookup(&route_table, 1), nullptr);
-    EXPECT_NE(xgl_route_table_lookup(&route_table, 4), nullptr);
+    EXPECT_NE(xgl_route_table_lookup(&route_table, 5), nullptr);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -491,8 +498,9 @@ TEST_F(XglRouteTest, LookupPerformanceWithManyRoutes) {
         xgl_route_table_init(&route_table, 100, xgl_test_host_allocator()),
         XGL_OK);
     /* Add many routes */
-    for (uint8_t i = 0; i < 100; i++) {
-        xgl_route_table_add(&route_table, i, &phy_ops, 256, 100, 1);
+    for (uint16_t i = 1; i <= 100; ++i) {
+        ASSERT_EQ(xgl_route_table_add(&route_table, i, &phy_ops, 256, 100, 1),
+                  XGL_OK);
     }
 
     /* Repeated indexed lookup retains the selected route. */

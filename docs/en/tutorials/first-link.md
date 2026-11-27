@@ -2,20 +2,20 @@
 
 ## Build and run
 
-From the repository root, build the host Boot example with CMake 3.24 or later, Ninja and a C11 compiler.
+From the repository root, build the two-endpoint echo example with CMake 3.24 or later, Ninja and a C11 compiler.
 
 ```sh
-cmake -S . -B build/first-link -G Ninja -DXGL_PROFILE=boot \
-  -DXGL_BUILD_EXAMPLES=ON -DXGL_BUILD_NOHEAP_SMOKE=ON
-cmake --build build/first-link
-ctest --test-dir build/first-link --output-on-failure --no-tests=error -R '^xgl_echo_example$'
+cmake -S . -B build/first-link -G Ninja -DXGL_PROFILE=embedded-lite \
+  -DXGL_BUILD_EXAMPLES=ON
+cmake --build build/first-link --target echo_server
+./build/first-link/examples/echo_server/echo_server
 ```
 
-CTest should run and pass one echo test. On failure, read `build/first-link/Testing/Temporary/LastTest.log`. The example exercises two endpoints over a synchronous simulated PHY.
+The program should print `Deferred echo: PASS`. It exercises two endpoints over a synchronous simulated PHY. The executable has an `.exe` suffix on Windows.
 
 ## Storage and lifetime
 
-Start with `xgl_config_get_preset_boot()` for one peer, one reliable slot and 128-byte MTU. Set local node, routes, PHY and application callbacks. Keep the configuration and referenced objects alive until destruction.
+The example starts with the Tiny preset and sets the reliable window and peer count to one with a 128-byte MTU. Configure each node's ID, route to the other endpoint, PHY and application callback. Keep the configuration and referenced objects alive until destruction.
 
 Call `xgl_memory_requirements()`, check the exact size and alignment, and supply that capacity to `xgl_init_static()`. Different profiles and limits require different sizes. Alternatively, `xgl_create()` reserves the same layout through the selected backend and requires `xgl_init()`.
 
@@ -30,8 +30,8 @@ if (xgl_next_timeout(handle, now_ms, &delay_ms)) {
 }
 ```
 
-Use `xgl_send_at()` outside callbacks. The receive acceptance callback can return BUSY while Flash or application storage is occupied. PHY TX must finish reading or copying the frame before returning.
+Use `xgl_send_at()` outside callbacks. The receive acceptance callback can return BUSY while application storage is occupied. PHY TX finishes reading or copying the complete frame before returning. Handle `xgl_step()` receive and maintenance errors as described in the [send API](../guides/send.md).
 
 ## Runnable programs
 
-See [examples](examples.md) for complete lifetime-correct programs. The Boot update demonstration models host pacing, fixed blocks, slow Flash and a lost ACK. It is not a secure hardware bootloader.
+See [examples](examples.md) for complete programs, including reliable application chunks and multihop delivery.

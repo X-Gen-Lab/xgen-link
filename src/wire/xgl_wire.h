@@ -36,6 +36,13 @@ extern "C" {
 #define XGL_SECURITY_EXT_SIZE                                                  \
     (XGL_WIRE_EXT_HEADER_SIZE + XGL_SECURITY_EXT_VALUE_SIZE)
 
+/** \brief           Encoded length of optional type and scope extensions. */
+static inline size_t xgl_wire_packet_extension_size(uint8_t data_type,
+                                                    uint32_t session_epoch) {
+    return (data_type != 0U ? XGL_DATA_TYPE_EXT_SIZE : 0U) +
+           (session_epoch != 0U ? XGL_SESSION_EXT_SIZE : 0U);
+}
+
 typedef enum {
     XGL_PACKET_TYPE_INVALID = 0,
     XGL_PACKET_TYPE_DATA = 1,

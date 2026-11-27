@@ -162,6 +162,28 @@ TEST_F(XglTransportSackViewTest, FutureBitRejectsTheWholeBorrowedBitmap) {
     ExpectUnchanged();
 }
 
+TEST_F(XglTransportSackViewTest, BaseDoesNotCumulativelyAcknowledge) {
+    const uint8_t received = 1U;
+    ASSERT_EQ(Receive(&received, 1U, 2U), XGL_OK);
+    auto* peer = context.peers;
+    EXPECT_EQ(xgl_reliable_get_count(&peer->reliable_queue), 2U);
+    EXPECT_EQ(peer->tx_window.send_base_packet_number, 0U);
+    EXPECT_EQ(xgl_reliable_find_packet_number(&peer->reliable_queue, 2U, 2U),
+              nullptr);
+
+    const uint8_t missing = 0U;
+    ASSERT_EQ(Receive(&missing, 1U, 1U), XGL_OK);
+    const auto* before_base =
+        xgl_reliable_find_packet_number(&peer->reliable_queue, 0U, 2U);
+    const auto* at_base =
+        xgl_reliable_find_packet_number(&peer->reliable_queue, 1U, 2U);
+    ASSERT_NE(before_base, nullptr);
+    ASSERT_NE(at_base, nullptr);
+    EXPECT_FALSE(before_base->fast_retry_pending);
+    EXPECT_TRUE(at_base->fast_retry_pending);
+    EXPECT_EQ(sends, sends_before_ack);
+}
+
 TEST_F(XglTransportSackViewTest,
        CrossByteAcknowledgementsIgnoreTrailingZeroBytes) {
     const uint8_t acknowledged = 0x07;

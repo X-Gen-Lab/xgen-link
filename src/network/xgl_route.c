@@ -99,7 +99,7 @@ xgl_error_t xgl_route_table_add(xgl_route_table_t* table, uint16_t target_id,
     if (table == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    if (phy == NULL) {
+    if (target_id == 0U || phy == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
     xgl_route_item_t* route = xgl_route_table_lookup(table, target_id);

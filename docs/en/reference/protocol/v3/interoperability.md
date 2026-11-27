@@ -8,7 +8,7 @@ Peers must agree on MTU, extension semantics, authentication tag length, trusted
 
 ## Reproduce the cross-SDK test
 
-In the repository, `test/interop/README.md` identifies the pinned SDK 3 baseline and dependency preparation. Both endpoints use `test/interop/interop_peer.c`, one linked against the installed SDK 3 and the other against the current production library. The driver `test/interop/test_wire_interop.py` passes actual frames over standard streams.
+In the repository, `test/interop/README.md` identifies the pinned SDK 3 baseline and dependency preparation. Both endpoints use `test/interop/interop_peer.c`. CI links one against the installed SDK 3 and the other against the current installed SDK. The fixture also supports building the current endpoint from source. The driver `test/interop/test_wire_interop.py` passes actual frames over standard streams.
 
 Run from the repository root with a C11 toolchain. Run once for `boot` and once for `full`.
 

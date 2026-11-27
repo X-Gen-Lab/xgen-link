@@ -117,6 +117,11 @@ xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,
                                         uint32_t connection_id,
                                         uint32_t session_epoch);
 
+/** \brief           Check whether an exact installed association is active. */
+bool xgl_security_session_is_active(const xgl_security_ctx_t* ctx,
+                                    uint16_t remote_id, uint32_t connection_id,
+                                    uint32_t session_epoch);
+
 /**
  * \brief           Install a trusted association; closed slots stay reserved
  * \param[in,out]   ctx: Security context

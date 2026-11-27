@@ -80,6 +80,15 @@ typedef enum {
     TRANSPORT_RX_DELIVER
 } transport_rx_decision_t;
 
+static bool transport_has_rx_handler(const xgl_transport_ctx_t* ctx) {
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (ctx->rx_scoped_callback != NULL) {
+        return true;
+    }
+#endif
+    return ctx->rx_accept_callback != NULL || ctx->rx_callback != NULL;
+}
+
 /**
  * \brief           Classify duplicates and retain supported out-of-order
  *                  packets
@@ -229,6 +238,17 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #endif
     }
 
+    /* No application can take responsibility for these bytes. Reject before
+     * reliable ordering can cache or acknowledge them. */
+    if (!transport_has_rx_handler(ctx)) {
+#if XGL_FEATURE_STATISTICS
+        if (ctx->stats != NULL) {
+            ctx->stats->rx_dropped++;
+        }
+#endif
+        return XGL_ERR_UNSUPPORTED;
+    }
+
     xgl_transport_peer_state_t* rx_peer = transport_find_rx_peer(ctx, packet);
     const bool scope_was_absent = rx_peer == NULL;
     if (rx_peer != NULL && rx_peer->failed) {
@@ -259,6 +279,12 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 #endif
     }
 #endif
+    if (packet->reliable == XGL_RELIABILITY_ACK_ELICITING) {
+        err = transport_check_feedback(ctx, packet);
+        if (err != XGL_OK) {
+            return err;
+        }
+    }
     if (rx_peer != NULL) {
         rx_peer->last_active_ms = transport_now(ctx);
     }

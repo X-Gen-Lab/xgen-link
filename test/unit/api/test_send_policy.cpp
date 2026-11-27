@@ -50,7 +50,15 @@ class XglSendPolicyTest : public ::testing::Test {
             config.features.max_tx_message_bytes = message_limit;
         }
         ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
-        handle = xgl_create(&config);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+        if (options.tx_lifetime_ms != 0U) {
+            ASSERT_EQ(xgl_create_with_options(&config, &options, &handle),
+                      XGL_OK);
+        } else
+#endif
+        {
+            handle = xgl_create(&config);
+        }
         ASSERT_NE(handle, nullptr);
         ASSERT_EQ(xgl_init(handle), XGL_OK);
         if (authenticated) {
@@ -176,6 +184,9 @@ class XglSendPolicyTest : public ::testing::Test {
     }
 
     xgl_config_t config = {};
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
+#endif
     xgl_handle_t handle = nullptr;
     xgl_phy_ops_t phy = {};
     xgl_route_item_t route = {};
@@ -253,11 +264,11 @@ TEST_F(XglSendPolicyTest, AllSendPathsAcceptMessageLimitBoundary) {
 }
 
 TEST_F(XglSendPolicyTest,
-       FirstReliableFragmentHardFailureIsAcceptedAndTerminal) {
+       FirstReliableFragmentHardFailureIsReturnedAndTerminal) {
     Initialize(true, false, 64U, 96U);
     fail_data_call = 1U;
     auto tx = Ordinary(64U, true);
-    EXPECT_EQ(xgl_send_at(handle, &tx, 0U), XGL_OK);
+    EXPECT_EQ(xgl_send_at(handle, &tx, 0U), XGL_ERR_TX_FAILED);
     EXPECT_EQ(data_calls, 1U);
     EXPECT_NE(std::find(errors.begin(), errors.end(), XGL_ERR_TX_FAILED),
               errors.end());
@@ -267,6 +278,27 @@ TEST_F(XglSendPolicyTest,
     EXPECT_EQ(xgl_send_at(handle, &tx, 1U), XGL_ERR_ACK_TIMEOUT);
     ExpectStatsUnchanged(before);
 }
+
+#if XGL_BUILD_WINDOW_CAPACITY >= 2
+TEST_F(XglSendPolicyTest, EagerReliableFragmentHardFailureIsReturned) {
+    config.protocol.window_size = 2U;
+    config.features.max_tx_packets = 2U;
+    config.features.max_rx_buffered_packets = 2U;
+    config.error_callback = nullptr;
+    Initialize(true, false, 64U, 96U);
+    fail_data_call = 2U;
+    auto tx = Ordinary(64U, true);
+    EXPECT_EQ(xgl_send_at(handle, &tx, 0U), XGL_ERR_TX_FAILED);
+    EXPECT_EQ(data_numbers, (std::vector<uint32_t>{0U, 1U}));
+    EXPECT_EQ(xgl_send_at(handle, &tx, 1U), XGL_ERR_ACK_TIMEOUT);
+    const xgl_work_budget_t budget = {0U, 100U};
+    EXPECT_EQ(xgl_step(handle, 2U, &budget), XGL_OK);
+    EXPECT_EQ(data_calls, 2U);
+#if XGL_FEATURE_STATISTICS
+    EXPECT_EQ(Snapshot().network.tx_bytes, 24U);
+#endif
+}
+#endif
 
 TEST_F(XglSendPolicyTest, UnreliableFragmentFailurePreservesEarlierSubmission) {
     Initialize(true, false, 64U, 96U);
@@ -321,6 +353,34 @@ TEST_F(XglSendPolicyTest, FailedScopeRejectsScopedZeroCopyData) {
     EXPECT_EQ(tx_calls, submitted);
     ExpectStatsUnchanged(before);
 }
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+TEST_F(XglSendPolicyTest, ScopedZeroCopyAppliesLifetimeAtWraparoundDeadline) {
+    options.tx_lifetime_ms = 10U;
+    Initialize();
+    auto tx = Ordinary(1U, true);
+    tx.connection_id = 7U;
+    tx.session_epoch = 9U;
+    ASSERT_EQ(xgl_send_at(handle, &tx, UINT32_MAX - 4U), XGL_OK);
+    auto request = CallerFrame(1U);
+    request.connection_id = tx.connection_id;
+    request.session_epoch = tx.session_epoch;
+    xgl_tx_frame_layout_t layout = {};
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    request.data.data_offset = layout.payload_offset;
+    frame[layout.payload_offset] = payload[0];
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 4U), XGL_OK);
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
+    EXPECT_TRUE(errors.empty());
+    const auto submitted = tx_calls;
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 5U),
+              XGL_ERR_TIMEOUT);
+    EXPECT_EQ(tx_calls, submitted);
+    EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_TIMEOUT}));
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 6U),
+              XGL_ERR_ACK_TIMEOUT);
+}
+#endif
 
 TEST_F(XglSendPolicyTest, FailedScopeLayoutIsClearedWithoutSideEffects) {
     Initialize();

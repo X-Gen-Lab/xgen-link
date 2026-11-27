@@ -48,6 +48,9 @@ typedef struct {
 typedef struct {
     void* ctx;
     xgl_error_t (*send)(void* ctx, xgl_handle_t handle, xgl_packet_t* packet);
+    /** Check local ACK egress from received DATA without sending it. */
+    xgl_error_t (*check_feedback)(void* ctx, const xgl_packet_t* received,
+                                  size_t ack_extension_len);
 } xgl_packet_tx_endpoint_t;
 
 /**
@@ -86,6 +89,7 @@ static inline void xgl_packet_tx_endpoint_init(
     if (iface != NULL) {
         iface->ctx = ctx;
         iface->send = send;
+        iface->check_feedback = NULL;
     }
 }
 

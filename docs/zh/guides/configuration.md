@@ -28,6 +28,8 @@
 
 实际帧必须同时满足协议上限和路由 MTU，包括 24 字节基础头、扩展、payload、启用认证时的 tag 和 2 字节 CRC。`memory.rx_buffer_size` 至少为 `protocol.max_frame_size`。
 
+生产 SDK 的 `XGL_DATALINK_MAX_FRAME_SIZE` 默认 2048 字节，可在构建库时通过同名 CMake 选项在 64–2048 字节之间选择。实例 MTU 必须处于 64 字节与所选上限之间。单条路由可以声明更大的物理 MTU，发送时两项限制同时生效。`xgl_config_get_default()` 会约束默认 MTU，使用具名 preset 时应检查并调整 `protocol.max_frame_size`。接收存储设为同一 MTU 可避免额外预留。涉及可靠通信时同时检查[反向反馈预算](../reference/protocol/v3/routing.md)。
+
 ## 显式容量
 
 | 配置字段 | 上限 |

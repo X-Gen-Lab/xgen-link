@@ -49,8 +49,7 @@ static xgl_error_t network_validate_forward_ttl(xgl_network_ctx_t* ctx,
 static xgl_error_t network_validate_forward_size(xgl_network_ctx_t* ctx,
                                                  const xgl_route_item_t* route,
                                                  size_t frame_len) {
-    if (frame_len > XGL_DATALINK_MAX_FRAME_SIZE ||
-        frame_len > route->max_frame_size) {
+    if (frame_len > xgl_route_frame_limit(route, XGL_DATALINK_MAX_FRAME_SIZE)) {
         xgl_network_count_rx_drop(ctx);
         return XGL_ERR_BUFFER_TOO_SMALL;
     }

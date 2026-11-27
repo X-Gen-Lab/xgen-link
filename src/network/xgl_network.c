@@ -110,6 +110,7 @@ xgl_error_t xgl_network_get_endpoints(xgl_network_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
     xgl_packet_tx_endpoint_init(packets, ctx, network_send_impl);
+    packets->check_feedback = xgl_network_check_feedback;
     xgl_frame_rx_endpoint_init(frames, ctx, network_receive_impl);
     return XGL_OK;
 }

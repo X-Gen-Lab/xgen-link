@@ -60,6 +60,14 @@ typedef struct {
     const xgl_allocator_t* allocator; /**< Memory allocator */
 } xgl_route_table_t;
 
+/** \brief           Bound one frame by the route and instance limits. */
+static inline size_t xgl_route_frame_limit(const xgl_route_item_t* route,
+                                           size_t frame_limit) {
+    return route != NULL && route->max_frame_size < frame_limit
+               ? route->max_frame_size
+               : frame_limit;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Route Table API                                                           */
 /*---------------------------------------------------------------------------*/

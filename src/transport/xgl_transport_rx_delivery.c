@@ -38,6 +38,8 @@ static xgl_error_t transport_accept_payload(
         } else if (ctx->rx_callback != NULL) {
             ctx->rx_callback(handle, source_id, data_type, data, len,
                              ctx->callback_user_data);
+        } else {
+            return XGL_ERR_UNSUPPORTED;
         }
 #if XGL_FEATURE_ADVANCED_RUNTIME
     }

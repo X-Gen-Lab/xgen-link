@@ -1,5 +1,5 @@
 add_executable(multi_node main.c)
-target_link_libraries(multi_node PRIVATE xgl)
+target_link_libraries(multi_node PRIVATE xgl::xgl)
 if(XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE)
     add_test(NAME xgl_multi_node_example COMMAND multi_node)
     set_tests_properties(xgl_multi_node_example PROPERTIES LABELS integration TIMEOUT 10)

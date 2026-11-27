@@ -7,6 +7,7 @@
 | wire v3、TLV、CRC、未对齐字节跨度 | `test/unit/wire/test_wire.cpp`、`test/unit/datalink/test_parser.cpp`、frame 性质测试 |
 | 长度回绕、借用 SACK、失败视图清零及 raw/stream 一致 | `test/unit/wire/test_frame.cpp`、`test_wire_sack_view.cpp`、`test_wire_rx_contracts.cpp`、`test/unit/transport/test_transport_sack_view.cpp` |
 | 固定路由及认证帧转发 | `test/unit/network/test_route.cpp`、`test/unit/network/test_network.cpp` |
+| 本地反馈出口、反向 MTU 与 PHY 背压 | `test/integration/test_network_multihop.cpp` |
 | 精确 scope、原子 ACK、RX 保留、重传、RESET 与关闭 | `test/unit/transport/test_transport.cpp`、transport 性质测试 |
 | RX/TX 无副作用拒绝、延迟快重传、终止错误与唯一存储归属 | `test_transport_rx_contracts.cpp`、`test_transport_tx_contracts.cpp`、`test_transport_runtime_contracts.cpp`、`test_transport_storage.cpp`（均位于 `test/unit/transport/`） |
 | 分片预算、重叠、超时、消息大于窗口 | `test/unit/transport/test_fragment.cpp`、memory 性质测试 |
@@ -29,9 +30,9 @@
 
 ## 构建和安装
 
-在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库、源码子目录和独立安装消费者。消费检查需实际编译、链接并运行公共 C 程序，验证 ABI、profile 和必需能力的错误组合会被拒绝。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。
+在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库和源码子目录。独立安装消费实际编译、链接并运行公开 C11 和 C++17 程序，覆盖 ABI、profile、必需能力、资源身份和前缀冲突。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。
 
-`ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。复现 CI 主机验证时，对同一个构建运行测试、分析器和覆盖率检查。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。行、函数和分支覆盖率均至少达到 80%。
+`ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。复现 CI 主机验证时，对同一个构建运行测试、分析器和覆盖率检查。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。多配置构建逐配置保存证据。行、函数和分支覆盖率均至少达到 80%。
 
 ```sh
 cmake --preset ci

@@ -10,8 +10,22 @@ import xml.etree.ElementTree as ET
 
 
 def run(build, configuration):
-    inventory_path = build / "ctest-inventory.json"
-    junit = build / "ctest.xml"
+    reports = build
+    cache = build / "CMakeCache.txt"
+    if cache.is_file():
+        configurations = next((line.partition("=")[2]
+                               for line in cache.read_text(encoding="utf-8").splitlines()
+                               if line.startswith("CMAKE_CONFIGURATION_TYPES:")), "")
+        if configurations:
+            selected = next((value for value in configurations.split(";")
+                             if value.casefold() == configuration.casefold()), None)
+            if selected is None:
+                raise ValueError(f"Unknown configuration {configuration!r}; choose {configurations}")
+            reports = build / "test-results" / selected
+            reports.mkdir(parents=True, exist_ok=True)
+
+    inventory_path = reports / "ctest-inventory.json"
+    junit = reports / "ctest.xml"
     inventory_path.unlink(missing_ok=True)
     junit.unlink(missing_ok=True)
 

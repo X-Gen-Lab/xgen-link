@@ -137,18 +137,18 @@ struct PublicReceiver {
 
     xgl_phy_ops_t phy = {Write, Read, this};
     xgl_route_item_t route = {2U, &phy, 128U, 1000U, 0U};
+    xgl_config_t config = {};
     std::unique_ptr<xgl_instance, decltype(&xgl_destroy)> instance{
         nullptr, &xgl_destroy};
 
-    void Init() {
-        xgl_config_t config = {};
+    void Init(bool with_handler = true) {
         xgl_config_get_default(&config);
         config.memory.allocator = xgl_test_host_allocator();
         config.protocol.max_frame_size = 128U;
         config.memory.rx_buffer_size = 128U;
         config.route_table = &route;
         config.route_table_len = 1U;
-        config.rx_accept_callback = Accept;
+        config.rx_accept_callback = with_handler ? Accept : nullptr;
         config.callback_user_data = this;
         ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
         instance.reset(xgl_create(&config));
@@ -283,6 +283,22 @@ TEST(XglTransportRxWireContract, StepReportsFeedbackFailureWithoutRedelivery) {
     EXPECT_EQ(receiver.feedback_attempts, 2U);
 }
 
+TEST(XglTransportRxWireContract, MissingHandlerCannotAcknowledgeData) {
+    PublicReceiver receiver;
+    receiver.Init(false);
+    const auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, {}, false, true);
+    ASSERT_FALSE(frame.empty());
+    EXPECT_EQ(receiver.Feed(frame), XGL_ERR_UNSUPPORTED);
+    EXPECT_EQ(receiver.feedback_attempts, 0U);
+#if XGL_FEATURE_STATISTICS
+    xgl_statistics_t statistics = {};
+    ASSERT_EQ(xgl_stats_get(receiver.instance.get(), &statistics), XGL_OK);
+    EXPECT_EQ(statistics.transport.rx_packets, 0U);
+    EXPECT_EQ(statistics.transport.rx_bytes, 0U);
+    EXPECT_EQ(statistics.transport.rx_dropped, 1U);
+#endif
+}
+
 #if XGL_BUILD_WINDOW_CAPACITY >= 4
 TEST_F(XglTransportRxContract, ReservedNumberCannotCreateReceiveHistory) {
     EXPECT_EQ(Receive(UINT32_MAX, 0x41U), XGL_ERR_SEQUENCE_ERROR);
@@ -387,6 +403,15 @@ TEST_F(XglTransportRxContract, PendingMessageFailureReleasesOwnedBytesOnce) {
     EXPECT_TRUE(delivered.empty());
 }
 
+TEST_F(XglTransportRxContract, MissingHandlerCannotReserveFragmentStorage) {
+    context.rx_accept_callback = nullptr;
+    EXPECT_EQ(Receive(0U, 0x41U, Fragment(7U, 0U, 2U), true),
+              XGL_ERR_UNSUPPORTED);
+    EXPECT_EQ(context.peers, nullptr);
+    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 0U);
+    EXPECT_EQ(feedback_attempts, 0U);
+}
+
 TEST(XglTransportRxWireContract, DuplicateFragmentMetadataNeverDelivers) {
     PublicReceiver receiver;
     receiver.Init();
@@ -406,6 +431,17 @@ TEST_F(XglTransportRxContract, UnknownExtensionsRemainCompatibleWithFragment) {
 }
 
 #if XGL_FEATURE_OUT_OF_ORDER
+TEST_F(XglTransportRxContract, MissingHandlerCannotCacheFutureData) {
+    context.rx_accept_callback = nullptr;
+    auto* peer = transport_get_or_create_peer_scope(&context, 2U, 0U, 0U);
+    ASSERT_NE(peer, nullptr);
+    EXPECT_EQ(Receive(1U, 0x41U), XGL_ERR_UNSUPPORTED);
+    EXPECT_EQ(context.peers, peer);
+    EXPECT_FALSE(peer->rx_has_packet_number_state);
+    EXPECT_EQ(peer->rx_buffered_count, 0U);
+    EXPECT_EQ(feedback_attempts, 0U);
+}
+
 TEST_F(XglTransportRxContract, DuplicateFragmentRejectsBeforeCacheAndSack) {
     EXPECT_EQ(Receive(1U, 0x41U, DuplicateFragments(), true),
               XGL_ERR_INVALID_FRAME);

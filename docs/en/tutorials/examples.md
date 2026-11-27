@@ -9,7 +9,7 @@
 | `multi_node` | Routing through an intermediate node; requires forwarding |
 | `boot_update` | Bounded blocks, slow Flash BUSY and lost-ACK recovery |
 
-All examples use public APIs, explicit time and fixed application storage. The common synchronous host PHY copies frames into bounded byte queues.
+The examples link `xgl::xgl` and provide explicit time and fixed application storage. `boot_update` also uses private byte and CRC helpers. The common synchronous host PHY copies frames into bounded byte queues.
 
 ## Run
 

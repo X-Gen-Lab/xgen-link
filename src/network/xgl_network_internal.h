@@ -13,6 +13,10 @@ xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
                                          xgl_handle_t handle,
                                          xgl_packet_t* packet);
 
+/** \brief           Check ACK egress using the actual reverse-scope policy. */
+xgl_error_t xgl_network_check_feedback(void* ctx, const xgl_packet_t* received,
+                                       size_t ack_extension_len);
+
 /** \brief           Validate caller storage before DATA admission policy. */
 xgl_error_t
 xgl_network_validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data);
