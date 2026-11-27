@@ -105,7 +105,6 @@ TEST(XglFrameTest, AckOnlyFrameDoesNotSetControlFlag) {
     params.target_id = 0x20;
     params.packet_type = XGL_PACKET_TYPE_ACK;
     params.connection_id = 0x01020304;
-    params.packet_number = 0x11223344;
     params.payload = nullptr;
     params.payload_len = 0;
     params.reliable = false;
@@ -579,7 +578,6 @@ TEST(XglFrameTest, ZeroCopyAndCopiedFramesUseIdenticalWireRules) {
     params.target_id = 2U;
     params.payload = payload;
     params.payload_len = sizeof(payload);
-    params.packet_number = 99U;
     params.ttl = 8U;
     xgl_frame_t frame = {};
     ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
@@ -589,90 +587,16 @@ TEST(XglFrameTest, ZeroCopyAndCopiedFramesUseIdenticalWireRules) {
         xgl_frame_serialize(copied, sizeof(copied), &frame, &copied_length),
         XGL_OK);
     std::memcpy(inplace + 24U, payload, sizeof(payload));
-    ASSERT_EQ(xgl_frame_build_zerocopy(inplace, sizeof(inplace), 24U,
-                                       sizeof(payload), 1U, 2U, 0U, 99U, false,
-                                       0U, &inplace_length),
+    frame.payload = inplace + 24U;
+    xgl_frame_layout_t layout = {};
+    ASSERT_EQ(
+        xgl_frame_encode_into(inplace, sizeof(inplace), &frame, 0U, &layout),
+        XGL_OK);
+    ASSERT_EQ(xgl_frame_finalize_crc(inplace, sizeof(inplace), &layout,
+                                     &inplace_length),
               XGL_OK);
     EXPECT_EQ(copied_length, inplace_length);
     EXPECT_EQ(std::memcmp(copied, inplace, sizeof(copied)), 0);
-}
-
-/*---------------------------------------------------------------------------*/
-/* Zero-Copy Tests                                                           */
-/*---------------------------------------------------------------------------*/
-
-TEST(XglFrameTest, BuildZeroCopyFrame) {
-    /* Allocate buffer with space for header */
-    uint8_t buffer[256];
-    size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
-    size_t data_len = 8;
-    size_t frame_len;
-
-    /* Write payload data */
-    for (size_t i = 0; i < data_len; i++) {
-        buffer[data_offset + i] = (uint8_t)(0x10 + i);
-    }
-
-    /* Build frame in zero-copy mode */
-    xgl_error_t result =
-        xgl_frame_build_zerocopy(buffer, sizeof(buffer), data_offset, data_len,
-                                 0x10, 0x20, 0x05, 0x42, true, 3, &frame_len);
-
-    EXPECT_EQ(result, XGL_OK);
-
-    /* Expected: Header(27) + Data(8) + CRC16(2) = 37 */
-    EXPECT_EQ(frame_len, 37);
-
-    EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
-    EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
-
-    xgl_wire_header_t header = {};
-    ASSERT_EQ(xgl_wire_decode_header(&header, buffer, frame_len), XGL_OK);
-    EXPECT_EQ(header.packet_type, XGL_PACKET_TYPE_DATA);
-    EXPECT_EQ(header.header_len, data_offset);
-    EXPECT_EQ(header.traffic_class & XGL_RELIABILITY_CLASS_MASK,
-              XGL_RELIABILITY_ACK_ELICITING);
-
-    xgl_wire_ext_cursor_t cursor = {};
-    ASSERT_EQ(
-        xgl_wire_ext_cursor_init(&cursor, buffer + XGL_WIRE_BASE_HEADER_SIZE,
-                                 header.header_len - XGL_WIRE_BASE_HEADER_SIZE),
-        XGL_OK);
-    xgl_wire_ext_t ext = {};
-    ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
-    EXPECT_EQ(ext.type, XGL_WIRE_EXT_DATA_TYPE);
-    ASSERT_EQ(ext.len, 1U);
-    EXPECT_EQ(ext.value[0], 0x05U);
-
-    /* Check payload is intact */
-    for (size_t i = 0; i < data_len; i++) {
-        EXPECT_EQ(buffer[data_offset + i], (uint8_t)(0x10 + i));
-    }
-}
-
-TEST(XglFrameTest, ZeroCopyInvalidOffset) {
-    uint8_t buffer[256];
-    size_t frame_len;
-
-    /* Offset too small (no room for fixed header) */
-    xgl_error_t result = xgl_frame_build_zerocopy(
-        buffer, sizeof(buffer), 10, /* Too small, needs to be at least 12 */
-        8, 0x10, 0x20, 0x05, 0x42, false, 0, &frame_len);
-
-    EXPECT_EQ(result, XGL_ERR_INVALID_PARAM);
-}
-
-TEST(XglFrameTest, ZeroCopyBufferTooSmall) {
-    uint8_t buffer[20];
-    size_t data_offset = XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
-    size_t frame_len;
-
-    /* Buffer too small for data + CRC16 */
-    xgl_error_t result = xgl_frame_build_zerocopy(
-        buffer, sizeof(buffer), data_offset, 100, /* Too large */
-        0x10, 0x20, 0x05, 0x42, false, 0, &frame_len);
-
-    EXPECT_EQ(result, XGL_ERR_BUFFER_TOO_SMALL);
 }
 
 /*---------------------------------------------------------------------------*/

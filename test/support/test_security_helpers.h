@@ -36,7 +36,7 @@ static inline xgl_error_t test_serialize_trusted_frame(
     }
     xgl_wire_ext_metadata_t metadata = {};
     err = xgl_wire_decode_ext_metadata(frame->extensions, frame->extensions_len,
-                                       &metadata);
+                                       false, &metadata);
     if (err != XGL_OK) {
         return err;
     }

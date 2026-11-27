@@ -6,7 +6,7 @@ Datalink separates PHY byte I/O from protocol packets. It does not own reliabili
 
 PHY receive bytes may end in the middle of a header or frame, or contain several frames. The incremental parser preserves bounded partial-frame state, detects the magic/header layout and submits complete frames upward. Truncated input is retained only within the configured receive buffer and frame timeout. Malformed lengths, header CRC and final frame CRC are rejected before local transport processing.
 
-The canonical wire decoder validates complete frame layout. CRC detects transmission errors; authentication policy and verification are enforced at local network delivery. A decoded AUTH flag is not proof of verification.
+Incremental stream parsing and complete-frame decoding share the canonical Wire checks for headers, extensions, lengths and CRCs. CRC detects transmission errors; authentication policy and verification are enforced at local network delivery. A decoded AUTH flag is not proof of verification.
 
 Once the fixed header validates, the parser immediately checks that the header, payload and CRC minimum fits its cache. After decoding SECURITY, it checks the authentication trailer too. Capacity, format or CRC errors reject the current candidate and search retained bytes for magic, including a final single `A5`. Recovery prefers the earliest complete valid frame, otherwise retaining the earliest possible partial candidate. Magic inside a normally received payload does not preempt that frame.
 

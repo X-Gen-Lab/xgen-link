@@ -67,7 +67,8 @@ static xgl_error_t datalink_check_frame_size(xgl_datalink_ctx_t* ctx,
 
 /** \brief           Deliver a validated view within the datalink size limit. */
 static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
-                                         const xgl_wire_frame_view_t* view) {
+                                         const xgl_wire_frame_view_t* view,
+                                         uint8_t* mutable_frame) {
 #if XGL_FEATURE_STATISTICS
     if (ctx->stats != NULL) {
         ctx->stats->rx_packets++;
@@ -77,6 +78,7 @@ static xgl_error_t datalink_deliver_view(xgl_datalink_ctx_t* ctx,
     if (ctx->upper_layer != NULL && ctx->upper_layer->receive != NULL) {
         xgl_frame_rx_message_t message = {
             .view = view,
+            .mutable_frame = mutable_frame,
         };
         return ctx->upper_layer->receive(ctx->upper_layer->ctx,
                                          ctx->owner_handle, &message);
@@ -134,7 +136,7 @@ xgl_error_t xgl_datalink_consume_span_bounded(xgl_datalink_ctx_t* ctx,
         if (result == XGL_PARSE_RESULT_COMPLETE) {
             xgl_error_t error = datalink_check_frame_size(ctx, view.frame_len);
             if (error == XGL_OK) {
-                error = datalink_deliver_view(ctx, &view);
+                error = datalink_deliver_view(ctx, &view, parser->cache);
             }
             if (first_error == XGL_OK) {
                 first_error = error;
@@ -256,7 +258,7 @@ xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
         if (result == XGL_PARSE_RESULT_COMPLETE) {
             xgl_error_t error = datalink_check_frame_size(ctx, view.frame_len);
             if (error == XGL_OK) {
-                error = datalink_deliver_view(ctx, &view);
+                error = datalink_deliver_view(ctx, &view, parser->cache);
             }
             if (first_error == XGL_OK) {
                 first_error = error;
@@ -352,5 +354,5 @@ xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
         return err;
     }
 
-    return datalink_deliver_view(ctx, &view);
+    return datalink_deliver_view(ctx, &view, NULL);
 }

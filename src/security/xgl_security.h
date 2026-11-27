@@ -110,12 +110,20 @@ xgl_security_scope_requires_auth(const xgl_security_ctx_t* ctx,
 }
 #endif
 
-/** \brief           Check an installed TX scope without consuming a sequence.
+/**
+ * \brief           Check room for successive signatures without reserving them
+ * \param[in]       ctx: Security context
+ * \param[in]       remote_id: Remote endpoint identifier
+ * \param[in]       connection_id: Connection identity
+ * \param[in]       session_epoch: Exact trusted epoch
+ * \param[in]       need_second_signature: Whether both HELLO and DATA need
+ * signatures
  */
-xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,
+xgl_error_t xgl_security_check_tx_scope(const xgl_security_ctx_t* ctx,
                                         uint16_t remote_id,
                                         uint32_t connection_id,
-                                        uint32_t session_epoch);
+                                        uint32_t session_epoch,
+                                        bool need_second_signature);
 
 /** \brief           Check whether an exact installed association is active. */
 bool xgl_security_session_is_active(const xgl_security_ctx_t* ctx,
@@ -170,6 +178,21 @@ xgl_error_t xgl_security_verify_frame(xgl_security_ctx_t* ctx,
 xgl_error_t xgl_security_sign_frame(xgl_security_ctx_t* ctx, uint8_t* buffer,
                                     size_t capacity, size_t aad_len,
                                     size_t payload_len, size_t* frame_len);
+
+/**
+ * \brief           Sign after encoding the current measured frame
+ * \param[in,out]   ctx: Non-busy security context with a valid provider
+ * \param[in,out]   buffer: Encoded header, extensions and payload with tag
+ * space
+ * \param[in]       frame: Unchanged logical input used to encode buffer
+ * \param[in]       layout: Validated layout with a nonzero provider tag length
+ * \return          XGL_OK, or a source, session or provider error
+ * \note            The encoder has already appended SECURITY. This continuation
+ *                  borrows only the current synchronous serialization state.
+ */
+xgl_error_t xgl_security_sign_measured(xgl_security_ctx_t* ctx, uint8_t* buffer,
+                                       const xgl_frame_t* frame,
+                                       const xgl_frame_layout_t* layout);
 
 /**
  * \brief           Resolve the single authentication policy used by TX layers

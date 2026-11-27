@@ -83,15 +83,9 @@ xgl_error_t xgl_security_serialize_measured(uint8_t* buffer,
         return err;
     }
 
-    size_t frame_len_without_crc = 0;
-    err = xgl_security_sign_frame(
-        security, buffer, layout->frame_len - XGL_CRC16_SIZE,
-        layout->header_len, layout->payload_len, &frame_len_without_crc);
+    err = xgl_security_sign_measured(security, buffer, frame, layout);
     if (err != XGL_OK) {
         return err;
-    }
-    if (frame_len_without_crc + XGL_CRC16_SIZE != layout->frame_len) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
     }
     return xgl_frame_finalize_crc(buffer, layout->frame_len, layout,
                                   bytes_written);

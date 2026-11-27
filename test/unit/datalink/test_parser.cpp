@@ -103,9 +103,12 @@ class XglParserTest : public ::testing::Test {
         header.header_len =
             static_cast<uint8_t>(XGL_WIRE_BASE_HEADER_SIZE + ext.size());
         header.packet_type = XGL_PACKET_TYPE_DATA;
-        header.flags = static_cast<uint8_t>(XGL_WIRE_FLAG_HAS_EXTENSIONS);
+        header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
+        if (!ext.empty()) {
+            header.flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
+        }
         header.ttl = 8;
-        header.traffic_class = 3;
+        header.traffic_class = XGL_RELIABILITY_ACK_ELICITING | 3U;
         header.source_id = 0x1234;
         header.target_id = 0x5678;
         header.connection_id = 0x01020304;
@@ -181,7 +184,7 @@ TEST_F(XglParserTest, ResetParser) {
     parser.timestamp = 1000;
     parser.expected_header_len = 27;
     parser.expected_payload_len = 12;
-    parser.expected_auth_tag_len = 8;
+    parser.layout.auth_tag_len = 8;
 
     /* Reset */
     xgl_parser_reset(&parser);
@@ -192,7 +195,7 @@ TEST_F(XglParserTest, ResetParser) {
     EXPECT_EQ(parser.timestamp, 0);
     EXPECT_EQ(parser.expected_header_len, 0);
     EXPECT_EQ(parser.expected_payload_len, 0);
-    EXPECT_EQ(parser.expected_auth_tag_len, 0);
+    EXPECT_EQ(parser.layout.auth_tag_len, 0);
 }
 
 TEST_F(XglParserTest, ResetNullPointer) {
@@ -304,20 +307,17 @@ TEST_F(XglParserTest, ParseCompleteFrameWithPayload) {
 }
 
 TEST_F(XglParserTest, ParseCompleteFrameWithExtensionsAndPayload) {
-    uint8_t ack_value[32] = {};
-    size_t ack_value_len = 0;
-    const xgl_wire_ack_range_t ranges[] = {{/* gap */ 0, /* length */ 3},
-                                           {/* gap */ 2, /* length */ 1}};
-    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(ack_value, sizeof(ack_value),
-                                                  42, 250, ranges, 2,
-                                                  &ack_value_len),
+    uint8_t session_value[XGL_SESSION_EXT_VALUE_SIZE] = {};
+    size_t session_value_len = 0;
+    ASSERT_EQ(xgl_wire_encode_session_ext_value(
+                  session_value, sizeof(session_value), 42U, UINT64_C(250),
+                  &session_value_len),
               XGL_OK);
 
-    std::vector<uint8_t> ext(64);
+    std::vector<uint8_t> ext(XGL_SESSION_EXT_SIZE);
     size_t ext_len = 0;
-    ASSERT_EQ(xgl_wire_encode_ext(ext.data(), ext.size(),
-                                  XGL_WIRE_EXT_ACK_RANGE, ack_value,
-                                  ack_value_len, &ext_len),
+    ASSERT_EQ(xgl_wire_encode_ext(ext.data(), ext.size(), XGL_WIRE_EXT_SESSION,
+                                  session_value, session_value_len, &ext_len),
               XGL_OK);
     ext.resize(ext_len);
 
@@ -382,8 +382,9 @@ TEST_F(XglParserTest, ParseCompleteAuthenticatedFrameWithSecurityTrailer) {
 }
 
 TEST_F(XglParserTest, InvalidExtensionLengthResetsParser) {
-    std::vector<uint8_t> invalid_ext = {XGL_WIRE_EXT_ACK_RANGE, 12, 0x01, 0x02};
-    std::vector<uint8_t> frame = create_wire_frame_with_ext(invalid_ext, {});
+    std::vector<uint8_t> invalid_ext = {XGL_WIRE_EXT_SESSION, 12, 0x01, 0x02};
+    std::vector<uint8_t> frame =
+        create_wire_frame_with_ext(invalid_ext, {0x55U});
 
     xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;
     bool error_detected = false;

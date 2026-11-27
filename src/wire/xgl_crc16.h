@@ -1,6 +1,7 @@
 /**
  * \file            xgl_crc16.h
  * \brief           Private CRC-16/MODBUS used by the wire format
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_CRC16_H

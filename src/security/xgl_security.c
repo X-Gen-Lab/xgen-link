@@ -173,10 +173,11 @@ bool xgl_security_scope_requires_auth(const xgl_security_ctx_t* ctx,
 }
 #endif
 
-xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,
+xgl_error_t xgl_security_check_tx_scope(const xgl_security_ctx_t* ctx,
                                         uint16_t remote_id,
                                         uint32_t connection_id,
-                                        uint32_t session_epoch) {
+                                        uint32_t session_epoch,
+                                        bool need_second_signature) {
     if (ctx == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -187,12 +188,20 @@ xgl_error_t xgl_security_check_tx_scope(xgl_security_ctx_t* ctx,
         remote_id == ctx->local_id) {
         return XGL_ERR_INVALID_PARAM;
     }
-    xgl_security_session_t* session =
-        security_find(ctx, remote_id, connection_id, session_epoch);
-    if (session == NULL || !session->active) {
+    const size_t index =
+        security_find_index(ctx, remote_id, connection_id, session_epoch);
+    if (index >= XGL_SECURITY_SESSION_CAPACITY ||
+        !ctx->sessions[index].active) {
         return XGL_ERR_NOT_FOUND;
     }
-    return session->exhausted ? XGL_ERR_SEQUENCE_ERROR : XGL_OK;
+    const xgl_security_session_t* session = &ctx->sessions[index];
+    /* The last sequence can carry one frame, but cannot cover HELLO and DATA.
+     */
+    if (session->exhausted ||
+        (need_second_signature && session->tx_next_seq == UINT64_MAX)) {
+        return XGL_ERR_SEQUENCE_ERROR;
+    }
+    return XGL_OK;
 }
 
 /**
@@ -327,7 +336,7 @@ xgl_error_t xgl_security_session_close(xgl_security_ctx_t* ctx,
  * \brief           Construct strict nonce and canonical AAD for a provider call
  * \param[in,out]   ctx: Context owning canonical AAD scratch
  * \param[out]      input: Versioned borrowed provider input
- * \param[in]       header: Parsed wire header
+ * \param[in]       header: Validated or constructed wire header
  * \param[in]       buffer: Actual frame bytes
  * \param[in]       epoch: Trusted epoch
  * \param[in]       key_id: Directional key identifier
@@ -360,6 +369,71 @@ static void security_prepare_input(xgl_security_ctx_t* ctx,
     input->aad_len = header->header_len;
     input->payload = buffer + header->header_len;
     input->payload_len = header->payload_len;
+}
+
+/** \brief           Sign with the exact scope and SECURITY value already known.
+ */
+static xgl_error_t security_sign_encoded(xgl_security_ctx_t* ctx,
+                                         uint8_t* buffer,
+                                         const xgl_wire_header_t* header,
+                                         uint32_t epoch,
+                                         uint8_t* security_value) {
+    xgl_security_session_t* session =
+        security_find(ctx, header->target_id, header->connection_id, epoch);
+    if (session == NULL || !session->active) {
+        return XGL_ERR_NOT_FOUND;
+    }
+    if (session->exhausted) {
+        return XGL_ERR_SEQUENCE_ERROR;
+    }
+
+    const uint64_t sequence = session->tx_next_seq;
+    if (sequence == UINT64_MAX) {
+        session->exhausted = true;
+    } else {
+        session->tx_next_seq++;
+    }
+    size_t written = 0U;
+    xgl_error_t err = xgl_wire_encode_security_ext_value(
+        security_value, XGL_SECURITY_EXT_VALUE_SIZE, session->config.tx_key_id,
+        sequence, (uint8_t)ctx->provider->tag_len, &written);
+    if (err != XGL_OK) {
+        return err;
+    }
+
+    ctx->busy = true;
+    xgl_auth_input_t input;
+    security_prepare_input(ctx, &input, header, buffer, epoch,
+                           session->config.tx_key_id,
+                           session->config.tx_nonce_prefix, sequence);
+    const size_t tag_offset = (size_t)header->header_len + header->payload_len;
+    size_t tag_len = 0U;
+    err =
+        ctx->provider->sign(&input, buffer + tag_offset, ctx->provider->tag_len,
+                            &tag_len, ctx->provider->user_data);
+    ctx->busy = false;
+    if (err != XGL_OK) {
+        return err;
+    }
+    return tag_len == ctx->provider->tag_len ? XGL_OK : XGL_ERR_INVALID_FRAME;
+}
+
+xgl_error_t xgl_security_sign_measured(xgl_security_ctx_t* ctx, uint8_t* buffer,
+                                       const xgl_frame_t* frame,
+                                       const xgl_frame_layout_t* layout) {
+    if (frame->header.source_id != ctx->local_id) {
+        return XGL_ERR_INVALID_FRAME;
+    }
+
+    /* The measured encoder derives these fields and appends SECURITY last. */
+    xgl_wire_header_t header = frame->header;
+    header.version = XGL_WIRE_VERSION;
+    header.header_len = (uint8_t)layout->header_len;
+    header.payload_len = (uint16_t)layout->payload_len;
+    uint8_t* security_value =
+        buffer + layout->header_len - XGL_SECURITY_EXT_VALUE_SIZE;
+    return security_sign_encoded(ctx, buffer, &header, layout->session_epoch,
+                                 security_value);
 }
 
 /**
@@ -404,62 +478,18 @@ xgl_error_t xgl_security_sign_frame(xgl_security_ctx_t* ctx, uint8_t* buffer,
         return XGL_ERR_INVALID_FRAME;
     }
     xgl_wire_ext_metadata_t metadata;
-    err = xgl_wire_decode_ext_metadata(buffer + XGL_WIRE_BASE_HEADER_SIZE,
-                                       aad_len - XGL_WIRE_BASE_HEADER_SIZE,
-                                       &metadata);
-    if (err != XGL_OK || !metadata.has_security_ext ||
-        metadata.auth_tag_len != ctx->provider->tag_len) {
+    uint8_t* extensions = buffer + XGL_WIRE_BASE_HEADER_SIZE;
+    err = xgl_wire_decode_ext_metadata(
+        extensions, aad_len - XGL_WIRE_BASE_HEADER_SIZE, true, &metadata);
+    if (err != XGL_OK || metadata.auth_tag_len != ctx->provider->tag_len) {
         return XGL_ERR_INVALID_FRAME;
     }
-    xgl_security_session_t* session = security_find(
-        ctx, header.target_id, header.connection_id, metadata.session_epoch);
-    if (session == NULL || !session->active) {
-        return XGL_ERR_NOT_FOUND;
+    err = security_sign_encoded(ctx, buffer, &header, metadata.session_epoch,
+                                extensions + metadata.security_offset);
+    if (err == XGL_OK) {
+        *frame_len = aad_len + payload_len + metadata.auth_tag_len;
     }
-    if (session->exhausted) {
-        return XGL_ERR_SEQUENCE_ERROR;
-    }
-    xgl_wire_ext_cursor_t cursor;
-    xgl_wire_ext_t ext;
-    (void)xgl_wire_ext_cursor_init(&cursor, buffer + XGL_WIRE_BASE_HEADER_SIZE,
-                                   aad_len - XGL_WIRE_BASE_HEADER_SIZE);
-    while (xgl_wire_ext_cursor_next(&cursor, &ext) == XGL_OK) {
-        if (ext.type == XGL_WIRE_EXT_SECURITY) {
-            break;
-        }
-    }
-    uint64_t sequence = session->tx_next_seq;
-    if (sequence == UINT64_MAX) {
-        session->exhausted = true;
-    } else {
-        session->tx_next_seq++;
-    }
-    size_t written = 0U;
-    err = xgl_wire_encode_security_ext_value(
-        buffer + (ext.value - buffer), ext.len, session->config.tx_key_id,
-        sequence, metadata.auth_tag_len, &written);
-    if (err != XGL_OK) {
-        return err;
-    }
-    ctx->busy = true;
-    xgl_auth_input_t input;
-    security_prepare_input(ctx, &input, &header, buffer, metadata.session_epoch,
-                           session->config.tx_key_id,
-                           session->config.tx_nonce_prefix, sequence);
-    size_t tag_len = 0U;
-    size_t tag_offset = aad_len + payload_len;
-    err =
-        ctx->provider->sign(&input, buffer + tag_offset, ctx->provider->tag_len,
-                            &tag_len, ctx->provider->user_data);
-    ctx->busy = false;
-    if (err != XGL_OK) {
-        return err;
-    }
-    if (tag_len != ctx->provider->tag_len) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-    *frame_len = tag_offset + tag_len;
-    return XGL_OK;
+    return err;
 }
 
 /**

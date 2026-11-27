@@ -2,6 +2,9 @@
  * \file            xgl_parser.c
  * \brief           Per-link bounded byte-stream framing state machine
  * \author          X-Gen Lab
+ * \version         5.0.0
+ * \date            2026-11-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>
@@ -34,7 +37,7 @@ void xgl_parser_reset(xgl_parser_t* parser) {
     parser->timestamp = 0U;
     parser->expected_header_len = 0U;
     parser->expected_payload_len = 0U;
-    parser->expected_auth_tag_len = 0U;
+    parser->layout = (xgl_wire_rx_layout_t){0};
 #if XGL_FEATURE_ADVANCED_RUNTIME
     parser->input_offset = 0U;
     parser->input_end = 0U;
@@ -64,7 +67,7 @@ static xgl_parse_result_t parser_reject(xgl_parser_t* parser) {
 
 static size_t parser_frame_len(const xgl_parser_t* parser) {
     return (size_t)parser->expected_header_len + parser->expected_payload_len +
-           parser->expected_auth_tag_len + XGL_CRC16_SIZE;
+           parser->layout.auth_tag_len + XGL_CRC16_SIZE;
 }
 
 /** \brief           Inspect boundaries without moving buffered bytes. */
@@ -75,12 +78,8 @@ parser_inspect(xgl_parser_t* parser, const uint8_t* buffer, size_t available,
         if (available < XGL_WIRE_BASE_HEADER_SIZE) {
             return XGL_PARSE_RESULT_INCOMPLETE;
         }
-        xgl_error_t error =
-            xgl_wire_decode_header(&view->header, buffer, available);
-        if (error != XGL_OK) {
-            if (status != NULL && error == XGL_ERR_CRC_FAILED) {
-                *status = XGL_WIRE_DECODE_HEADER_CRC;
-            }
+        if (xgl_wire_rx_check_header(&view->header, buffer, available,
+                                     status) != XGL_OK) {
             return parser_reject(parser);
         }
         const size_t minimum_frame_len =
@@ -91,27 +90,23 @@ parser_inspect(xgl_parser_t* parser, const uint8_t* buffer, size_t available,
         }
         parser->expected_header_len = view->header.header_len;
         parser->expected_payload_len = view->header.payload_len;
-        parser->expected_auth_tag_len = 0U;
         parser->state = XGL_PARSE_EXTENSIONS;
     }
     if (parser->state == XGL_PARSE_EXTENSIONS) {
         if (available < parser->expected_header_len) {
             return XGL_PARSE_RESULT_INCOMPLETE;
         }
-        xgl_wire_ext_metadata_t metadata;
-        if (xgl_wire_decode_ext_metadata(buffer + XGL_WIRE_BASE_HEADER_SIZE,
-                                         (size_t)parser->expected_header_len -
-                                             XGL_WIRE_BASE_HEADER_SIZE,
-                                         &metadata) != XGL_OK) {
+        if (xgl_wire_rx_check_extensions(&parser->layout, buffer,
+                                         parser->expected_header_len) !=
+            XGL_OK) {
             return parser_reject(parser);
         }
         /* The fixed-header check already proved this base fits the cache. */
         const size_t base_size = (size_t)parser->expected_header_len +
                                  parser->expected_payload_len + XGL_CRC16_SIZE;
-        if (metadata.auth_tag_len > parser->cache_size - base_size) {
+        if (parser->layout.auth_tag_len > parser->cache_size - base_size) {
             return parser_reject(parser);
         }
-        parser->expected_auth_tag_len = metadata.auth_tag_len;
         parser->state = XGL_PARSE_PAYLOAD;
     }
     if (parser->state != XGL_PARSE_PAYLOAD && parser->state != XGL_PARSE_CRC) {
@@ -123,7 +118,8 @@ parser_inspect(xgl_parser_t* parser, const uint8_t* buffer, size_t available,
                                                            : XGL_PARSE_CRC;
         return XGL_PARSE_RESULT_INCOMPLETE;
     }
-    if (xgl_wire_decode_frame(view, buffer, total, status) != XGL_OK) {
+    if (xgl_wire_rx_complete(view, buffer, total, &parser->layout, status) !=
+        XGL_OK) {
         return parser_reject(parser);
     }
     parser->state = XGL_PARSE_COMPLETE;

@@ -47,7 +47,7 @@ if (result == XGL_OK && layout.frame_size <= sizeof(frame_buffer)) {
 
 Network TX 包数及 payload 字节数只在下层提交成功后计入，普通、原地与转发路径保持一致。这些计数不证明远端交付。
 
-Boot 私有的 network 逻辑发送工作区最多容纳 32 字节扩展，足够同时组合一个 ACK_RANGE、SESSION 和 DATA_TYPE。更长的逻辑发送扩展列表会在提交 PHY 前被拒绝。该 profile 限制不改变 Wire v1：完整帧编解码仍支持 255 字节帧头，其他 profile 保留完整的 231 字节逻辑扩展工作区。
+本机发送时，Network 使用 32 字节的临时缓冲组合 Transport 生成的扩展，编码阶段追加所需的 SECURITY。接收和转发仍按完整 Wire 帧校验，帧头的线上上限为 255 字节。
 
 ## 可靠和非可靠发送
 

@@ -303,6 +303,93 @@ TEST_F(XglSendTest, OrdinaryRejectsPayloadAboveRouteMtu) {
     EXPECT_EQ(xgl_send_at(handle, &tx_data, 0U), XGL_OK);
 }
 
+TEST_F(XglSendTest, ScopedAuthenticatedCopyAndZeroCopyHonorExactRouteMtu) {
+    xgl_destroy(handle);
+    handle = nullptr;
+    constexpr size_t mtu = 80U;
+    constexpr size_t payload_offset = 24U + 3U + 14U + 15U;
+    constexpr size_t tag_length = 8U;
+    constexpr size_t capacity = mtu - payload_offset - tag_length - 2U;
+    route.max_frame_size = mtu;
+    xgl_auth_provider_t provider = {};
+    provider.sign = send_test_auth_sign;
+    provider.verify = send_test_auth_verify;
+    provider.tag_len = tag_length;
+    config.auth_provider = &provider;
+    config.auth_required = true;
+    handle = xgl_create(&config);
+    ASSERT_NE(handle, nullptr);
+    ASSERT_EQ(xgl_init(handle), XGL_OK);
+    constexpr uint32_t connection = 17U;
+    constexpr uint32_t epoch = 42U;
+    const auto session = test_session_config(2U, connection, epoch);
+    ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
+
+    uint8_t frame[mtu + 1U] = {};
+    std::memset(frame + payload_offset, 0x5A, capacity + 1U);
+    xgl_tx_data_t copy = {};
+    copy.target_id = 2U;
+    copy.connection_id = connection;
+    copy.session_epoch = epoch;
+    copy.data_type = 7U;
+    copy.data = frame + payload_offset;
+    copy.data_len = capacity + 1U;
+    xgl_tx_zerocopy_request_t zero_copy = {};
+    zero_copy.connection_id = connection;
+    zero_copy.session_epoch = epoch;
+    zero_copy.data.target_id = copy.target_id;
+    zero_copy.data.data_type = copy.data_type;
+    zero_copy.data.buffer = frame;
+    zero_copy.data.buffer_size = sizeof(frame);
+    zero_copy.data.data_offset = payload_offset;
+    zero_copy.data.data_len = copy.data_len;
+    const std::vector<uint8_t> original(frame, frame + sizeof(frame));
+
+    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
+    EXPECT_EQ(xgl_send_at(handle, &copy, 0U), XGL_ERR_BUFFER_TOO_SMALL);
+    xgl_tx_frame_layout_t layout = {1U, 1U};
+    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &zero_copy, &layout),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(layout.payload_offset, 0U);
+    EXPECT_EQ(layout.frame_size, 0U);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero_copy, 0U),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(std::memcmp(frame, original.data(), sizeof(frame)), 0);
+    ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(mock_phy));
+
+    copy.data_len = capacity;
+    zero_copy.data.data_len = capacity;
+    ASSERT_EQ(xgl_send_zerocopy_layout(handle, &zero_copy, &layout), XGL_OK);
+    EXPECT_EQ(layout.payload_offset, payload_offset);
+    EXPECT_EQ(layout.frame_size, mtu);
+    uint64_t next_sequence = 0U;
+    auto check_frame = [=, &next_sequence](const uint8_t* bytes, size_t len,
+                                           void*) {
+        xgl_wire_frame_view_t view = {};
+        const auto decoded = xgl_wire_decode_frame(&view, bytes, len, nullptr);
+        EXPECT_EQ(decoded, XGL_OK);
+        if (decoded == XGL_OK) {
+            EXPECT_EQ(view.header.connection_id, connection);
+            EXPECT_EQ(view.session_epoch, epoch);
+            EXPECT_EQ(view.payload_len, capacity);
+            EXPECT_EQ(view.header.header_len, payload_offset);
+            EXPECT_EQ(view.data_type, 7U);
+            EXPECT_TRUE(view.authenticated);
+            EXPECT_EQ(view.auth_tag_len, tag_length);
+            EXPECT_EQ(view.nonce_id, next_sequence++);
+            EXPECT_EQ(view.payload[0], 0x5AU);
+        }
+        return decoded;
+    };
+    testing::InSequence sequence;
+    EXPECT_CALL(*mock_phy, tx(testing::_, mtu, testing::_))
+        .WillOnce(testing::Invoke(check_frame));
+    EXPECT_CALL(*mock_phy, tx(frame, mtu, testing::_))
+        .WillOnce(testing::Invoke(check_frame));
+    EXPECT_EQ(xgl_send_at(handle, &copy, 1U), XGL_OK);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero_copy, 2U), XGL_OK);
+}
+
 /**
  * \brief           Test send to non-existent route
  */

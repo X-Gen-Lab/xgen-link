@@ -116,9 +116,6 @@ typedef struct xgl_transport_ctx_s {
     uint32_t current_time_ms;    /**< Caller-provided runtime clock */
     uint32_t default_timeout_ms; /**< Default timeout in milliseconds */
     uint16_t max_frame_size;     /**< Maximum frame size */
-    uint8_t auth_tag_len; /**< Authentication tag length reserved per frame */
-    xgl_route_table_t*
-        route_table; /**< Optional route table for route MTU lookup */
     uint32_t
         peer_idle_timeout_ms; /**< Unused peer reclaim timeout; 0 = disabled */
 
@@ -172,9 +169,6 @@ typedef struct {
     uint32_t default_timeout_ms; /**< Default timeout in milliseconds */
     uint8_t window_size;         /**< Sliding window size */
     uint16_t max_frame_size;     /**< Maximum frame size */
-    uint8_t auth_tag_len; /**< Authentication tag length reserved per frame */
-    xgl_route_table_t*
-        route_table; /**< Optional route table for route MTU lookup */
     xgl_packet_tx_endpoint_t*
         lower_layer;               /**< Lower layer interface (network) */
     xgl_rx_callback_t rx_callback; /**< Receive callback (can be NULL) */

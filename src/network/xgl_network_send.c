@@ -12,12 +12,15 @@
 #include "xgl/xgl_config.h"
 #include "xgl_network_internal.h"
 
-/* Boot emits one ACK range, SESSION and optional DATA_TYPE. This logical TX
- * workspace does not constrain the wire decoder or serialized frame ingress. */
-#if !XGL_FEATURE_AUTH && !XGL_FEATURE_FORWARDING && !XGL_FEATURE_OUT_OF_ORDER
-#define XGL_NETWORK_TX_EXT_CAPACITY 32U
+/* Transport emits at most 15 bytes of feedback plus a SESSION and optional
+ * DATA_TYPE. Only the generic network sender serves caller-supplied TLVs. */
+#define XGL_NETWORK_TX_GENERATED_EXT_CAPACITY 32U
+#if XGL_BUILD_PROFILE_BOOT
+#define XGL_NETWORK_TX_GENERIC_EXT_CAPACITY                                    \
+    XGL_NETWORK_TX_GENERATED_EXT_CAPACITY
 #else
-#define XGL_NETWORK_TX_EXT_CAPACITY (UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE)
+#define XGL_NETWORK_TX_GENERIC_EXT_CAPACITY                                    \
+    (UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE)
 #endif
 
 static void network_count_tx_error(xgl_network_ctx_t* ctx) {
@@ -75,21 +78,22 @@ static xgl_error_t network_copy_packet_extensions(uint8_t* extensions,
     if (packet->extensions == NULL && packet->extensions_len > 0U) {
         return XGL_ERR_NULL_POINTER;
     }
+    xgl_wire_ext_metadata_t metadata = {0};
+    xgl_error_t err;
     if (packet->extensions_len > 0U) {
         if (packet->extensions_len > extensions_capacity) {
             return XGL_ERR_BUFFER_TOO_SMALL;
+        }
+        err = xgl_wire_decode_ext_metadata(
+            packet->extensions, packet->extensions_len, false, &metadata);
+        if (err != XGL_OK) {
+            return err;
         }
         memcpy(extensions, packet->extensions, packet->extensions_len);
         *extensions_len = packet->extensions_len;
     }
 
-    xgl_wire_ext_metadata_t metadata;
-    xgl_error_t err =
-        xgl_wire_decode_ext_metadata(extensions, *extensions_len, &metadata);
-    if (err != XGL_OK) {
-        return err;
-    }
-    if (metadata.data_type_found) {
+    if (metadata.data_type_offset != 0U) {
         if (packet->data_type != 0U &&
             packet->data_type != metadata.data_type) {
             return XGL_ERR_INVALID_PARAM;
@@ -101,7 +105,7 @@ static xgl_error_t network_copy_packet_extensions(uint8_t* extensions,
             return err;
         }
     }
-    if (metadata.session_epoch_found) {
+    if (metadata.session_offset != 0U) {
         return metadata.session_epoch == packet->session_epoch
                    ? XGL_OK
                    : XGL_ERR_INVALID_PARAM;
@@ -165,7 +169,6 @@ static xgl_error_t network_build_tx_frame(xgl_network_ctx_t* ctx,
         .target_id = packet->target_id,
         .packet_type = packet->packet_type,
         .flags = packet->flags,
-        .traffic_class = packet->traffic_class,
         .connection_id = packet->connection_id,
         .packet_number = packet->packet_number,
         .extensions = (extensions_len > 0U) ? extensions : NULL,
@@ -176,14 +179,6 @@ static xgl_error_t network_build_tx_frame(xgl_network_ctx_t* ctx,
         .reliability_class = network_reliability_class(packet),
         .priority = packet->priority,
         .ttl = XGL_DEFAULT_TTL};
-
-#if XGL_FEATURE_AUTH && XGL_FEATURE_ADVANCED_RUNTIME
-    if (xgl_security_scope_requires_auth(ctx->security, packet->target_id,
-                                         packet->connection_id,
-                                         packet->session_epoch)) {
-        params.flags |= XGL_WIRE_FLAG_AUTHENTICATED;
-    }
-#endif
 
     err = xgl_frame_build(frame, &params);
     if (err != XGL_OK) {
@@ -207,33 +202,110 @@ static xgl_error_t network_measure_egress_frame(const xgl_network_ctx_t* ctx,
         return error;
     }
     const size_t instance_limit =
-        ctx->max_frame_size != 0U ? ctx->max_frame_size : SIZE_MAX;
+        ctx->max_frame_size != 0U &&
+                ctx->max_frame_size < XGL_DATALINK_MAX_FRAME_SIZE
+            ? ctx->max_frame_size
+            : XGL_DATALINK_MAX_FRAME_SIZE;
     return layout->frame_len <= xgl_route_frame_limit(route, instance_limit)
                ? XGL_OK
                : XGL_ERR_BUFFER_TOO_SMALL;
 }
 
-#if XGL_FEATURE_AUTH
 /* Parameter order follows the documented protocol scope. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-static xgl_error_t network_check_scope_tag(const xgl_network_ctx_t* ctx,
-                                           uint16_t target_id,
-                                           uint32_t connection_id,
-                                           uint32_t session_epoch,
-                                           size_t* tag_len) {
+static xgl_error_t
+network_check_scope_tag(const xgl_network_ctx_t* ctx, uint16_t target_id,
+                        uint32_t connection_id, uint32_t session_epoch,
+                        uint8_t flags, bool need_second_signature,
+                        size_t* tag_len) {
     /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    xgl_security_ctx_t* security = ctx->security;
+#if XGL_FEATURE_AUTH
+    const xgl_security_ctx_t* security = ctx->security;
     xgl_error_t error = xgl_security_frame_tag_len(
         xgl_security_scope_requires_auth(security, target_id, connection_id,
                                          session_epoch),
-        security != NULL ? security->provider : NULL, 0U, tag_len);
+        security != NULL ? security->provider : NULL, flags, tag_len);
     if (error != XGL_OK || *tag_len == 0U) {
         return error;
     }
     return xgl_security_check_tx_scope(security, target_id, connection_id,
-                                       session_epoch);
-}
+                                       session_epoch, need_second_signature);
+#else
+    (void)ctx;
+    (void)target_id;
+    (void)connection_id;
+    (void)session_epoch;
+    (void)need_second_signature;
+    *tag_len = 0U;
+    return (flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U ? XGL_ERR_INVALID_FRAME
+                                                       : XGL_OK;
 #endif
+}
+
+/* Caller-supplied extension lengths exclude SECURITY. */
+/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
+static xgl_error_t
+network_prepare_egress(const xgl_network_ctx_t* ctx,
+                       const xgl_route_item_t* route, uint32_t connection_id,
+                       uint32_t session_epoch, uint8_t flags,
+                       size_t payload_len, size_t extensions_len,
+                       bool need_second_signature, xgl_frame_layout_t* layout) {
+    /* NOLINTEND(bugprone-easily-swappable-parameters) */
+    size_t tag_len;
+    xgl_error_t error = network_check_scope_tag(
+        ctx, route->target_id, connection_id, session_epoch, flags,
+        need_second_signature, &tag_len);
+    if (error != XGL_OK) {
+        return error;
+    }
+    error = network_measure_egress_frame(ctx, route, payload_len,
+                                         extensions_len, tag_len, layout);
+    if (error == XGL_OK) {
+        layout->session_epoch = session_epoch;
+    }
+    return error;
+}
+
+static void network_report_missing_route(xgl_network_ctx_t* ctx,
+                                         xgl_handle_t handle) {
+    if (ctx->error_callback != NULL) {
+        ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
+                            XGL_ERROR_MESSAGE("Route not found"),
+                            ctx->callback_user_data);
+    }
+    network_count_tx_error(ctx);
+}
+
+xgl_error_t xgl_network_check_data(void* network, xgl_handle_t handle,
+                                   const xgl_tx_data_t* data, bool need_hello) {
+    xgl_network_ctx_t* ctx = network;
+    const xgl_route_item_t* route =
+        xgl_route_table_lookup(ctx->route_table, data->target_id);
+    if (route == NULL) {
+        network_report_missing_route(ctx, handle);
+        return XGL_ERR_ROUTE_NOT_FOUND;
+    }
+    if (route->phy == NULL || route->phy->tx == NULL ||
+        ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
+        network_count_tx_error(ctx);
+        return XGL_ERR_INVALID_PARAM;
+    }
+    const size_t extensions_len =
+        xgl_wire_packet_extension_size(data->data_type, data->session_epoch);
+    xgl_frame_layout_t layout;
+    xgl_error_t error = network_prepare_egress(
+        ctx, route, data->connection_id, data->session_epoch, 0U,
+        data->data_len, extensions_len, need_hello, &layout);
+    if (error == XGL_OK && need_hello) {
+        /* HELLO adds a DATA_TYPE TLV even if DATA has no type or one byte. */
+        const size_t hello_extensions_len =
+            XGL_DATA_TYPE_EXT_SIZE +
+            xgl_wire_packet_extension_size(0U, data->session_epoch);
+        error = network_measure_egress_frame(
+            ctx, route, 0U, hello_extensions_len, layout.tag_len, &layout);
+    }
+    return error;
+}
 
 xgl_error_t xgl_network_check_feedback(void* network,
                                        const xgl_packet_t* received,
@@ -245,67 +317,27 @@ xgl_error_t xgl_network_check_feedback(void* network,
         return XGL_ERR_ROUTE_NOT_FOUND;
     }
 
-    size_t tag_len = 0U;
-#if XGL_FEATURE_AUTH
-    const xgl_error_t error = network_check_scope_tag(
-        ctx, received->source_id, received->connection_id,
-        received->session_epoch, &tag_len);
-    if (error != XGL_OK) {
-        return error;
-    }
-#endif
-
     const size_t extensions_len =
         ack_extension_len +
         xgl_wire_packet_extension_size(0U, received->session_epoch);
     xgl_frame_layout_t layout;
-    return network_measure_egress_frame(ctx, route, 0U, extensions_len, tag_len,
-                                        &layout);
-}
-
-/**
- * \brief           Check the complete frame size against the egress route MTU
- * \param[in,out]   ctx: Network frame policy and statistics context
- * \param[in]       frame: Built frame including composed extensions
- * \param[in]       route: Selected egress route
- * \return          XGL_OK if the complete frame fits, error code otherwise
- */
-static xgl_error_t network_validate_tx_budget(xgl_network_ctx_t* ctx,
-                                              const xgl_frame_t* frame,
-                                              const xgl_route_item_t* route) {
-    size_t auth_tag_len = 0U;
-#if XGL_FEATURE_AUTH
-    const xgl_security_ctx_t* security = ctx->security;
-    xgl_error_t error =
-        xgl_security_frame_tag_len(security != NULL && security->auth_required,
-                                   security != NULL ? security->provider : NULL,
-                                   frame->header.flags, &auth_tag_len);
-    if (error != XGL_OK) {
-        network_count_tx_error(ctx);
-        return error;
-    }
-#endif
-
-    xgl_frame_layout_t layout;
-    xgl_error_t measured = network_measure_egress_frame(
-        ctx, route, frame->payload_len, frame->extensions_len, auth_tag_len,
-        &layout);
-    if (measured != XGL_OK) {
-        network_count_tx_error(ctx);
-    }
-    return measured;
+    return network_prepare_egress(ctx, route, received->connection_id,
+                                  received->session_epoch, 0U, 0U,
+                                  extensions_len, false, &layout);
 }
 
 static xgl_error_t
 network_send_frame_to_lower(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                             xgl_phy_ops_t* phy, xgl_frame_t* frame,
+                            const xgl_frame_layout_t* layout,
                             const xgl_tx_data_zerocopy_t* inplace) {
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         network_count_tx_error(ctx);
         return XGL_ERR_INVALID_PARAM;
     }
 
-    xgl_frame_tx_message_t send_data = {.frame = frame, .phy = phy};
+    xgl_frame_tx_message_t send_data = {
+        .frame = frame, .layout = layout, .phy = phy};
     if (inplace != NULL) {
         send_data.buffer = inplace->buffer;
         send_data.buffer_size = inplace->buffer_size;
@@ -320,10 +352,10 @@ network_send_frame_to_lower(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     return err;
 }
 
-static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
-                                       xgl_handle_t handle,
-                                       xgl_packet_t* packet,
-                                       const xgl_tx_data_zerocopy_t* inplace) {
+static xgl_error_t
+network_send_packet(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                    xgl_packet_t* packet, const xgl_tx_data_zerocopy_t* inplace,
+                    uint8_t* extensions, size_t extensions_capacity) {
     if (ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -331,17 +363,15 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
     if (packet->data == NULL) {
         return XGL_ERR_INVALID_PARAM;
     }
+    if (packet->data->data_len != 0U && packet->data->data == NULL) {
+        network_count_tx_error(ctx);
+        return XGL_ERR_NULL_POINTER;
+    }
 
     xgl_route_item_t* route =
         xgl_route_table_lookup(ctx->route_table, packet->target_id);
     if (route == NULL) {
-        if (ctx->error_callback != NULL) {
-            ctx->error_callback(handle, XGL_ERR_ROUTE_NOT_FOUND,
-                                XGL_ERROR_MESSAGE("Route not found"),
-                                ctx->callback_user_data);
-        }
-
-        network_count_tx_error(ctx);
+        network_report_missing_route(ctx, handle);
         return XGL_ERR_ROUTE_NOT_FOUND;
     }
 
@@ -349,20 +379,27 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
         packet->source_id = ctx->local_id;
     }
 
-    uint8_t extensions[XGL_NETWORK_TX_EXT_CAPACITY];
     xgl_frame_t frame;
     xgl_error_t err = network_build_tx_frame(ctx, packet, extensions,
-                                             sizeof(extensions), &frame);
+                                             extensions_capacity, &frame);
     if (err != XGL_OK) {
         return err;
     }
 
-    err = network_validate_tx_budget(ctx, &frame, route);
+    xgl_frame_layout_t layout;
+    err = network_prepare_egress(
+        ctx, route, packet->connection_id, packet->session_epoch, packet->flags,
+        frame.payload_len, frame.extensions_len, false, &layout);
     if (err != XGL_OK) {
+        network_count_tx_error(ctx);
         return err;
     }
+    if (layout.tag_len != 0U) {
+        frame.header.flags |= XGL_WIRE_FLAG_AUTHENTICATED;
+    }
 
-    err = network_send_frame_to_lower(ctx, handle, route->phy, &frame, inplace);
+    err = network_send_frame_to_lower(ctx, handle, route->phy, &frame, &layout,
+                                      inplace);
 #if XGL_FEATURE_STATISTICS
     if (err == XGL_OK && ctx->stats != NULL) {
         ctx->stats->tx_packets++;
@@ -372,14 +409,18 @@ static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
     return err;
 }
 
-xgl_error_t xgl_network_send_with_handle(xgl_network_ctx_t* ctx,
-                                         xgl_handle_t handle,
-                                         xgl_packet_t* packet) {
-    return network_send_packet(ctx, handle, packet, NULL);
+xgl_error_t xgl_network_send_generated(xgl_network_ctx_t* ctx,
+                                       xgl_handle_t handle,
+                                       xgl_packet_t* packet) {
+    uint8_t extensions[XGL_NETWORK_TX_GENERATED_EXT_CAPACITY];
+    return network_send_packet(ctx, handle, packet, NULL, extensions,
+                               sizeof(extensions));
 }
 
 xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet) {
-    return xgl_network_send_with_handle(ctx, NULL, packet);
+    uint8_t extensions[XGL_NETWORK_TX_GENERIC_EXT_CAPACITY];
+    return network_send_packet(ctx, NULL, packet, NULL, extensions,
+                               sizeof(extensions));
 }
 
 /**
@@ -458,7 +499,9 @@ xgl_network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         .priority = request->priority,
         .data = &data,
     };
-    return network_send_packet(ctx, handle, &packet, request);
+    uint8_t extensions[XGL_NETWORK_TX_GENERATED_EXT_CAPACITY];
+    return network_send_packet(ctx, handle, &packet, request, extensions,
+                               sizeof(extensions));
 }
 
 xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
@@ -502,20 +545,12 @@ xgl_network_zerocopy_layout(xgl_network_ctx_t* ctx,
     if (route == NULL) {
         return XGL_ERR_ROUTE_NOT_FOUND;
     }
-    size_t tag_len = 0U;
-#if XGL_FEATURE_AUTH
-    xgl_error_t error =
-        network_check_scope_tag(ctx, data->target_id, request->connection_id,
-                                request->session_epoch, &tag_len);
-    if (error != XGL_OK) {
-        return error;
-    }
-#endif
     size_t extensions_len =
         xgl_wire_packet_extension_size(data->data_type, request->session_epoch);
     xgl_frame_layout_t measured;
-    xgl_error_t error_layout = network_measure_egress_frame(
-        ctx, route, data->data_len, extensions_len, tag_len, &measured);
+    xgl_error_t error_layout = network_prepare_egress(
+        ctx, route, request->connection_id, request->session_epoch, 0U,
+        data->data_len, extensions_len, false, &measured);
     if (error_layout != XGL_OK) {
         return error_layout;
     }

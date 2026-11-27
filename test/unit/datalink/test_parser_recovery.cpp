@@ -25,6 +25,9 @@ make_header(uint8_t header_length, uint16_t payload_length,
     header.header_len = header_length;
     header.packet_type = XGL_PACKET_TYPE_DATA;
     header.flags = flags;
+    if (header_length > XGL_WIRE_BASE_HEADER_SIZE) {
+        header.flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    }
     header.source_id = 1U;
     header.target_id = 2U;
     header.payload_len = payload_length;
@@ -106,7 +109,7 @@ TEST_F(XglParserRecoveryTest, LaterBodyBytesDoNotExtendTheCandidateDeadline) {
 TEST_F(XglParserRecoveryTest,
        ImpossibleLengthsRejectAtBaseHeaderAndAcceptTheNextFrame) {
     const std::array<std::array<uint16_t, 2>, 4> lengths = {
-        {{60U, 0U}, {49U, 0U}, {27U, 22U}, {255U, UINT16_MAX}}};
+        {{60U, 1U}, {49U, 1U}, {27U, 22U}, {255U, UINT16_MAX}}};
     const auto valid = make_frame();
     for (const auto& length : lengths) {
         SCOPED_TRACE(::testing::Message()
@@ -155,8 +158,8 @@ TEST_F(XglParserRecoveryTest, ExactCapacityRequiresBothCrcBytes) {
 
 TEST_F(XglParserRecoveryTest, AuthenticationTrailerIsBoundedAfterExtensions) {
     const auto header =
-        make_header(XGL_WIRE_BASE_HEADER_SIZE + XGL_SECURITY_EXT_SIZE, 0U,
-                    XGL_WIRE_FLAG_AUTHENTICATED | XGL_WIRE_FLAG_HAS_EXTENSIONS);
+        make_header(XGL_WIRE_BASE_HEADER_SIZE + XGL_SECURITY_EXT_SIZE, 1U,
+                    XGL_WIRE_FLAG_AUTHENTICATED);
     std::array<uint8_t, XGL_SECURITY_EXT_SIZE> extension = {};
     extension[0] = XGL_WIRE_EXT_SECURITY;
     extension[1] = XGL_SECURITY_EXT_VALUE_SIZE;

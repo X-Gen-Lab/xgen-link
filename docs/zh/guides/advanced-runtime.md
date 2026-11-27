@@ -48,7 +48,7 @@ scoped 接收回调可返回 BUSY。若缓存中的乱序包已经由协议接�
 
 有认证能力的 profile 可设 `protect_installed_scopes=true`。它要求合法 provider 和可容纳基本认证帧的协议 MTU。先为 exact `(remote_id, connection_id, epoch)` 安装可信安全会话，再发送数据；该 scope 的 HELLO、DATA、ACK、SACK、RESET、重传及零拷贝布局均采用认证策略。
 
-关闭后的 scope 不回退为明文。其他未安装 scope 在全局 `auth_required=false` 时仍可使用明文；这不是自动协商或动态信任建立。全局 required 继续强制所有本地收发认证。发送容量保守预留 tag，混合模式下明文 scope 也可能使用较小 payload。
+关闭后的 scope 不回退为明文。其他未安装 scope 在全局 `auth_required=false` 时仍可使用明文；这不是自动协商或动态信任建立。全局 required 继续强制所有本地收发认证。发送预检、原地布局与实际提交按目标的精确 scope 计算帧大小，仅为须认证的帧计入 SECURITY 和 tag。
 
 安装不撤销之前已经接纳的数据；先前缓存的明文仍可在安装后交付。需要新的信任边界时，使用新 epoch/scope 并先安装后接收，显式处置旧 scope 的数据。详见[安全生命周期](../reference/protocol/v1/security.md)。
 

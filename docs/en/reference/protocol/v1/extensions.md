@@ -1,6 +1,6 @@
 # Extensions
 
-Each TLV is `type:u8 | value_length:u8 | value`. TLVs are bounded by `header_len`, not by payload contents. Structurally valid unknown types are skipped. Type `4` is reserved and rejected. Duplicate DATA_TYPE, SESSION or SECURITY singleton extensions are rejected; transport accepts exactly one ACK_RANGE or SACK extension per ACK packet.
+Each TLV is `type:u8 | value_length:u8 | value`. TLVs are bounded by `header_len`, not by payload contents. Type `0` is invalid. Structurally valid unknown noncritical types are skipped. Duplicate DATA_TYPE, SESSION or SECURITY singleton extensions are rejected; transport accepts exactly one ACK_RANGE or SACK extension per ACK packet.
 
 ## Defined Values
 
@@ -9,10 +9,10 @@ Each TLV is `type:u8 | value_length:u8 | value`. TLVs are bounded by `header_len
 | SESSION = 1 | 12 | `epoch:u32`, `incarnation_id:u64` |
 | ACK_RANGE = 2 | `9 + 4*n` | `largest_ack:u32`, `ack_delay_us:u32`, `count:u8`, then `gap:u16,length:u16` |
 | SACK = 3 | `5 + n` | `base:u32`, `bitmap_length:u8`, bitmap bytes |
-| SECURITY = 5 | 13 | `key_id:u32`, `security_seq:u64`, `tag_length:u8` |
-| DATA_TYPE = 8 | 1 | Application type or CONTROL operation |
+| SECURITY = 4 | 13 | `key_id:u32`, `security_seq:u64`, `tag_length:u8` |
+| DATA_TYPE = 5 | 1 | Application type or CONTROL operation |
 
-Values use little-endian integers. ROUTE and TIMESTAMP identifiers are reserved. SESSION adds 14 frame bytes. SECURITY adds 15. Missing SESSION denotes epoch zero. `incarnation_id` is carried metadata; its presence does not install trust or replace the peer key.
+Values use little-endian integers. SESSION adds 14 frame bytes. SECURITY adds 15. Missing SESSION denotes epoch zero. `incarnation_id` is carried metadata; its presence does not install trust or replace the peer key.
 
 ## ACK Semantics
 

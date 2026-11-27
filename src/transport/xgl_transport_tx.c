@@ -3,7 +3,6 @@
  * \brief           Transport transmit planning, admission and submission
  */
 
-#include "network/xgl_route.h"
 #include "wire/xgl_frame.h"
 #include "wire/xgl_wire.h"
 #include "xgl/xgl_config.h"
@@ -55,21 +54,18 @@ xgl_error_t transport_prepare_data_tx(xgl_transport_ctx_t* ctx,
 
 /** \brief           Check the complete frame budget without changing state. */
 static xgl_error_t transport_check_frame_budget(const xgl_transport_ctx_t* ctx,
-                                                const xgl_tx_data_t* tx_data) {
-    const xgl_route_item_t* route =
-        xgl_route_table_lookup(ctx->route_table, tx_data->target_id);
-    size_t max_frame_size = xgl_route_frame_limit(route, ctx->max_frame_size);
-    size_t extensions_len = xgl_wire_packet_extension_size(
-        tx_data->data_type, tx_data->session_epoch);
-
-    size_t payload_budget;
-    if (!xgl_frame_payload_budget(max_frame_size, 0U, ctx->auth_tag_len,
-                                  &payload_budget)) {
-        return XGL_ERR_INVALID_PARAM;
+                                                xgl_handle_t handle,
+                                                const xgl_tx_data_t* tx_data,
+                                                bool need_hello) {
+    if (ctx->lower_layer->check_data != NULL) {
+        return ctx->lower_layer->check_data(ctx->lower_layer->ctx, handle,
+                                            tx_data, need_hello);
     }
-
-    if (!xgl_frame_payload_budget(max_frame_size, extensions_len,
-                                  ctx->auth_tag_len, &payload_budget) ||
+    const size_t extensions_len = xgl_wire_packet_extension_size(
+        tx_data->data_type, tx_data->session_epoch);
+    size_t payload_budget;
+    if (!xgl_frame_payload_budget(ctx->max_frame_size, extensions_len, 0U,
+                                  &payload_budget) ||
         tx_data->data_len > payload_budget) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
@@ -172,10 +168,6 @@ transport_send_packet_view(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 static xgl_error_t transport_prepare_reliable_send(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle, const xgl_tx_data_t* tx_data,
     xgl_transport_peer_state_t** peer, bool* created) {
-    *peer = transport_find_peer_scope(ctx, tx_data->target_id,
-                                      tx_data->connection_id,
-                                      tx_data->session_epoch);
-    *created = false;
     xgl_error_t status = transport_check_active_tx_scope(ctx, handle, *peer);
     if (status != XGL_OK) {
         return status;
@@ -272,20 +264,19 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_INVALID_PARAM;
     }
 
-    xgl_error_t err = transport_check_frame_budget(ctx, tx_data);
+    xgl_transport_peer_state_t* peer = transport_find_peer_scope(
+        ctx, tx_data->target_id, tx_data->connection_id,
+        tx_data->session_epoch);
+    const bool need_hello =
+        tx_data->reliable && (peer == NULL || !peer->hello_sent);
+    xgl_error_t err =
+        transport_check_frame_budget(ctx, handle, tx_data, need_hello);
     if (err != XGL_OK) {
         transport_count_send_error(ctx);
-        if (err == XGL_ERR_INVALID_PARAM && ctx->error_callback != NULL) {
-            ctx->error_callback(
-                handle, XGL_ERR_INVALID_PARAM,
-                XGL_ERROR_MESSAGE("max_frame_size too small for headers"),
-                ctx->callback_user_data);
-        }
         return err;
     }
 
     /* Validate the complete frame budget before reserving a scope or HELLO. */
-    xgl_transport_peer_state_t* peer = NULL;
     bool created = false;
     err =
         transport_prepare_reliable_send(ctx, handle, tx_data, &peer, &created);

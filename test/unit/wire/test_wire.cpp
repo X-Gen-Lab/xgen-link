@@ -1,5 +1,6 @@
 #include <wire/xgl_wire.h>
 
+#include <array>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
@@ -34,6 +35,7 @@ TEST(XglWireViewTest, BorrowsValidatedBytesAndRejectsEveryTruncation) {
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;
     header.header_len = XGL_WIRE_BASE_HEADER_SIZE + 3;
+    header.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
     header.packet_type = XGL_PACKET_TYPE_DATA;
     header.source_id = 1;
     header.target_id = 2;
@@ -71,6 +73,7 @@ TEST(XglWireViewTest, RejectsForgedHeaderLengthBeforeReadingExtensions) {
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;
     header.header_len = UINT8_MAX;
+    header.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
     header.packet_type = XGL_PACKET_TYPE_DATA;
     header.source_id = 1;
     header.target_id = 2;
@@ -111,7 +114,7 @@ TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     header.version = XGL_WIRE_VERSION;
     header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
     header.packet_type = XGL_PACKET_TYPE_DATA;
-    header.flags = XGL_WIRE_FLAG_ACK_ELICITING | XGL_WIRE_FLAG_AUTHENTICATED;
+    header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
     header.ttl = 9;
     header.traffic_class = 0x43;
     header.source_id = 0x1234;
@@ -128,7 +131,7 @@ TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     EXPECT_EQ(buffer[2], 1U);
     EXPECT_EQ(buffer[3], XGL_WIRE_BASE_HEADER_SIZE);
     EXPECT_EQ(buffer[4], XGL_PACKET_TYPE_DATA);
-    EXPECT_EQ(buffer[5], 0x11U);
+    EXPECT_EQ(buffer[5], 0x01U);
     EXPECT_EQ(buffer[6], 9U);
     EXPECT_EQ(buffer[7], 0x43U);
     EXPECT_EQ(xgl_deserialize_u16_le(&buffer[8]), 0x1234U);
@@ -145,17 +148,87 @@ TEST(XglWireTest, EncodesProductionHeaderAtStableOffsets) {
     EXPECT_EQ(encoded_crc, xgl_crc16_modbus(crc_input, sizeof(crc_input)));
 }
 
+TEST(XglWireTest, ModbusMatchesTheIndependentCheckValue) {
+    constexpr uint8_t data[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+    EXPECT_EQ(xgl_crc16_modbus(data, sizeof(data)), 0x4B37U);
+    const uint16_t prefix = xgl_crc16_modbus_update(UINT16_MAX, data, 4U);
+    EXPECT_EQ(xgl_crc16_modbus_update(prefix, data + 4U, 5U), 0x4B37U);
+}
+
+TEST(XglWireTest, MatchCompleteDataFrameAgainstIndependentGoldenBytes) {
+    constexpr std::array<uint8_t, 45> golden = {
+        0xA5U, 0x5AU, 0x01U, 0x29U, 0x01U, 0x03U, 0x09U, 0x43U, 0x34U,
+        0x12U, 0xCDU, 0xABU, 0x04U, 0x03U, 0x02U, 0x01U, 0x11U, 0x00U,
+        0x00U, 0x00U, 0x02U, 0x00U, 0xE8U, 0x9EU, 0x05U, 0x01U, 0x07U,
+        0x01U, 0x0CU, 0x0DU, 0x0CU, 0x0BU, 0x0AU, 0x80U, 0x70U, 0x60U,
+        0x50U, 0x40U, 0x30U, 0x20U, 0x10U, 0x42U, 0x87U, 0xEAU, 0xA7U};
+    xgl_wire_frame_view_t decoded = {};
+    ASSERT_EQ(
+        xgl_wire_decode_frame(&decoded, golden.data(), golden.size(), nullptr),
+        XGL_OK);
+    EXPECT_EQ(decoded.header.version, 1U);
+    EXPECT_EQ(decoded.header.source_id, 0x1234U);
+    EXPECT_EQ(decoded.header.target_id, 0xABCDU);
+    EXPECT_EQ(decoded.header.connection_id, 0x01020304U);
+    EXPECT_EQ(decoded.header.packet_number, 17U);
+    EXPECT_EQ(decoded.header.header_crc16, 0x9EE8U);
+    EXPECT_EQ(decoded.data_type, 7U);
+    EXPECT_EQ(decoded.session_epoch, 0x0A0B0C0DU);
+    ASSERT_EQ(decoded.payload_len, 2U);
+    EXPECT_EQ(decoded.payload[0], 0x42U);
+    EXPECT_EQ(decoded.payload[1], 0x87U);
+
+    xgl_wire_header_t header = {};
+    header.version = XGL_WIRE_VERSION;
+    header.header_len = 41U;
+    header.packet_type = XGL_PACKET_TYPE_DATA;
+    header.flags = XGL_WIRE_FLAG_ACK_ELICITING | XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    header.ttl = 9U;
+    header.traffic_class = XGL_RELIABILITY_ACK_ELICITING | 3U;
+    header.source_id = 0x1234U;
+    header.target_id = 0xABCDU;
+    header.connection_id = 0x01020304U;
+    header.packet_number = 17U;
+    header.payload_len = 2U;
+    std::array<uint8_t, golden.size()> encoded = {};
+    ASSERT_EQ(xgl_wire_encode_header(encoded.data(), encoded.size(), &header),
+              XGL_OK);
+    size_t type_size = 0;
+    const uint8_t data_type = 7U;
+    ASSERT_EQ(xgl_wire_encode_ext(encoded.data() + 24U, encoded.size() - 24U,
+                                  XGL_WIRE_EXT_DATA_TYPE, &data_type,
+                                  sizeof(data_type), &type_size),
+              XGL_OK);
+    ASSERT_EQ(type_size, 3U);
+    uint8_t session[12] = {};
+    size_t value_size = 0;
+    ASSERT_EQ(
+        xgl_wire_encode_session_ext_value(session, sizeof(session), 0x0A0B0C0DU,
+                                          0x1020304050607080ULL, &value_size),
+        XGL_OK);
+    size_t session_size = 0;
+    ASSERT_EQ(xgl_wire_encode_ext(encoded.data() + 27U, encoded.size() - 27U,
+                                  XGL_WIRE_EXT_SESSION, session, value_size,
+                                  &session_size),
+              XGL_OK);
+    ASSERT_EQ(session_size, 14U);
+    encoded[41] = 0x42U;
+    encoded[42] = 0x87U;
+    xgl_serialize_u16_le(encoded.data() + 43U,
+                         xgl_crc16_modbus(encoded.data(), 43U));
+    EXPECT_EQ(encoded, golden);
+}
+
 TEST(XglWireTest, DecodesHeaderAndRejectsCorruptedCrc) {
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;
     header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
     header.packet_type = XGL_PACKET_TYPE_ACK;
-    header.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    header.traffic_class = XGL_RELIABILITY_ACK_ONLY;
     header.ttl = 1;
     header.source_id = 7;
     header.target_id = 8;
     header.connection_id = 0x99;
-    header.packet_number = 42;
     header.payload_len = 0;
 
     uint8_t buffer[XGL_WIRE_BASE_HEADER_SIZE] = {};
@@ -167,7 +240,7 @@ TEST(XglWireTest, DecodesHeaderAndRejectsCorruptedCrc) {
     EXPECT_EQ(decoded.source_id, 7U);
     EXPECT_EQ(decoded.target_id, 8U);
     EXPECT_EQ(decoded.connection_id, 0x99U);
-    EXPECT_EQ(decoded.packet_number, 42U);
+    EXPECT_EQ(decoded.packet_number, 0U);
 
     buffer[4] ^= 0x01U;
     EXPECT_EQ(xgl_wire_decode_header(&decoded, buffer, sizeof(buffer)),
@@ -178,7 +251,7 @@ TEST(XglWireTest, RejectsPacketTypeOutsideProtocolRange) {
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;
     header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
-    header.packet_type = static_cast<uint8_t>(XGL_PACKET_TYPE_CLOSE + 1U);
+    header.packet_type = 4U;
     header.ttl = 8;
     header.source_id = 7;
     header.target_id = 8;
@@ -189,7 +262,7 @@ TEST(XglWireTest, RejectsPacketTypeOutsideProtocolRange) {
 
     header.packet_type = XGL_PACKET_TYPE_DATA;
     ASSERT_EQ(xgl_wire_encode_header(buffer, sizeof(buffer), &header), XGL_OK);
-    buffer[4] = static_cast<uint8_t>(XGL_PACKET_TYPE_CLOSE + 1U);
+    buffer[4] = 4U;
     xgl_serialize_u16_le(&buffer[22], 0U);
     xgl_serialize_u16_le(&buffer[22], xgl_crc16_modbus(buffer, sizeof(buffer)));
 
@@ -245,21 +318,17 @@ TEST(XglWireTest, EncodesAndDecodesAckRangeExtension) {
     EXPECT_EQ(xgl_deserialize_u16_le(&value[13]), 2U);
     EXPECT_EQ(xgl_deserialize_u16_le(&value[15]), 1U);
 
-    uint32_t largest_ack = 0;
-    uint32_t ack_delay_us = 0;
-    xgl_wire_ack_range_t decoded_ranges[2] = {};
-    size_t decoded_count = 0;
-    ASSERT_EQ(xgl_wire_decode_ack_range_ext_value(
-                  value, value_len, &largest_ack, &ack_delay_us, decoded_ranges,
-                  2, &decoded_count),
-              XGL_OK);
-    EXPECT_EQ(largest_ack, 0x01020304U);
-    EXPECT_EQ(ack_delay_us, 250U);
-    EXPECT_EQ(decoded_count, 2U);
-    EXPECT_EQ(decoded_ranges[0].gap, 0U);
-    EXPECT_EQ(decoded_ranges[0].length, 3U);
-    EXPECT_EQ(decoded_ranges[1].gap, 2U);
-    EXPECT_EQ(decoded_ranges[1].length, 1U);
+    xgl_wire_ack_range_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_ack_range_view(value, value_len, &view), XGL_OK);
+    EXPECT_EQ(view.largest_ack, 0x01020304U);
+    EXPECT_EQ(view.ack_delay_us, 250U);
+    ASSERT_EQ(view.range_count, 2U);
+    for (size_t index = 0; index < view.range_count; ++index) {
+        xgl_wire_ack_range_t decoded = {};
+        ASSERT_EQ(xgl_wire_ack_range_at(&view, index, &decoded), XGL_OK);
+        EXPECT_EQ(decoded.gap, ranges[index].gap);
+        EXPECT_EQ(decoded.length, ranges[index].length);
+    }
 }
 
 TEST(XglWireTest, EncodesAndDecodesSackExtension) {
@@ -277,19 +346,15 @@ TEST(XglWireTest, EncodesAndDecodesSackExtension) {
     EXPECT_EQ(value[4], sizeof(bitmap));
     EXPECT_EQ(memcmp(&value[5], bitmap, sizeof(bitmap)), 0);
 
-    uint32_t base_packet = 0;
-    uint8_t decoded_bitmap[2] = {};
-    size_t decoded_bitmap_len = 0;
-    ASSERT_EQ(xgl_wire_decode_sack_ext_value(
-                  value, value_len, &base_packet, decoded_bitmap,
-                  sizeof(decoded_bitmap), &decoded_bitmap_len),
-              XGL_OK);
-    EXPECT_EQ(base_packet, 0x0A0B0C0DU);
-    EXPECT_EQ(decoded_bitmap_len, sizeof(bitmap));
-    EXPECT_EQ(memcmp(decoded_bitmap, bitmap, sizeof(bitmap)), 0);
+    xgl_wire_sack_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_sack_view(value, value_len, &view), XGL_OK);
+    EXPECT_EQ(view.base_packet, 0x0A0B0C0DU);
+    ASSERT_EQ(view.bitmap_len, sizeof(bitmap));
+    EXPECT_EQ(view.bitmap, value + 5U);
+    EXPECT_EQ(memcmp(view.bitmap, bitmap, sizeof(bitmap)), 0);
 }
 
-TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
+TEST(XglWireTest, EncodesAndDecodesSessionAndSecurityExtensions) {
     uint8_t session[16] = {};
     size_t session_len = 0;
     ASSERT_EQ(
@@ -328,30 +393,6 @@ TEST(XglWireTest, EncodesAndDecodesSessionSecurityAndRouteExtensions) {
     EXPECT_EQ(key_id, 0xA0B0C0D0U);
     EXPECT_EQ(nonce_id, 0x0102030405060708ULL);
     EXPECT_EQ(tag_len, 16U);
-
-    uint8_t route[16] = {};
-    size_t route_len = 0;
-    ASSERT_EQ(xgl_wire_encode_route_ext_value(route, sizeof(route), 0x1234,
-                                              0x5678, 0xCAFEBABEU, 9,
-                                              &route_len),
-              XGL_OK);
-    EXPECT_EQ(route_len, 10U);
-    EXPECT_EQ(xgl_deserialize_u16_le(&route[0]), 0x1234U);
-    EXPECT_EQ(xgl_deserialize_u16_le(&route[2]), 0x5678U);
-    EXPECT_EQ(xgl_deserialize_u32_le(&route[4]), 0xCAFEBABEU);
-    EXPECT_EQ(xgl_deserialize_u16_le(&route[8]), 9U);
-
-    uint16_t previous_hop = 0;
-    uint16_t next_hop = 0;
-    uint32_t route_epoch = 0;
-    uint16_t metric = 0;
-    ASSERT_EQ(xgl_wire_decode_route_ext_value(route, route_len, &previous_hop,
-                                              &next_hop, &route_epoch, &metric),
-              XGL_OK);
-    EXPECT_EQ(previous_hop, 0x1234U);
-    EXPECT_EQ(next_hop, 0x5678U);
-    EXPECT_EQ(route_epoch, 0xCAFEBABEU);
-    EXPECT_EQ(metric, 9U);
 }
 
 TEST(XglWireTest, RejectsZeroLengthSecurityTag) {
@@ -375,8 +416,8 @@ TEST(XglWireTest, RejectsZeroLengthSecurityTag) {
               XGL_ERR_INVALID_FRAME);
 }
 
-TEST(XglWireTest, RejectsV2WithoutAutomaticDowngrade) {
-    uint8_t bytes[XGL_WIRE_BASE_HEADER_SIZE] = {};
+TEST(XglWireTest, RejectsNonV1WithoutAutomaticDowngrade) {
+    uint8_t bytes[XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE] = {};
     xgl_wire_header_t header = {};
     header.version = XGL_WIRE_VERSION;
     header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
@@ -384,14 +425,78 @@ TEST(XglWireTest, RejectsV2WithoutAutomaticDowngrade) {
     header.source_id = 1U;
     header.target_id = 2U;
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
-    for (const uint8_t version : {2U, 3U}) {
+    const uint8_t retired_versions[] = {0U, 2U, 3U, 0xFFU};
+    for (const uint8_t version : retired_versions) {
         SCOPED_TRACE(static_cast<unsigned>(version));
         bytes[2] = version;
         bytes[22] = bytes[23] = 0U;
-        xgl_serialize_u16_le(bytes + 22,
-                             xgl_crc16_modbus(bytes, sizeof(bytes)));
+        xgl_serialize_u16_le(
+            bytes + 22, xgl_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
+        xgl_serialize_u16_le(
+            bytes + XGL_WIRE_BASE_HEADER_SIZE,
+            xgl_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
         EXPECT_EQ(xgl_wire_decode_header(&header, bytes, sizeof(bytes)),
                   XGL_ERR_INVALID_FRAME);
+        xgl_wire_frame_view_t view = {};
+        xgl_wire_decode_status_t status = XGL_WIRE_DECODE_OK;
+        EXPECT_EQ(xgl_wire_decode_frame(&view, bytes, sizeof(bytes), &status),
+                  XGL_ERR_INVALID_FRAME);
+        EXPECT_EQ(status, XGL_WIRE_DECODE_INVALID);
+        EXPECT_EQ(view.frame_buf, nullptr);
+    }
+}
+
+TEST(XglWireTest, EnforcesCanonicalDataAckAndControlFields) {
+    struct HeaderFields {
+        uint8_t type;
+        uint8_t flags;
+        uint8_t traffic_class;
+        uint32_t packet_number;
+        uint16_t payload_len;
+        bool valid;
+    };
+
+    constexpr HeaderFields cases[] = {
+        {1U, 0U, 7U, 0U, 0U, true},     {1U, 1U, 0x47U, 17U, 1U, true},
+        {2U, 0U, 0x87U, 0U, 0U, true},  {3U, 8U, 7U, 0U, 0U, true},
+        {1U, 0U, 7U, 1U, 0U, false},    {1U, 0U, 0x47U, 0U, 0U, false},
+        {1U, 1U, 7U, 0U, 0U, false},    {1U, 0U, 0x87U, 0U, 0U, false},
+        {1U, 8U, 7U, 0U, 0U, false},    {1U, 2U, 7U, 0U, 0U, false},
+        {2U, 1U, 0x87U, 0U, 0U, false}, {2U, 8U, 0x87U, 0U, 0U, false},
+        {2U, 0U, 7U, 0U, 0U, false},    {2U, 0U, 0x87U, 1U, 0U, false},
+        {2U, 0U, 0x87U, 0U, 1U, false}, {3U, 0U, 7U, 0U, 0U, false},
+        {3U, 9U, 0x47U, 0U, 0U, false}, {3U, 8U, 0x87U, 0U, 0U, false},
+        {3U, 8U, 7U, 1U, 0U, false},    {3U, 8U, 7U, 0U, 1U, false},
+    };
+    for (const auto& entry : cases) {
+        SCOPED_TRACE(&entry - cases);
+        uint8_t bytes[XGL_WIRE_BASE_HEADER_SIZE] = {};
+        xgl_wire_header_t header = {};
+        header.version = XGL_WIRE_VERSION;
+        header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
+        header.packet_type = XGL_PACKET_TYPE_DATA;
+        header.source_id = 1U;
+        header.target_id = 2U;
+        ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header),
+                  XGL_OK);
+        header.packet_type = entry.type;
+        header.flags = entry.flags;
+        header.traffic_class = entry.traffic_class;
+        header.packet_number = entry.packet_number;
+        header.payload_len = entry.payload_len;
+        EXPECT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header),
+                  entry.valid ? XGL_OK : XGL_ERR_INVALID_PARAM);
+
+        bytes[4] = entry.type;
+        bytes[5] = entry.flags;
+        bytes[7] = entry.traffic_class;
+        xgl_serialize_u32_le(bytes + 16U, entry.packet_number);
+        xgl_serialize_u16_le(bytes + 20U, entry.payload_len);
+        xgl_serialize_u16_le(bytes + 22U, 0U);
+        xgl_serialize_u16_le(bytes + 22U,
+                             xgl_crc16_modbus(bytes, sizeof(bytes)));
+        EXPECT_EQ(xgl_wire_decode_header(&header, bytes, sizeof(bytes)),
+                  entry.valid ? XGL_OK : XGL_ERR_INVALID_FRAME);
     }
 }
 
@@ -407,14 +512,10 @@ TEST(XglWireTest, RejectsInvalidExtensionLength) {
 }
 
 TEST(XglWireTest, RejectsUnsupportedFlagsAndTrafficClasses) {
-    const uint8_t unsupported_flags[] = {
-        XGL_WIRE_FLAG_ENCRYPTED, 0U, 0U, 0U, 0x04U, 0U};
-    const uint8_t unsupported_classes[] = {0U,
-                                           XGL_TRAFFIC_ENCRYPTION_AES128,
-                                           XGL_TRAFFIC_ENCRYPTION_CHACHA20,
-                                           XGL_TRAFFIC_ENCRYPTION_MASK,
-                                           0U,
-                                           0x20U};
+    const uint8_t unsupported_flags[] = {0x10U, 0x20U, 0x40U, 0x80U,
+                                         0U,    0U,    0U,    0U};
+    const uint8_t unsupported_classes[] = {0U,    0U,    0U,    0U,
+                                           0x08U, 0x10U, 0x20U, 0xC0U};
     for (size_t i = 0; i < sizeof(unsupported_flags); ++i) {
         xgl_wire_header_t header = {};
         header.version = XGL_WIRE_VERSION;

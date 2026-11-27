@@ -6,7 +6,7 @@ One peer owns one TX window, one reliable queue and one RX ordering state, plus 
 
 Reliable DATA is copied before submission. Failed admission does not consume its packet number. A successful first lower-layer send marks the retained packet sent, including at timestamp zero, then advances the DATA number. ACK completion frees the queue record and advances only the owning window.
 
-Before sending the first HELLO, transport checks the frame budget, scope state, number space, window and global TX capacity, then reserves the reliable record and payload. A local admission failure sends no HELLO. A successful HELLO does not guarantee DATA has reached the receiver, so unused receive reservations still need a bounded lifetime.
+Before sending the first HELLO, Transport and Network check the complete DATA and HELLO frame sizes, scope state, number space, window and global TX capacity, then reserve the reliable record and payload. If authentication is required, preflight checks that the exact scope has two available security sequences without consuming them. A local admission failure sends no HELLO. A successful HELLO does not guarantee DATA has reached the receiver, so unused receive reservations still need a bounded lifetime.
 
 The initial ACK timeout uses the request's nonzero `timeout_ms` override first. Without an override, a peer with an accepted RTT sample uses its estimated RTO; a peer without samples uses the configured `protocol.ack_timeout_ms`. RTT arithmetic uses a wide intermediate before clamping, including the largest accepted 32-bit millisecond sample.
 

@@ -215,20 +215,23 @@ TEST(XglTransportRxWireContract, AcceptsVersionOneAndRejectsVersionThree) {
     EXPECT_EQ(receiver.feedback_attempts, 1U);
 }
 
-TEST(XglTransportRxWireContract, RetiredFragmentMarkersNeverDeliverOrAck) {
+TEST(XglTransportRxWireContract,
+     UnsupportedFlagsTrafficOrSecurityLayoutCannotDeliver) {
     PublicReceiver receiver;
     receiver.Init();
     const auto current =
         MakeFrame(XGL_PACKET_TYPE_DATA, true, 1U, {0x7EU, 1U, 0xAAU});
     ASSERT_GT(current.size(), XGL_FRAME_HEADER_SIZE);
 
-    auto former_flag = current;
-    former_flag[5] |= 0x04U;
-    auto former_traffic_bit = current;
-    former_traffic_bit[7] |= 0x20U;
-    auto former_tlv = current;
-    former_tlv[XGL_FRAME_HEADER_SIZE] = 4U;
-    for (auto* frame : {&former_flag, &former_traffic_bit, &former_tlv}) {
+    auto reserved_flag = current;
+    reserved_flag[5] |= 0x10U;
+    auto reserved_traffic_bit = current;
+    reserved_traffic_bit[7] |= 0x20U;
+    auto malformed_security = current;
+    malformed_security[5] |= 0x04U;
+    malformed_security[XGL_FRAME_HEADER_SIZE] = 4U;
+    for (auto* frame :
+         {&reserved_flag, &reserved_traffic_bit, &malformed_security}) {
         RefreshFrameCrc(*frame);
         (void)receiver.Feed(*frame);
         EXPECT_EQ(receiver.delivered, 0U);
@@ -265,12 +268,17 @@ TEST(XglTransportRxWireContract, ReservedPacketTypesNeverReachApplication) {
     receiver.Init();
     for (uint8_t type : {uint8_t{4U}, uint8_t{5U}, uint8_t{6U}, uint8_t{7U}}) {
         SCOPED_TRACE(static_cast<unsigned>(type));
-        auto frame = MakeFrame(type);
-        ASSERT_FALSE(frame.empty());
-        EXPECT_EQ(receiver.Feed(frame), XGL_ERR_INVALID_FRAME);
+        auto frame = MakeFrame(XGL_PACKET_TYPE_DATA);
+        ASSERT_GT(frame.size(), XGL_FRAME_HEADER_SIZE);
+        frame[4] = type;
+        RefreshFrameCrc(frame);
+        (void)receiver.Feed(frame);
     }
     EXPECT_EQ(receiver.delivered, 0U);
     EXPECT_EQ(receiver.feedback_attempts, 0U);
+    EXPECT_EQ(receiver.Feed(MakeFrame(XGL_PACKET_TYPE_DATA, true)), XGL_OK);
+    EXPECT_EQ(receiver.delivered, 1U);
+    EXPECT_EQ(receiver.feedback_attempts, 1U);
 }
 
 TEST(XglTransportRxWireContract, ReliableBroadcastPreservesUnicastHistory) {

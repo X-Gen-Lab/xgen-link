@@ -271,10 +271,10 @@ TEST_F(XglSecuritySessionTest, ProducesFixedNonceAndCanonicalAadVector) {
     EXPECT_EQ(spy.last_sequence, tx_config.tx_initial_seq);
     ASSERT_EQ(spy.aad.size(), bytes[3]);
     const std::vector<uint8_t> expected_aad = {
-        0xA5, 0x5A, 0x01, 0x35, 0x01, 0x13, 0x00, 0x40, 0x01, 0x00, 0x02,
+        0xA5, 0x5A, 0x01, 0x35, 0x01, 0x07, 0x00, 0x40, 0x01, 0x00, 0x02,
         0x00, 0x0B, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x03, 0x00,
         0x00, 0x00, 0x01, 0x0C, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0D, 0x07, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x0D, 0x07, 0x00, 0x00, 0x00,
         0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x04};
     EXPECT_EQ(spy.aad, expected_aad);
     EXPECT_EQ(xgl_deserialize_u32_le(bytes + 16), 17U);
@@ -300,12 +300,19 @@ TEST_F(XglSecuritySessionTest,
     EXPECT_EQ(Verify(), XGL_OK);
     frame.header.packet_type = XGL_PACKET_TYPE_ACK;
     frame.header.packet_number = 0;
+    frame.header.traffic_class = XGL_RELIABILITY_ACK_ONLY;
+    frame.payload = nullptr;
+    frame.payload_len = 0U;
     ASSERT_EQ(Sign(), XGL_OK);
     /* This ACK is intentionally lost. It is not a reliable DATA sequence. */
     frame.header.packet_type = XGL_PACKET_TYPE_CONTROL;
+    frame.header.traffic_class = XGL_RELIABILITY_NONE;
     ASSERT_EQ(Sign(), XGL_OK);
     frame.header.packet_type = XGL_PACKET_TYPE_DATA;
     frame.header.packet_number = 18;
+    frame.header.traffic_class = XGL_RELIABILITY_ACK_ELICITING;
+    frame.payload = payload;
+    frame.payload_len = sizeof(payload);
     ASSERT_EQ(Sign(), XGL_OK);
     EXPECT_EQ(spy.last_sequence, 3U);
     EXPECT_EQ(xgl_deserialize_u32_le(bytes + 16), 18U);
@@ -515,11 +522,16 @@ TEST_F(XglSecuritySessionTest, SecurityExtensionCannotBeSuppliedTwice) {
 TEST_F(XglSecuritySessionTest,
        PacketClassCannotBeChangedWithoutAuthentication) {
     Install();
+    frame.payload = nullptr;
+    frame.payload_len = 0U;
     ASSERT_EQ(Sign(), XGL_OK);
     xgl_wire_header_t header = {};
     ASSERT_EQ(xgl_wire_decode_header(&header, bytes, length), XGL_OK);
     header.packet_type = XGL_PACKET_TYPE_CONTROL;
     header.packet_number = 0;
+    header.flags = XGL_WIRE_FLAG_AUTHENTICATED | XGL_WIRE_FLAG_CONTROL |
+                   XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    header.traffic_class = XGL_RELIABILITY_NONE;
     ASSERT_EQ(xgl_wire_encode_header(bytes, length, &header), XGL_OK);
     RecomputeCrc();
     EXPECT_EQ(Verify(), XGL_ERR_INVALID_FRAME);

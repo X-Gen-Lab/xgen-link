@@ -25,6 +25,7 @@ extern "C" {
  */
 typedef struct {
     const xgl_frame_t* frame;
+    const xgl_frame_layout_t* layout; /**< Validated logical frame layout */
     xgl_phy_ops_t* phy;
     uint8_t* buffer;       /**< Caller frame storage for in-place encoding */
     size_t buffer_size;    /**< Available caller storage bytes */
@@ -40,6 +41,7 @@ typedef struct {
  */
 typedef struct {
     const xgl_wire_frame_view_t* view;
+    uint8_t* mutable_frame; /**< Optional parser-owned bytes backing view */
 } xgl_frame_rx_message_t;
 
 /**
@@ -48,6 +50,9 @@ typedef struct {
 typedef struct {
     void* ctx;
     xgl_error_t (*send)(void* ctx, xgl_handle_t handle, xgl_packet_t* packet);
+    /** Check DATA and any first HELLO before transport reserves resources. */
+    xgl_error_t (*check_data)(void* ctx, xgl_handle_t handle,
+                              const xgl_tx_data_t* data, bool need_hello);
     /** Check local ACK egress from received DATA without sending it. */
     xgl_error_t (*check_feedback)(void* ctx, const xgl_packet_t* received,
                                   size_t ack_extension_len);
@@ -89,6 +94,7 @@ static inline void xgl_packet_tx_endpoint_init(
     if (iface != NULL) {
         iface->ctx = ctx;
         iface->send = send;
+        iface->check_data = NULL;
         iface->check_feedback = NULL;
     }
 }

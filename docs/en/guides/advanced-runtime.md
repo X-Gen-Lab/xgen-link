@@ -48,7 +48,7 @@ Snapshots describe active content; `xgl_memory_report_with_options()` describes 
 
 Profiles with authentication support can set `protect_installed_scopes=true`. It requires a valid provider and a protocol MTU that fits a basic authenticated frame. Install trusted parameters for the exact `(remote_id, connection_id, epoch)` before sending. HELLO, DATA, ACK, SACK, RESET, retries and zero-copy layouts then share this authentication policy.
 
-Closing the scope does not downgrade it to plaintext. Other uninstalled scopes can remain plaintext when global `auth_required=false`; this is neither negotiation nor dynamic trust establishment. Global required mode still protects all local traffic. TX capacity conservatively reserves the tag, so plaintext scopes in mixed mode may also use smaller payloads.
+Closing the scope does not downgrade it to plaintext. Other uninstalled scopes can remain plaintext when global `auth_required=false`; this is neither negotiation nor dynamic trust establishment. Global required mode still protects all local traffic. Send preflight, in-place layout and submission size the frame for the exact target scope. Only frames that require authentication include SECURITY and the tag.
 
 Installation does not revoke previously admitted data; earlier cached plaintext may still be delivered afterward. Use a new epoch/scope and install before receiving when establishing a new trust boundary, and explicitly dispose of old-scope data. See the [security lifecycle](../reference/protocol/v1/security.md).
 

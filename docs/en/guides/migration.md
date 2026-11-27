@@ -4,7 +4,8 @@ Build SDK 5 from the repository root. Use fresh build directories and install pr
 
 ## Protocol and application changes
 
-- **Upgrade each endpoint and relay on the path to Wire v1.** The version field is now `1`. The fixed header layout, CRC coverage, and active flag and TLV assignments are specified in the [Wire v1 reference](../reference/protocol/v1/index.md).
+- **Upgrade each endpoint and relay on the path to Wire v1.** The version field is `1`. Install this revision on existing Wire v1 endpoints and relays together because it compacts flag and TLV assignments. The fixed header layout and CRC coverage are specified in the [Wire v1 reference](../reference/protocol/v1/index.md).
+- **Remove references to the former `XGL_TRAFFIC_ENCRYPTION_*` constants.** Traffic class carries only priority and reliability.
 - **Submit one frame's worth of DATA per call.** Remove the previous fragmentation setting and split larger transfers into [application blocks](send.md#application-blocks). The sender returns `XGL_ERR_BUFFER_TOO_SMALL` when a payload exceeds the single-frame budget.
 - **Check MTU in both directions.** Verify the DATA path and the ACK return path independently. The receiver reports a missing local reverse route or insufficient feedback capacity before accepting reliable DATA. See [Routing](../reference/protocol/v1/routing.md).
 

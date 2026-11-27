@@ -68,8 +68,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->max_peers = config->max_peers;
     ctx->default_timeout_ms = config->default_timeout_ms;
     ctx->max_frame_size = config->max_frame_size;
-    ctx->auth_tag_len = config->auth_tag_len;
-    ctx->route_table = config->route_table;
     ctx->lower_layer = config->lower_layer;
     ctx->rx_callback = config->rx_callback;
     ctx->rx_accept_callback = config->rx_accept_callback;

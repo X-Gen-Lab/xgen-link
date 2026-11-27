@@ -16,7 +16,7 @@ Closing a security session keeps a tombstone. Installing reserves each direction
 
 SECURITY value is `LE32(key_id) || LE64(security_seq) || u8(tag_length)`. The provider receives versioned `xgl_auth_input_t`, including the exact endpoints, connection, epoch, sequence and a 12-byte nonce: `BE32(installed_directional_prefix) || BE64(security_seq)`.
 
-AAD is the entire encoded header and TLVs, with TTL byte 6 and header-CRC bytes 22–23 zeroed. Every other AAD byte and every payload byte is authenticated. Tags have the provider's fixed declared length. A sign attempt reserves a new sequence before the provider call; failure does not roll it back. `UINT64_MAX` can be used once, then the association is exhausted. Reliable retransmission keeps DATA numbering but always signs a newly composed frame.
+AAD is the entire encoded header and TLVs, with TTL byte 6 and header-CRC bytes 22–23 zeroed. Every other AAD byte and every payload byte is authenticated. Tags have the provider's fixed declared length. A sign attempt reserves a new sequence before the provider call; failure does not roll it back. `UINT64_MAX` can be used once, then the association is exhausted. Reliable retransmission keeps DATA numbering but always signs a newly composed frame. Production send uses the validated frame layout to locate SECURITY and the tag without rescanning encoded TLVs.
 
 ## Receive and Forwarding
 

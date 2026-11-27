@@ -7,7 +7,7 @@ XGen Link is a standalone C11 protocol library. It owns wire encoding, link proc
 | Module | Responsibility | Boundary |
 | --- | --- | --- |
 | API | Validate ABI/profile/capacities; construct instances; drive work | Public configuration and explicit timestamps |
-| Transport | Exact peer ownership; reliable DATA; ACK; retry; optional messages | Typed logical packet views |
+| Transport | Exact peer ownership; reliable DATA; ACK; retry; optional out-of-order receive buffering | Typed logical packet views |
 | Network | Route lookup, TLV composition, local authentication, forwarding | Logical packets above, complete frames below |
 | Security | Installed directional nonce domains, signing and replay state | Versioned authentication input |
 | Datalink | Incremental stream framing and synchronous PHY submission | Borrowed byte spans |

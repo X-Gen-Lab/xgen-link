@@ -22,7 +22,7 @@
 | RTT observations, workspace reservations and streaming CRC classification | `test/unit/api/test_stats.cpp`, `test/unit/datalink/test_datalink.cpp` |
 | Boot error contracts with statistics and detailed diagnostics disabled | Conditional checks in `test/smoke/static_workspace_smoke.c` |
 | Boot/Lite reliable delivery, capacity rejection and parsing | Capability-selected cases in `test/unit/api/test_bounded_profile.cpp` |
-| Boot 32-byte logical-TX extension limit and independent raw-wire boundary | `test/unit/network/test_boot_network.cpp` |
+| Boot generated TX extensions and the complete raw Wire frame boundary | `test/unit/network/test_boot_network.cpp` |
 | Multi-configuration publication/installation, exported capabilities, and budget rejection | `test/contracts/build/test_profile_builds.py`, `test/contracts/footprint/test_footprint_budget.py` |
 | Four resource-configured API sets, installed fixed-RTO tests and complete labels | `test/contracts/build/test_transport_resource_config.py` |
 | Independent C11/C++17 public/private header compilation, discovery and seed replay | `test/cmake/HeaderContracts.cmake`, classification and runner contracts |

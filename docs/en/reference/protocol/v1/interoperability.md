@@ -1,6 +1,6 @@
 # Interoperability
 
-Endpoints and relays on a path must use Wire v1. The SDK version and C ABI identify local builds. Each build uses its matching headers and library.
+Endpoints and relays on a path must use the Wire v1 encoding specified here. Replace endpoints and relays that use the earlier Wire v1 encoding together during deployment. The version byte is `1` in both revisions, so ensure all devices use the same flags and TLV assignments. Each build uses its matching headers and library.
 
 ## Required agreements
 

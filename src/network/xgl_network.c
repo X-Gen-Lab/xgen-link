@@ -86,7 +86,7 @@ bool xgl_network_validate_address(const xgl_network_ctx_t* ctx,
  */
 static xgl_error_t network_send_impl(void* ctx, xgl_handle_t handle,
                                      xgl_packet_t* packet) {
-    return xgl_network_send_with_handle(ctx, handle, packet);
+    return xgl_network_send_generated(ctx, handle, packet);
 }
 
 /**
@@ -97,7 +97,8 @@ static xgl_error_t network_receive_impl(void* ctx, xgl_handle_t handle,
     if (ctx == NULL || message == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    return xgl_network_receive_view(ctx, handle, message->view);
+    return xgl_network_receive_mutable_view(ctx, handle, message->view,
+                                            message->mutable_frame);
 }
 
 /**
@@ -110,6 +111,7 @@ xgl_error_t xgl_network_get_endpoints(xgl_network_ctx_t* ctx,
         return XGL_ERR_NULL_POINTER;
     }
     xgl_packet_tx_endpoint_init(packets, ctx, network_send_impl);
+    packets->check_data = xgl_network_check_data;
     packets->check_feedback = xgl_network_check_feedback;
     xgl_frame_rx_endpoint_init(frames, ctx, network_receive_impl);
     return XGL_OK;

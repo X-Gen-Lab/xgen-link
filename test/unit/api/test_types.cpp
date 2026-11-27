@@ -188,17 +188,9 @@ TEST(XglTypesTest, TrafficClassBitDefinitions) {
     EXPECT_EQ(XGL_RELIABILITY_ACK_ELICITING, 0x40);
     EXPECT_EQ(XGL_RELIABILITY_ACK_ONLY, 0x80);
 
-    /* Test encryption class */
-    EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_SHIFT, 3);
-    EXPECT_EQ(XGL_TRAFFIC_ENCRYPTION_MASK, 0x18);
-
     /* Test priority class */
     EXPECT_EQ(XGL_TRAFFIC_PRIORITY_SHIFT, 0);
     EXPECT_EQ(XGL_TRAFFIC_PRIORITY_MASK, 0x07);
-
-    /* Test compression class */
-    EXPECT_EQ(XGL_COMPRESSION_SHIFT, 6);
-    EXPECT_EQ(XGL_COMPRESSION_MASK, 0xC0);
 }
 
 /**

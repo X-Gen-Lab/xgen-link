@@ -1,6 +1,6 @@
 /**
  * \file            test_wire_sack_view.cpp
- * \brief           Checked borrowed SACK values and legacy copy compatibility
+ * \brief           Checked borrowed SACK values
  * \author          X-Gen Lab
  */
 
@@ -69,34 +69,4 @@ TEST(XglWireSackViewTest, NullInputClearsAPreviouslySuccessfulView) {
     EXPECT_EQ(view.bitmap, nullptr);
     EXPECT_EQ(xgl_wire_decode_sack_view(bytes, sizeof(bytes), nullptr),
               XGL_ERR_NULL_POINTER);
-}
-
-TEST(XglWireSackViewTest, LegacyCopyPreservesOutputsUntilAllChecksSucceed) {
-    const uint8_t bytes[] = {7, 0, 0, 0, 3, 1, 2, 4};
-    uint8_t bitmap[] = {0xAA, 0xBB, 0xCC};
-    uint32_t base = 99U;
-    size_t length = 77U;
-    EXPECT_EQ(xgl_wire_decode_sack_ext_value(bytes, sizeof(bytes), &base,
-                                             bitmap, 2U, &length),
-              XGL_ERR_BUFFER_TOO_SMALL);
-    EXPECT_EQ(xgl_wire_decode_sack_ext_value(bytes, sizeof(bytes), &base,
-                                             nullptr, 0U, &length),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_sack_ext_value(bytes, sizeof(bytes) - 1U, &base,
-                                             bitmap, sizeof(bitmap), &length),
-              XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(base, 99U);
-    EXPECT_EQ(length, 77U);
-    EXPECT_EQ(bitmap[0], 0xAAU);
-    EXPECT_EQ(bitmap[1], 0xBBU);
-    EXPECT_EQ(bitmap[2], 0xCCU);
-
-    ASSERT_EQ(xgl_wire_decode_sack_ext_value(bytes, sizeof(bytes), &base,
-                                             bitmap, sizeof(bitmap), &length),
-              XGL_OK);
-    EXPECT_EQ(base, 7U);
-    EXPECT_EQ(length, 3U);
-    EXPECT_EQ(bitmap[0], 1U);
-    EXPECT_EQ(bitmap[1], 2U);
-    EXPECT_EQ(bitmap[2], 4U);
 }

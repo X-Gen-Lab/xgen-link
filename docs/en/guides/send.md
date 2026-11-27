@@ -23,7 +23,7 @@ The example assumes valid application variables and an initialized handle. Paylo
 
 `xgl_send_zerocopy_at()` keeps its original request layout and always uses connection ID and epoch zero. Use `xgl_send_zerocopy_scoped_at()` with `xgl_tx_zerocopy_request_t` for an explicit scope. Both entries support only nonempty, unreliable, single-frame payloads; `reliable=true` is rejected and `timeout_ms` is ignored. They do not provide retained-buffer DMA or retransmission ownership.
 
-Call `xgl_send_zerocopy_layout()` before placing the payload. The query ignores `data.buffer`, `data.buffer_size` and `data.data_offset`; it validates the requested metadata, route, complete-frame MTU, installed authentication scope, message length and terminal-scope policy. It returns `payload_offset` and `frame_size`, including DATA_TYPE, nonzero SESSION, SECURITY, the fixed tag and final CRC. It allocates nothing, changes no counters or security sequence, and calls neither the provider nor the PHY. Failure clears the output. A successful query does not reserve resources; sending validates the current state again.
+Call `xgl_send_zerocopy_layout()` before placing the payload. The query ignores `data.buffer`, `data.buffer_size` and `data.data_offset`; it validates the requested metadata, route, complete-frame MTU, installed authentication scope and terminal-scope policy. It returns `payload_offset` and `frame_size`, including DATA_TYPE, nonzero SESSION, SECURITY, the fixed tag and final CRC. It allocates nothing, changes no counters or security sequence, and calls neither the provider nor the PHY. Failure clears the output. A successful query does not reserve resources; sending validates the current state again.
 
 ```c
 xgl_tx_zerocopy_request_t request = {0};
@@ -47,7 +47,7 @@ The example assumes a caller-owned array `frame_buffer` and `<string.h>`. If the
 
 Network TX packets and payload bytes commit only after successful lower-layer submission, consistently for copied, in-place and forwarded frames. These counters do not prove remote delivery.
 
-Boot's private logical network TX workspace is 32 extension bytes, enough for one ACK_RANGE, SESSION and DATA_TYPE together. Larger logical TX extension lists fail before PHY submission. This profile limit does not change Wire v1: complete-frame encoding/decoding still supports the 255-byte header, and other profiles retain the full 231-byte logical extension workspace.
+For local sends, Network composes Transport-generated extensions using 32 bytes of temporary storage. Encoding adds SECURITY when required. Receive and forwarding validate complete Wire frames, whose header limit is 255 bytes.
 
 ## Reliable and Unreliable
 

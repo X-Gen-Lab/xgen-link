@@ -101,21 +101,6 @@ typedef struct {
 /** Packet carries acknowledgement information and no application payload. */
 #define XGL_RELIABILITY_ACK_ONLY 0x80
 
-/** Reserved encryption-class bit position. */
-#define XGL_TRAFFIC_ENCRYPTION_SHIFT 3
-
-/** Reserved encryption-class mask. */
-#define XGL_TRAFFIC_ENCRYPTION_MASK 0x18
-
-/** No encryption. This is the only accepted production value today. */
-#define XGL_TRAFFIC_ENCRYPTION_NONE 0x00
-
-/** Reserved; rejected until the encryption path is wired. */
-#define XGL_TRAFFIC_ENCRYPTION_AES128 0x08
-
-/** Reserved; rejected until the encryption path is wired. */
-#define XGL_TRAFFIC_ENCRYPTION_CHACHA20 0x10
-
 /** Traffic-class bit position used for priority. */
 #define XGL_TRAFFIC_PRIORITY_SHIFT 0
 

@@ -275,7 +275,7 @@ TEST(XglConfigConsistency, SmallRouteKeepsForwardingAndChecksActualSendBudget) {
     tx.target_id = 2U;
     tx.data = &byte;
     tx.data_len = 1U;
-    EXPECT_EQ(xgl_send_at(instance.handle, &tx, 0U), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_send_at(instance.handle, &tx, 0U), XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_TRUE(port.transmitted.empty());
 
 #if XGL_FEATURE_FORWARDING

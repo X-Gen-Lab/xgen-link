@@ -25,9 +25,10 @@ extern "C" {
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Complete frame structure
- * \details         Represents a complete protocol frame with all components
- * \note            The fixed header already contains the production magic bytes
+ * \brief           Logical frame and borrowed extension and payload bytes
+ * \note            Keep both spans alive until encoding returns. The encoder
+ *                  writes the fixed header CRC. Finalization writes the CRC
+ *                  that covers the complete encoded frame body.
  */
 typedef struct {
     xgl_wire_header_t header;  /**< Production logical wire header */
@@ -43,15 +44,13 @@ typedef struct {
 
 /**
  * \brief           Frame building parameters
- * \details         Normalizes transport flags and borrowed byte spans.
- * DATA_TYPE and SESSION values are encoded only in the extension span.
+ * \note            DATA_TYPE and SESSION are supplied in the extension span.
  */
 typedef struct {
     uint16_t source_id;  /**< Source node ID */
     uint16_t target_id;  /**< Target node ID */
-    uint8_t packet_type; /**< Production packet type, 0 uses DATA */
-    uint8_t flags;       /**< Production wire flags merged with derived flags */
-    uint8_t traffic_class;     /**< Production traffic class, 0 uses priority */
+    uint8_t packet_type; /**< Packet type, 0 derives DATA or ACK from class */
+    uint8_t flags;       /**< AUTHENTICATED requests an authenticated layout */
     uint32_t connection_id;    /**< Production connection context ID */
     uint32_t packet_number;    /**< Production monotonic packet number */
     const uint8_t* extensions; /**< Production TLV extension bytes */
@@ -66,8 +65,8 @@ typedef struct {
 } xgl_frame_params_t;
 
 /**
- * \brief           Build frame from parameters
- * \param[out]      frame: Frame structure to populate
+ * \brief           Set logical header fields and borrow the source spans
+ * \param[out]      frame: Logical frame, written only on success
  * \param[in]       params: Frame building parameters
  * \return          XGL_OK on success, error code otherwise
  */
@@ -75,23 +74,24 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
                             const xgl_frame_params_t* params);
 
 /**
- * \brief           Serialize frame to buffer
+ * \brief           Serialize a plaintext frame into caller storage
  * \param[out]      buffer: Output buffer
  * \param[in]       buffer_size: Buffer size in bytes
- * \param[in]       frame: Frame structure to serialize
- * \param[out]      bytes_written: Number of bytes written
+ * \param[in]       frame: Frame and source spans held until the call returns
+ * \param[out]      bytes_written: Complete frame size, zero on failure
  * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_frame_serialize(uint8_t* buffer, size_t buffer_size,
                                 const xgl_frame_t* frame,
                                 size_t* bytes_written);
 
-/** \brief           Checked offsets for one encoded frame. */
+/** \brief           Checked sizes and scope for one encoded frame. */
 typedef struct {
     size_t header_len;
     size_t payload_len;
     size_t tag_len;
     size_t frame_len;
+    uint32_t session_epoch; /**< Checked SESSION epoch, or 0 if unavailable */
 } xgl_frame_layout_t;
 
 /**
@@ -99,7 +99,7 @@ typedef struct {
  * \param[in]       payload_len: Number of payload bytes
  * \param[in]       extensions_len: Existing TLV bytes, excluding SECURITY
  * \param[in]       auth_tag_len: Zero or the selected authentication tag size
- * \param[out]      layout: Checked offsets and size, cleared on failure
+ * \param[out]      layout: Checked sizes and a zero epoch, cleared on failure
  * \return          XGL_OK or a length/capacity error
  */
 xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
@@ -119,13 +119,15 @@ xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
 /**
  * \brief           Encode header, extensions and payload without authentication
  * \param[out]      buffer: Complete frame storage, including tag/CRC capacity
- * \param[in]       buffer_size: Available capacity
- * \param[in]       frame: Logical input; in-place payload storage is supported
+ * \param[in]       buffer_size: Available capacity in bytes
+ * \param[in]       frame: Logical frame and source spans
  * \param[in]       auth_tag_len: Zero, or the reserved tag length
- * \param[out]      layout: Produced layout for signing and finalization
+ * \param[out]      layout: Measured layout, written before checking capacity
  * \return          XGL_OK on success, error code otherwise
- * \note            A nonzero tag length appends a SECURITY placeholder. The
- *                  caller must fill it and the tag before finalizing the CRC.
+ * \note            Place an in-place payload at the measured payload offset.
+ *                  Otherwise keep source spans separate from the destination.
+ *                  A nonzero tag length reserves SECURITY and the tag. Fill
+ *                  both before finalizing the CRC.
  */
 xgl_error_t xgl_frame_encode_into(uint8_t* buffer, size_t buffer_size,
                                   const xgl_frame_t* frame, size_t auth_tag_len,
@@ -134,7 +136,7 @@ xgl_error_t xgl_frame_encode_into(uint8_t* buffer, size_t buffer_size,
 /**
  * \brief           Finalize an encoded frame after its optional tag is ready
  * \param[in,out]   buffer: Encoded header, payload and optional tag
- * \param[in]       buffer_size: Available capacity
+ * \param[in]       buffer_size: Available capacity in bytes
  * \param[in]       layout: Layout returned by the encoder
  * \param[out]      bytes_written: Complete frame length, zero on failure
  * \return          XGL_OK on success, error code otherwise
@@ -144,33 +146,9 @@ xgl_error_t xgl_frame_finalize_crc(uint8_t* buffer, size_t buffer_size,
                                    size_t* bytes_written);
 
 /**
- * \brief           Build frame in zero-copy mode
- * \param[in,out]   buffer: Buffer with pre-allocated header space
- * \param[in]       buffer_size: Total buffer size
- * \param[in]       data_offset: Payload offset; use XGL_FRAME_HEADER_SIZE plus
- *                  XGL_DATA_TYPE_EXT_SIZE when data_type is non-zero
- * \param[in]       data_len: Payload data length
- * \param[in]       source_id: Source node ID
- * \param[in]       target_id: Target node ID
- * \param[in]       data_type: Application data type encoded as DATA_TYPE_EXT
- * \param[in]       packet_number: Production packet number
- * \param[in]       reliable: Reliable transmission flag
- * \param[in]       priority: Priority level (0-7)
- * \param[out]      frame_len: Total frame length
- * \return          XGL_OK on success, error code otherwise
- */
-xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer, size_t buffer_size,
-                                     size_t data_offset, size_t data_len,
-                                     uint16_t source_id, uint16_t target_id,
-                                     uint8_t data_type, uint32_t packet_number,
-                                     bool reliable, uint8_t priority,
-                                     size_t* frame_len);
-
-/**
  * \brief           Calculate frame size
  * \param[in]       payload_len: Payload length in bytes
- * \return          Total frame size, or zero if payload_len is not
- * representable
+ * \return          Total frame size in bytes, or zero on invalid length
  */
 static inline size_t xgl_frame_calculate_size(size_t payload_len) {
     xgl_frame_layout_t layout;
@@ -179,8 +157,8 @@ static inline size_t xgl_frame_calculate_size(size_t payload_len) {
                : 0U;
 }
 
-/** \brief           Return the checked encoded size, or zero on invalid
- * lengths. */
+/** \brief           Return the encoded byte size, or zero on invalid lengths.
+ */
 static inline size_t xgl_frame_serialized_size(size_t payload_len,
                                                size_t extensions_len,
                                                size_t auth_tag_len) {
@@ -193,8 +171,8 @@ static inline size_t xgl_frame_serialized_size(size_t payload_len,
 
 /* Parameter order follows the documented protocol fields and units. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-/** \brief           Compute a wire-representable payload budget, cleared on
- * failure. */
+/** \brief           Compute the payload budget in bytes, zeroing it on error.
+ */
 static inline bool xgl_frame_payload_budget(size_t max_frame_size,
                                             size_t extensions_len,
                                             size_t auth_tag_len,

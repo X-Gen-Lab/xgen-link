@@ -1,6 +1,6 @@
 # 扩展
 
-每个 TLV 的布局为 `type:u8 | value_length:u8 | value`。TLV 受 `header_len` 限定，不从载荷内容推断边界。解码器拒绝退役的类型 4，并跳过其他结构合法的未知非关键类型。重复的 DATA_TYPE、SESSION、SECURITY 单例扩展会被拒绝；transport 要求每个 ACK 恰好包含一个 ACK_RANGE 或 SACK。
+每个 TLV 的布局为 `type:u8 | value_length:u8 | value`。TLV 受 `header_len` 限定，不从载荷内容推断边界。类型 `0` 无效，结构合法的未知非关键类型可被跳过。重复的 DATA_TYPE、SESSION、SECURITY 单例扩展会被拒绝；transport 要求每个 ACK 恰好包含一个 ACK_RANGE 或 SACK。
 
 ## 已定义的值
 
@@ -9,10 +9,10 @@
 | SESSION = 1 | 12 | `epoch:u32`、`incarnation_id:u64` |
 | ACK_RANGE = 2 | `9 + 4*n` | `largest_ack:u32`、`ack_delay_us:u32`、`count:u8`，后接 `gap:u16,length:u16` |
 | SACK = 3 | `5 + n` | `base:u32`、`bitmap_length:u8`、位图 |
-| SECURITY = 5 | 13 | `key_id:u32`、`security_seq:u64`、`tag_length:u8` |
-| DATA_TYPE = 8 | 1 | 应用类型或 CONTROL 操作 |
+| SECURITY = 4 | 13 | `key_id:u32`、`security_seq:u64`、`tag_length:u8` |
+| DATA_TYPE = 5 | 1 | 应用类型或 CONTROL 操作 |
 
-值中的整数使用小端序。编号 4 保留给已退役的扩展，ROUTE 与 TIMESTAMP 编号继续保留。SESSION 增加 14 字节，SECURITY 增加 15 字节。未携带 SESSION 表示 epoch 为零。`incarnation_id` 是传输的元数据，其存在不会安装信任，也不会替代 peer key。
+值中的整数使用小端序。SESSION 增加 14 字节，SECURITY 增加 15 字节。未携带 SESSION 表示 epoch 为零。`incarnation_id` 是传输的元数据，其存在不会安装信任，也不会替代 peer key。
 
 ## ACK 语义
 

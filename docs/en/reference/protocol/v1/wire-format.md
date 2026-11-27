@@ -20,17 +20,26 @@ The wire version is `1`. Integer fields are little-endian unless explicitly stat
 | 20 | 2 | Payload length, excluding tag and CRC |
 | 22 | 2 | Header CRC16 |
 
-Node zero is invalid; `0xFFFF` is broadcast. DATA, ACK and CONTROL use types 1, 2 and 3. Other declared packet types reserve encoding values and do not define additional application services; local transport rejects types 4–7 instead of delivering them as DATA. DATA_TYPE is a separate extension, so an application type cannot accidentally become a control packet. Reliable broadcast is rejected at endpoint admission; unreliable broadcast remains subject to routing and authentication policy.
+Node zero is invalid; `0xFFFF` is broadcast. DATA, ACK and CONTROL use types `1`, `2` and `3`, respectively. Wire rejects all other packet types. DATA_TYPE is a separate extension, so an application type cannot accidentally become a control packet. Reliable broadcast is rejected at endpoint admission; unreliable broadcast remains subject to routing and authentication policy.
 
 ## Flags and Traffic Class
 
-The flag byte uses `0x01` for ACK elicitation, `0x02` for extensions, `0x10` for authentication and `0x20` for control. The reserved `0x08` encryption flag must be clear. The retired fragmentation flag `0x04` must also be clear.
+The flag byte uses `0x01` for ACK elicitation, `0x02` to indicate extensions, `0x04` to indicate an authentication tag, and `0x08` for control. Unassigned flag bits must be clear.
 
-The traffic-class byte uses bits 0–2 for priority and bits 6–7 for reliability. The supported reliability values are `0x00` (none), `0x40` (ACK eliciting) and `0x80` (ACK only). Reserved encryption bits `0x18` and the retired fragmentation bit `0x20` must be clear.
+The traffic-class byte uses bits 0–2 for priority and bits 6–7 for reliability. The supported reliability values are `0x00` (none), `0x40` (ACK eliciting) and `0x80` (ACK only). Bits 3–5 are unassigned and must be clear.
+
+The extension flag is set exactly when `header_len > 24`. The packet type determines the permitted reliability value, flags and header fields.
+
+| Type | Reliability | ACK-eliciting flag | Control flag | Packet number and payload |
+| --- | --- | --- | --- | --- |
+| Unreliable DATA | `0x00` | Clear | Clear | Packet number is zero |
+| Reliable DATA | `0x40` | Set | Clear | Header packet number identifies the reliable DATA |
+| ACK | `0x80` | Clear | Clear | Packet number and payload length are zero |
+| CONTROL | `0x00` | Clear | Set | Packet number and payload length are zero |
 
 ## Validation and Numbering
 
-Both CRCs use CRC-16/MODBUS and are encoded little-endian. Header CRC covers the 24-byte header with bytes 22 and 23 zeroed. Frame CRC covers every preceding frame byte, including TLVs and the authentication tag. The decoder validates complete boundaries, exact payload/tag lengths and DATA_TYPE, SESSION and SECURITY singleton constraints before returning borrowed spans. The decoder accepts version `01` and rejects frames with any other version, either retired fragmentation bit or retired TLV type `4`. Structurally valid unknown TLVs are skipped. A wire-authenticated flag indicates a tag is present; only security verification establishes authenticity.
+Both CRCs use CRC-16/MODBUS and are encoded little-endian. Header CRC covers the 24-byte header with bytes 22 and 23 zeroed. Frame CRC covers every preceding frame byte, including TLVs and the authentication tag. The decoder validates complete boundaries, exact payload/tag lengths and DATA_TYPE, SESSION and SECURITY singleton constraints before returning borrowed spans. Complete-frame decoding and incremental stream parsing share Wire field, length and CRC checks. The version field must be `01`. Structurally valid unknown noncritical TLVs are skipped. A wire-authenticated flag indicates a tag is present; only security verification establishes authenticity.
 
 Reliable DATA starts at packet number zero per peer scope and increments only after accepted initial submission. Retransmission preserves it. Usable DATA numbers end at `UINT32_MAX - 1`; both sending and receiving reject `UINT32_MAX` for reliable DATA, so receive history cannot wrap to zero. ACK, CONTROL and unreliable DATA encode zero; acknowledged numbers occur only inside ACK_RANGE or SACK. A connection must move to a new epoch before the reliable sequence is exhausted.
 

@@ -90,9 +90,10 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx, xgl_handle_t handle,
  * \param[in]       metadata: Borrowed view from the trusted internal RX path
  * \return          XGL_OK on success, error code otherwise
  */
-xgl_error_t xgl_network_receive_view(xgl_network_ctx_t* ctx,
-                                     xgl_handle_t handle,
-                                     const xgl_wire_frame_view_t* metadata) {
+xgl_error_t
+xgl_network_receive_mutable_view(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                                 const xgl_wire_frame_view_t* metadata,
+                                 uint8_t* mutable_frame) {
     if (ctx == NULL || metadata == NULL || metadata->frame_buf == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -125,9 +126,16 @@ xgl_error_t xgl_network_receive_view(xgl_network_ctx_t* ctx,
     }
 
 #if XGL_FEATURE_FORWARDING
-    return xgl_network_forward(ctx, handle, metadata);
+    return xgl_network_forward_mutable(ctx, handle, metadata, mutable_frame);
 #else
+    (void)mutable_frame;
     xgl_network_count_rx_drop(ctx);
     return XGL_ERR_ROUTE_NOT_FOUND;
 #endif
+}
+
+xgl_error_t xgl_network_receive_view(xgl_network_ctx_t* ctx,
+                                     xgl_handle_t handle,
+                                     const xgl_wire_frame_view_t* metadata) {
+    return xgl_network_receive_mutable_view(ctx, handle, metadata, NULL);
 }

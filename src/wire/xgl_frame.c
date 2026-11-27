@@ -2,6 +2,9 @@
  * \file            xgl_frame.c
  * \brief           Frame encapsulation implementation
  * \author          X-Gen Lab
+ * \version         5.0.0
+ * \date            2026-11-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <wire/xgl_crc16.h>
@@ -14,37 +17,46 @@
 
 #include <string.h>
 
-#define XGL_FRAME_DEFAULT_TTL 8U
-
 /*---------------------------------------------------------------------------*/
 /* Frame Header                                                              */
 /*---------------------------------------------------------------------------*/
+
+/** \brief           Derive flags from the packet kind and measured spans. */
+static uint8_t frame_flags(const xgl_wire_header_t* header,
+                           size_t extensions_len, bool authenticated) {
+    uint8_t flags = 0U;
+    if ((header->traffic_class & XGL_RELIABILITY_CLASS_MASK) ==
+        XGL_RELIABILITY_ACK_ELICITING) {
+        flags |= XGL_WIRE_FLAG_ACK_ELICITING;
+    }
+    if (header->packet_type == XGL_PACKET_TYPE_CONTROL) {
+        flags |= XGL_WIRE_FLAG_CONTROL;
+    }
+    if (extensions_len != 0U) {
+        flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    }
+    if (authenticated) {
+        flags |= XGL_WIRE_FLAG_AUTHENTICATED;
+    }
+    return flags;
+}
 
 /** \brief           Normalize derived header fields from the checked layout. */
 static xgl_error_t encode_frame_wire_header(uint8_t* buffer,
                                             const xgl_frame_t* frame,
                                             const xgl_frame_layout_t* layout) {
-    uint8_t flags = frame->header.flags;
-    if (layout->tag_len > 0U) {
-        flags |= XGL_WIRE_FLAG_AUTHENTICATED;
-    }
-    if (layout->header_len > XGL_WIRE_BASE_HEADER_SIZE) {
-        flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
-    }
-
     xgl_wire_header_t wire = frame->header;
     wire.version = XGL_WIRE_VERSION;
     wire.header_len = (uint8_t)layout->header_len;
-    wire.flags = flags;
+    wire.flags =
+        frame_flags(&wire, layout->header_len - XGL_WIRE_BASE_HEADER_SIZE,
+                    layout->tag_len > 0U);
     wire.payload_len = (uint16_t)layout->payload_len;
     wire.header_crc16 = 0;
 
     return xgl_wire_encode_header(buffer, layout->frame_len, &wire);
 }
 
-/**
- * \brief           Build frame from parameters
- */
 xgl_error_t xgl_frame_build(xgl_frame_t* frame,
                             const xgl_frame_params_t* params) {
     if (frame == NULL || params == NULL) {
@@ -55,7 +67,6 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    /* Initialize frame */
     memset(frame, 0, sizeof(xgl_frame_t));
 
     uint8_t traffic_class_bits = 0;
@@ -67,48 +78,34 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
     }
     xgl_frame_set_priority(&traffic_class_bits, params->priority);
 
-    uint8_t flags = params->flags;
     uint8_t reliable =
         (uint8_t)(traffic_class_bits & XGL_RELIABILITY_CLASS_MASK);
-    if (reliable == XGL_RELIABILITY_ACK_ELICITING) {
-        flags |= XGL_WIRE_FLAG_ACK_ELICITING;
-    }
-    if (params->extensions != NULL && params->extensions_len > 0U) {
-        flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
-    }
-
     uint8_t packet_type = params->packet_type;
     if (packet_type == XGL_PACKET_TYPE_INVALID) {
-        packet_type = XGL_PACKET_TYPE_DATA;
-    }
-    if (reliable == XGL_RELIABILITY_ACK_ONLY) {
-        packet_type = XGL_PACKET_TYPE_ACK;
-    }
-    if (packet_type == XGL_PACKET_TYPE_CONTROL) {
-        flags |= XGL_WIRE_FLAG_CONTROL;
+        packet_type = reliable == XGL_RELIABILITY_ACK_ONLY
+                          ? XGL_PACKET_TYPE_ACK
+                          : XGL_PACKET_TYPE_DATA;
     }
 
     frame->header.version = XGL_WIRE_VERSION;
     frame->header.header_len = XGL_WIRE_BASE_HEADER_SIZE;
     frame->header.packet_type = packet_type;
-    frame->header.flags = flags;
     frame->header.ttl = params->ttl;
-    frame->header.traffic_class = (params->traffic_class != 0U)
-                                      ? params->traffic_class
-                                      : traffic_class_bits;
+    frame->header.traffic_class = traffic_class_bits;
+    frame->header.flags =
+        frame_flags(&frame->header, params->extensions_len,
+                    (params->flags & XGL_WIRE_FLAG_AUTHENTICATED) != 0U);
     frame->header.source_id = params->source_id;
     frame->header.target_id = params->target_id;
     frame->header.connection_id = params->connection_id;
     frame->header.packet_number =
         packet_type == XGL_PACKET_TYPE_DATA &&
-                (reliable == XGL_RELIABILITY_ACK_ELICITING ||
-                 (flags & XGL_WIRE_FLAG_ACK_ELICITING) != 0U)
+                reliable == XGL_RELIABILITY_ACK_ELICITING
             ? params->packet_number
             : 0U;
     frame->header.payload_len = (uint16_t)params->payload_len;
     frame->header.header_crc16 = 0;
 
-    /* Set payload */
     frame->payload = params->payload;
     frame->payload_len = params->payload_len;
     frame->extensions = params->extensions;
@@ -119,9 +116,6 @@ xgl_error_t xgl_frame_build(xgl_frame_t* frame,
 
 /* Layout lengths follow payload, existing TLV, then appended tag order. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-/**
- * \brief           Validate lengths before any sum, write or allocation
- */
 xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
                                       size_t auth_tag_len,
                                       xgl_frame_layout_t* layout) {
@@ -131,7 +125,7 @@ xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
     }
     memset(layout, 0, sizeof(*layout));
     if (payload_len > UINT16_MAX ||
-        extensions_len > UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE) {
+        extensions_len > XGL_WIRE_MAX_EXTENSIONS_SIZE) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     if (auth_tag_len > XGL_AUTH_TAG_MAX_LEN) {
@@ -140,7 +134,7 @@ xgl_error_t xgl_frame_measure_lengths(size_t payload_len, size_t extensions_len,
     size_t extension_len = extensions_len;
     if (auth_tag_len > 0U) {
         if (extension_len >
-            UINT8_MAX - XGL_WIRE_BASE_HEADER_SIZE - XGL_SECURITY_EXT_SIZE) {
+            XGL_WIRE_MAX_EXTENSIONS_SIZE - XGL_SECURITY_EXT_SIZE) {
             return XGL_ERR_BUFFER_TOO_SMALL;
         }
         extension_len += XGL_SECURITY_EXT_SIZE;
@@ -162,8 +156,8 @@ xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
     if (layout == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    memset(layout, 0, sizeof(*layout));
     if (frame == NULL) {
+        memset(layout, 0, sizeof(*layout));
         return XGL_ERR_NULL_POINTER;
     }
     xgl_error_t error = xgl_frame_measure_lengths(
@@ -176,14 +170,15 @@ xgl_error_t xgl_frame_measure(const xgl_frame_t* frame, size_t auth_tag_len,
         memset(layout, 0, sizeof(*layout));
         return XGL_ERR_NULL_POINTER;
     }
-    if (auth_tag_len > 0U) {
+    if (frame->extensions_len != 0U) {
         xgl_wire_ext_metadata_t metadata;
-        error = xgl_wire_decode_ext_metadata(frame->extensions,
-                                             frame->extensions_len, &metadata);
-        if (error != XGL_OK || metadata.has_security_ext) {
+        error = xgl_wire_decode_ext_metadata(
+            frame->extensions, frame->extensions_len, false, &metadata);
+        if (error != XGL_OK) {
             memset(layout, 0, sizeof(*layout));
-            return XGL_ERR_INVALID_FRAME;
+            return error;
         }
+        layout->session_epoch = metadata.session_epoch;
     }
     return XGL_OK;
 }
@@ -269,64 +264,4 @@ xgl_error_t xgl_frame_serialize(uint8_t* buffer, size_t buffer_size,
         return error;
     }
     return xgl_frame_finalize_crc(buffer, buffer_size, &layout, bytes_written);
-}
-
-/* Parameter order follows the documented protocol fields and units. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-xgl_error_t xgl_frame_build_zerocopy(uint8_t* buffer, size_t buffer_size,
-                                     size_t data_offset, size_t data_len,
-                                     uint16_t source_id, uint16_t target_id,
-                                     uint8_t data_type, uint32_t packet_number,
-                                     bool reliable, uint8_t priority,
-                                     size_t* frame_len) {
-    /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    if (buffer == NULL || frame_len == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    if (data_len > UINT16_MAX) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    size_t app_type_ext_len = (data_type != 0U) ? XGL_DATA_TYPE_EXT_SIZE : 0U;
-    xgl_frame_layout_t layout;
-    xgl_error_t error =
-        xgl_frame_measure_lengths(data_len, app_type_ext_len, 0U, &layout);
-    if (error != XGL_OK) {
-        return error;
-    }
-    if (data_offset != layout.header_len) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    if (buffer_size < layout.frame_len) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    uint8_t extensions[XGL_DATA_TYPE_EXT_SIZE];
-    if (app_type_ext_len > 0U) {
-        size_t written = 0U;
-        error = xgl_wire_encode_ext(extensions, sizeof(extensions),
-                                    XGL_WIRE_EXT_DATA_TYPE, &data_type, 1U,
-                                    &written);
-        if (error != XGL_OK) {
-            return error;
-        }
-    }
-    xgl_frame_params_t params = {.source_id = source_id,
-                                 .target_id = target_id,
-                                 .packet_number = packet_number,
-                                 .extensions =
-                                     app_type_ext_len > 0U ? extensions : NULL,
-                                 .extensions_len = app_type_ext_len,
-                                 .payload = buffer + data_offset,
-                                 .payload_len = data_len,
-                                 .reliable = reliable,
-                                 .priority = priority,
-                                 .ttl = XGL_FRAME_DEFAULT_TTL};
-    xgl_frame_t frame;
-    error = xgl_frame_build(&frame, &params);
-    if (error != XGL_OK) {
-        return error;
-    }
-    return xgl_frame_serialize(buffer, buffer_size, &frame, frame_len);
 }

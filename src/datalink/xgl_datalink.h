@@ -121,6 +121,10 @@ xgl_error_t xgl_datalink_send_inplace(xgl_datalink_ctx_t* ctx,
                                       size_t buffer_size,
                                       size_t payload_offset);
 
+/** \brief           Submit a synchronously borrowed frame and layout. */
+xgl_error_t xgl_datalink_submit(xgl_datalink_ctx_t* ctx,
+                                const xgl_frame_tx_message_t* message);
+
 /**
  * \brief           Send raw frame buffer via physical layer
  * \param[in]       ctx: Data link layer context

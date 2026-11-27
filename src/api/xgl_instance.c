@@ -139,11 +139,6 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .default_timeout_ms = handle->config->protocol.ack_timeout_ms,
         .window_size = handle->config->protocol.window_size,
         .max_frame_size = handle->config->protocol.max_frame_size,
-        .auth_tag_len = (handle->config->auth_required &&
-                         handle->config->auth_provider != NULL)
-                            ? (uint8_t)handle->config->auth_provider->tag_len
-                            : 0U,
-        .route_table = &handle->route_table,
         .lower_layer = NULL, /* Will be set after creating network interface */
         .rx_callback = handle->config->rx_callback,
         .rx_accept_callback = handle->config->rx_accept_callback,
@@ -167,13 +162,6 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         transport_config.scope_event_callback =
             handle->options->scope_event_callback;
         transport_config.extended_user_data = handle->options->user_data;
-#if XGL_FEATURE_AUTH
-        if (handle->options->protect_installed_scopes &&
-            handle->config->auth_provider != NULL) {
-            transport_config.auth_tag_len =
-                (uint8_t)handle->config->auth_provider->tag_len;
-        }
-#endif
     }
 #endif
     err = xgl_transport_init(&handle->layers.transport_ctx, &transport_config);

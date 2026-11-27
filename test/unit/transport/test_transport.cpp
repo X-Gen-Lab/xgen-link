@@ -182,15 +182,10 @@ static void expect_sack_packet_for_base(const LowerLayerSpy& spy,
     ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
     ASSERT_EQ(ext.type, XGL_WIRE_EXT_SACK);
 
-    uint32_t decoded_base = 0;
-    uint8_t bitmap[8] = {};
-    size_t bitmap_len = 0;
-    ASSERT_EQ(xgl_wire_decode_sack_ext_value(ext.value, ext.len, &decoded_base,
-                                             bitmap, sizeof(bitmap),
-                                             &bitmap_len),
-              XGL_OK);
-    EXPECT_EQ(decoded_base, base_packet);
-    ASSERT_GT(bitmap_len, 0U);
+    xgl_wire_sack_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_sack_view(ext.value, ext.len, &view), XGL_OK);
+    EXPECT_EQ(view.base_packet, base_packet);
+    ASSERT_GT(view.bitmap_len, 0U);
 }
 
 static uint32_t regression_time_ms;
@@ -985,8 +980,8 @@ TEST(XglTransportTest,
     const uint8_t value[] = {0xAA};
     uint8_t ext[8] = {};
     size_t ext_len = 0;
-    ASSERT_EQ(xgl_wire_encode_ext(ext, sizeof(ext), XGL_WIRE_EXT_ROUTE, value,
-                                  sizeof(value), &ext_len),
+    ASSERT_EQ(xgl_wire_encode_ext(ext, sizeof(ext), 250U, value, sizeof(value),
+                                  &ext_len),
               XGL_OK);
 
     xgl_packet_data_t ack_ext_data = {};
@@ -1457,19 +1452,16 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     ASSERT_EQ(xgl_wire_ext_cursor_next(&cursor, &ext), XGL_OK);
     EXPECT_EQ(ext.type, XGL_WIRE_EXT_ACK_RANGE);
 
-    uint32_t largest_ack = 0;
-    uint32_t ack_delay_us = 0;
-    xgl_wire_ack_range_t ranges[1] = {};
-    size_t range_count = 0;
-    ASSERT_EQ(xgl_wire_decode_ack_range_ext_value(ext.value, ext.len,
-                                                  &largest_ack, &ack_delay_us,
-                                                  ranges, 1, &range_count),
+    xgl_wire_ack_range_view_t view = {};
+    ASSERT_EQ(xgl_wire_decode_ack_range_view(ext.value, ext.len, &view),
               XGL_OK);
-    EXPECT_EQ(largest_ack, 0U);
-    EXPECT_EQ(ack_delay_us, 0U);
-    ASSERT_EQ(range_count, 1U);
-    EXPECT_EQ(ranges[0].gap, 0U);
-    EXPECT_EQ(ranges[0].length, 1U);
+    EXPECT_EQ(view.largest_ack, 0U);
+    EXPECT_EQ(view.ack_delay_us, 0U);
+    ASSERT_EQ(view.range_count, 1U);
+    xgl_wire_ack_range_t range = {};
+    ASSERT_EQ(xgl_wire_ack_range_at(&view, 0U, &range), XGL_OK);
+    EXPECT_EQ(range.gap, 0U);
+    EXPECT_EQ(range.length, 1U);
 
     xgl_transport_destroy(&ctx);
 }
@@ -1659,7 +1651,7 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     xgl_transport_destroy(&ctx);
 }
 
-TEST(XglTransportTest, SingleFrameSendHonorsRouteMtuAndAuthBudget) {
+TEST(XglTransportTest, SingleFrameSendChecksLowerPolicyBeforeSubmission) {
     LowerLayerSpy spy;
     xgl_packet_tx_endpoint_t lower = {};
     xgl_packet_tx_endpoint_init(&lower, &spy, spy_send);
@@ -1669,20 +1661,17 @@ TEST(XglTransportTest, SingleFrameSendHonorsRouteMtuAndAuthBudget) {
     xgl_transport_config_t config =
         make_transport_config(&lower, &stats, &tx_retries);
     config.max_frame_size = 128;
-    config.auth_tag_len = 8;
-
-    xgl_route_table_t route_table;
-    xgl_phy_ops_t phy = {};
-    ASSERT_EQ(xgl_route_table_init(&route_table, 4, xgl_test_host_allocator()),
-              XGL_OK);
-    ASSERT_EQ(xgl_route_table_add(&route_table, 2, &phy, 80, 100, 1), XGL_OK);
-    config.route_table = &route_table;
-
+    lower.check_data = [](void* ctx, xgl_handle_t, const xgl_tx_data_t* tx,
+                          bool need_hello) {
+        const auto* spy = static_cast<const LowerLayerSpy*>(ctx);
+        EXPECT_EQ(spy->send_count, 0);
+        EXPECT_FALSE(need_hello);
+        EXPECT_EQ(tx->target_id, 2U);
+        return tx->data_len > 32U ? XGL_ERR_BUFFER_TOO_SMALL : XGL_OK;
+    };
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
 
-    constexpr size_t payload_budget =
-        80U - XGL_WIRE_BASE_HEADER_SIZE - XGL_DATA_TYPE_EXT_SIZE -
-        XGL_SECURITY_EXT_SIZE - 8U - XGL_CRC16_SIZE;
+    constexpr size_t payload_budget = 32U;
     const uint8_t payload[payload_budget + 1U] = {};
     xgl_tx_data_t tx_data = {};
     tx_data.target_id = 2;
@@ -1699,7 +1688,6 @@ TEST(XglTransportTest, SingleFrameSendHonorsRouteMtuAndAuthBudget) {
     EXPECT_EQ(spy.sent_payloads.back().size(), payload_budget);
 
     xgl_transport_destroy(&ctx);
-    xgl_route_table_destroy(&route_table);
 }
 
 TEST(XglTransportTest, ReliableTimeoutRetransmitsThroughLowerLayer) {

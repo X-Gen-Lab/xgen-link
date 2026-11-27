@@ -24,6 +24,8 @@ std::vector<uint8_t> make_frame(const std::vector<uint8_t>& extensions = {}) {
         static_cast<uint8_t>(XGL_WIRE_BASE_HEADER_SIZE + extensions.size());
     header.packet_type = XGL_PACKET_TYPE_DATA;
     header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
+    header.traffic_class = XGL_RELIABILITY_ACK_ELICITING;
+    header.flags |= extensions.empty() ? 0U : XGL_WIRE_FLAG_HAS_EXTENSIONS;
     header.source_id = 0x1234U;
     header.target_id = 0x5678U;
     header.connection_id = 9U;
@@ -53,16 +55,6 @@ void expect_cleared_failure(const uint8_t* bytes, size_t size) {
 
 }  // namespace
 
-TEST(XglWireRxContractTest, RejectsRetiredExtensionNumber) {
-    std::vector<uint8_t> retired_extension = {4U, 12U};
-    retired_extension.resize(14U, 0U);
-    const auto bytes = make_frame(retired_extension);
-    xgl_wire_frame_view_t view = {};
-    EXPECT_EQ(xgl_wire_decode_frame(&view, bytes.data(), bytes.size(), nullptr),
-              XGL_ERR_INVALID_FRAME);
-    expect_cleared_failure(bytes.data(), bytes.size());
-}
-
 TEST(XglWireRxContractTest,
      HeaderEncodingOverwritesEveryByteAndPreservesOutsideSentinels) {
     std::array<uint8_t, XGL_WIRE_BASE_HEADER_SIZE + 2U> zeroed = {};
@@ -76,7 +68,7 @@ TEST(XglWireRxContractTest,
     header.packet_type = XGL_PACKET_TYPE_DATA;
     header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
     header.ttl = 17U;
-    header.traffic_class = 3U;
+    header.traffic_class = 0x43U;
     header.source_id = 0x1234U;
     header.target_id = 0x5678U;
     header.connection_id = 0x12345678U;

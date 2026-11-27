@@ -7,6 +7,8 @@
 #include "internal/xgl_allocator.h"
 #include <internal/xgl_diagnostics.h>
 #include <string.h>
+#include <wire/xgl_wire_bytes.h>
+#include <wire/xgl_wire_rx_internal.h>
 
 #include "xgl_network_internal.h"
 
@@ -57,39 +59,19 @@ static xgl_error_t network_validate_forward_size(xgl_network_ctx_t* ctx,
     return XGL_OK;
 }
 
-static xgl_error_t network_rewrite_forward_frame(
-    xgl_network_ctx_t* ctx, const uint8_t* frame_buf, size_t frame_len,
-    const xgl_wire_frame_view_t* metadata, uint8_t* forward_buf) {
-    memcpy(forward_buf, frame_buf, frame_len);
-
-    xgl_wire_header_t wire_header = metadata->header;
-    wire_header.ttl = (uint8_t)(wire_header.ttl - 1U);
-    if (xgl_wire_encode_header(forward_buf, frame_len, &wire_header) !=
-        XGL_OK) {
-        xgl_network_count_rx_drop(ctx);
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    const xgl_frame_layout_t layout = {
-        .header_len = metadata->header.header_len,
-        .payload_len = metadata->payload_len,
-        .tag_len = metadata->auth_tag_len,
-        .frame_len = frame_len,
-    };
-    size_t written = 0U;
-    return xgl_frame_finalize_crc(forward_buf, frame_len, &layout, &written);
-}
-
 /**
- * \brief           Forward a frame using an allocator-owned temporary buffer
+ * \brief           Forward a frame using parser storage or bounded scratch
  * \param[in,out]   ctx: Network layer context
  * \param[in]       handle: Protocol instance handle
  * \param[in]       metadata: Validated incoming frame view
+ * \param[in,out]   mutable_frame: Parser-owned bytes, restored before return
  * \return          XGL_OK on success, error code otherwise
  * \note            The selected PHY must finish reading before tx returns.
  */
-xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                                const xgl_wire_frame_view_t* metadata) {
+xgl_error_t xgl_network_forward_mutable(xgl_network_ctx_t* ctx,
+                                        xgl_handle_t handle,
+                                        const xgl_wire_frame_view_t* metadata,
+                                        uint8_t* mutable_frame) {
     const uint8_t* frame_buf = metadata->frame_buf;
     const size_t frame_len = metadata->frame_len;
     xgl_route_item_t* route = NULL;
@@ -109,7 +91,10 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         return err;
     }
 
-    uint8_t* forward_buf = (uint8_t*)xgl_alloc(ctx->allocator, frame_len);
+    const bool owns_scratch = mutable_frame != frame_buf;
+    uint8_t* forward_buf = owns_scratch
+                               ? (uint8_t*)xgl_alloc(ctx->allocator, frame_len)
+                               : mutable_frame;
     if (forward_buf == NULL) {
         xgl_network_count_rx_drop(ctx);
 #if XGL_FEATURE_STATISTICS
@@ -120,12 +105,14 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_NO_MEMORY;
     }
 
-    err = network_rewrite_forward_frame(ctx, frame_buf, frame_len, metadata,
-                                        forward_buf);
-    if (err != XGL_OK) {
-        xgl_free(ctx->allocator, forward_buf);
-        return err;
+    uint8_t* frame_crc = forward_buf + frame_len - XGL_CRC16_SIZE;
+    uint16_t original_frame_crc = 0U;
+    if (owns_scratch) {
+        memcpy(forward_buf, frame_buf, frame_len);
+    } else {
+        original_frame_crc = xgl_deserialize_u16_le(frame_crc);
     }
+    xgl_wire_decrement_frame_ttl(forward_buf, frame_len);
 
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         err = XGL_ERR_INVALID_PARAM;
@@ -137,7 +124,15 @@ xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,
         };
         err = ctx->lower_layer->send(ctx->lower_layer->ctx, handle, &message);
     }
-    xgl_free(ctx->allocator, forward_buf);
+    if (owns_scratch) {
+        xgl_free(ctx->allocator, forward_buf);
+    } else {
+        forward_buf[XGL_WIRE_TTL_OFFSET] = metadata->header.ttl;
+        xgl_serialize_u16_le(forward_buf + XGL_WIRE_BASE_HEADER_SIZE -
+                                 XGL_CRC16_SIZE,
+                             metadata->header.header_crc16);
+        xgl_serialize_u16_le(frame_crc, original_frame_crc);
+    }
     if (err != XGL_OK) {
 #if XGL_FEATURE_STATISTICS
         if (ctx->stats != NULL) {

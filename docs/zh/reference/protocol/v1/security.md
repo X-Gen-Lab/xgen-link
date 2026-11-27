@@ -16,7 +16,7 @@ embedded、full profile 编译认证能力，Boot 和 embedded-lite 不包含认
 
 SECURITY 值为 `LE32(key_id) || LE64(security_seq) || u8(tag_length)`。provider 接收版本化的 `xgl_auth_input_t`，其中包含实际端点、connection、epoch、安全序号和 12 字节 nonce：`BE32(installed_directional_prefix) || BE64(security_seq)`。
 
-AAD 是实际编码的整个帧头和 TLV，仅将 TTL 第 6 字节及帧头 CRC 第 22–23 字节置零。其余所有 AAD 字节与全部载荷字节都参与认证。标签长度必须等于 provider 声明的固定长度。调用 provider 前先保留新序号；签名失败不回滚。`UINT64_MAX` 可以使用一次，之后关联进入耗尽状态。可靠重传保留 DATA 包号，但每次重新构帧、重新签名。
+AAD 是实际编码的整个帧头和 TLV，仅将 TTL 第 6 字节及帧头 CRC 第 22–23 字节置零。其余所有 AAD 字节与全部载荷字节都参与认证。标签长度必须等于 provider 声明的固定长度。调用 provider 前先保留新序号；签名失败不回滚。`UINT64_MAX` 可以使用一次，之后关联进入耗尽状态。可靠重传保留 DATA 包号，但每次重新构帧、重新签名。生产发送路径使用已经校验的帧布局定位 SECURITY 和标签，无需再次扫描已编码的 TLV。
 
 ## 接收与转发
 

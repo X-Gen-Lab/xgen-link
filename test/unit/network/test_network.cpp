@@ -12,6 +12,7 @@
 #include <wire/xgl_wire.h>
 #include <xgl/xgl_config.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <gtest/gtest.h>
@@ -203,6 +204,39 @@ class XglNetworkTest : public ::testing::Test {
         return bytes;
     }
 
+    std::vector<uint8_t> make_duplicate_data_type_frame() {
+        const uint8_t payload = 'x';
+        const uint8_t extensions[] = {
+            XGL_WIRE_EXT_DATA_TYPE, 1U, 3U, 0x70U, 1U, 4U,
+        };
+        xgl_frame_t frame = {};
+        xgl_frame_params_t params = {};
+        params.source_id = REMOTE_ID;
+        params.target_id = LOCAL_ID;
+        params.extensions = extensions;
+        params.extensions_len = sizeof(extensions);
+        params.payload = &payload;
+        params.payload_len = sizeof(payload);
+        params.ttl = XGL_DEFAULT_TTL;
+        EXPECT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+        std::vector<uint8_t> bytes(
+            xgl_frame_serialized_size(sizeof(payload), sizeof(extensions), 0U));
+        size_t written = 0U;
+        if (xgl_frame_serialize(bytes.data(), bytes.size(), &frame, &written) !=
+            XGL_OK) {
+            ADD_FAILURE() << "Valid fixture failed to serialize";
+            return {};
+        }
+
+        // Replace the unknown TLV with a second DATA_TYPE and repair the CRC.
+        bytes[XGL_WIRE_BASE_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE] =
+            XGL_WIRE_EXT_DATA_TYPE;
+        const size_t crc_offset = written - XGL_CRC16_SIZE;
+        xgl_serialize_u16_le(bytes.data() + crc_offset,
+                             xgl_crc16_modbus(bytes.data(), crc_offset));
+        return bytes;
+    }
+
     xgl_route_table_t route_table;
     xgl_network_ctx_t network_ctx;
     xgl_layer_stats_t stats;
@@ -233,11 +267,28 @@ TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
     };
     network_ctx.lower_layer = &lower;
     const uint8_t payload[] = {1};
-    xgl_packet_data_t data = {};
-    data.data_len = sizeof(payload);
-    data.data = payload;
+    const uint8_t ack[] = {XGL_WIRE_EXT_ACK_RANGE,
+                           13U,
+                           0U,
+                           0U,
+                           0U,
+                           0U,
+                           0U,
+                           0U,
+                           0U,
+                           0U,
+                           1U,
+                           0U,
+                           0U,
+                           1U,
+                           0U};
     for (uint8_t type :
          {XGL_PACKET_TYPE_DATA, XGL_PACKET_TYPE_ACK, XGL_PACKET_TYPE_CONTROL}) {
+        xgl_packet_data_t data = {};
+        if (type == XGL_PACKET_TYPE_DATA) {
+            data.data_len = sizeof(payload);
+            data.data = payload;
+        }
         xgl_packet_t packet = {};
         packet.source_id = LOCAL_ID;
         packet.target_id = REMOTE_ID;
@@ -245,6 +296,14 @@ TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
         packet.session_epoch = 100;
         packet.packet_type = type;
         packet.data = &data;
+        if (type == XGL_PACKET_TYPE_ACK) {
+            packet.reliable = XGL_RELIABILITY_ACK_ONLY;
+            packet.extensions = ack;
+            packet.extensions_len = sizeof(ack);
+        }
+        if (type == XGL_PACKET_TYPE_CONTROL) {
+            packet.data_type = 0x0EU;
+        }
         ASSERT_EQ(xgl_network_send(&network_ctx, &packet), XGL_OK);
         xgl_wire_frame_view_t metadata = {};
         ASSERT_EQ(xgl_wire_decode_frame(&metadata, captured.data(),
@@ -394,6 +453,53 @@ TEST_F(XglNetworkTest, ForwardAllocationFailureDoesNotSubmitOrChangeInput) {
     EXPECT_EQ(stats.tx_errors, 1U);
 }
 
+TEST_F(XglNetworkTest, StreamForwardBorrowsAndRestoresParserStorage) {
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        XGL_OK);
+    xgl_allocator_t unavailable = {};
+    unavailable.alloc = [](void*, size_t) -> void* { return nullptr; };
+    unavailable.free = [](void*, void*) { FAIL() << "No allocation to free"; };
+    network_ctx.allocator = &unavailable;
+
+    xgl_packet_tx_endpoint_t packets = {};
+    xgl_frame_rx_endpoint_t frames = {};
+    ASSERT_EQ(xgl_network_get_endpoints(&network_ctx, &packets, &frames),
+              XGL_OK);
+    datalink_ctx.upper_layer = &frames;
+    std::vector<uint8_t> cache(128U);
+    xgl_parser_t parser = {};
+    ASSERT_EQ(xgl_parser_init(&parser, cache.data(), cache.size()), XGL_OK);
+
+    struct ForwardCapture {
+        const uint8_t* expected;
+        size_t calls;
+        xgl_error_t result;
+    } outgoing = {cache.data(), 0U, XGL_ERR_BUSY};
+
+    phy_ops.user_data = &outgoing;
+    phy_ops.tx = [](const uint8_t* bytes, size_t size, void* context) {
+        auto& capture = *static_cast<ForwardCapture*>(context);
+        ++capture.calls;
+        EXPECT_EQ(bytes, capture.expected);
+        xgl_wire_frame_view_t received = {};
+        EXPECT_EQ(xgl_wire_decode_frame(&received, bytes, size, nullptr),
+                  XGL_OK);
+        EXPECT_EQ(received.header.ttl, 3U);
+        return capture.result;
+    };
+
+    const auto frame = make_frame(REMOTE_ID, FORWARD_ID, 4U, "abc");
+    for (const auto result : {XGL_ERR_BUSY, XGL_OK}) {
+        outgoing.result = result;
+        EXPECT_EQ(xgl_datalink_consume_span(&datalink_ctx, &parser,
+                                            frame.data(), frame.size(), 1U),
+                  result);
+        EXPECT_TRUE(std::equal(frame.begin(), frame.end(), cache.begin()));
+    }
+    EXPECT_EQ(outgoing.calls, 2U);
+}
+
 TEST_F(XglNetworkTest, ForwardMissingLowerEndpointReleasesScratch) {
     ASSERT_EQ(
         xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
@@ -518,7 +624,7 @@ TEST_F(XglNetworkTest, FrameMetadataRejectsCorruptPayloadAndNullExtensionSpan) {
         xgl_wire_decode_frame(&frame, bytes.data(), bytes.size(), nullptr),
         XGL_OK);
     xgl_wire_ext_metadata_t extensions = {};
-    EXPECT_EQ(xgl_wire_decode_ext_metadata(nullptr, 3, &extensions),
+    EXPECT_EQ(xgl_wire_decode_ext_metadata(nullptr, 3, false, &extensions),
               XGL_ERR_NULL_POINTER);
 }
 
@@ -528,6 +634,7 @@ TEST_F(XglNetworkTest, FrameMetadataRejectsEveryTruncatedHeaderExtension) {
     header.version = XGL_WIRE_VERSION;
     header.header_len = XGL_WIRE_BASE_HEADER_SIZE + XGL_SESSION_EXT_SIZE;
     header.packet_type = XGL_PACKET_TYPE_DATA;
+    header.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
     header.source_id = REMOTE_ID;
     header.target_id = LOCAL_ID;
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
@@ -820,6 +927,13 @@ TEST_F(XglNetworkTest, SendPacketRouteMtuIncludesAuthenticationOverhead) {
     provider.user_data = nullptr;
     xgl_security_ctx_t security = {};
     ASSERT_EQ(xgl_security_init(&security, LOCAL_ID, true, &provider), XGL_OK);
+    xgl_security_session_config_t session = {};
+    session.remote_id = REMOTE_ID;
+    session.tx_key_id = 7U;
+    session.rx_key_id = 7U;
+    session.tx_nonce_prefix = 1U;
+    session.rx_nonce_prefix = 2U;
+    ASSERT_EQ(xgl_security_session_install(&security, &session), XGL_OK);
     network_ctx.security = &security;
     xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 60, 100, 1);
 
@@ -1206,44 +1320,11 @@ TEST_F(XglNetworkTest, ReceiveInvalidFrame) {
 }
 
 TEST_F(XglNetworkTest, ReceiveRejectsDuplicateDataTypeExtension) {
-    uint8_t ext_buf[XGL_DATA_TYPE_EXT_SIZE * 2U] = {};
-    uint8_t data_type_a = 3U;
-    uint8_t data_type_b = 4U;
-    size_t ext_len = 0U;
-    size_t written = 0U;
-    ASSERT_EQ(xgl_wire_encode_ext(ext_buf, sizeof(ext_buf),
-                                  XGL_WIRE_EXT_DATA_TYPE, &data_type_a, 1U,
-                                  &written),
-              XGL_OK);
-    ext_len += written;
-    ASSERT_EQ(xgl_wire_encode_ext(&ext_buf[ext_len], sizeof(ext_buf) - ext_len,
-                                  XGL_WIRE_EXT_DATA_TYPE, &data_type_b, 1U,
-                                  &written),
-              XGL_OK);
-    ext_len += written;
-
-    const uint8_t payload[] = {'x'};
-    xgl_frame_t frame = {};
-    xgl_frame_params_t params = {};
-    params.source_id = REMOTE_ID;
-    params.target_id = LOCAL_ID;
-    params.packet_type = XGL_PACKET_TYPE_DATA;
-    params.extensions = ext_buf;
-    params.extensions_len = ext_len;
-    params.payload = payload;
-    params.payload_len = sizeof(payload);
-    params.ttl = XGL_DEFAULT_TTL;
-    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
-
-    std::vector<uint8_t> frame_buf(xgl_frame_calculate_size(sizeof(payload)) +
-                                   ext_len);
-    size_t frame_len = 0U;
-    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(), frame_buf.size(), &frame,
-                                  &frame_len),
-              XGL_OK);
+    const auto bytes = make_duplicate_data_type_frame();
+    ASSERT_FALSE(bytes.empty());
 
     EXPECT_EQ(
-        xgl_network_receive(&network_ctx, nullptr, frame_buf.data(), frame_len),
+        xgl_network_receive(&network_ctx, nullptr, bytes.data(), bytes.size()),
         XGL_ERR_INVALID_FRAME);
     EXPECT_EQ(stats.rx_errors, 1);
 }
@@ -1315,7 +1396,7 @@ TEST_F(XglNetworkTest, ReceiveLocalPacketPropagatesSessionExtensionEpoch) {
     EXPECT_EQ(capture.packet.session_epoch, 0x01020304U);
 }
 
-TEST_F(XglNetworkTest, ReceiveLocalDataPacketDoesNotTreatControlFlagAsAckOnly) {
+TEST_F(XglNetworkTest, DataBuilderNormalizesTheControlFlag) {
     const uint8_t payload[] = {'f'};
     xgl_frame_t frame = {};
     xgl_frame_params_t params = {};
@@ -1362,6 +1443,7 @@ TEST_F(XglNetworkTest, ReceiveLocalDataPacketDoesNotTreatControlFlagAsAckOnly) {
     ASSERT_TRUE(capture.called);
     EXPECT_EQ(capture.packet.packet_type, XGL_PACKET_TYPE_DATA);
     EXPECT_EQ(capture.packet.reliable, XGL_RELIABILITY_NONE);
+    EXPECT_EQ(capture.packet.flags & XGL_WIRE_FLAG_CONTROL, 0U);
 }
 
 TEST_F(XglNetworkTest, FrameMetadataDecodesTransportPacketSemantics) {
@@ -1437,43 +1519,12 @@ TEST_F(XglNetworkTest, FrameMetadataDecodesTransportPacketSemantics) {
 }
 
 TEST_F(XglNetworkTest, FrameMetadataRejectsDuplicateDataTypeExtensions) {
-    uint8_t ext_buf[XGL_DATA_TYPE_EXT_SIZE * 2U] = {};
-    uint8_t first_type = 1U;
-    uint8_t second_type = 2U;
-    size_t first_len = 0U;
-    size_t second_len = 0U;
-    ASSERT_EQ(xgl_wire_encode_ext(ext_buf, sizeof(ext_buf),
-                                  XGL_WIRE_EXT_DATA_TYPE, &first_type, 1U,
-                                  &first_len),
-              XGL_OK);
-    ASSERT_EQ(xgl_wire_encode_ext(
-                  &ext_buf[first_len], sizeof(ext_buf) - first_len,
-                  XGL_WIRE_EXT_DATA_TYPE, &second_type, 1U, &second_len),
-              XGL_OK);
-
-    const uint8_t payload[] = {'d'};
-    xgl_frame_t frame = {};
-    xgl_frame_params_t params = {};
-    params.source_id = REMOTE_ID;
-    params.target_id = LOCAL_ID;
-    params.packet_type = XGL_PACKET_TYPE_DATA;
-    params.extensions = ext_buf;
-    params.extensions_len = first_len + second_len;
-    params.payload = payload;
-    params.payload_len = sizeof(payload);
-    params.ttl = XGL_DEFAULT_TTL;
-    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
-
-    std::vector<uint8_t> frame_buf(
-        xgl_frame_serialized_size(sizeof(payload), params.extensions_len, 0U));
-    size_t frame_len = 0U;
-    ASSERT_EQ(xgl_frame_serialize(frame_buf.data(), frame_buf.size(), &frame,
-                                  &frame_len),
-              XGL_OK);
+    const auto bytes = make_duplicate_data_type_frame();
+    ASSERT_FALSE(bytes.empty());
 
     xgl_wire_frame_view_t metadata = {};
     EXPECT_EQ(
-        xgl_wire_decode_frame(&metadata, frame_buf.data(), frame_len, nullptr),
+        xgl_wire_decode_frame(&metadata, bytes.data(), bytes.size(), nullptr),
         XGL_ERR_INVALID_FRAME);
 }
 

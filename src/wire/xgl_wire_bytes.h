@@ -1,6 +1,7 @@
 /**
  * \file            xgl_wire_bytes.h
  * \brief           Fixed-width byte access for wire fields and nonces
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_WIRE_BYTES_H

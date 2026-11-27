@@ -1,6 +1,10 @@
 /**
  * \file            xgl_crc16.c
  * \brief           CRC-16/MODBUS for wire header and frame checksums
+ * \author          X-Gen Lab
+ * \version         5.0.0
+ * \date            2026-11-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <wire/xgl_crc16.h>

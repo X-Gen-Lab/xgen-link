@@ -1,6 +1,10 @@
 /**
  * \file            xgl_wire_ack_ext.c
  * \brief           Wire-format ACK extension value codecs
+ * \author          X-Gen Lab
+ * \version         5.0.0
+ * \date            2026-11-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <wire/xgl_wire.h>
@@ -46,40 +50,6 @@ xgl_wire_encode_ack_range_ext_value(uint8_t* buffer, size_t buffer_size,
     }
 
     *bytes_written = required_size;
-    return XGL_OK;
-}
-
-xgl_error_t xgl_wire_decode_ack_range_ext_value(
-    const uint8_t* buffer, size_t buffer_size, uint32_t* largest_ack,
-    uint32_t* ack_delay_us, xgl_wire_ack_range_t* ranges, size_t range_capacity,
-    size_t* range_count) {
-    if (buffer == NULL || largest_ack == NULL || ack_delay_us == NULL ||
-        range_count == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    xgl_wire_ack_range_view_t view;
-    xgl_error_t error =
-        xgl_wire_decode_ack_range_view(buffer, buffer_size, &view);
-    if (error != XGL_OK) {
-        return error;
-    }
-
-    if (view.range_count > 0U && ranges == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (range_capacity < view.range_count) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    *largest_ack = view.largest_ack;
-    *ack_delay_us = view.ack_delay_us;
-    *range_count = view.range_count;
-    for (size_t i = 0U; i < view.range_count; ++i) {
-        (void)xgl_wire_ack_range_at(&view, i, &ranges[i]);
-    }
-
     return XGL_OK;
 }
 
@@ -136,10 +106,11 @@ xgl_error_t xgl_wire_encode_sack_ext_value(uint8_t* buffer, size_t buffer_size,
         return XGL_ERR_NULL_POINTER;
     }
 
-    size_t required_size = 5U + bitmap_len;
-    if (bitmap_len > UINT8_MAX || required_size > UINT8_MAX) {
+    if (bitmap_len > UINT8_MAX - 5U) {
         return XGL_ERR_INVALID_PARAM;
     }
+
+    size_t required_size = 5U + bitmap_len;
 
     if (buffer_size < required_size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
@@ -152,37 +123,6 @@ xgl_error_t xgl_wire_encode_sack_ext_value(uint8_t* buffer, size_t buffer_size,
     }
 
     *bytes_written = required_size;
-    return XGL_OK;
-}
-
-xgl_error_t
-xgl_wire_decode_sack_ext_value(const uint8_t* buffer, size_t buffer_size,
-                               uint32_t* base_packet, uint8_t* bitmap,
-                               size_t bitmap_capacity, size_t* bitmap_len) {
-    if (buffer == NULL || base_packet == NULL || bitmap_len == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    xgl_wire_sack_view_t view;
-    xgl_error_t error = xgl_wire_decode_sack_view(buffer, buffer_size, &view);
-    if (error != XGL_OK) {
-        return error;
-    }
-
-    if (view.bitmap_len > 0U && bitmap == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (bitmap_capacity < view.bitmap_len) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    *base_packet = view.base_packet;
-    *bitmap_len = view.bitmap_len;
-    if (view.bitmap_len > 0U) {
-        memcpy(bitmap, view.bitmap, view.bitmap_len);
-    }
-
     return XGL_OK;
 }
 

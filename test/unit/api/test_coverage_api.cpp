@@ -529,6 +529,7 @@ TEST(XglCoverageApi,
         header.target_id = 2;
         if (invalid == 0) {
             header.header_len = 25;
+            header.flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
         }
         if (invalid == 1) {
             header.payload_len = 1;
@@ -541,6 +542,7 @@ TEST(XglCoverageApi,
         }
         if (invalid >= 4) {
             header.header_len = 39;
+            header.flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
         }
         ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header),
                   XGL_OK);
@@ -640,7 +642,7 @@ TEST(XglCoverageApi, AuthenticatedFrameBuilderRejectsInvalidBorrowedInputs) {
               XGL_ERR_BUFFER_TOO_SMALL);
     frame.header.source_id = 0;
     EXPECT_EQ(xgl_security_serialize_frame(bytes, 300, &frame, &ctx, &written),
-              XGL_ERR_INVALID_PARAM);
+              XGL_ERR_INVALID_FRAME);
     frame.header.source_id = 1;
     frame.extensions = extensions;
     frame.extensions_len = sizeof(extensions);

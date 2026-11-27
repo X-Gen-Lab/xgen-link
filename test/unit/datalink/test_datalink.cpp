@@ -58,9 +58,12 @@ TEST(XglDatalinkMetadataTest, RejectsDuplicateSessionExtensions) {
     header.version = XGL_WIRE_VERSION;
     header.header_len = static_cast<uint8_t>(offset);
     header.packet_type = XGL_PACKET_TYPE_DATA;
+    header.flags = XGL_WIRE_FLAG_HAS_EXTENSIONS;
     header.source_id = 1;
     header.target_id = 2;
+    header.payload_len = 1;
     ASSERT_EQ(xgl_wire_encode_header(bytes, sizeof(bytes), &header), XGL_OK);
+    bytes[offset++] = 0x55U;
     xgl_serialize_u16_le(bytes + offset, xgl_crc16_modbus(bytes, offset));
     xgl_layer_stats_t statistics = {};
     xgl_datalink_ctx_t context = {};

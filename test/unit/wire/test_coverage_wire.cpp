@@ -54,14 +54,8 @@ TEST(XglCoverageWire, HeaderRejectsEachInvalidSemanticFieldAndNullArgument) {
         uint8_t value;
     };
 
-    const InvalidField cases[] = {{2, 0},
-                                  {3, 0},
-                                  {4, 0},
-                                  {4, 255},
-                                  {5, XGL_WIRE_FLAG_ENCRYPTED},
-                                  {7, XGL_TRAFFIC_ENCRYPTION_MASK},
-                                  {8, 0},
-                                  {10, 0}};
+    const InvalidField cases[] = {{2, 0},   {3, 0},    {4, 0},
+                                  {4, 255}, {5, 0x10}, {7, 0x18}};
     for (const auto& item : cases) {
         SCOPED_TRACE(item.offset);
         header = valid_header();
@@ -127,7 +121,6 @@ TEST(XglCoverageWire,
     size_t written = 0;
     uint32_t a = 0;
     uint64_t wide = 0;
-    uint16_t hop = 0, next = 0, metric = 0;
     uint8_t tag = 0;
     EXPECT_EQ(xgl_wire_encode_session_ext_value(nullptr, 32, 1, 2, &written),
               XGL_ERR_NULL_POINTER);
@@ -165,44 +158,21 @@ TEST(XglCoverageWire,
               XGL_ERR_INVALID_FRAME);
     EXPECT_EQ(xgl_wire_decode_security_ext_value(bytes, 13, &a, &wide, &tag),
               XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(
-        xgl_wire_encode_route_ext_value(nullptr, 32, 1, 2, 3, 4, &written),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_encode_route_ext_value(bytes, 32, 1, 2, 3, 4, nullptr),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_encode_route_ext_value(bytes, 9, 1, 2, 3, 4, &written),
-              XGL_ERR_BUFFER_TOO_SMALL);
-    EXPECT_EQ(
-        xgl_wire_decode_route_ext_value(nullptr, 10, &hop, &next, &a, &metric),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_wire_decode_route_ext_value(bytes, 10, nullptr, &next, &a, &metric),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_wire_decode_route_ext_value(bytes, 10, &hop, nullptr, &a, &metric),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_route_ext_value(bytes, 10, &hop, &next, nullptr,
-                                              &metric),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_wire_decode_route_ext_value(bytes, 10, &hop, &next, &a, nullptr),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_wire_decode_route_ext_value(bytes, 11, &hop, &next, &a, &metric),
-        XGL_ERR_INVALID_FRAME);
 }
 
 TEST(XglCoverageWire, SingletonMetadataRejectsMalformedAndDuplicateExtensions) {
     xgl_wire_ext_metadata_t metadata = {};
-    EXPECT_EQ(xgl_wire_decode_ext_metadata(nullptr, 0, nullptr),
+    EXPECT_EQ(xgl_wire_decode_ext_metadata(nullptr, 0, false, nullptr),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_ext_metadata(nullptr, 1, &metadata),
+    EXPECT_EQ(xgl_wire_decode_ext_metadata(nullptr, 1, false, &metadata),
               XGL_ERR_NULL_POINTER);
     for (uint8_t type : {XGL_WIRE_EXT_DATA_TYPE, XGL_WIRE_EXT_SESSION,
                          XGL_WIRE_EXT_SECURITY}) {
         SCOPED_TRACE(type);
         const uint8_t wrong[] = {type, 0};
-        EXPECT_EQ(xgl_wire_decode_ext_metadata(wrong, sizeof(wrong), &metadata),
+        EXPECT_EQ(xgl_wire_decode_ext_metadata(wrong, sizeof(wrong),
+                                               type == XGL_WIRE_EXT_SECURITY,
+                                               &metadata),
                   XGL_ERR_INVALID_FRAME);
         uint8_t value[13] = {};
         size_t value_len = type == XGL_WIRE_EXT_DATA_TYPE ? 1U
@@ -215,8 +185,9 @@ TEST(XglCoverageWire, SingletonMetadataRejectsMalformedAndDuplicateExtensions) {
             duplicate.push_back(static_cast<uint8_t>(value_len));
             duplicate.insert(duplicate.end(), value, value + value_len);
         }
-        EXPECT_EQ(xgl_wire_decode_ext_metadata(duplicate.data(),
-                                               duplicate.size(), &metadata),
+        EXPECT_EQ(xgl_wire_decode_ext_metadata(
+                      duplicate.data(), duplicate.size(),
+                      type == XGL_WIRE_EXT_SECURITY, &metadata),
                   XGL_ERR_INVALID_FRAME);
     }
 }
@@ -226,8 +197,8 @@ TEST(XglCoverageWire, AckRangesValidateCapacityAndRoundTripMaximumCount) {
     std::array<xgl_wire_ack_range_t, 62> ranges = {};
     ranges[0].gap = 7;
     ranges[0].length = 9;
-    size_t written = 0, count = 0;
-    uint32_t largest = 0, delay = 0;
+    size_t written = 0;
+    xgl_wire_ack_range_view_t view = {};
     EXPECT_EQ(xgl_wire_encode_ack_range_ext_value(nullptr, 260, 1, 2, nullptr,
                                                   0, &written),
               XGL_ERR_NULL_POINTER);
@@ -246,52 +217,34 @@ TEST(XglCoverageWire, AckRangesValidateCapacityAndRoundTripMaximumCount) {
     ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(bytes, 260, 1, 2, nullptr, 0,
                                                   &written),
               XGL_OK);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(bytes, written, &largest,
-                                                  &delay, nullptr, 0, &count),
-              XGL_OK);
-    EXPECT_EQ(count, 0U);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(nullptr, 9, &largest, &delay,
-                                                  ranges.data(), 62, &count),
+    ASSERT_EQ(xgl_wire_decode_ack_range_view(bytes, written, &view), XGL_OK);
+    EXPECT_EQ(view.range_count, 0U);
+    EXPECT_EQ(xgl_wire_decode_ack_range_view(nullptr, 9U, &view),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(bytes, 9, nullptr, &delay,
-                                                  ranges.data(), 62, &count),
+    EXPECT_EQ(xgl_wire_decode_ack_range_view(bytes, 9U, nullptr),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(bytes, 9, &largest, nullptr,
-                                                  ranges.data(), 62, &count),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(bytes, 9, &largest, &delay,
-                                                  ranges.data(), 62, nullptr),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(bytes, 8, &largest, &delay,
-                                                  ranges.data(), 62, &count),
+    EXPECT_EQ(xgl_wire_decode_ack_range_view(bytes, 8U, &view),
               XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(bytes, 10, &largest, &delay,
-                                                  ranges.data(), 62, &count),
+    EXPECT_EQ(xgl_wire_decode_ack_range_view(bytes, 10U, &view),
               XGL_ERR_INVALID_FRAME);
     ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(bytes, 260, UINT32_MAX, 31,
                                                   ranges.data(), 61, &written),
               XGL_OK);
     EXPECT_EQ(written, 253U);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(bytes, written, &largest,
-                                                  &delay, nullptr, 61, &count),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_ack_range_ext_value(
-                  bytes, written, &largest, &delay, ranges.data(), 60, &count),
-              XGL_ERR_BUFFER_TOO_SMALL);
-    ASSERT_EQ(xgl_wire_decode_ack_range_ext_value(
-                  bytes, written, &largest, &delay, ranges.data(), 61, &count),
-              XGL_OK);
-    EXPECT_EQ(largest, UINT32_MAX);
-    EXPECT_EQ(delay, 31U);
-    EXPECT_EQ(count, 61U);
-    EXPECT_EQ(ranges[0].gap, 7U);
-    EXPECT_EQ(ranges[0].length, 9U);
+    ASSERT_EQ(xgl_wire_decode_ack_range_view(bytes, written, &view), XGL_OK);
+    EXPECT_EQ(view.largest_ack, UINT32_MAX);
+    EXPECT_EQ(view.ack_delay_us, 31U);
+    ASSERT_EQ(view.range_count, 61U);
+    xgl_wire_ack_range_t range = {};
+    ASSERT_EQ(xgl_wire_ack_range_at(&view, 0U, &range), XGL_OK);
+    EXPECT_EQ(range.gap, 7U);
+    EXPECT_EQ(range.length, 9U);
 }
 
 TEST(XglCoverageWire, SackEmptyAndMaximumBitmapHonorOutputContracts) {
     uint8_t bytes[260] = {}, bitmap[256] = {};
-    size_t written = 0, length = 0;
-    uint32_t base = 0;
+    size_t written = 0;
+    xgl_wire_sack_view_t view = {};
     EXPECT_EQ(
         xgl_wire_encode_sack_ext_value(nullptr, 260, 1, nullptr, 0, &written),
         XGL_ERR_NULL_POINTER);
@@ -312,42 +265,17 @@ TEST(XglCoverageWire, SackEmptyAndMaximumBitmapHonorOutputContracts) {
     ASSERT_EQ(
         xgl_wire_encode_sack_ext_value(bytes, 260, 17, nullptr, 0, &written),
         XGL_OK);
-    ASSERT_EQ(xgl_wire_decode_sack_ext_value(bytes, written, &base, nullptr, 0,
-                                             &length),
-              XGL_OK);
-    EXPECT_EQ(base, 17U);
-    EXPECT_EQ(length, 0U);
-    EXPECT_EQ(
-        xgl_wire_decode_sack_ext_value(nullptr, 5, &base, bitmap, 256, &length),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_wire_decode_sack_ext_value(bytes, 5, nullptr, bitmap, 256, &length),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_wire_decode_sack_ext_value(bytes, 5, &base, bitmap, 256, nullptr),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(
-        xgl_wire_decode_sack_ext_value(bytes, 4, &base, bitmap, 256, &length),
-        XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(
-        xgl_wire_decode_sack_ext_value(bytes, 6, &base, bitmap, 256, &length),
-        XGL_ERR_INVALID_FRAME);
+    ASSERT_EQ(xgl_wire_decode_sack_view(bytes, written, &view), XGL_OK);
+    EXPECT_EQ(view.base_packet, 17U);
+    EXPECT_EQ(view.bitmap_len, 0U);
     bitmap[249] = 0xA5;
     ASSERT_EQ(xgl_wire_encode_sack_ext_value(bytes, 260, UINT32_MAX, bitmap,
                                              250, &written),
               XGL_OK);
-    EXPECT_EQ(xgl_wire_decode_sack_ext_value(bytes, written, &base, nullptr,
-                                             250, &length),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_sack_ext_value(bytes, written, &base, bitmap, 249,
-                                             &length),
-              XGL_ERR_BUFFER_TOO_SMALL);
-    ASSERT_EQ(xgl_wire_decode_sack_ext_value(bytes, written, &base, bitmap, 250,
-                                             &length),
-              XGL_OK);
-    EXPECT_EQ(base, UINT32_MAX);
-    EXPECT_EQ(length, 250U);
-    EXPECT_EQ(bitmap[249], 0xA5U);
+    ASSERT_EQ(xgl_wire_decode_sack_view(bytes, written, &view), XGL_OK);
+    EXPECT_EQ(view.base_packet, UINT32_MAX);
+    ASSERT_EQ(view.bitmap_len, 250U);
+    EXPECT_EQ(view.bitmap[249], 0xA5U);
 }
 
 TEST(XglCoverageWire, AckRangeCountRejectsSizeOverflowBeforeCapacityCheck) {
@@ -386,6 +314,7 @@ TEST(XglCoverageWire, DecodedFrameClearsBorrowedPointersOnStructuralMismatch) {
     EXPECT_EQ(view.frame_buf, nullptr);
     EXPECT_EQ(view.payload, nullptr);
     header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
+    header.traffic_class = XGL_RELIABILITY_ACK_ELICITING;
     ASSERT_EQ(xgl_wire_encode_header(bytes, 64, &header), XGL_OK);
     xgl_serialize_u16_le(bytes + 24, xgl_crc16_modbus(bytes, 24));
     ASSERT_EQ(xgl_wire_decode_frame(&view, bytes, 26, &status), XGL_OK);
@@ -400,13 +329,13 @@ TEST(XglCoverageWire,
     params.source_id = 1;
     params.target_id = 2;
     params.packet_type = XGL_PACKET_TYPE_DATA;
-    params.flags = XGL_WIRE_FLAG_ACK_ELICITING;
     params.packet_number = 73;
-    params.traffic_class = 3;
+    params.reliability_class = XGL_RELIABILITY_ACK_ELICITING;
+    params.priority = 3U;
     params.extensions = extensions;
     ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
     EXPECT_EQ(frame.header.packet_number, 73U);
-    EXPECT_EQ(frame.header.traffic_class, 3U);
+    EXPECT_EQ(frame.header.traffic_class, 0x43U);
     size_t written = 0;
     frame.extensions_len = 232;
     EXPECT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &written),
@@ -416,35 +345,9 @@ TEST(XglCoverageWire,
     ASSERT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &written),
               XGL_OK);
     EXPECT_EQ(written, 26U);
-    frame.header.target_id = 0;
+    frame.header.traffic_class = 0xC0U;
     EXPECT_EQ(xgl_frame_serialize(bytes, sizeof(bytes), &frame, &written),
               XGL_ERR_INVALID_PARAM);
-}
-
-TEST(XglCoverageWire,
-     ZeroCopyBuilderValidatesPointersAndApplicationTypeHeadroom) {
-    uint8_t bytes[64] = {};
-    size_t written = 0;
-    EXPECT_EQ(xgl_frame_build_zerocopy(nullptr, 64, 24, 1, 1, 2, 0, 0, false, 0,
-                                       &written),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_frame_build_zerocopy(bytes, 64, 24, 1, 1, 2, 0, 0, false, 0,
-                                       nullptr),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_frame_build_zerocopy(bytes, 64, 24, UINT16_MAX + 1U, 1, 2, 0,
-                                       0, false, 0, &written),
-              XGL_ERR_BUFFER_TOO_SMALL);
-    EXPECT_EQ(xgl_frame_build_zerocopy(bytes, 64, 24, 1, 0, 2, 0, 0, false, 0,
-                                       &written),
-              XGL_ERR_INVALID_PARAM);
-    bytes[27] = 0x83;
-    ASSERT_EQ(xgl_frame_build_zerocopy(bytes, 64, 27, 1, 1, 2, 9, 0, false, 0,
-                                       &written),
-              XGL_OK);
-    xgl_wire_frame_view_t view = {};
-    ASSERT_EQ(xgl_wire_decode_frame(&view, bytes, written, nullptr), XGL_OK);
-    EXPECT_EQ(view.data_type, 9U);
-    EXPECT_EQ(view.payload[0], 0x83U);
 }
 
 TEST(XglCoverageWire,

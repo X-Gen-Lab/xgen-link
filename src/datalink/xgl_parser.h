@@ -7,7 +7,7 @@
 #ifndef XGL_PARSER_H
 #define XGL_PARSER_H
 
-#include "wire/xgl_wire.h"
+#include "wire/xgl_wire_rx_internal.h"
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
@@ -52,14 +52,14 @@ typedef enum {
  * \brief           Frame parser structure
  */
 typedef struct {
-    xgl_parse_state_t state;       /**< Current parser state */
     uint8_t* cache;                /**< Cache buffer for frame data */
     size_t cache_size;             /**< Total cache buffer size */
     size_t cache_len;              /**< Current data length in cache */
     uint32_t timestamp;            /**< Timestamp when parsing started (ms) */
     uint16_t expected_payload_len; /**< Expected payload length from header */
     uint8_t expected_header_len;   /**< Header length including extensions */
-    uint8_t expected_auth_tag_len; /**< Authentication trailer length */
+    uint8_t state;                 /**< Current xgl_parse_state_t value */
+    xgl_wire_rx_layout_t layout;   /**< Accepted extension offsets */
 #if XGL_FEATURE_ADVANCED_RUNTIME
     size_t input_offset;      /**< First unread byte in the same cache */
     size_t input_end;         /**< End of the retained input batch */
@@ -219,7 +219,7 @@ xgl_error_t xgl_parser_get_frame(const xgl_parser_t* parser,
  */
 static inline xgl_parse_state_t
 xgl_parser_get_state(const xgl_parser_t* parser) {
-    return parser ? parser->state : XGL_PARSE_MAGIC;
+    return parser ? (xgl_parse_state_t)parser->state : XGL_PARSE_MAGIC;
 }
 
 /**

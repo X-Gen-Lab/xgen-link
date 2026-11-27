@@ -4,7 +4,8 @@ SDK 5 使用配置 ABI 5 和 Wire v1。清理旧构建缓存和安装前缀，�
 
 ## 线上协议与应用
 
-- **将链路上的端点和中继切换到 Wire v1。** 版本字段为 `1`，收发与转发按该版本校验。基本帧头布局、CRC 算法及有效的标志位和 TLV 编号见[线格式](../reference/protocol/v1/wire-format.md)。
+- **将链路上的端点和中继切换到 Wire v1。** 版本字段为 `1`。已经部署早期 Wire v1 的产品也应同步替换端点和中继，因为本版重新分配了标志位和 TLV 编号。基本帧头布局及 CRC 算法见[线格式](../reference/protocol/v1/wire-format.md)。
+- **移除旧 `XGL_TRAFFIC_ENCRYPTION_*` 常量的引用。** 流量类别只携带优先级和可靠性。
 - **每次发送提交一个完整 DATA 帧。** 超出完整帧上限返回 `XGL_ERR_BUFFER_TOO_SMALL`。大数据改用[应用分块](send.md)，可参考文件传输与固件更新示例。接收 DATA 的实例需要配置接纳回调；纯发送端可使用空回调处理 ACK 和 CONTROL。
 - **核对可靠通信的[双向 MTU](../reference/protocol/v1/routing.md)。** 分别检查 DATA 路径和 ACK 回程。缺失本地反向路由或反馈预算不足时，接收端在接纳前报错。
 

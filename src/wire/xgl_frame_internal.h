@@ -16,12 +16,13 @@ extern "C" {
 /**
  * \brief           Encode with the layout validated in the current send call
  * \param[out]      buffer: Non-NULL destination with frame_len bytes available
- * \param[in]       frame: Unchanged frame and spans passed to xgl_frame_measure
+ * \param[in]       frame: Logical frame and already validated borrowed spans
  * \param[in]       layout: Successful measurement of that exact frame and tag
  * \return          XGL_OK, or a wire header/extension encoding error
- * \note            Private continuation, never an input validation boundary.
- *                  Frame, spans and layout must remain unchanged; no callback
- *                  may mutate them between measurement and encoding.
+ * \note            Keep the logical frame, TLVs and measured lengths unchanged
+ *                  from measurement through encoding. An in-place payload
+ *                  starts at layout->header_len. The caller supplies the
+ *                  optional tag and finalizes the frame CRC.
  */
 xgl_error_t xgl_frame_encode_measured(uint8_t* buffer, const xgl_frame_t* frame,
                                       const xgl_frame_layout_t* layout);

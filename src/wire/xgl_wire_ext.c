@@ -1,6 +1,10 @@
 /**
  * \file            xgl_wire_ext.c
  * \brief           Wire-format extension value encoding primitives
+ * \author          X-Gen Lab
+ * \version         5.0.0
+ * \date            2026-11-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <wire/xgl_wire.h>
@@ -86,20 +90,17 @@ xgl_error_t xgl_wire_ext_cursor_next(xgl_wire_ext_cursor_t* cursor,
     return XGL_OK;
 }
 
-/**
- * \brief           Decode singleton extension metadata from a bounded TLV span
- * \param[in]       extensions: Extension bytes, or NULL for an empty span
- * \param[in]       extensions_len: Available extension bytes
- * \param[out]      metadata: Decoded values, valid only on success
- * \return          XGL_OK on success, error code otherwise
- */
 xgl_error_t xgl_wire_decode_ext_metadata(const uint8_t* extensions,
                                          size_t extensions_len,
+                                         bool authenticated,
                                          xgl_wire_ext_metadata_t* metadata) {
     if (metadata == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     memset(metadata, 0, sizeof(*metadata));
+    if (extensions_len > XGL_WIRE_MAX_EXTENSIONS_SIZE) {
+        return XGL_ERR_INVALID_FRAME;
+    }
     xgl_wire_ext_cursor_t cursor;
     xgl_error_t err =
         xgl_wire_ext_cursor_init(&cursor, extensions, extensions_len);
@@ -110,44 +111,41 @@ xgl_error_t xgl_wire_decode_ext_metadata(const uint8_t* extensions,
     while ((err = xgl_wire_ext_cursor_next(&cursor, &ext)) == XGL_OK) {
         switch (ext.type) {
             case XGL_WIRE_EXT_DATA_TYPE:
-                if (metadata->data_type_found || ext.len != 1U) {
+                if (metadata->data_type_offset != 0U || ext.len != 1U) {
                     return XGL_ERR_INVALID_FRAME;
                 }
                 metadata->data_type = ext.value[0];
-                metadata->data_type_found = true;
+                metadata->data_type_offset = (uint8_t)(ext.value - extensions);
                 break;
             case XGL_WIRE_EXT_SESSION:
-                if (metadata->session_epoch_found) {
+                if (metadata->session_offset != 0U ||
+                    ext.len != XGL_SESSION_EXT_VALUE_SIZE) {
                     return XGL_ERR_INVALID_FRAME;
                 }
-                err = xgl_wire_decode_session_ext_value(
-                    ext.value, ext.len, &metadata->session_epoch,
-                    &metadata->incarnation_id);
-                if (err != XGL_OK) {
-                    return err;
-                }
-                metadata->session_epoch_found = true;
+                metadata->session_epoch = xgl_deserialize_u32_le(ext.value);
+                metadata->session_offset = (uint8_t)(ext.value - extensions);
                 break;
             case XGL_WIRE_EXT_SECURITY:
-                if (metadata->has_security_ext) {
+                if (!authenticated || metadata->security_offset != 0U ||
+                    ext.len != XGL_SECURITY_EXT_VALUE_SIZE ||
+                    ext.value[XGL_SECURITY_EXT_VALUE_SIZE - 1U] == 0U) {
                     return XGL_ERR_INVALID_FRAME;
                 }
-                err = xgl_wire_decode_security_ext_value(
-                    ext.value, ext.len, &metadata->auth_key_id,
-                    &metadata->nonce_id, &metadata->auth_tag_len);
-                if (err != XGL_OK) {
-                    return err;
-                }
-                metadata->has_security_ext = true;
+                metadata->auth_tag_len =
+                    ext.value[XGL_SECURITY_EXT_VALUE_SIZE - 1U];
+                metadata->security_offset = (uint8_t)(ext.value - extensions);
                 break;
-            case 4U: /* Retired extension type, reserved in Wire v1. */
-                return XGL_ERR_INVALID_FRAME;
             default:
-                /* Skip unassigned noncritical extensions. */
+                /* Feedback and unknown types carry no common metadata. */
                 break;
         }
     }
-    return (err == XGL_ERR_NOT_FOUND) ? XGL_OK : err;
+    if (err != XGL_ERR_NOT_FOUND) {
+        return err;
+    }
+    return authenticated && metadata->security_offset == 0U
+               ? XGL_ERR_INVALID_FRAME
+               : XGL_OK;
 }
 
 /* Parameter order follows the documented protocol fields and units. */
@@ -238,53 +236,6 @@ xgl_error_t xgl_wire_decode_security_ext_value(const uint8_t* buffer,
     if (*tag_len == 0U) {
         return XGL_ERR_INVALID_FRAME;
     }
-
-    return XGL_OK;
-}
-
-/* Parameter order follows the documented protocol fields and units. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-xgl_error_t xgl_wire_encode_route_ext_value(uint8_t* buffer, size_t buffer_size,
-                                            uint16_t previous_hop,
-                                            uint16_t next_hop,
-                                            uint32_t route_epoch,
-                                            uint16_t metric,
-                                            size_t* bytes_written) {
-    /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    if (buffer == NULL || bytes_written == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (buffer_size < 10U) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-
-    xgl_serialize_u16_le(&buffer[0], previous_hop);
-    xgl_serialize_u16_le(&buffer[2], next_hop);
-    xgl_serialize_u32_le(&buffer[4], route_epoch);
-    xgl_serialize_u16_le(&buffer[8], metric);
-    *bytes_written = 10U;
-
-    return XGL_OK;
-}
-
-xgl_error_t
-xgl_wire_decode_route_ext_value(const uint8_t* buffer, size_t buffer_size,
-                                uint16_t* previous_hop, uint16_t* next_hop,
-                                uint32_t* route_epoch, uint16_t* metric) {
-    if (buffer == NULL || previous_hop == NULL || next_hop == NULL ||
-        route_epoch == NULL || metric == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (buffer_size != 10U) {
-        return XGL_ERR_INVALID_FRAME;
-    }
-
-    *previous_hop = xgl_deserialize_u16_le(&buffer[0]);
-    *next_hop = xgl_deserialize_u16_le(&buffer[2]);
-    *route_epoch = xgl_deserialize_u32_le(&buffer[4]);
-    *metric = xgl_deserialize_u16_le(&buffer[8]);
 
     return XGL_OK;
 }

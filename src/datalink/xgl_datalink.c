@@ -69,20 +69,7 @@ static xgl_error_t datalink_send_impl(void* ctx, xgl_handle_t handle,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (send_data->frame == NULL) {
-        return xgl_datalink_send_raw(dl_ctx, send_data->phy,
-                                     send_data->serialized,
-                                     send_data->serialized_len);
-    }
-
-    if (send_data->buffer != NULL) {
-        return xgl_datalink_send_inplace(
-            dl_ctx, send_data->phy, send_data->frame, send_data->buffer,
-            send_data->buffer_size, send_data->payload_offset);
-    }
-
-    /* Forward to datalink send function */
-    return xgl_datalink_send(dl_ctx, send_data->phy, send_data->frame);
+    return xgl_datalink_submit(dl_ctx, send_data);
 }
 
 /**
