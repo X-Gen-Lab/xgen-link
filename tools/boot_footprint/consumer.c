@@ -84,8 +84,6 @@ static void probe_main(void) {
                      .max_frame_size = XGL_FOOTPRINT_FRAME_SIZE},
         .features = {.max_tx_packets = XGL_FOOTPRINT_TX_PACKETS,
                      .max_rx_buffered_packets = 0U,
-                     .max_reassembly_bytes = 0U,
-                     .max_tx_message_bytes = 0U,
                      .peer_idle_timeout_ms = 60000U,
                      .max_peers = XGL_FOOTPRINT_PEERS},
         .route_table = &route,

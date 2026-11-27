@@ -129,13 +129,13 @@ class StandaloneContracts(unittest.TestCase):
              f'target_compile_features(consumer PRIVATE {"c_std_11" if language == "C" else "cxx_std_17"})\n'
              'target_link_libraries(consumer PRIVATE xgl::xgl)\n'
              'if(FORCE_STALE_HEADER_ABI)\n'
-             '  target_compile_definitions(consumer PRIVATE XGL_CONFIG_ABI_VERSION=3)\nendif()\n'
+             '  target_compile_definitions(consumer PRIVATE XGL_CONFIG_ABI_VERSION=4)\nendif()\n'
              'if(DEFINED FORCE_FRAME_CEILING)\n'
              '  target_compile_definitions(consumer PRIVATE '
              'XGL_DATALINK_MAX_FRAME_SIZE=${FORCE_FRAME_CEILING})\nendif()\n'
              'if(FORCE_STALE_TARGET_ABI)\n'
              '  add_library(legacy_abi INTERFACE)\n'
-             '  set_property(TARGET legacy_abi PROPERTY INTERFACE_XGL_CONFIG_ABI_VERSION 3)\n'
+             '  set_property(TARGET legacy_abi PROPERTY INTERFACE_XGL_CONFIG_ABI_VERSION 4)\n'
              '  target_link_libraries(consumer PRIVATE legacy_abi)\nendif()\n'
              if include_consumer else ""),
             encoding="utf-8")
@@ -192,7 +192,7 @@ class StandaloneContracts(unittest.TestCase):
                         self.assertEqual(identity, 303 if macro == "XGL_BUILD_CONFIG_ID" else 8043)
                 consumer = self.new_consumer(
                     f"ceiling-{value}-consumer", "C",
-                    'find_package(xgl 4 CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+                    'find_package(xgl 5 CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
                     + VERIFY_PREFIX
                     + 'get_target_property(ceiling xgl::xgl XGL_DATALINK_MAX_FRAME_SIZE)\n'
                       'if(NOT ceiling STREQUAL xgl_DATALINK_MAX_FRAME_SIZE OR\n'
@@ -256,14 +256,14 @@ for family in (socket.AF_INET, socket.AF_INET6):
         cases = (
             (
                 "required-then-full",
-                'find_package(xgl 4 QUIET CONFIG COMPONENTS authentication\n'
+                'find_package(xgl 5 QUIET CONFIG COMPONENTS authentication\n'
                 '    PATHS "${BOOT_PREFIX}" NO_DEFAULT_PATH)\n'
                 'if(xgl_FOUND OR TARGET xgl::xgl OR xgl_authentication_FOUND)\n'
                 '  message(FATAL_ERROR "Failed required capability imported a target")\nendif()\n'
                 'if(NOT xgl_NOT_FOUND_MESSAGE MATCHES "Unsupported xgl capability: authentication")\n'
                 '  message(FATAL_ERROR "Missing required capability diagnostic")\nendif()\n'
                 'unset(xgl_DIR CACHE)\n'
-                'find_package(xgl 4 CONFIG REQUIRED COMPONENTS authentication\n'
+                'find_package(xgl 5 CONFIG REQUIRED COMPONENTS authentication\n'
                 '    PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
                 'if(NOT xgl_authentication_FOUND OR DEFINED xgl_NOT_FOUND_MESSAGE)\n'
                 '  message(FATAL_ERROR "Successful retry retained failed capability state")\nendif()\n'
@@ -272,7 +272,7 @@ for family in (socket.AF_INET, socket.AF_INET6):
             ),
             (
                 "optional-missing",
-                'find_package(xgl 4 CONFIG REQUIRED COMPONENTS reliable\n'
+                'find_package(xgl 5 CONFIG REQUIRED COMPONENTS reliable\n'
                 '    OPTIONAL_COMPONENTS authentication PATHS "${BOOT_PREFIX}" NO_DEFAULT_PATH)\n'
                 'if(xgl_authentication_FOUND OR NOT xgl_reliable_FOUND OR\n'
                 '    NOT TARGET xgl::xgl OR DEFINED xgl_NOT_FOUND_MESSAGE)\n'
@@ -282,31 +282,31 @@ for family in (socket.AF_INET, socket.AF_INET6):
             ),
             (
                 "later-incompatible",
-                'find_package(xgl 4 CONFIG REQUIRED PATHS "${BOOT_PREFIX}" NO_DEFAULT_PATH)\n'
+                'find_package(xgl 5 CONFIG REQUIRED PATHS "${BOOT_PREFIX}" NO_DEFAULT_PATH)\n'
                 'unset(xgl_DIR CACHE)\n'
-                'find_package(xgl 4 QUIET CONFIG OPTIONAL_COMPONENTS authentication\n'
+                'find_package(xgl 5 QUIET CONFIG OPTIONAL_COMPONENTS authentication\n'
                 '    PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n',
                 "xgl::xgl conflicts with the requested SDK resource identity",
             ),
             (
                 "same-prefix-again",
-                'find_package(xgl 4 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
-                'find_package(xgl 4 CONFIG REQUIRED COMPONENTS wire reliable\n'
+                'find_package(xgl 5 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
+                'find_package(xgl 5 CONFIG REQUIRED COMPONENTS wire reliable\n'
                 '    PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
                 'set(XGL_SDK_PREFIX "${FULL_PREFIX}")\n' + VERIFY_PREFIX,
                 None,
             ),
             (
                 "later-different-prefix",
-                'find_package(xgl 4 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
+                'find_package(xgl 5 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n'
                 'unset(xgl_DIR CACHE)\n'
-                'find_package(xgl 4 CONFIG REQUIRED PATHS "${OTHER_FULL_PREFIX}" NO_DEFAULT_PATH)\n',
+                'find_package(xgl 5 CONFIG REQUIRED PATHS "${OTHER_FULL_PREFIX}" NO_DEFAULT_PATH)\n',
                 "xgl::xgl already comes from another SDK configuration",
             ),
             (
                 "later-lookup-after-source",
                 f'add_subdirectory("{ARGS.link_source.as_posix()}" production)\n'
-                'find_package(xgl 4 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n',
+                'find_package(xgl 5 CONFIG REQUIRED PATHS "${FULL_PREFIX}" NO_DEFAULT_PATH)\n',
                 "xgl::xgl already comes from a source build or an untracked package",
             ),
         )
@@ -329,7 +329,7 @@ for family in (socket.AF_INET, socket.AF_INET6):
         ambient = self.new_consumer(
             "ambient-sdk", "C",
             'set(ENV{xgl_ROOT} "${BOOT_PREFIX}")\n'
-            'find_package(xgl 4 QUIET CONFIG PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+            'find_package(xgl 5 QUIET CONFIG PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
             'if(xgl_FOUND OR TARGET xgl::xgl)\n'
             '  message(FATAL_ERROR "Found ambient xgl_ROOT despite empty expected prefix")\nendif()\n',
             include_consumer=False)
@@ -339,7 +339,7 @@ for family in (socket.AF_INET, socket.AF_INET6):
         wrong = self.new_consumer(
             "wrong-xgl-dir", "C",
             'set(xgl_DIR "${BOOT_CONFIG_DIR}")\n'
-            'find_package(xgl 4 CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
+            'find_package(xgl 5 CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
             + VERIFY_PREFIX, include_consumer=False)
         output = self.configure(wrong, self.work / "wrong-xgl-dir-build",
                                 f"-DBOOT_CONFIG_DIR={boot_config_dir}", location,
@@ -352,10 +352,10 @@ for family in (socket.AF_INET, socket.AF_INET6):
                     suffix = f"{profile}-{language}"
                     consumer = self.new_consumer(
                         "sdk-" + suffix, language,
-                        'find_package(xgl 4 CONFIG REQUIRED COMPONENTS reliable\n'
+                        'find_package(xgl 5 CONFIG REQUIRED COMPONENTS reliable\n'
                         '    PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
                         + VERIFY_PREFIX +
-                        "if(NOT xgl_CONFIG_ABI_VERSION EQUAL 4)\n"
+                        "if(NOT xgl_CONFIG_ABI_VERSION EQUAL 5)\n"
                         '  message(FATAL_ERROR "Unexpected SDK ABI")\n'
                         "endif()")
                     binary = self.work / ("sdk-build-" + suffix)
@@ -374,15 +374,18 @@ for family in (socket.AF_INET, socket.AF_INET6):
                         self.assertIn("XGL_CONFIG_ABI_VERSION conflicts", output)
 
         for name, selection, diagnostic in (
-            ("legacy-sdk", "find_package(xgl 3 CONFIG REQUIRED", 'requested version "3"'),
-            ("boot-auth", "find_package(xgl 4 CONFIG REQUIRED COMPONENTS authentication",
+            ("legacy-sdk", "find_package(xgl 4 CONFIG REQUIRED", 'requested version "4"'),
+            ("boot-auth", "find_package(xgl 5 CONFIG REQUIRED COMPONENTS authentication",
              "Unsupported xgl capability: authentication"),
+            ("removed-component", "find_package(xgl 5 CONFIG REQUIRED COMPONENTS fragmentation",
+             "Unsupported xgl capability: fragmentation"),
         ):
             consumer = self.new_consumer(
                 name, "C", selection + ' PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n',
                 include_consumer=False)
+            prefix = prefixes["full" if name == "removed-component" else "boot"]
             output = self.configure(consumer, self.work / (name + "-build"),
-                                    f"-DXGL_SDK_PREFIX={prefixes['boot'].as_posix()}",
+                                    f"-DXGL_SDK_PREFIX={prefix.as_posix()}",
                                     succeeds=False)
             self.assertIn(diagnostic, output)
 

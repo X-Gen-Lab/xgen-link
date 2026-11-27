@@ -47,27 +47,23 @@ The example assumes a caller-owned array `frame_buffer` and `<string.h>`. If the
 
 Network TX packets and payload bytes commit only after successful lower-layer submission, consistently for copied, in-place and forwarded frames. These counters do not prove remote delivery.
 
-Boot's private logical network TX workspace is 32 extension bytes, enough for one ACK_RANGE, SESSION and DATA_TYPE together. Larger logical TX extension lists fail before PHY submission. This profile limit does not change Wire v3: complete-frame encoding/decoding still supports the 255-byte header, and other profiles retain the full 231-byte logical extension workspace.
+Boot's private logical network TX workspace is 32 extension bytes, enough for one ACK_RANGE, SESSION and DATA_TYPE together. Larger logical TX extension lists fail before PHY submission. This profile limit does not change Wire v1: complete-frame encoding/decoding still supports the 255-byte header, and other profiles retain the full 231-byte logical extension workspace.
 
 ## Reliable and Unreliable
 
 Reliable sends are constrained by the peer window and global TX capacity. Continue calling `xgl_step()` to receive ACKs, advance retransmissions, and report terminal failures.
 
-For ordinary sends, `timeout_ms` sets the initial ACK wait for each reliable packet, not a completion deadline for the whole message. Zero uses the RTT estimate supported by the current profile, falling back to the configured ACK wait when no estimate exists, or the built-in default if that configuration is also zero; retransmission may adjust the wait. Ordinary unreliable sends create no ACK timer. Both zero-copy send entries and the layout query ignore this field.
+For ordinary sends, `timeout_ms` sets the initial ACK wait for each reliable packet, so the application still owns any end-to-end operation deadline. Zero uses the RTT estimate supported by the current profile, falling back to the configured ACK wait when no estimate exists, or the built-in default if that configuration is also zero; retransmission may adjust the wait. Ordinary unreliable sends create no ACK timer. Both zero-copy send entries and the layout query ignore this field.
 
 `reliable=true` requires a unicast target. A broadcast target (`0xFFFF`) is rejected with `XGL_ERR_INVALID_PARAM` before allocating peer or retransmission state. Plain unreliable broadcast remains available through an explicit route when authentication policy permits it.
 
 Unreliable sends do not create an ACK/retry guarantee. A PHY success confirms local frame acceptance only. The SDK has no public per-message delivery-completion callback; use an application response if that distinction matters.
 
-## Fragmentation
+## Application Blocks
 
-When `enable_fragmentation` is enabled, `max_message_size` limits the application payload of each message across all DATA send entries and receive admission, including single-frame messages. Ordinary sends, both zero-copy send entries and the layout query return `XGL_ERR_BUFFER_TOO_SMALL` above this limit. Zero-copy remains single-frame and never fragments automatically, so the complete frame must also fit the MTU.
+Each DATA submission fits in one frame. The payload budget is the effective frame MTU minus the base header, TLVs, authentication tag when present, and final CRC. Check the [wire budget](../reference/protocol/v1/wire-format.md#size-budget) and both directions of the route for reliable traffic. A payload above the single-frame budget returns `XGL_ERR_BUFFER_TOO_SMALL` before creating a peer, sending HELLO or submitting DATA.
 
-Fragmentation requires a supporting profile and explicit message/reassembly budgets. A reliable message can span more fragments than the window: one retained message per peer feeds the window as ACKs free packet slots. ACK reception releases those slots; the transport maintenance phase performs further DATA transmission. Temporary PHY/resource backpressure pauses the pump. Admission checks that every fragment fits the remaining usable DATA numbers. Do not resubmit a message merely because not all fragments were emitted synchronously.
-
-For reliable fragmented sends, `XGL_OK` means local message admission. The protocol retains work and retries after temporary backpressure. A synchronous hard submission error is returned by `xgl_send_at()`. A hard error during later maintenance is returned by `xgl_step*()`. Either hard error fails the scope and releases its owned work. Fragments already accepted by the PHY may still arrive.
-
-Unreliable fragmentation sends fragments synchronously. An error can occur after earlier fragments have reached the PHY; retrying the entire application message is not transactional.
+For a larger transfer, choose a block size that fits the end-to-end path, including any application metadata. Send blocks independently with `xgl_send_at()` and use application IDs or offsets to correlate them. The [file transfer example](../tutorials/examples.md) sends fixed blocks. Firmware updates can use application receipts to confirm durable writes.
 
 ## Receive Admission and Callbacks
 
@@ -75,7 +71,7 @@ Prefer `rx_accept_callback`: return `XGL_OK` after consuming or copying the payl
 
 Local DATA requires a receive callback. The Advanced scoped callback takes precedence, followed by the accept and legacy callbacks. With all three absent, `xgl_step*()` returns `XGL_ERR_UNSUPPORTED` for local DATA before retention or acknowledgement. A send-only endpoint can leave these callbacks empty and still process ACK and CONTROL. To accept and discard DATA, install an explicit acceptance callback.
 
-A reliable packet is ACKed only after application acceptance or admission into owned bounded receive storage. A completed fragmented message may therefore already be ACKed while waiting for the application; its bytes remain retained and charged to the RX budget. Keep stepping to retry delivery.
+An in-order reliable packet is ACKed after application acceptance. An out-of-order packet can be SACKed once the protocol has retained its bytes. Keep stepping after application capacity returns to deliver retained packets.
 
 An ACK/SACK submission error is returned without undoing accepted bytes or receive numbering. Retrying the same incoming DATA never repeats successful application delivery. During later maintenance, BUSY or NO_MEMORY retains owned data as normal backpressure; a hard application error fails the owning scope, releases its bytes and is reported once. Notify the protocol owner when application capacity returns, since pending application delivery alone does not create a ready timeout.
 

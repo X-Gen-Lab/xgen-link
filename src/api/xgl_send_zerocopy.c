@@ -22,7 +22,7 @@ static xgl_error_t send_zerocopy_scope(xgl_handle_t handle,
     }
     error = transport_prepare_data_tx(&handle->layers.transport_ctx, handle,
                                       data->target_id, connection_id,
-                                      session_epoch, data->data_len);
+                                      session_epoch);
     if (error != XGL_OK) {
         return error;
     }
@@ -82,7 +82,7 @@ xgl_error_t xgl_send_zerocopy_layout(xgl_handle_t handle,
     }
     error = transport_check_data_tx_policy(
         &handle->layers.transport_ctx, request->data.target_id,
-        request->connection_id, request->session_epoch, request->data.data_len);
+        request->connection_id, request->session_epoch);
     if (error != XGL_OK) {
         memset(layout, 0, sizeof(*layout));
     }

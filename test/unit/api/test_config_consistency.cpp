@@ -9,7 +9,6 @@
 
 #if XGL_FEATURE_AUTH
 #include "test_security_helpers.h"
-#endif
 #include "transport/xgl_transport.h"
 #include "wire/xgl_frame.h"
 #include "wire/xgl_wire.h"
@@ -72,7 +71,6 @@ void expect_rejected_before_allocation(xgl_config_t config) {
     EXPECT_EQ(allocator.attempts, 0U);
 }
 
-#if XGL_FEATURE_AUTH
 xgl_error_t fixed_tag_sign(const xgl_auth_input_t*, uint8_t* tag,
                            size_t capacity, size_t* length, void*) {
     if (capacity < XGL_AUTH_TAG_MAX_LEN) {
@@ -172,52 +170,8 @@ xgl_phy_ops_t connected_phy(ConnectedPhy* state) {
     };
     return phy;
 }
-#endif
-
 }  // namespace
 
-#if SIZE_MAX > UINT32_MAX
-TEST(XglConfigConsistency, DisabledFragmentationIgnoresUnrepresentableLimit) {
-    auto config = bounded_config();
-    config.features.max_message_size = static_cast<size_t>(UINT32_MAX) + 1U;
-    ASSERT_FALSE(config.features.enable_fragmentation);
-    ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
-
-    xgl_memory_requirements_t requirements = {};
-    ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
-    std::vector<xgl_max_align_t> workspace(
-        (requirements.size + sizeof(xgl_max_align_t) - 1U) /
-        sizeof(xgl_max_align_t));
-    ScopedInstance instance;
-    EXPECT_EQ(xgl_init_static(&config, workspace.data(),
-                              workspace.size() * sizeof(xgl_max_align_t),
-                              &instance.handle),
-              XGL_OK);
-    EXPECT_NE(instance.handle, nullptr);
-}
-
-#if XGL_FEATURE_FRAGMENTATION
-TEST(XglConfigConsistency, EnabledFragmentationRejectsUnrepresentableLimit) {
-    auto config = bounded_config();
-    config.features.enable_fragmentation = true;
-    config.features.max_reassembly_slots = 1U;
-    config.features.max_message_size = static_cast<size_t>(UINT32_MAX) + 1U;
-    config.features.max_reassembly_bytes = config.features.max_message_size;
-    config.features.max_tx_message_bytes = config.features.max_message_size;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
-    xgl_memory_requirements_t requirements = {};
-    EXPECT_EQ(xgl_memory_requirements(&config, &requirements),
-              XGL_ERR_INVALID_PARAM);
-
-    config.features.max_message_size = UINT32_MAX;
-    config.features.max_reassembly_bytes = UINT32_MAX;
-    config.features.max_tx_message_bytes = UINT32_MAX;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-}
-#endif
-#endif
-
-#if XGL_FEATURE_AUTH
 TEST(XglConfigConsistency, OptionalInvalidProviderIsRejectedBeforeAllocation) {
     for (unsigned invalid = 0U; invalid < 4U; ++invalid) {
         SCOPED_TRACE(invalid);

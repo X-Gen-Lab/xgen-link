@@ -1,25 +1,19 @@
-# Migrate to SDK 4
+# Migrate to SDK 5
 
-Build SDK 4 from the repository root. Clear old CMake caches and install prefixes, then [rebuild each consumer](build-and-consume.md) with the generated header and library for the same profile.
+Build SDK 5 from the repository root. Use fresh build directories and install prefixes, then [rebuild each consumer](build-and-consume.md) with the matching generated header and library. Continue linking `xgl::xgl`.
 
-## Build and public ABI
+## Protocol and application changes
 
-Continue linking `xgl::xgl`. Use the CMake export and `xgl_build_config.h` for capabilities and build identity. Remove the old source assembly and foundation source arguments from product scripts. Products can still select foundation packages for their own libraries.
+- **Upgrade each endpoint and relay on the path to Wire v1.** The version field is now `1`. The fixed header layout, CRC coverage, and active flag and TLV assignments are specified in the [Wire v1 reference](../reference/protocol/v1/index.md).
+- **Submit one frame's worth of DATA per call.** Remove the previous fragmentation setting and split larger transfers into [application blocks](send.md#application-blocks). The sender returns `XGL_ERR_BUFFER_TOO_SMALL` when a payload exceeds the single-frame budget.
+- **Check MTU in both directions.** Verify the DATA path and the ACK return path independently. The receiver reports a missing local reverse route or insufficient feedback capacity before accepting reliable DATA. See [Routing](../reference/protocol/v1/routing.md).
 
-Dynamic creation uses `xgl_allocator_t` from the XGL public headers. Declare `ctx`, `alloc` and `free` using the new descriptor type. Successful allocations satisfy `xgl_max_align_t` alignment. To adapt an existing provider, create a new descriptor and keep it and its context alive until destruction. Use type-compatible callbacks and pointers.
+## Configuration and storage
 
-Static initialization still measures storage through `xgl_memory_requirements()`. Recheck RAM, alignment and status under the new toolchain and configuration. The SDK 4 checked entry points validate configuration size, ABI and build identity.
+Remove the fragmentation configuration fields, the CMake `fragmentation` component requirement and any references to fragmentation workspace or resource counts. Continue using `XGL_INSTANCE_OPTIONS_INIT` to construct the version 2 advanced options descriptor. It supplies the required size, version and build identity. Scoped callbacks, installed-scope authentication and the reliable TX lifetime option remain available.
 
-## Send and receive behavior changes
+Measure aligned storage again with `xgl_memory_requirements()` or `xgl_memory_report_with_options()` before allocating the workspace. Keep the configuration, callbacks and allocator descriptor alive until destruction. The checked entry points validate configuration size, ABI and build identity.
 
-- Install an acceptance callback where the instance needs to receive DATA. Products that previously discarded DATA with empty callbacks can install an explicit accept-and-discard callback. Send-only endpoints can still process ACK and CONTROL with empty callbacks.
-- Check `xgl_send_at()` for synchronous fragmented-send failures and `xgl_step*()` for maintenance failures. If the scope fails, fragments already accepted by the PHY may still be in transit. Follow the [send and recovery contract](send.md) for closing the old scope and retrying application work.
-- Advanced send operations use the same scope deadline. A layout query prepares storage and the actual send checks the deadline again.
-- Check the [MTU in both directions](../reference/protocol/v3/routing.md) for reliable traffic. A missing local reverse route or insufficient feedback capacity is reported before acceptance.
-- For a custom compiled frame ceiling, set `-DXGL_DATALINK_MAX_FRAME_SIZE=<bytes>` when configuring the library. Install the resulting header and library together, then rebuild consumers.
+For a custom compiled frame ceiling, set `-DXGL_DATALINK_MAX_FRAME_SIZE=<bytes>` when configuring the library. Reinstall the generated header and library together. See [Interoperability](../reference/protocol/v1/interoperability.md) and [Validation](../development/validation.md) for the release checks.
 
-## Wire compatibility
-
-The wire version remains v3. Both endpoints must support the frames, extensions and authentication policy in use. See [Interoperability](../reference/protocol/v3/interoperability.md) and [Validation](../development/validation.md).
-
-The historical SDK 3 assembly is documented in the [previous migration guide](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/docs/en/guide/modular-migration.md).
+The SDK 4 migration guide remains available at its [historical revision](https://github.com/X-Gen-Lab/xgen-link/blob/d775c8a2fbc2dabcfc2406034e5cdc43808954bd/docs/en/guides/migration.md).

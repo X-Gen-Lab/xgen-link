@@ -31,11 +31,9 @@ take time. Receive-triggered ACKs and explicit application sends are outside the
 maintenance TX limit. Measure whole-step worst-case execution time on the
 product, including these costs.
 
-Bounded maintenance rotates its starting peer and processes that peer's due
-retries before advancing its message tail. Continuously ready messages cannot
-consume retry turns through a separate global message-pump phase. Rotation
-provides work opportunities; callback cost, driver backpressure and actual
-service latency still require product validation.
+Bounded maintenance rotates its starting peer when processing due retries.
+Rotation gives peers opportunities to submit work. Validate callback cost,
+driver backpressure and actual service latency on the product.
 
 ## Continuation and Input Ownership
 

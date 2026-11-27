@@ -61,7 +61,6 @@ typedef struct {
     bool reliable;             /**< Reliable transmission flag */
     uint8_t
         reliability_class; /**< Raw reliability class, 0 uses reliable flag */
-    bool fragment;         /**< Fragment flag */
     uint8_t priority;      /**< Priority level (0-7) */
     uint8_t ttl;           /**< Hop limit */
 } xgl_frame_params_t;
@@ -247,22 +246,6 @@ static inline void xgl_frame_set_reliability_class(uint8_t* traffic_class,
                                 ~((uint32_t)XGL_RELIABILITY_CLASS_MASK)) |
                                ((uint32_t)reliability_class &
                                 (uint32_t)XGL_RELIABILITY_CLASS_MASK));
-}
-
-/**
- * \brief           Set fragmented bit in traffic-class bits
- * \param[in,out]   traffic_class: Traffic-class byte
- * \param[in]       fragment: Fragment flag
- */
-static inline void xgl_frame_set_fragmented(uint8_t* traffic_class,
-                                            bool fragment) {
-    if (fragment) {
-        *traffic_class = (uint8_t)((uint32_t)*traffic_class |
-                                   (uint32_t)XGL_TRAFFIC_FRAGMENTED_MASK);
-    } else {
-        *traffic_class = (uint8_t)((uint32_t)*traffic_class &
-                                   ~((uint32_t)XGL_TRAFFIC_FRAGMENTED_MASK));
-    }
 }
 
 /**

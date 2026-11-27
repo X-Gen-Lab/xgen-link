@@ -4,7 +4,7 @@ Transfer a 1024-byte in-memory file in sixteen reliable 64-byte application
 blocks with the default build. With a smaller compiled frame ceiling, the
 example uses 32-byte blocks if a 64-byte block cannot fit in one frame.
 
-This is a deterministic host simulation using wire v3. The nodes, configuration,
+This is a deterministic host simulation using wire v1. The nodes, configuration,
 routes, PHY descriptors, application contexts, and static workspaces remain at
 fixed addresses until `xgl_destroy()` returns. No protocol heap allocation is
 needed. `common/sim_link.h` shares a bounded byte-ring PHY; TX copies bytes before
@@ -28,8 +28,7 @@ submission; it does not prove peer receipt. The receiver copies each accepted
 ordered block into bounded storage. The example uses the public SDK. It checks
 the received length, compares every byte with the source and prints the result.
 
-This example intentionally uses application block boundaries and does not need
-protocol fragmentation. See `../boot_update` for delayed Flash acceptance,
+The application chooses block boundaries so each block fits in one DATA frame. See `../boot_update` for delayed Flash acceptance,
 application commit notifications, host throttling, and dropped-ACK recovery.
 
 The fixed workspace arrays are generous host reservations, not a measured MCU

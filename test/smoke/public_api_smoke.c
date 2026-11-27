@@ -94,7 +94,6 @@ static int smoke_optional_runtime(const xgl_config_t* config,
     const xgl_work_budget_t disabled = {0U, 100U};
     if (xgl_resources_get(handle, &snapshot) != XGL_OK ||
         snapshot.peer_count != 0U || snapshot.tx_packets != 0U ||
-        snapshot.reassembly_slots != 0U ||
         xgl_step_bounded(handle, 20U, &disabled, &limits, &result) != XGL_OK ||
         result.pending || state->reads != 1U) {
         return 15;

@@ -1,4 +1,4 @@
-"""Run two separately linked XGL SDKs against a deterministic byte stream."""
+"""Run two XGL Wire v1 endpoints against a deterministic byte stream."""
 
 import argparse
 import queue
@@ -10,15 +10,17 @@ from contextlib import ExitStack, suppress
 from pathlib import Path
 
 
-# SDK 3 Boot HELLO captures and their RESET variants with the SDK 3 body CRC.
-BOOT_HELLO = tuple(map(bytes.fromhex, (
-    "a55a0329032208070100020053000000000000000000e1b508010e010c1d0000000000000000000000e7f6",
-    "a55a0329032208070200010053000000000000000000a24708010e010c1d000000000000000000000020f7",
-)))
-BOOT_RESET = tuple(map(bytes.fromhex, (
-    "a55a0329032208070100020053000000000000000000e1b508010f010c1d000000000000000000000026f6",
-    "a55a0329032208070200010053000000000000000000a24708010f010c1d0000000000000000000000e1f7",
-)))
+WIRE_BASE_HEADER_SIZE = 24
+WIRE_PREAMBLE = b"\xa5\x5a\x01"
+PACKET_DATA = 1
+PACKET_ACK = 2
+PACKET_CONTROL = 3
+EXT_ACK_RANGE = 2
+EXT_SACK = 3
+EXT_DATA_TYPE = 8
+FLAG_AUTHENTICATED = 0x10
+CONTROL_HELLO = b"\x0e"
+CONTROL_RESET = b"\x0f"
 
 
 class Peer:
@@ -104,10 +106,11 @@ class Peer:
                 raise RuntimeError(f"peer {self.node}: invalid {event} byte string") from None
             if event == "rx":
                 self.delivered.append(payload)
-            elif len(payload) >= 26 and payload[:3] == b"\xa5\x5a\x03":
+            elif (len(payload) >= WIRE_BASE_HEADER_SIZE + 2 and
+                  payload.startswith(WIRE_PREAMBLE)):
                 frames.append(payload)
             else:
-                raise RuntimeError(f"peer {self.node}: invalid wire v3 frame {value}")
+                raise RuntimeError(f"peer {self.node}: invalid Wire v1 frame {value}")
         raise RuntimeError(f"peer {self.node}: exited during {command!r}")
 
 
@@ -118,17 +121,59 @@ def transfer(peer, frames):
 
 def extensions(frame):
     header_size = frame[3]
-    offset = 24
+    offset = WIRE_BASE_HEADER_SIZE
     if not offset <= header_size <= len(frame) - 2:
-        raise RuntimeError(f"Invalid v3 header size in {frame.hex()}")
+        raise RuntimeError(f"Invalid Wire v1 header size in {frame.hex()}")
     while offset < header_size:
         if offset + 2 > header_size:
-            raise RuntimeError(f"Truncated v3 TLV in {frame.hex()}")
+            raise RuntimeError(f"Truncated Wire v1 TLV in {frame.hex()}")
         end = offset + 2 + frame[offset + 1]
         if end > header_size:
-            raise RuntimeError(f"Truncated v3 TLV value in {frame.hex()}")
+            raise RuntimeError(f"Truncated Wire v1 TLV value in {frame.hex()}")
         yield frame[offset], frame[offset + 2 : end]
         offset = end
+
+
+def crc16(data):
+    value = 0xFFFF
+    for byte in data:
+        value ^= byte
+        for _ in range(8):
+            value = (value >> 1) ^ (0xA001 if value & 1 else 0)
+    return value.to_bytes(2, "little")
+
+
+def refresh_checksums(frame):
+    header_crc = slice(WIRE_BASE_HEADER_SIZE - 2, WIRE_BASE_HEADER_SIZE)
+    frame[header_crc] = b"\0\0"
+    frame[header_crc] = crc16(frame[:WIRE_BASE_HEADER_SIZE])
+    frame[-2:] = crc16(frame[:-2])
+    return bytes(frame)
+
+
+def reset_from_hello(hello):
+    reset = bytearray(hello)
+    offset = WIRE_BASE_HEADER_SIZE
+    for kind, value in extensions(hello):
+        if kind == EXT_DATA_TYPE and value == CONTROL_HELLO:
+            reset[offset + 2 : offset + 3] = CONTROL_RESET
+            return refresh_checksums(reset)
+        offset += 2 + len(value)
+    raise RuntimeError("Expected an operation TLV in HELLO")
+
+
+def reject_old_wire_version(receiver, data, now, record):
+    old = bytearray(data)
+    old[2] = 3
+    record(f"link: sent checksum-consistent Wire v3 DATA to peer {receiver.node}")
+    transfer(receiver, [refresh_checksums(old)])
+    previous_deliveries = len(receiver.delivered)
+    for _ in range(8):
+        now += 1
+        outgoing = receiver.command(f"step {now}")
+        if outgoing or len(receiver.delivered) != previous_deliveries:
+            raise RuntimeError("Wire v3 DATA was accepted or acknowledged")
+    return now
 
 
 def scenario(first, second, profile, timeout, record):
@@ -136,35 +181,49 @@ def scenario(first, second, profile, timeout, record):
         a = Peer(first, 1, profile, stack, timeout, record)
         b = Peer(second, 2, profile, stack, timeout, record)
         now = 0
+        resets = []
         for sender, receiver, node in ((a, b, 1), (b, a, 2)):
-            size = 240 if profile == "full" else 12
-            frames = sender.command(f"send {size} {now}")
-            hello = [frame for frame in frames if frame[4] == 3]
-            if len(hello) != 1 or (8, b"\x0e") not in extensions(hello[0]):
-                raise RuntimeError("Expected a scoped HELLO")
-            if profile == "boot" and hello[0] != BOOT_HELLO[node - 1]:
-                raise RuntimeError("Boot HELLO differs from the SDK 3 wire vector")
-            data = [i for i, frame in enumerate(frames) if frame[4] == 1]
+            sizes = (12, 19) if profile == "full" else (12,)
+            frames = []
+            for size in sizes:
+                frames.extend(sender.command(f"send {size} {now}"))
+            hello = [frame for frame in frames if frame[4] == PACKET_CONTROL]
+            if (len(hello) != 1 or
+                    (EXT_DATA_TYPE, CONTROL_HELLO) not in extensions(hello[0])):
+                raise RuntimeError("Expected one HELLO per sending direction")
+            data = [frame for frame in frames if frame[4] == PACKET_DATA]
+            lengths = tuple(int.from_bytes(frame[20:22], "little") for frame in data)
+            if len(frames) != len(sizes) + 1 or lengths != sizes:
+                raise RuntimeError("Expected one DATA frame per application submission")
             if profile == "full":
-                if len(data) < 2 or not all(frames[i][5] & 0x10 for i in data):
-                    raise RuntimeError("Expected authenticated fragments")
-                i, j = data[:2]
-                frames[i], frames[j] = frames[j], frames[i]
-                record(f"link: reordered fragments from peer {sender.node}")
-            transfer(receiver, frames)
+                if not all(frame[5] & FLAG_AUTHENTICATED for frame in frames):
+                    raise RuntimeError("Expected authenticated HELLO and DATA")
+                data.reverse()
+                record(f"link: reordered DATA frames from peer {sender.node}")
+            else:
+                resets.append((receiver, reset_from_hello(hello[0])))
+                if node == 1:
+                    now = reject_old_wire_version(receiver, data[0], now, record)
+            transfer(receiver, hello + data)
 
             dropped = False
+            ack_seen = False
             sack_seen = False
             retry_seen = False
             for _ in range(50):
                 now += 100
                 outgoing = receiver.command(f"step {now}")
-                sack_seen |= any(
-                    kind == 3 for frame in outgoing for kind, _ in extensions(frame)
-                )
+                feedback = [frame for frame in outgoing if frame[4] == PACKET_ACK]
+                kinds = {kind for frame in feedback for kind, _ in extensions(frame)}
+                ack_seen |= EXT_ACK_RANGE in kinds
+                sack_seen |= EXT_SACK in kinds
+                if profile == "full" and any(
+                    not frame[5] & FLAG_AUTHENTICATED for frame in feedback
+                ):
+                    raise RuntimeError("Expected authenticated feedback")
                 if profile == "boot" and not dropped:
                     ack = next(
-                        (i for i, frame in enumerate(outgoing) if frame[4] == 2),
+                        (i for i, frame in enumerate(outgoing) if frame[4] == PACKET_ACK),
                         None,
                     )
                     if ack is not None:
@@ -173,27 +232,26 @@ def scenario(first, second, profile, timeout, record):
                         dropped = True
                 transfer(sender, outgoing)
                 outgoing = sender.command(f"step {now}")
-                retry_seen |= any(frame[4] == 1 for frame in outgoing)
+                retry_seen |= any(frame[4] == PACKET_DATA for frame in outgoing)
                 transfer(receiver, outgoing)
 
-            expected = bytes((i ^ node ^ 0xA5) & 0xFF for i in range(size))
-            if receiver.delivered != [expected]:
+            expected = [bytes((i ^ node ^ 0xA5) & 0xFF for i in range(size))
+                        for size in sizes]
+            if receiver.delivered != expected:
                 raise RuntimeError(f"{profile}: unexpected deliveries {receiver.delivered}")
-            if (profile == "full" and not sack_seen) or (
-                profile == "boot" and not (dropped and retry_seen)
-            ):
+            recovery_seen = sack_seen if profile == "full" else dropped and retry_seen
+            if not ack_seen or not recovery_seen:
                 raise RuntimeError(f"{profile}: recovery branch did not execute")
 
-        if profile == "boot":
-            for receiver, reset in zip((b, a), BOOT_RESET):
-                transfer(receiver, [reset, reset])
-                # Boot polls only one small PHY chunk per step.
-                for _ in range(8):
-                    now += 100
-                    if receiver.command(f"step {now}"):
-                        raise RuntimeError("RESET emitted unexpected traffic")
-                if receiver.command(f"reject send 12 {now}"):
-                    raise RuntimeError("A reset epoch must not emit DATA")
+        for receiver, reset in resets:
+            transfer(receiver, [reset, reset])
+            # Boot polls only one small PHY chunk per step.
+            for _ in range(8):
+                now += 100
+                if receiver.command(f"step {now}"):
+                    raise RuntimeError("RESET emitted unexpected traffic")
+            if receiver.command(f"reject send 12 {now}"):
+                raise RuntimeError("A reset epoch must not emit DATA")
 
         a.finish()
         b.finish()
@@ -201,8 +259,8 @@ def scenario(first, second, profile, timeout, record):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("first", help="First SDK's interop_peer executable")
-    parser.add_argument("second", help="Second SDK's interop_peer executable")
+    parser.add_argument("first", help="First xgl_interop_peer executable")
+    parser.add_argument("second", help="Second xgl_interop_peer executable")
     parser.add_argument("--profile", choices=("boot", "full"), required=True)
     parser.add_argument("--timeout-seconds", type=float, default=10.0,
                         help="Wall-clock limit for each command or peer exit (default: 10)")
@@ -227,7 +285,7 @@ def main():
             print(f"{args.profile}: {error}", file=sys.stderr)
             return 1
         record("PASS")
-    print(f"{args.profile}: two-way v3 interop passed")
+    print(f"{args.profile}: two-way Wire v1 interop passed")
     return 0
 
 

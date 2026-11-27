@@ -125,27 +125,10 @@ TEST(XglCoverageWire,
      FixedWidthExtensionCodecsRejectMissingOutputAndWrongSizes) {
     uint8_t bytes[32] = {};
     size_t written = 0;
-    uint32_t a = 0, b = 0, c = 0;
+    uint32_t a = 0;
     uint64_t wide = 0;
     uint16_t hop = 0, next = 0, metric = 0;
     uint8_t tag = 0;
-    EXPECT_EQ(
-        xgl_wire_encode_fragment_ext_value(nullptr, 32, 1, 2, 3, &written),
-        XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_encode_fragment_ext_value(bytes, 32, 1, 2, 3, nullptr),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_encode_fragment_ext_value(bytes, 11, 1, 2, 3, &written),
-              XGL_ERR_BUFFER_TOO_SMALL);
-    EXPECT_EQ(xgl_wire_decode_fragment_ext_value(nullptr, 12, &a, &b, &c),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_fragment_ext_value(bytes, 12, nullptr, &b, &c),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_fragment_ext_value(bytes, 12, &a, nullptr, &c),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_fragment_ext_value(bytes, 12, &a, &b, nullptr),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_wire_decode_fragment_ext_value(bytes, 13, &a, &b, &c),
-              XGL_ERR_INVALID_FRAME);
     EXPECT_EQ(xgl_wire_encode_session_ext_value(nullptr, 32, 1, 2, &written),
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_wire_encode_session_ext_value(bytes, 32, 1, 2, nullptr),

@@ -1,3 +1,3 @@
 # Page moved
 
-See the [current documentation](../reference/protocol/v3/security.md).
+See the [current documentation](../reference/protocol/v1/security.md).

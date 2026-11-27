@@ -25,12 +25,6 @@ typedef struct {
     const xgl_allocator_t* rx_packet;
     const xgl_allocator_t* rx_payload;
 #endif
-#if XGL_FEATURE_FRAGMENTATION
-    const xgl_allocator_t* tx_extensions;
-    const xgl_allocator_t* tx_message;
-    const xgl_allocator_t* reassembly;
-    const xgl_allocator_t* reassembly_payload;
-#endif
 } xgl_protocol_memory_t;
 
 #endif /* XGL_PROTOCOL_MEMORY_H */

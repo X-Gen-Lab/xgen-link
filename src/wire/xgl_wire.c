@@ -23,11 +23,14 @@ static bool wire_packet_type_valid(uint8_t packet_type) {
 }
 
 static bool wire_header_valid(const xgl_wire_header_t* header) {
+    /* The retired bit positions remain reserved in this frame layout. */
+    const uint8_t reserved_flags = 0x04U | XGL_WIRE_FLAG_ENCRYPTED;
+    const uint8_t reserved_traffic = 0x20U | XGL_TRAFFIC_ENCRYPTION_MASK;
     return !(header->version != XGL_WIRE_VERSION ||
              header->header_len < XGL_WIRE_BASE_HEADER_SIZE ||
              !wire_packet_type_valid(header->packet_type) ||
-             (header->flags & XGL_WIRE_FLAG_ENCRYPTED) != 0U ||
-             (header->traffic_class & XGL_TRAFFIC_ENCRYPTION_MASK) != 0U ||
+             (header->flags & reserved_flags) != 0U ||
+             (header->traffic_class & reserved_traffic) != 0U ||
              header->source_id == 0U || header->target_id == 0U);
 }
 
@@ -197,7 +200,6 @@ xgl_error_t xgl_wire_decode_frame(xgl_wire_frame_view_t* view,
                header->packet_type == XGL_PACKET_TYPE_ACK) {
         view->reliable = XGL_RELIABILITY_ACK_ONLY;
     }
-    view->fragment = (header->flags & XGL_WIRE_FLAG_FRAGMENTED) != 0U;
     view->priority =
         (uint8_t)((header->traffic_class & XGL_TRAFFIC_PRIORITY_MASK) >>
                   XGL_TRAFFIC_PRIORITY_SHIFT);

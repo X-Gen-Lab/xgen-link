@@ -48,12 +48,8 @@ typedef struct xgl_reliable_packet_s {
     uint8_t data_type;      /**< Data type */
 
     /* Attributes */
-    uint8_t packet_type;   /**< Production packet type */
-    uint8_t flags;         /**< Production wire flags */
-    bool fragment;         /**< Fragment flag */
-    uint8_t priority;      /**< Priority level (0-7) */
-    uint8_t* extensions;   /**< Owned TLV extension bytes */
-    size_t extensions_len; /**< Length of TLV extension bytes */
+    uint8_t packet_type; /**< Production packet type */
+    uint8_t priority;    /**< Priority level (0-7) */
 
     /* Retransmission state */
     uint8_t retry_count; /**< Current retry count */
@@ -80,8 +76,7 @@ typedef struct {
     xgl_reliable_packet_t*
         index_buckets[XGL_RELIABLE_INDEX_BUCKETS]; /**< Packet lookup buckets */
     const xgl_allocator_t* data_allocator;         /**< Owned payload storage */
-    const xgl_allocator_t* extensions_allocator; /**< Owned extension storage */
-    const xgl_allocator_t* allocator;            /**< Memory allocator */
+    const xgl_allocator_t* allocator;              /**< Memory allocator */
 } xgl_reliable_queue_t;
 
 /*---------------------------------------------------------------------------*/
@@ -113,10 +108,6 @@ xgl_error_t xgl_reliable_add_packet_number(
     uint16_t source_id, uint16_t target_id, uint32_t packet_number,
     uint8_t data_type, uint8_t priority, int32_t timeout_ms,
     xgl_reliable_packet_t** packet_out);
-
-xgl_error_t xgl_reliable_set_packet_extensions(
-    const xgl_reliable_queue_t* queue, xgl_reliable_packet_t* packet,
-    const uint8_t* extensions, size_t extensions_len);
 
 xgl_error_t xgl_reliable_remove_packet_number(xgl_reliable_queue_t* queue,
                                               uint32_t packet_number,

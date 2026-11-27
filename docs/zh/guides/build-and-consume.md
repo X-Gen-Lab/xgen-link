@@ -15,7 +15,7 @@ cmake --install build/production --prefix "$PWD/build/sdk"
 从源代码装配时，父工程先确定工具链和所需的 [编译档位](../reference/profiles.md)，再调用 `add_subdirectory(path/to/xgen-link)`。安装消费使用以下入口。两种入口均提供 `xgl::xgl`。
 
 ```cmake
-find_package(xgl 4 CONFIG REQUIRED COMPONENTS wire reliable)
+find_package(xgl 5 CONFIG REQUIRED COMPONENTS wire reliable)
 target_link_libraries(my_application PRIVATE xgl::xgl)
 ```
 

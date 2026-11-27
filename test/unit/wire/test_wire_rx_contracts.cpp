@@ -53,6 +53,16 @@ void expect_cleared_failure(const uint8_t* bytes, size_t size) {
 
 }  // namespace
 
+TEST(XglWireRxContractTest, RejectsRetiredExtensionNumber) {
+    std::vector<uint8_t> retired_extension = {4U, 12U};
+    retired_extension.resize(14U, 0U);
+    const auto bytes = make_frame(retired_extension);
+    xgl_wire_frame_view_t view = {};
+    EXPECT_EQ(xgl_wire_decode_frame(&view, bytes.data(), bytes.size(), nullptr),
+              XGL_ERR_INVALID_FRAME);
+    expect_cleared_failure(bytes.data(), bytes.size());
+}
+
 TEST(XglWireRxContractTest,
      HeaderEncodingOverwritesEveryByteAndPreservesOutsideSentinels) {
     std::array<uint8_t, XGL_WIRE_BASE_HEADER_SIZE + 2U> zeroed = {};

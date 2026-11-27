@@ -1,6 +1,6 @@
 /**
  * \file            interop_peer.c
- * \brief           Host process for exercising one SDK against another.
+ * \brief           Standalone host process for exercising Wire v1 exchanges.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -171,7 +171,8 @@ int main(int argc, char** argv) {
     xgl_config_t config;
     if (strcmp(argv[2], "boot") == 0) {
         xgl_config_get_preset_boot(&config);
-    } else if (strcmp(argv[2], "full") == 0 && XGL_FEATURE_FRAGMENTATION) {
+    } else if (strcmp(argv[2], "full") == 0 && XGL_FEATURE_AUTH &&
+               XGL_FEATURE_OUT_OF_ORDER) {
         xgl_config_get_preset_small(&config);
     } else {
         return EXIT_FAILURE;
@@ -189,11 +190,7 @@ int main(int argc, char** argv) {
     config.auth_provider = config.auth_required ? &provider : NULL;
 #endif
 
-#if XGL_CONFIG_ABI_VERSION >= 4
     static xgl_max_align_t storage[4096];
-#else
-    static xgm_max_align_t storage[4096];
-#endif
     xgl_handle_t handle = NULL;
     if (xgl_init_static(&config, storage, sizeof(storage), &handle) != XGL_OK) {
         return EXIT_FAILURE;

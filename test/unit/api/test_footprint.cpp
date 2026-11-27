@@ -170,13 +170,12 @@ TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
                              report.initialization_bytes + report.peer_bytes +
                              report.window_bytes + report.tx_record_bytes +
                              report.tx_payload_bytes + report.scratch_bytes +
-                             report.rx_buffered_bytes + report.fragment_bytes;
+                             report.rx_buffered_bytes;
     EXPECT_EQ(explained, report.requirements.size);
     EXPECT_GT(report.management_bytes, 0U);
     EXPECT_GT(report.initialization_bytes, 0U);
     EXPECT_EQ(report.scratch_bytes, 128U);
     EXPECT_EQ(report.rx_buffered_bytes, 0U);
-    EXPECT_EQ(report.fragment_bytes, 0U);
     void* workspace = std::malloc(report.requirements.size);
     ASSERT_NE(workspace, nullptr);
     xgl_handle_t handle = nullptr;
@@ -185,23 +184,6 @@ TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
         XGL_OK);
     xgl_destroy(handle);
     std::free(workspace);
-}
-
-TEST(XglFootprintTest, AdmissionBudgetIsDistinctFromReservedMessageStorage) {
-    xgl_config_t config;
-    xgl_config_get_preset_small(&config);
-    config.features.max_message_size = 128U;
-    config.features.max_reassembly_bytes = 256U;
-    config.features.max_tx_message_bytes = 256U;
-    xgl_memory_report_t original{};
-    ASSERT_EQ(xgl_memory_report(&config, &original), XGL_OK);
-    EXPECT_GT(original.fragment_bytes, 0U);
-    config.features.max_reassembly_bytes = 128U;
-    config.features.max_tx_message_bytes = 128U;
-    xgl_memory_report_t reduced{};
-    ASSERT_EQ(xgl_memory_report(&config, &reduced), XGL_OK);
-    EXPECT_EQ(reduced.requirements.size, original.requirements.size);
-    EXPECT_EQ(reduced.fragment_bytes, original.fragment_bytes);
 }
 
 TEST(XglFootprintTest, MemoryReportFailureDoesNotOverwriteOutput) {

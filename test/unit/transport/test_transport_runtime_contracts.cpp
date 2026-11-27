@@ -66,13 +66,13 @@ class XglTransportRuntimeTest : public ::testing::Test {
         static_cast<XglTransportRuntimeTest*>(user)->errors.push_back(error);
     }
 
-    void Init(bool fragmentation = false) {
+    void Init() {
         lower = {this, SendPacket};
         xgl_transport_config_t config = {};
         config.local_id = 1U;
         config.max_retry_count = 2U;
         config.default_timeout_ms = 100U;
-        config.window_size = fragmentation ? 1U : 4U;
+        config.window_size = 4U;
         config.max_frame_size = 64U;
         config.max_peers = 2U;
         config.max_tx_packets = 4U;
@@ -84,11 +84,6 @@ class XglTransportRuntimeTest : public ::testing::Test {
         config.error_callback = Error;
         config.rx_accept_callback = Accept;
         config.callback_user_data = this;
-        config.enable_fragmentation = fragmentation;
-        config.max_message_size = 128U;
-        config.max_tx_message_bytes = 256U;
-        config.max_reassembly_bytes = 256U;
-        config.max_reassembly_slots = 2U;
         ASSERT_EQ(xgl_transport_init(&context, &config), XGL_OK);
     }
 
@@ -96,12 +91,12 @@ class XglTransportRuntimeTest : public ::testing::Test {
         xgl_transport_destroy(&context);
     }
 
-    xgl_error_t Send(uint16_t target = 2U, size_t length = 1U) {
-        const std::array<uint8_t, 128> payload = {};
+    xgl_error_t Send(uint16_t target = 2U) {
+        const uint8_t payload = 0U;
         xgl_tx_data_t request = {};
         request.target_id = target;
-        request.data = payload.data();
-        request.data_len = length;
+        request.data = &payload;
+        request.data_len = sizeof(payload);
         request.reliable = true;
         return xgl_transport_send(&context, nullptr, &request);
     }
@@ -347,31 +342,6 @@ TEST_F(XglTransportRuntimeTest,
     EXPECT_EQ(xgl_transport_run(&context, nullptr, 2U), XGL_OK);
     EXPECT_EQ(Receive(1U), XGL_OK);
     EXPECT_EQ(delivered, (std::vector<uint8_t>{0U, 1U, 2U}));
-}
-#endif
-
-#if XGL_FEATURE_FRAGMENTATION
-TEST_F(XglTransportRuntimeTest, AckDefersMessagePumpAndPublishesImmediateWork) {
-    Init(true);
-    ASSERT_EQ(Send(2U, 96U), XGL_OK);
-    ASSERT_EQ(attempts, 1U);
-    ASSERT_EQ(Feedback(false, 0U), XGL_OK);
-    EXPECT_EQ(attempts, 1U);
-    EXPECT_EQ(Deadline(0U), 0U);
-    ASSERT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_OK);
-    EXPECT_EQ(attempts, 2U);
-}
-
-TEST_F(XglTransportRuntimeTest, DeferredMessageFailureIsReturnedByMaintenance) {
-    Init(true);
-    ASSERT_EQ(Send(2U, 96U), XGL_OK);
-    failing_target = 2U;
-    failure = XGL_ERR_TX_FAILED;
-    ASSERT_EQ(Feedback(false, 0U), XGL_OK);
-    EXPECT_TRUE(errors.empty());
-    EXPECT_EQ(xgl_transport_run(&context, nullptr, 0U), XGL_ERR_TX_FAILED);
-    ASSERT_EQ(errors.size(), 1U);
-    EXPECT_EQ(context.tx_message_bytes, 0U);
 }
 #endif
 

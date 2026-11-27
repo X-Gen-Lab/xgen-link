@@ -6,12 +6,13 @@
 
 #include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
+#include <wire/xgl_crc16.h>
 #include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
+#include <wire/xgl_wire_bytes.h>
 #include <xgl/xgl.h>
 
 #include <algorithm>
-#include <array>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <memory>
@@ -29,7 +30,6 @@ class XglTransportRxContract : public ::testing::Test {
     xgl_error_t application_error = XGL_OK;
     size_t feedback_attempts = 0U;
     std::vector<uint8_t> delivered;
-    std::vector<xgl_error_t> errors;
     bool initialized = false;
 
     static xgl_error_t Send(void* opaque, xgl_handle_t, xgl_packet_t*) {
@@ -45,11 +45,6 @@ class XglTransportRxContract : public ::testing::Test {
             self.delivered.insert(self.delivered.end(), data, data + len);
         }
         return self.application_error;
-    }
-
-    static void ReportError(xgl_handle_t, xgl_error_t error, const char*,
-                            void* opaque) {
-        static_cast<XglTransportRxContract*>(opaque)->errors.push_back(error);
     }
 
     void SetUp() override {
@@ -68,15 +63,7 @@ class XglTransportRxContract : public ::testing::Test {
         config.stats = &statistics;
         config.tx_retries = &retries;
         config.rx_accept_callback = Accept;
-        config.error_callback = ReportError;
         config.callback_user_data = this;
-#if XGL_FEATURE_FRAGMENTATION
-        config.enable_fragmentation = true;
-        config.max_message_size = 128U;
-        config.max_reassembly_slots = 2U;
-        config.max_reassembly_bytes = 256U;
-        config.max_tx_message_bytes = 128U;
-#endif
         ASSERT_EQ(xgl_transport_init(&context, &config), XGL_OK);
         initialized = true;
     }
@@ -87,9 +74,7 @@ class XglTransportRxContract : public ::testing::Test {
         }
     }
 
-    xgl_error_t Receive(uint32_t number, uint8_t value,
-                        const std::vector<uint8_t>& extensions = {},
-                        bool fragmented = false) {
+    xgl_error_t Receive(uint32_t number, uint8_t value) {
         xgl_packet_data_t data = {1U, &value};
         xgl_packet_t packet = {};
         packet.source_id = 2U;
@@ -97,10 +82,7 @@ class XglTransportRxContract : public ::testing::Test {
         packet.packet_number = number;
         packet.packet_type = XGL_PACKET_TYPE_DATA;
         packet.reliable = XGL_RELIABILITY_ACK_ELICITING;
-        packet.fragment = fragmented;
         packet.data = &data;
-        packet.extensions = extensions.empty() ? nullptr : extensions.data();
-        packet.extensions_len = extensions.size();
         return xgl_transport_receive(&context, nullptr, &packet);
     }
 };
@@ -173,26 +155,26 @@ struct PublicReceiver {
     }
 };
 
-std::vector<uint8_t> MakeFrame(uint8_t type,
+std::vector<uint8_t> MakeFrame(uint8_t type, bool reliable = false,
+                               uint16_t target = 1U,
                                const std::vector<uint8_t>& extensions = {},
-                               bool fragmented = false, bool reliable = false,
-                               uint16_t target = 1U) {
-    const uint8_t payload = 0x42U;
+                               size_t payload_size = 1U) {
+    const std::vector<uint8_t> payload(payload_size, 0x42U);
     xgl_frame_params_t parameters = {};
     parameters.source_id = 2U;
     parameters.target_id = target;
     parameters.packet_type = type;
     parameters.reliable =
         reliable ? XGL_RELIABILITY_ACK_ELICITING : XGL_RELIABILITY_NONE;
-    parameters.fragment = fragmented;
     parameters.extensions = extensions.empty() ? nullptr : extensions.data();
     parameters.extensions_len = extensions.size();
-    parameters.payload = &payload;
-    parameters.payload_len = 1U;
+    parameters.payload = payload.data();
+    parameters.payload_len = payload.size();
     parameters.ttl = 4U;
     xgl_frame_t frame = {};
     EXPECT_EQ(xgl_frame_build(&frame, &parameters), XGL_OK);
-    std::vector<uint8_t> encoded(128U);
+    std::vector<uint8_t> encoded(XGL_FRAME_HEADER_SIZE + extensions.size() +
+                                 payload.size() + XGL_CRC16_SIZE);
     size_t size = 0U;
     EXPECT_EQ(
         xgl_frame_serialize(encoded.data(), encoded.size(), &frame, &size),
@@ -201,33 +183,82 @@ std::vector<uint8_t> MakeFrame(uint8_t type,
     return encoded;
 }
 
-#if XGL_FEATURE_FRAGMENTATION
-std::vector<uint8_t> Fragment(uint32_t message = 7U, uint32_t offset = 0U,
-                              uint32_t total = 1U) {
-    std::array<uint8_t, XGL_FRAGMENT_EXT_VALUE_SIZE> value = {};
-    size_t value_len = 0U, encoded_len = 0U;
-    EXPECT_EQ(xgl_wire_encode_fragment_ext_value(value.data(), value.size(),
-                                                 message, offset, total,
-                                                 &value_len),
-              XGL_OK);
-    std::vector<uint8_t> encoded(value.size() + 2U);
-    EXPECT_EQ(xgl_wire_encode_ext(encoded.data(), encoded.size(),
-                                  XGL_WIRE_EXT_FRAGMENT, value.data(),
-                                  value_len, &encoded_len),
-              XGL_OK);
-    encoded.resize(encoded_len);
-    return encoded;
+void RefreshFrameCrc(std::vector<uint8_t>& encoded) {
+    const size_t header_crc = XGL_FRAME_HEADER_SIZE - XGL_CRC16_SIZE;
+    xgl_serialize_u16_le(encoded.data() + header_crc, 0U);
+    xgl_serialize_u16_le(
+        encoded.data() + header_crc,
+        xgl_crc16_modbus(encoded.data(), XGL_FRAME_HEADER_SIZE));
+    const size_t frame_crc = encoded.size() - XGL_CRC16_SIZE;
+    xgl_serialize_u16_le(encoded.data() + frame_crc,
+                         xgl_crc16_modbus(encoded.data(), frame_crc));
 }
-
-std::vector<uint8_t> DuplicateFragments() {
-    auto extensions = Fragment();
-    auto duplicate = Fragment(8U);
-    extensions.insert(extensions.end(), duplicate.begin(), duplicate.end());
-    return extensions;
-}
-#endif
 
 }  // namespace
+
+TEST(XglTransportRxWireContract, AcceptsVersionOneAndRejectsVersionThree) {
+    PublicReceiver receiver;
+    receiver.Init();
+    const auto current = MakeFrame(XGL_PACKET_TYPE_DATA, true);
+    ASSERT_GE(current.size(), XGL_FRAME_HEADER_SIZE);
+    EXPECT_EQ(current[2], 1U);
+
+    auto previous = current;
+    previous[2] = 3U;
+    RefreshFrameCrc(previous);
+    (void)receiver.Feed(previous);
+    EXPECT_EQ(receiver.delivered, 0U);
+    EXPECT_EQ(receiver.feedback_attempts, 0U);
+
+    EXPECT_EQ(receiver.Feed(current), XGL_OK);
+    EXPECT_EQ(receiver.delivered, 1U);
+    EXPECT_EQ(receiver.feedback_attempts, 1U);
+}
+
+TEST(XglTransportRxWireContract, RetiredFragmentMarkersNeverDeliverOrAck) {
+    PublicReceiver receiver;
+    receiver.Init();
+    const auto current =
+        MakeFrame(XGL_PACKET_TYPE_DATA, true, 1U, {0x7EU, 1U, 0xAAU});
+    ASSERT_GT(current.size(), XGL_FRAME_HEADER_SIZE);
+
+    auto former_flag = current;
+    former_flag[5] |= 0x04U;
+    auto former_traffic_bit = current;
+    former_traffic_bit[7] |= 0x20U;
+    auto former_tlv = current;
+    former_tlv[XGL_FRAME_HEADER_SIZE] = 4U;
+    for (auto* frame : {&former_flag, &former_traffic_bit, &former_tlv}) {
+        RefreshFrameCrc(*frame);
+        (void)receiver.Feed(*frame);
+        EXPECT_EQ(receiver.delivered, 0U);
+        EXPECT_EQ(receiver.feedback_attempts, 0U);
+    }
+
+    EXPECT_EQ(receiver.Feed(current), XGL_OK);
+    EXPECT_EQ(receiver.delivered, 1U);
+    EXPECT_EQ(receiver.feedback_attempts, 1U);
+}
+
+TEST(XglTransportRxWireContract, OversizedFrameDoesNotConsumeReceiveSequence) {
+    PublicReceiver receiver;
+    receiver.Init();
+    constexpr size_t payload_budget =
+        128U - XGL_FRAME_HEADER_SIZE - XGL_CRC16_SIZE;
+    const auto oversized =
+        MakeFrame(XGL_PACKET_TYPE_DATA, true, 1U, {}, payload_budget + 1U);
+    ASSERT_EQ(oversized.size(), 129U);
+    (void)receiver.Feed(oversized);
+    EXPECT_EQ(receiver.delivered, 0U);
+    EXPECT_EQ(receiver.feedback_attempts, 0U);
+
+    const auto at_limit =
+        MakeFrame(XGL_PACKET_TYPE_DATA, true, 1U, {}, payload_budget);
+    ASSERT_EQ(at_limit.size(), 128U);
+    EXPECT_EQ(receiver.Feed(at_limit), XGL_OK);
+    EXPECT_EQ(receiver.delivered, 1U);
+    EXPECT_EQ(receiver.feedback_attempts, 1U);
+}
 
 TEST(XglTransportRxWireContract, ReservedPacketTypesNeverReachApplication) {
     PublicReceiver receiver;
@@ -245,14 +276,13 @@ TEST(XglTransportRxWireContract, ReservedPacketTypesNeverReachApplication) {
 TEST(XglTransportRxWireContract, ReliableBroadcastPreservesUnicastHistory) {
     PublicReceiver receiver;
     receiver.Init();
-    auto broadcast =
-        MakeFrame(XGL_PACKET_TYPE_DATA, {}, false, true, UINT16_MAX);
+    auto broadcast = MakeFrame(XGL_PACKET_TYPE_DATA, true, UINT16_MAX);
     ASSERT_FALSE(broadcast.empty());
     EXPECT_EQ(receiver.Feed(broadcast), XGL_ERR_INVALID_FRAME);
     EXPECT_EQ(receiver.delivered, 0U);
     EXPECT_EQ(receiver.feedback_attempts, 0U);
 
-    auto unicast = MakeFrame(XGL_PACKET_TYPE_DATA, {}, false, true);
+    auto unicast = MakeFrame(XGL_PACKET_TYPE_DATA, true);
     ASSERT_FALSE(unicast.empty());
     EXPECT_EQ(receiver.Feed(unicast), XGL_OK);
     EXPECT_EQ(receiver.delivered, 1U);
@@ -262,7 +292,7 @@ TEST(XglTransportRxWireContract, ReliableBroadcastPreservesUnicastHistory) {
 TEST(XglTransportRxWireContract, UnreliableBroadcastStillDelivers) {
     PublicReceiver receiver;
     receiver.Init();
-    auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, {}, false, false, UINT16_MAX);
+    auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, false, UINT16_MAX);
     ASSERT_FALSE(frame.empty());
     EXPECT_EQ(receiver.Feed(frame), XGL_OK);
     EXPECT_EQ(receiver.delivered, 1U);
@@ -272,7 +302,7 @@ TEST(XglTransportRxWireContract, UnreliableBroadcastStillDelivers) {
 TEST(XglTransportRxWireContract, StepReportsFeedbackFailureWithoutRedelivery) {
     PublicReceiver receiver;
     receiver.Init();
-    auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, {}, false, true);
+    auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, true);
     ASSERT_FALSE(frame.empty());
     receiver.feedback_error = XGL_ERR_TX_FAILED;
     EXPECT_EQ(receiver.Feed(frame), XGL_ERR_TX_FAILED);
@@ -286,7 +316,7 @@ TEST(XglTransportRxWireContract, StepReportsFeedbackFailureWithoutRedelivery) {
 TEST(XglTransportRxWireContract, MissingHandlerCannotAcknowledgeData) {
     PublicReceiver receiver;
     receiver.Init(false);
-    const auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, {}, false, true);
+    const auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, true);
     ASSERT_FALSE(frame.empty());
     EXPECT_EQ(receiver.Feed(frame), XGL_ERR_UNSUPPORTED);
     EXPECT_EQ(receiver.feedback_attempts, 0U);
@@ -371,65 +401,6 @@ TEST_F(XglTransportRxContract, AdmissionErrorPrecedesFeedbackError) {
 }
 #endif
 
-#if XGL_FEATURE_FRAGMENTATION
-TEST_F(XglTransportRxContract, PendingMessageFailureReleasesOwnedBytesOnce) {
-    application_error = XGL_ERR_BUSY;
-    ASSERT_EQ(Receive(0U, 0x41U, Fragment(), true), XGL_OK);
-    ASSERT_NE(context.peers, nullptr);
-    auto* peer = context.peers;
-    ASSERT_NE(peer->rx_pending_message.data, nullptr);
-    const auto* owned = peer->rx_pending_message.data;
-    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 1U);
-    EXPECT_EQ(peer->rx_next_packet_number, 1U);
-    EXPECT_EQ(feedback_attempts, 1U);
-
-    EXPECT_EQ(xgl_transport_run(&context, nullptr, 10U), XGL_OK);
-    EXPECT_EQ(peer->rx_pending_message.data, owned);
-    application_error = XGL_ERR_NO_MEMORY;
-    EXPECT_EQ(xgl_transport_run(&context, nullptr, 11U), XGL_OK);
-    EXPECT_EQ(peer->rx_pending_message.data, owned);
-    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 1U);
-    EXPECT_TRUE(errors.empty());
-
-    application_error = XGL_ERR_INVALID_PARAM;
-    EXPECT_EQ(xgl_transport_run(&context, nullptr, 12U), XGL_ERR_INVALID_PARAM);
-    EXPECT_TRUE(peer->failed);
-    EXPECT_EQ(peer->rx_pending_message.data, nullptr);
-    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 0U);
-    EXPECT_EQ(errors, (std::vector<xgl_error_t>{XGL_ERR_INVALID_PARAM}));
-    EXPECT_EQ(xgl_transport_run(&context, nullptr, 13U), XGL_OK);
-    EXPECT_EQ(errors.size(), 1U);
-    EXPECT_EQ(feedback_attempts, 1U);
-    EXPECT_TRUE(delivered.empty());
-}
-
-TEST_F(XglTransportRxContract, MissingHandlerCannotReserveFragmentStorage) {
-    context.rx_accept_callback = nullptr;
-    EXPECT_EQ(Receive(0U, 0x41U, Fragment(7U, 0U, 2U), true),
-              XGL_ERR_UNSUPPORTED);
-    EXPECT_EQ(context.peers, nullptr);
-    EXPECT_EQ(context.fragment_mgr->current_reassembly_bytes, 0U);
-    EXPECT_EQ(feedback_attempts, 0U);
-}
-
-TEST(XglTransportRxWireContract, DuplicateFragmentMetadataNeverDelivers) {
-    PublicReceiver receiver;
-    receiver.Init();
-    auto frame = MakeFrame(XGL_PACKET_TYPE_DATA, DuplicateFragments(), true);
-    ASSERT_FALSE(frame.empty());
-    EXPECT_EQ(receiver.Feed(frame), XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(receiver.delivered, 0U);
-}
-
-TEST_F(XglTransportRxContract, UnknownExtensionsRemainCompatibleWithFragment) {
-    std::vector<uint8_t> extensions = {0x7EU, 1U, 0xAAU};
-    auto fragment = Fragment();
-    extensions.insert(extensions.end(), fragment.begin(), fragment.end());
-    extensions.insert(extensions.end(), {0x7DU, 1U, 0xBBU});
-    EXPECT_EQ(Receive(0U, 0x41U, extensions, true), XGL_OK);
-    EXPECT_EQ(delivered, (std::vector<uint8_t>{0x41U}));
-}
-
 #if XGL_FEATURE_OUT_OF_ORDER
 TEST_F(XglTransportRxContract, MissingHandlerCannotCacheFutureData) {
     context.rx_accept_callback = nullptr;
@@ -441,35 +412,4 @@ TEST_F(XglTransportRxContract, MissingHandlerCannotCacheFutureData) {
     EXPECT_EQ(peer->rx_buffered_count, 0U);
     EXPECT_EQ(feedback_attempts, 0U);
 }
-
-TEST_F(XglTransportRxContract, DuplicateFragmentRejectsBeforeCacheAndSack) {
-    EXPECT_EQ(Receive(1U, 0x41U, DuplicateFragments(), true),
-              XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(context.peers, nullptr);
-    EXPECT_EQ(feedback_attempts, 0U);
-    EXPECT_TRUE(delivered.empty());
-}
-
-TEST_F(XglTransportRxContract, MissingFragmentRejectsBeforeCacheAndSack) {
-    EXPECT_EQ(Receive(1U, 0x41U, {0x7EU, 1U, 0xAAU}, true),
-              XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(context.peers, nullptr);
-    EXPECT_EQ(feedback_attempts, 0U);
-}
-
-TEST_F(XglTransportRxContract, MalformedFragmentTailRejectsBeforeCacheAndSack) {
-    auto extensions = Fragment();
-    extensions.insert(extensions.end(), {0x7EU, 3U, 0xAAU});
-    EXPECT_EQ(Receive(1U, 0x41U, extensions, true), XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(context.peers, nullptr);
-    EXPECT_EQ(feedback_attempts, 0U);
-}
-
-TEST_F(XglTransportRxContract, InvalidFragmentRangeRejectsBeforeCacheAndSack) {
-    EXPECT_EQ(Receive(1U, 0x41U, Fragment(7U, 1U, 1U), true),
-              XGL_ERR_INVALID_FRAME);
-    EXPECT_EQ(context.peers, nullptr);
-    EXPECT_EQ(feedback_attempts, 0U);
-}
-#endif
 #endif

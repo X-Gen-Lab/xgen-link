@@ -108,7 +108,7 @@ class TransportResourceConfig(unittest.TestCase):
                 (self.root / (name + "-discovery.json")).write_text(
                     json.dumps(listing, indent=2) + "\n", encoding="utf-8")
                 names = {case["name"] for case in listing["tests"]}
-                self.assertGreaterEqual(len(names), 49, "Public API cases must not disappear")
+                self.assertGreaterEqual(len(names), 48, "Public API cases must not disappear")
                 if baseline is None:
                     baseline = names
                 else:

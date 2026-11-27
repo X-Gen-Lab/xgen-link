@@ -142,23 +142,6 @@ TEST(XglCoverageApi,
     config.protocol.window_size = 2;
     config.features.max_rx_buffered_packets = 0;
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
-    for (int missing = 0; missing < 4; ++missing) {
-        SCOPED_TRACE(missing);
-        xgl_config_get_preset_small(&config);
-        if (missing == 0) {
-            config.features.max_message_size = 0;
-        }
-        if (missing == 1) {
-            config.features.max_reassembly_slots = 0;
-        }
-        if (missing == 2) {
-            config.features.max_reassembly_bytes = 0;
-        }
-        if (missing == 3) {
-            config.features.max_tx_message_bytes = 0;
-        }
-        EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
-    }
     auto provider = coverage_provider();
     config = coverage_config();
     config.auth_required = true;
@@ -218,29 +201,17 @@ TEST(XglCoverageApi,
 
 TEST(XglCoverageApi,
      WorkspaceMeasuresOverflowWithoutAllocatingOrChangingResult) {
-    for (int resource = 0; resource < 4; ++resource) {
-        SCOPED_TRACE(resource);
+    for (bool receive : {false, true}) {
+        SCOPED_TRACE(receive);
         auto config = coverage_config();
-        if (resource == 0) {
-            config.features.max_tx_packets = SIZE_MAX;
-        }
-        if (resource == 1) {
+        if (receive) {
             config.features.max_rx_buffered_packets = SIZE_MAX;
-        }
-        if (resource >= 2) {
-            config.features.enable_fragmentation = true;
-            config.features.max_message_size =
-                resource == 2 ? SIZE_MAX : SIZE_MAX / 2;
-            config.features.max_reassembly_slots = 2;
-            config.features.max_reassembly_bytes = SIZE_MAX;
-            config.features.max_tx_message_bytes = SIZE_MAX;
+        } else {
+            config.features.max_tx_packets = SIZE_MAX;
         }
         xgl_memory_requirements_t required = {};
         required.size = 123;
-        const auto validation = resource >= 2 && SIZE_MAX > UINT32_MAX
-                                    ? XGL_ERR_INVALID_PARAM
-                                    : XGL_OK;
-        ASSERT_EQ(xgl_config_validate(&config), validation);
+        ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
         EXPECT_EQ(xgl_memory_requirements(&config, &required),
                   XGL_ERR_INVALID_PARAM);
         EXPECT_EQ(required.size, 123U);

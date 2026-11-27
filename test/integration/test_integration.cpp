@@ -174,7 +174,6 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
     EXPECT_EQ(config.features.max_tx_packets, 2U);
     EXPECT_EQ(config.protocol.max_frame_size, 128);
-    EXPECT_FALSE(config.features.enable_fragmentation);
 
     /* Test small preset */
     xgl_config_get_preset_small(&config);
@@ -182,7 +181,6 @@ TEST_F(XglIntegrationTest, ConfigurationPresets) {
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
     EXPECT_EQ(config.features.max_tx_packets, 4U);
     EXPECT_EQ(config.protocol.max_frame_size, 256);
-    EXPECT_TRUE(config.features.enable_fragmentation);
 
     /* Test medium preset */
     xgl_config_get_preset_medium(&config);
@@ -540,19 +538,14 @@ TEST_F(XglIntegrationTest, ReliableWithAck) {
 }
 
 /**
- * \brief           End-to-end fragmented message test
- * \details         A sends oversized payload -> B reassembles -> rx_callback
- * gets complete data
+ * \brief           Reject an oversized submission before sending on the PHY
  */
-TEST_F(XglIntegrationTest, FragmentedMessage) {
+TEST_F(XglIntegrationTest, RejectsOversizedMessageAndDeliversFrameAtMtu) {
     LoopbackPhyPair loopback;
     xgl_phy_ops_t phy_a = loopback.get_phy_a();
     xgl_phy_ops_t phy_b = loopback.get_phy_b();
 
-    /* Enable fragmentation with small max_frame_size to force fragmentation */
-    config1_.features.enable_fragmentation = true;
     config1_.protocol.max_frame_size = 64;
-    config2_.features.enable_fragmentation = true;
     config2_.protocol.max_frame_size = 64;
 
     xgl_route_item_t route_a = {};
@@ -587,8 +580,9 @@ TEST_F(XglIntegrationTest, FragmentedMessage) {
     ASSERT_NE(handle2_, nullptr);
     ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
-    /* Create payload larger than max_frame_size to force fragmentation */
-    std::vector<uint8_t> payload(100);
+    constexpr size_t payload_limit =
+        64U - XGL_FRAME_HEADER_SIZE - XGL_CRC16_SIZE;
+    std::vector<uint8_t> payload(payload_limit + 1U);
     for (size_t i = 0; i < payload.size(); ++i) {
         payload[i] = static_cast<uint8_t>(i & 0xFF);
     }
@@ -598,21 +592,23 @@ TEST_F(XglIntegrationTest, FragmentedMessage) {
     tx_data.data_type = 0;
     tx_data.data = payload.data();
     tx_data.data_len = payload.size();
-    tx_data.reliable = false;
+    tx_data.reliable = true;
     tx_data.priority = 0;
     tx_data.timeout_ms = 0;
+    EXPECT_EQ(xgl_send_at(handle1_, &tx_data, now_ms_),
+              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(loopback.get_a_tx_count(), 0U);
+    tx_data.data_len = payload_limit;
     ASSERT_EQ(xgl_send_at(handle1_, &tx_data, now_ms_), XGL_OK);
 
-    /* Run multiple cycles to deliver all fragments */
     for (int i = 0; i < 20; ++i) {
-        xgl_step(handle1_, now_ms_ += 10U, &budget_);
-        xgl_step(handle2_, now_ms_ += 10U, &budget_);
+        ASSERT_EQ(xgl_step(handle1_, now_ms_ += 10U, &budget_), XGL_OK);
+        ASSERT_EQ(xgl_step(handle2_, now_ms_ += 10U, &budget_), XGL_OK);
     }
 
-    /* Verify B received the complete reassembled data */
-    ASSERT_GE(rx_tracker_b.records.size(), 1U);
-    EXPECT_EQ(rx_tracker_b.records[0].data.size(), payload.size());
-    EXPECT_EQ(rx_tracker_b.records[0].data, payload);
+    ASSERT_EQ(rx_tracker_b.records.size(), 1U);
+    EXPECT_EQ(rx_tracker_b.records[0].data,
+              std::vector<uint8_t>(payload.begin(), payload.end() - 1));
 }
 
 /**

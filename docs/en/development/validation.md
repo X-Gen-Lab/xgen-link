@@ -4,13 +4,12 @@
 
 | Area | Evidence |
 | --- | --- |
-| Wire v3, TLV, CRC, unaligned spans | `test/unit/wire/test_wire.cpp`, `test/unit/datalink/test_parser.cpp`, frame properties |
+| Wire v1, version rejection, TLV, CRC, unaligned spans | `test/unit/wire/test_wire.cpp`, `test/unit/datalink/test_parser.cpp`, frame properties |
 | Length overflow, borrowed SACK, failure-view clearing, and raw/stream agreement | `test/unit/wire/test_frame.cpp`, `test_wire_sack_view.cpp`, `test_wire_rx_contracts.cpp`, `test/unit/transport/test_transport_sack_view.cpp` |
 | Fixed routes and authenticated forwarding | `test/unit/network/test_route.cpp`, `test/unit/network/test_network.cpp` |
 | Local feedback egress, reverse MTU and PHY backpressure | `test/integration/test_network_multihop.cpp` |
 | Exact scope, atomic ACK, RX retention, retry, RESET and close | `test/unit/transport/test_transport.cpp`, transport properties |
 | Side-effect-free RX/TX rejection, deferred fast retry, terminal errors and unique storage ownership | `test_transport_rx_contracts.cpp`, `test_transport_tx_contracts.cpp`, `test_transport_runtime_contracts.cpp`, `test_transport_storage.cpp` (all under `test/unit/transport/`) |
-| Fragment budgets, overlaps, timeout, messages larger than a window | `test/unit/transport/test_fragment.cpp`, memory properties |
 | Explicit trusted sessions, nonce/AAD, replay, closed slots | `test/unit/security/test_security.cpp` |
 | Static authenticated lost-ACK recovery and exactly-once delivery | `test/unit/api/test_send.cpp` |
 | Static workspace, backpressure, wraparound, storage reuse | `test/smoke/static_workspace_smoke.c` |
@@ -18,11 +17,11 @@
 | Public installed C consumer, ABI/profile rejection | SDK consumer CTest and instance tests |
 | Exact creation errors, pure work-budget deadlines and clock wraparound | `test/unit/api/test_api_contracts.cpp` |
 | Authentication preflight, base ACK capacity and smaller transit routes | `test/unit/api/test_config_consistency.cpp` |
-| Message limits, terminal scope rejection and pure layout across send APIs | `test/unit/api/test_send_policy.cpp` |
+| Single-frame capacity, terminal scope rejection and pure layout across send APIs | `test/unit/api/test_send_policy.cpp` |
 | ACK size overflow, failed-init release, PHY failure and recovery | `test/unit/wire/test_coverage_wire.cpp`, `test/unit/api/test_coverage_api.cpp`, `test/integration/test_coverage_delivery.cpp` |
 | RTT observations, workspace reservations and streaming CRC classification | `test/unit/api/test_stats.cpp`, `test/unit/datalink/test_datalink.cpp` |
 | Boot error contracts with statistics and detailed diagnostics disabled | Conditional checks in `test/smoke/static_workspace_smoke.c` |
-| Boot/Lite reliable delivery, capacity rejection, parsing, and multi-window fragmentation | Capability-selected cases in `test/unit/api/test_bounded_profile.cpp` |
+| Boot/Lite reliable delivery, capacity rejection and parsing | Capability-selected cases in `test/unit/api/test_bounded_profile.cpp` |
 | Boot 32-byte logical-TX extension limit and independent raw-wire boundary | `test/unit/network/test_boot_network.cpp` |
 | Multi-configuration publication/installation, exported capabilities, and budget rejection | `test/contracts/build/test_profile_builds.py`, `test/contracts/footprint/test_footprint_budget.py` |
 | Four resource-configured API sets, installed fixed-RTO tests and complete labels | `test/contracts/build/test_transport_resource_config.py` |

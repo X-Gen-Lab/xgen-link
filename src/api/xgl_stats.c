@@ -88,8 +88,8 @@ xgl_error_t xgl_stats_reset(xgl_handle_t handle) {
 #endif
 }
 
-xgl_error_t xgl_resources_get(xgl_handle_t handle,
-                              xgl_resource_snapshot_t* snapshot) {
+xgl_error_t xgl_resources_get_v5(xgl_handle_t handle,
+                                 xgl_resource_snapshot_t* snapshot) {
     if (handle == NULL || snapshot == NULL) {
         return XGL_ERR_NULL_POINTER;
     }

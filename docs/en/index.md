@@ -9,7 +9,7 @@ XGen Link provides a C11 communication protocol for embedded systems, with expli
 | Set budgets and hardware interfaces | [Configuration](guides/configuration.md), [Porting](guides/porting.md) |
 | Integrate Boot transfer | [Integrate Boot](guides/boot.md) |
 | Understand architecture and resources | [Architecture](explanation/architecture.md), [Resource model](explanation/resource-model.md) |
-| Look up API and protocol contracts | [Public API](reference/api.md), [Wire v3](reference/protocol/v3/index.md) |
+| Look up API and protocol contracts | [Public API](reference/api.md), [Wire v1](reference/protocol/v1/index.md) |
 | Develop and verify | [Development workflow](development/workflow.md), [Validation](development/validation.md) |
 
 [简体中文](../zh/index.md)

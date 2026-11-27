@@ -17,7 +17,7 @@ cmake --build build/boot-footprint --target xgl_boot_probe --parallel 4
 
 固定探针使用 Boot 档、单 peer、单路由、单 link、运行时 window 1 和单个可靠 TX 记录，关闭 libc allocator。默认 MTU/RX 均为 128 B。`XGL_FOOTPRINT_FRAME_SIZE` 可选 64–2048 B，`XGL_FOOTPRINT_RX_SIZE` 范围为 MTU–4096 B。Boot 的 `XGL_DATALINK_RX_CHUNK_SIZE=AUTO` 解析为 32 B，也可显式选择 16/32/64/128 B。布局对象与探针使用同一组编译配置。
 
-`layout_probe.c` 以目标 ABI 编译实际私有类型并导出 **格式 6**。报告计算初始化区以及 peer、TX record、TX payload 和 scratch 各分区。`ack_bytes` 记录逻辑位图需求，位图占用计入 peer，`window_pool_blocks` 固定为 0。布局还记录已编译窗口容量、索引桶数量、RTO 选项与资源身份。消费者入口在执行时调用真实的内存需求 API 核对大小，交叉构建阶段读取目标布局对象。
+`layout_probe.c` 以目标 ABI 编译实际私有类型并导出 **格式 7**。报告计算初始化区以及 peer、TX record、TX payload 和 scratch 各分区。`ack_bytes` 记录逻辑位图需求，位图占用计入 peer，`window_pool_blocks` 固定为 0。布局还记录已编译窗口容量、索引桶数量、RTO 选项、资源身份与 SDK 配置 ABI。消费者入口在执行时调用真实的内存需求 API 核对大小，交叉构建阶段读取目标布局对象。
 
 ## 资源组合与预算
 
@@ -37,7 +37,7 @@ python tools/boot_footprint/check_budget.py \
   --output build/boot-footprint/budget-result.json
 ```
 
-预算核对编译器、profile、帧与 RX 容量、LTO 和资源身份，并给出限额与历史基线差值。八份 policy 各自保存基线提交、源码摘要与限额。报告另行列出 8 KiB Flash 与 1 KiB workspace 设计目标。 [CI 矩阵](../../.github/workflows/ci.yml)
+预算核对编译器、profile、帧与 RX 容量、LTO、资源身份和配置 ABI，并给出限额与历史基线差值。八份 policy 各自保存基线提交、源码摘要与限额。报告另行列出 8 KiB Flash 与 1 KiB workspace 设计目标。 [CI 矩阵](../../.github/workflows/ci.yml)
 
 ## 扩展 API 与验证入口
 

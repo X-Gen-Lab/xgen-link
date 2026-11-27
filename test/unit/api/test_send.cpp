@@ -267,25 +267,24 @@ TEST_F(XglSendTest, BasicSendSuccess) {
     /* Expect PHY TX to be called */
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_))
         .Times(1)
-        .WillOnce(testing::Return(XGL_OK));
+        .WillOnce(testing::Invoke([](const uint8_t* bytes, size_t len, void*) {
+            if (len < XGL_FRAME_HEADER_SIZE) {
+                return XGL_ERR_INVALID_FRAME;
+            }
+            EXPECT_EQ(bytes[2], 1U);
+            return XGL_OK;
+        }));
 
     xgl_error_t err = xgl_send_at(handle, &tx_data, 0U);
 
     EXPECT_EQ(err, XGL_OK);
 }
 
-TEST_F(XglSendTest, SendFragmentsByRouteMaxFrameSize) {
-    xgl_destroy(handle);
-    handle = nullptr;
-
-    config.features.enable_fragmentation = true;
+TEST_F(XglSendTest, OrdinaryRejectsPayloadAboveRouteMtu) {
     ASSERT_LT(route.max_frame_size, config.protocol.max_frame_size);
-    xgl_test_use_host_allocator(&config);
-    handle = xgl_create(&config);
-    ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
-
-    std::vector<uint8_t> data(300, 0x5A);
+    const size_t capacity =
+        route.max_frame_size - kZeroCopyAppHeaderLen - XGL_CRC16_SIZE;
+    std::vector<uint8_t> data(capacity + 1U, 0x5A);
     xgl_tx_data_t tx_data = {};
     tx_data.target_id = 2;
     tx_data.data_type = 1;
@@ -295,20 +294,13 @@ TEST_F(XglSendTest, SendFragmentsByRouteMaxFrameSize) {
     tx_data.priority = 0;
     tx_data.timeout_ms = 0;
 
-    std::vector<size_t> frame_lengths;
-    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_))
-        .Times(testing::AtLeast(2))
-        .WillRepeatedly(testing::Invoke(
-            [&](const uint8_t* /*bytes*/, size_t len, void* /*user_data*/) {
-                frame_lengths.push_back(len);
-                return XGL_OK;
-            }));
-
+    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
+    EXPECT_EQ(xgl_send_at(handle, &tx_data, 0U), XGL_ERR_BUFFER_TOO_SMALL);
+    ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(mock_phy));
+    tx_data.data_len = capacity;
+    EXPECT_CALL(*mock_phy, tx(testing::_, route.max_frame_size, testing::_))
+        .WillOnce(testing::Return(XGL_OK));
     EXPECT_EQ(xgl_send_at(handle, &tx_data, 0U), XGL_OK);
-    ASSERT_GT(frame_lengths.size(), 1U);
-    for (size_t len : frame_lengths) {
-        EXPECT_LE(len, route.max_frame_size);
-    }
 }
 
 /**

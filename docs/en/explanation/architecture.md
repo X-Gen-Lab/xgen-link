@@ -33,7 +33,7 @@ Copied, authenticated and in-place sends share frame measurement and encoding ru
 
 One peer owns one exact `(remote_id, connection_id, session_epoch)` scope, including its window, wait-ACK records, RTT and receive order. Borrowed packet/frame views never outlive a synchronous call; retained payloads have a resource-class owner. Security state is separate from peer lifetime and survives transport RESET.
 
-The instance owns one security context, borrowed by the layers. Each unique PHY descriptor owns one parser and RX cache; multiple routes sharing that descriptor do not reserve duplicates. A completed reassembly transfers as an owned object carrying its length. Application BUSY retains the original byte admission charge until a common release operation returns it.
+The instance owns one security context, borrowed by the layers. Each unique PHY descriptor owns one parser and RX cache; multiple routes sharing that descriptor do not reserve duplicates. A retained out-of-order frame keeps its storage while the application reports BUSY.
 
 Calls on one instance are serialized by the caller. Callbacks cannot reenter or destroy that instance. The application provides the clock and schedules protocol work. Runtime operations use the fixed workspace reservations. See [Memory](resource-model.md) and [Platform](../guides/porting.md).
 

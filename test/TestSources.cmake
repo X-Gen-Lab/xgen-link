@@ -40,25 +40,20 @@ list(APPEND XGL_TEST_SOURCES
 if(XGL_FEATURE_AUTH)
     list(APPEND XGL_TEST_SOURCES
         unit/transport/test_reliable.cpp
-        unit/transport/test_fragment.cpp
         unit/transport/test_transport.cpp
         integration/test_integration.cpp
         property/test_memory_properties.cpp
         property/test_frame_properties.cpp
         property/test_network_properties.cpp
         property/test_transport_properties.cpp
-        property/test_fragment_properties.cpp
         property/test_instance_properties.cpp
         property/test_error_properties.cpp
         property/test_alignment_properties.cpp
         property/test_generator.cpp
     )
 else()
-    if(XGL_FEATURE_FRAGMENTATION)
-        list(APPEND XGL_TEST_SOURCES
-            unit/transport/test_fragment.cpp
-            unit/transport/test_reliable.cpp
-        )
+    if(XGL_PROFILE STREQUAL "embedded-lite")
+        list(APPEND XGL_TEST_SOURCES unit/transport/test_reliable.cpp)
     endif()
     if(XGL_PROFILE STREQUAL "boot")
         list(APPEND XGL_TEST_SOURCES unit/network/test_boot_network.cpp)
@@ -82,7 +77,6 @@ list(APPEND XGL_TEST_SOURCES
     unit/transport/test_transport_runtime_contracts.cpp
     unit/transport/test_transport_storage.cpp
     unit/transport/test_reliable_owned.cpp
-    unit/transport/test_transport_fragment_scope.cpp
     unit/transport/test_transport_fixed_rto.cpp
     unit/transport/test_timeout_control.cpp
     unit/datalink/test_parser_recovery.cpp

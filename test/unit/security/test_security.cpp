@@ -110,7 +110,7 @@ static xgl_error_t security_test_sign(const xgl_auth_input_t* input,
     std::memcpy(spy->nonce.data(), input->nonce, XGL_AUTH_NONCE_SIZE);
     spy->aad.assign(input->aad, input->aad + input->aad_len);
     EXPECT_EQ(input->version, XGL_AUTH_INPUT_VERSION);
-    EXPECT_EQ(input->wire_version, 3U);
+    EXPECT_EQ(input->wire_version, 1U);
     if (spy->reenter != nullptr) {
         spy->reenter_result =
             xgl_security_session_close(spy->reenter, 2, 11, 9);
@@ -271,7 +271,7 @@ TEST_F(XglSecuritySessionTest, ProducesFixedNonceAndCanonicalAadVector) {
     EXPECT_EQ(spy.last_sequence, tx_config.tx_initial_seq);
     ASSERT_EQ(spy.aad.size(), bytes[3]);
     const std::vector<uint8_t> expected_aad = {
-        0xA5, 0x5A, 0x03, 0x35, 0x01, 0x13, 0x00, 0x40, 0x01, 0x00, 0x02,
+        0xA5, 0x5A, 0x01, 0x35, 0x01, 0x13, 0x00, 0x40, 0x01, 0x00, 0x02,
         0x00, 0x0B, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x03, 0x00,
         0x00, 0x00, 0x01, 0x0C, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x0D, 0x07, 0x00, 0x00, 0x00,
@@ -394,7 +394,7 @@ TEST_F(XglSecuritySessionTest,
     EXPECT_EQ(Verify(), XGL_OK);
     ASSERT_EQ(Sign(), XGL_OK);
     ASSERT_EQ(xgl_wire_decode_header(&header, bytes, length), XGL_OK);
-    header.traffic_class ^= 0x20U;
+    header.traffic_class ^= 0x01U;
     ASSERT_EQ(xgl_wire_encode_header(bytes, length, &header), XGL_OK);
     RecomputeCrc();
     EXPECT_EQ(Verify(), XGL_ERR_INVALID_FRAME);

@@ -12,7 +12,7 @@
 
 _Static_assert(XGL_INIT_CLASSES == 3U && XGL_RESOURCE_COUNT == 4U,
                "Update the footprint layout for the new initialization plan");
-_Static_assert(XGL_FEATURE_AUTH == 0 && XGL_FEATURE_FRAGMENTATION == 0 &&
+_Static_assert(XGL_BUILD_PROFILE_BOOT == 1 && XGL_FEATURE_AUTH == 0 &&
                    XGL_FEATURE_FORWARDING == 0 && XGL_FEATURE_OUT_OF_ORDER == 0,
                "This layout describes only the bounded Boot profile");
 _Static_assert(XGL_FEATURE_ROUTE_INDEX == 0,
@@ -22,7 +22,7 @@ _Static_assert(XGL_ALLOW_FALLBACK_MALLOC == 0,
 
 __attribute__((used, section(".xgl_footprint_layout")))
 const uint32_t xgl_boot_target_layout[] = {UINT32_C(0x58474c42),
-                                           6U,
+                                           7U,
                                            sizeof(void*),
                                            _Alignof(xgl_max_align_t),
                                            sizeof(xgl_workspace_t),
@@ -49,4 +49,5 @@ const uint32_t xgl_boot_target_layout[] = {UINT32_C(0x58474c42),
                                            XGL_RESOURCE_CONFIG_ID,
                                            XGL_BUILD_WINDOW_CAPACITY,
                                            XGL_RELIABLE_BUCKET_COUNT,
-                                           XGL_FEATURE_ADAPTIVE_RTO};
+                                           XGL_FEATURE_ADAPTIVE_RTO,
+                                           XGL_CONFIG_ABI_VERSION};

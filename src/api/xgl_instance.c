@@ -138,7 +138,6 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .max_retry_count = handle->config->protocol.max_retry_count,
         .default_timeout_ms = handle->config->protocol.ack_timeout_ms,
         .window_size = handle->config->protocol.window_size,
-        .enable_fragmentation = handle->config->features.enable_fragmentation,
         .max_frame_size = handle->config->protocol.max_frame_size,
         .auth_tag_len = (handle->config->auth_required &&
                          handle->config->auth_provider != NULL)
@@ -154,20 +153,14 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .tx_retries = XGL_INSTANCE_STAT(handle, tx_retries),
         .allocator = handle->allocator,
         .peer_idle_timeout_ms = handle->config->features.peer_idle_timeout_ms,
-        .max_reassembly_slots = handle->config->features.max_reassembly_slots,
         .max_peers = handle->config->features.max_peers,
-        .max_message_size = handle->config->features.max_message_size,
         .max_tx_packets = handle->config->features.max_tx_packets,
         .max_rx_buffered_packets =
             handle->config->features.max_rx_buffered_packets,
-        .max_reassembly_bytes = handle->config->features.max_reassembly_bytes,
-        .max_tx_message_bytes = handle->config->features.max_tx_message_bytes,
         .memory = handle->memory,
     };
 #if XGL_FEATURE_ADVANCED_RUNTIME
     if (handle->options != NULL) {
-        transport_config.reassembly_timeout_ms =
-            handle->options->reassembly_timeout_ms;
         transport_config.tx_lifetime_ms = handle->options->tx_lifetime_ms;
         transport_config.rx_scoped_callback =
             handle->options->rx_scoped_callback;

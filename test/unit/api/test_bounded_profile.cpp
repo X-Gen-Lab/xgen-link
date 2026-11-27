@@ -241,24 +241,3 @@ TEST_F(XglBoundedProfileTest, ParserRequiresCompleteValidatedFrame) {
     EXPECT_EQ(xgl_parser_feed_byte(&parser, encoded[written - 1U], 1U),
               XGL_PARSE_RESULT_ERROR);
 }
-
-#if XGL_FEATURE_FRAGMENTATION
-TEST_F(XglBoundedProfileTest, FragmentedMessageCompletesBeyondWindow) {
-    config_a.features.enable_fragmentation = true;
-    config_a.features.max_message_size = 512U;
-    config_a.features.max_reassembly_slots = 1U;
-    config_a.features.max_reassembly_bytes = 512U;
-    config_a.features.max_tx_message_bytes = 512U;
-    config_b.features = config_a.features;
-    Initialize();
-    std::array<uint8_t, 384> payload{};
-    for (size_t i = 0U; i < payload.size(); ++i) {
-        payload[i] = static_cast<uint8_t>(i);
-    }
-    ASSERT_EQ(Send(payload.data(), payload.size()), XGL_OK);
-    Drive(32U);
-    EXPECT_EQ(b.deliveries, 1U);
-    EXPECT_EQ(b.delivered,
-              std::vector<uint8_t>(payload.begin(), payload.end()));
-}
-#endif

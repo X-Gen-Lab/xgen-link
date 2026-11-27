@@ -1,3 +1,3 @@
 # Page moved
 
-See the [current documentation](../reference/protocol/v3/extensions.md).
+See the [current documentation](../reference/protocol/v1/extensions.md).

@@ -83,6 +83,8 @@ class FootprintLto(unittest.TestCase):
         report_json = binary / "boot-footprint.json"
         report_text = binary / "boot-footprint.txt"
         report = json.loads(report_json.read_text())
+        self.assertEqual(report["layout_format_version"], 7)
+        self.assertEqual(report["config_abi_version"], 5)
         self.assertIs(report["lto"], enabled)
         self.assertIs(report["optimization"]["library_ipo"], enabled)
         self.assertIs(report["optimization"]["layout_ipo"], False)

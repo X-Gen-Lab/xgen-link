@@ -37,7 +37,7 @@
 | --- | --- | --- |
 | `clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling` | `.clang-tidy` 对可选 Annex K API 检查的排除 | 受支持的 C11 工具链使用通用字节例程；源码检查长度、容量与重叠，其他内存分析和边界测试继续覆盖。 |
 | `bugprone-easily-swappable-parameters` | 源码中对应 `NOLINTBEGIN/END` 的单个函数签名 | 相同整数类型具有不同的时间、单位、容量或协议身份。对应调用、向量、会话及边界测试覆盖；参数或调用变化时复核。 |
-| `bugprone-casting-through-void` | 已归属协议队列的 `XGL_LIST_ENTRY` 调用行 | 容器宏仅从属于该队列的有效节点恢复拥有对象。回归覆盖移除、重传释放和分片清理。 |
+| `bugprone-casting-through-void` | 已归属协议队列的 `XGL_LIST_ENTRY` 调用行 | 容器宏仅从属于该队列的有效节点恢复拥有对象。回归覆盖移除、重传释放和会话清理。 |
 | `clang-analyzer-optin.performance.Padding` | `xgl_transport_peer_state_t` | 主机布局建议不足以决定 MCU 切割。通过实际配置的 workspace 与 ELF 验证，字段排列变化时重测。 |
 
 诊断解释须匹配编译器、ABI 和系统头。缺少正确系统头或编译数据库时修复环境，再运行检查。

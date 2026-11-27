@@ -138,16 +138,17 @@ class RxChunkConfig(unittest.TestCase):
 
     def test_target_layout_exposes_actual_compiled_chunk(self):
         # A bounded target-layout fixture tests the report format, not host ABI.
-        values = (0x58474C42, 6, 4, 8, 512, 20, 40, 96, 72, 204, 20, 76,
+        values = (0x58474C42, 7, 4, 8, 512, 20, 40, 96, 72, 204, 20, 76,
                   128, 128, 1, 1, 1, 1, 1, 1, 1, 24, 2, 32, 0,
-                  1857, 128, 1, 1)
+                  1857, 128, 1, 1, 5)
         source = self.root / "layout.bin"
         source.write_bytes(struct.pack("<" + "I" * len(values), *values))
         output = self.root / "layout.json"
         self.report.generate_layout(SimpleNamespace(
             input=source, header=self.root / "layout.h", output=output))
         layout = json.loads(output.read_text())
-        self.assertEqual(layout["format_version"], 6)
+        self.assertEqual(layout["format_version"], 7)
+        self.assertEqual(layout["config_abi_version"], 5)
         self.assertEqual(layout["rx_chunk_bytes"], 32)
         self.assertEqual(layout["resource_config_id"], 1857)
         self.assertEqual(layout["compiled_window_capacity"], 128)

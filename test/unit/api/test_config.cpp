@@ -68,7 +68,6 @@ TEST_F(XglConfigTest, GetDefaultConfig) {
     EXPECT_EQ(config.protocol.window_size,
               std::min(8U, static_cast<unsigned>(XGL_BUILD_WINDOW_CAPACITY)));
     EXPECT_EQ(config.protocol.max_frame_size, 512);
-    EXPECT_TRUE(config.features.enable_fragmentation);
 }
 
 TEST_F(XglConfigTest, GetDefaultConfigNullPointer) {
@@ -88,7 +87,6 @@ TEST_F(XglConfigTest, GetPresetTiny) {
     EXPECT_EQ(config.protocol.max_retry_count, 3);
     EXPECT_EQ(config.protocol.window_size, 2);
     EXPECT_EQ(config.protocol.max_frame_size, 128);
-    EXPECT_FALSE(config.features.enable_fragmentation);
 }
 
 TEST_F(XglConfigTest, GetPresetSmall) {
@@ -99,7 +97,6 @@ TEST_F(XglConfigTest, GetPresetSmall) {
     EXPECT_EQ(config.protocol.max_retry_count, 5);
     EXPECT_EQ(config.protocol.window_size, 4);
     EXPECT_EQ(config.protocol.max_frame_size, 256);
-    EXPECT_TRUE(config.features.enable_fragmentation);
 }
 
 TEST_F(XglConfigTest, GetPresetMedium) {
@@ -110,7 +107,6 @@ TEST_F(XglConfigTest, GetPresetMedium) {
     EXPECT_EQ(config.protocol.max_retry_count, 5);
     EXPECT_EQ(config.protocol.window_size, 8);
     EXPECT_EQ(config.protocol.max_frame_size, 512);
-    EXPECT_TRUE(config.features.enable_fragmentation);
 }
 
 TEST_F(XglConfigTest, GetPresetLarge) {
@@ -121,7 +117,6 @@ TEST_F(XglConfigTest, GetPresetLarge) {
     EXPECT_EQ(config.protocol.max_retry_count, 7);
     EXPECT_EQ(config.protocol.window_size, 16);
     EXPECT_EQ(config.protocol.max_frame_size, 1024);
-    EXPECT_TRUE(config.features.enable_fragmentation);
 }
 
 TEST_F(XglConfigTest, GetPresetProductionRequiresAuthentication) {
@@ -436,24 +431,5 @@ TEST_F(XglConfigTest, CreateInstanceWithInvalidConfig) {
 
     xgl_test_use_host_allocator(&config);
     xgl_handle_t handle = xgl_create(&config);
-    EXPECT_EQ(handle, nullptr);
-}
-
-TEST(XglConfigResourceTest,
-     RejectsMessageLimitAboveGlobalReassemblyBudgetBeforePlanning) {
-    xgl_config_t config;
-    xgl_config_get_preset_small(&config);
-    config.protocol.window_size = 1U;
-    config.features.enable_fragmentation = true;
-    config.features.max_message_size = 512U;
-    config.features.max_reassembly_bytes = 256U;
-    xgl_memory_requirements_t required = {};
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
-    EXPECT_EQ(xgl_memory_requirements(&config, &required),
-              XGL_ERR_INVALID_PARAM);
-    alignas(xgl_max_align_t) static uint8_t storage[32768];
-    xgl_handle_t handle = nullptr;
-    EXPECT_EQ(xgl_init_static(&config, storage, sizeof(storage), &handle),
-              XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(handle, nullptr);
 }

@@ -7,7 +7,7 @@ XGen Link 是独立 C11 协议库，负责线上编码、链路处理与可靠�
 | 模块 | 职责 | 边界 |
 | --- | --- | --- |
 | API | 校验 ABI/profile/容量；构造实例；驱动执行 | 公开配置与显式时间戳 |
-| Transport | 精确 peer 所有权；可靠 DATA；ACK；重试；可选消息层 | 有类型的逻辑包视图 |
+| Transport | 精确 peer 所有权；可靠 DATA；ACK；重传；可选乱序缓存 | 有类型的逻辑包视图 |
 | Network | 路由查找、TLV 组合、本地认证、转发 | 上层逻辑包，下层完整帧 |
 | Security | 安装方向性 nonce 域、签名与重放状态 | 带版本的认证输入 |
 | Datalink | 增量流组帧与同步 PHY 提交 | 借用字节区间 |
@@ -33,7 +33,7 @@ flowchart LR
 
 一个 peer 唯一持有 `(remote_id, connection_id, session_epoch)` 对应的窗口、等待 ACK 记录、RTT 和接收顺序。借用的包/帧视图不得超出同步调用；需要保留的载荷由明确资源类别持有。安全状态独立于 peer 生命周期，不随 transport RESET 清除。
 
-实例持有唯一 security context，各层借用它；每个唯一 PHY 描述符对应一个 parser 和 RX cache，共用 PHY 的多条路由不会重复预留。完整重组消息以含长度的自有对象移交，应用 BUSY 时继续占用原字节预算，直到统一释放。
+实例持有唯一 security context，各层借用它；每个唯一 PHY 描述符对应一个 parser 和 RX cache，共用 PHY 的多条路由不会重复预留。已缓存的乱序包在应用 BUSY 时继续占用接收槽，直到交付或所属 scope 关闭或失败。
 
 同一实例由调用方串行访问。回调不得重入或销毁该实例。时钟和实例调度由应用提供。工作区固定，运行阶段只消耗已预留资源。参见[内存](resource-model.md)与[平台](../guides/porting.md)。
 
@@ -43,4 +43,4 @@ flowchart LR
 
 生产导出一个 `xgl::xgl` target。`cmake/XglVersion.cmake` 为库与独立文档提供版本，`XglProfiles.cmake` 解析档位与资源身份，`XglSources.cmake` 按能力列出生产编译单元，`XglLibrary.cmake` 组装带匹配配置头的库。`XglInstall.cmake` 导出 SDK，`XglDevelopment.cmake` 接入按需启用的开发检查。
 
-协议回归位于 `test/unit/<layer>`、`test/integration` 和 `test/property`。`test/smoke` 保存 C11 夹具，`test/interop` 保存 Wire 两代端点，`test/contracts` 按构建、安装、CTest 与资源报告区分验证对象。历史用例和回放种子由现有发现入口维护。
+协议回归位于 `test/unit/<layer>`、`test/integration` 和 `test/property`。`test/smoke` 保存 C11 夹具，`test/interop` 保存 Wire v1 双端点夹具，`test/contracts` 按构建、安装、CTest 与资源报告区分验证对象。历史用例和回放种子由现有发现入口维护。

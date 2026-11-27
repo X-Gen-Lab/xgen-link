@@ -692,23 +692,17 @@ TEST_F(XglInstanceTest, RejectsOversizedRouteCount) {
 }
 
 /**
- * \brief           Reserve windows and bounded fragmentation in static storage
+ * \brief           Reserve bounded receive buffering in static storage
  */
-TEST_F(XglInstanceTest, StaticWorkspaceSupportsWindowsAndFragmentation) {
+TEST_F(XglInstanceTest, StaticWorkspaceSupportsReceiveWindow) {
     xgl_config_get_preset_boot(&config);
     xgl_memory_requirements_t requirements{};
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
+    const size_t single_slot = requirements.size;
     config.protocol.window_size = 2U;
     config.features.max_rx_buffered_packets = 1U;
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
-    const size_t unfragmented = requirements.size;
-    config.features.enable_fragmentation = true;
-    config.features.max_message_size = 256U;
-    config.features.max_reassembly_slots = 1U;
-    config.features.max_reassembly_bytes = 256U;
-    config.features.max_tx_message_bytes = 256U;
-    ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
-    EXPECT_GT(requirements.size, unfragmented);
+    EXPECT_GT(requirements.size, single_slot);
     std::vector<xgl_max_align_t> storage(
         (requirements.size + sizeof(xgl_max_align_t) - 1U) /
         sizeof(xgl_max_align_t));

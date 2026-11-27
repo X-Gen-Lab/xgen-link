@@ -21,14 +21,11 @@ extern "C" {
 /* Wire Header Constants                                                      */
 /*---------------------------------------------------------------------------*/
 
-#define XGL_WIRE_MAGIC_0            ((uint8_t)0xA5U)
-#define XGL_WIRE_MAGIC_1            ((uint8_t)0x5AU)
-#define XGL_WIRE_VERSION            3U
-#define XGL_WIRE_BASE_HEADER_SIZE   XGL_FRAME_HEADER_SIZE
-#define XGL_WIRE_EXT_HEADER_SIZE    2U
-#define XGL_FRAGMENT_EXT_VALUE_SIZE 12U
-#define XGL_FRAGMENT_EXT_SIZE                                                  \
-    (XGL_WIRE_EXT_HEADER_SIZE + XGL_FRAGMENT_EXT_VALUE_SIZE)
+#define XGL_WIRE_MAGIC_0           ((uint8_t)0xA5U)
+#define XGL_WIRE_MAGIC_1           ((uint8_t)0x5AU)
+#define XGL_WIRE_VERSION           1U
+#define XGL_WIRE_BASE_HEADER_SIZE  XGL_FRAME_HEADER_SIZE
+#define XGL_WIRE_EXT_HEADER_SIZE   2U
 #define XGL_SESSION_EXT_VALUE_SIZE 12U
 #define XGL_SESSION_EXT_SIZE                                                   \
     (XGL_WIRE_EXT_HEADER_SIZE + XGL_SESSION_EXT_VALUE_SIZE)
@@ -56,7 +53,6 @@ typedef enum {
 
 #define XGL_WIRE_FLAG_ACK_ELICITING  0x01U
 #define XGL_WIRE_FLAG_HAS_EXTENSIONS 0x02U
-#define XGL_WIRE_FLAG_FRAGMENTED     0x04U
 #define XGL_WIRE_FLAG_ENCRYPTED      0x08U
 #define XGL_WIRE_FLAG_AUTHENTICATED  0x10U
 #define XGL_WIRE_FLAG_CONTROL        0x20U
@@ -65,7 +61,6 @@ typedef enum {
     XGL_WIRE_EXT_SESSION = 1,
     XGL_WIRE_EXT_ACK_RANGE = 2,
     XGL_WIRE_EXT_SACK = 3,
-    XGL_WIRE_EXT_FRAGMENT = 4,
     XGL_WIRE_EXT_SECURITY = 5,
     XGL_WIRE_EXT_ROUTE = 6,
     XGL_WIRE_EXT_TIMESTAMP = 7,
@@ -163,7 +158,6 @@ typedef struct {
     const uint8_t* payload;
     size_t payload_len;
     uint8_t reliable;
-    uint8_t fragment;
     uint8_t priority;
     const uint8_t* frame_buf;
     size_t frame_len;
@@ -189,8 +183,7 @@ typedef enum {
  * \param[in]       extensions_len: Number of available extension bytes
  * \param[out]      metadata: Decoded metadata, valid only on success
  * \return          XGL_OK on success, error code otherwise
- * \note            Unknown extension types are skipped for wire v3
- *                  compatibility.
+ * \note            Unassigned extension types are skipped.
  */
 xgl_error_t xgl_wire_decode_ext_metadata(const uint8_t* extensions,
                                          size_t extensions_len,
@@ -272,16 +265,6 @@ xgl_wire_decode_sack_ext_value(const uint8_t* buffer, size_t buffer_size,
  */
 xgl_error_t xgl_wire_decode_sack_view(const uint8_t* buffer, size_t buffer_size,
                                       xgl_wire_sack_view_t* view);
-
-xgl_error_t xgl_wire_encode_fragment_ext_value(
-    uint8_t* buffer, size_t buffer_size, uint32_t message_id,
-    uint32_t fragment_offset, uint32_t message_len, size_t* bytes_written);
-
-xgl_error_t xgl_wire_decode_fragment_ext_value(const uint8_t* buffer,
-                                               size_t buffer_size,
-                                               uint32_t* message_id,
-                                               uint32_t* fragment_offset,
-                                               uint32_t* message_len);
 
 xgl_error_t xgl_wire_encode_session_ext_value(uint8_t* buffer,
                                               size_t buffer_size,

@@ -38,15 +38,11 @@ class XglReliableOwnedTest : public ::testing::Test {
 
 }  // namespace
 
-TEST_F(XglReliableOwnedTest, RemovesKnownRecordAndItsExtensions) {
+TEST_F(XglReliableOwnedTest, RemovesKnownRecord) {
     auto* first = Add(queue, 10U);
     auto* second = Add(queue, 11U);
     ASSERT_NE(first, nullptr);
     ASSERT_NE(second, nullptr);
-    const uint8_t extension[] = {0x71U, 0x01U, 0x55U};
-    ASSERT_EQ(xgl_reliable_set_packet_extensions(&queue, first, extension,
-                                                 sizeof(extension)),
-              XGL_OK);
     ASSERT_EQ(xgl_reliable_remove_owned(&queue, first), XGL_OK);
     EXPECT_EQ(xgl_reliable_get_count(&queue), 1U);
     EXPECT_EQ(xgl_reliable_find_packet_number(&queue, 10U, 2U), nullptr);
@@ -91,10 +87,6 @@ TEST_F(XglReliableOwnedTest,
     for (uint32_t index = 0U; index < count; ++index) {
         auto* packet = Add(queue, index * XGL_RELIABLE_INDEX_BUCKETS);
         ASSERT_NE(packet, nullptr);
-        const uint8_t extensions[] = {0x71U, 0x01U, 0x55U};
-        ASSERT_EQ(xgl_reliable_set_packet_extensions(&queue, packet, extensions,
-                                                     sizeof(extensions)),
-                  XGL_OK);
     }
     auto* foreign = Add(other, 0U);
     ASSERT_NE(foreign, nullptr);

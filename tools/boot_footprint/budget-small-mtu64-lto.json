@@ -10,6 +10,7 @@
     "lto": true,
     "rx_chunk_bytes": 32,
     "window_pool_blocks": 0,
+    "config_abi_version": 5,
     "resource_config_id": 1025,
     "compiled_window_capacity": 1,
     "reliable_bucket_count": 1,

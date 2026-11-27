@@ -2,9 +2,9 @@
 
 [中文文档](docs/zh/index.md) · [English documentation](docs/en/index.md)
 
-XGen Link 是独立的 C11 嵌入式通信协议库。它提供 wire v3、可靠单播、有界工作区和可选认证。产品提供 PHY、单调时间、执行者与可信密钥。
+XGen Link 是独立的 C11 嵌入式通信协议库。它提供 Wire v1、可靠单播、有界工作区和可选认证。产品提供 PHY、单调时间、执行者与可信密钥。
 
-XGen Link is a standalone C11 communication library. It provides wire v3, reliable unicast, bounded workspaces and optional authentication. The product supplies the PHY, monotonic time, execution context and trusted keys.
+XGen Link is a standalone C11 communication library. It provides Wire v1, reliable unicast, bounded workspaces and optional authentication. The product supplies the PHY, monotonic time, execution context and trusted keys.
 
 ## 构建 / Build
 
@@ -25,5 +25,5 @@ Use a source subdirectory or an installed SDK to consume `xgl::xgl`. See [Build 
 - [跑通首次收发](docs/zh/tutorials/first-link.md) · [Run your first link](docs/en/tutorials/first-link.md)
 - [架构与资源所有权](docs/zh/explanation/architecture.md) · [Architecture and ownership](docs/en/explanation/architecture.md)
 - [Boot 接入](docs/zh/guides/boot.md) · [Integrate Boot](docs/en/guides/boot.md)
-- [SDK 4 迁移](docs/zh/guides/migration.md) · [Migrate to SDK 4](docs/en/guides/migration.md)
+- [SDK 5 迁移](docs/zh/guides/migration.md) · [Migrate to SDK 5](docs/en/guides/migration.md)
 - [贡献指南](CONTRIBUTING.md) · [Engineering conventions](docs/standards.md)

@@ -82,28 +82,21 @@ transport_copy_rx_buffered_packet(const xgl_transport_ctx_t* ctx,
                                   const xgl_packet_t* packet,
                                   uint32_t packet_number) {
     const size_t payload_len = packet->data->data_len;
-    const size_t extensions_len = packet->extensions_len;
-    buffered->storage = (uint8_t*)xgl_alloc(ctx->memory.rx_payload,
-                                            payload_len + extensions_len);
+    buffered->storage =
+        (uint8_t*)xgl_alloc(ctx->memory.rx_payload, payload_len);
     if (buffered->storage == NULL) {
         return XGL_ERR_NO_MEMORY;
     }
     memcpy(buffered->storage, packet->data->data, payload_len);
-    if (extensions_len != 0U) {
-        memcpy(buffered->storage + payload_len, packet->extensions,
-               extensions_len);
-    }
 
     buffered->packet = *packet;
     buffered->packet.packet_number = packet_number;
     buffered->packet_data.data_len = payload_len;
     buffered->packet_data.data = buffered->storage;
     buffered->packet.data = &buffered->packet_data;
-    buffered->packet.extensions =
-        extensions_len != 0U ? buffered->storage + payload_len : NULL;
-#if XGL_FEATURE_ADVANCED_RUNTIME && XGL_FEATURE_FRAGMENTATION
-    buffered->received_at_ms = ctx->current_time_ms;
-#endif
+    /* Delivery uses the parsed fields and the owned payload. */
+    buffered->packet.extensions = NULL;
+    buffered->packet.extensions_len = 0U;
 
     return XGL_OK;
 }
@@ -131,8 +124,8 @@ xgl_error_t transport_cache_out_of_order_packet(
         return XGL_ERR_INVALID_PARAM;
     }
 
-    /* A retained payload and its extensions belong to the same bounded frame.
-     * Subtract before adding so malformed internal input cannot wrap size_t. */
+    /* Check the full input frame before retaining its payload. Subtract before
+     * adding so malformed internal input cannot wrap size_t. */
     const size_t overhead = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE;
     if (ctx->max_frame_size < overhead ||
         packet->data->data_len > ctx->max_frame_size - overhead ||

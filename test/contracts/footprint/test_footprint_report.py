@@ -26,10 +26,10 @@ class FootprintReport(unittest.TestCase):
         self.layout = self.directory / "layout.json"
         self.layout.write_text(json.dumps({
             "frame_bytes": 128, "rx_bytes": 128, "rx_chunk_bytes": 32,
-            "workspace_bytes": 1072, "format_version": 6,
+            "workspace_bytes": 1072, "format_version": 7,
             "window_pool_blocks": 0, "resource_config_id": 1857,
             "compiled_window_capacity": 128, "reliable_bucket_count": 1,
-            "adaptive_rto": 1,
+            "adaptive_rto": 1, "config_abi_version": 5,
         }), encoding="utf-8")
         (self.directory / "CMakeCache.txt").write_text(
             "XGL_PROFILE:STRING=boot\n", encoding="utf-8")
@@ -81,6 +81,7 @@ class FootprintReport(unittest.TestCase):
             "probe.c:1:1:main\t0\tstatic\nprobe.c:2:1:worker\t24\tdynamic,bounded\n"), 0)
         result = json.loads(self.output.read_text(encoding="utf-8"))
         self.assertEqual(result["largest_linked_function_stack_bytes"], 24)
+        self.assertEqual(result["config_abi_version"], 5)
 
     def test_unlinked_unbounded_stack_does_not_reject_the_linked_image(self):
         self.assertEqual(self.run_report(

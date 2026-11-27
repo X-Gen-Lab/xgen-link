@@ -229,7 +229,7 @@ TEST_F(XglLayeredStatsTest, TransportLayerSemantics) {
     ASSERT_EQ(err, XGL_OK);
 
     /* Transport layer should track:
-     * - Application-level messages (not fragments)
+     * - Application-level messages
      * - Reliability errors
      * - Dropped messages
      */
@@ -258,8 +258,8 @@ TEST_F(XglLayeredStatsTest, NoDoubleCounting) {
 
     /* Conceptual test: If we send 1 application message:
      * - Transport layer: 1 packet
-     * - Network layer: 1 packet (or more if fragmented)
-     * - Datalink layer: 1 frame (or more if fragmented)
+     * - Network layer: 1 packet
+     * - Datalink layer: 1 frame
      *
      * Each layer counts independently, so no double counting
      */
@@ -268,35 +268,6 @@ TEST_F(XglLayeredStatsTest, NoDoubleCounting) {
     EXPECT_EQ(stats.datalink.tx_packets, 0);
     EXPECT_EQ(stats.network.tx_packets, 0);
     EXPECT_EQ(stats.transport.tx_packets, 0);
-}
-
-/**
- * \brief           Test fragmentation scenario statistics
- * \details         When a message is fragmented, each layer counts correctly
- */
-TEST_F(XglLayeredStatsTest, FragmentationScenario) {
-    xgl_statistics_t stats;
-
-    xgl_error_t err = xgl_stats_get(handle, &stats);
-    ASSERT_EQ(err, XGL_OK);
-
-    /* Conceptual test: If we send 1 large message that fragments into 3:
-     * - Transport layer: 1 packet (the original message)
-     * - Network layer: 3 packets (the fragments)
-     * - Datalink layer: 3 frames (the fragments)
-     *
-     * This shows the actual work done at each layer
-     */
-
-    /* Simulate fragmentation scenario */
-    stats.transport.tx_packets = 1;
-    stats.network.tx_packets = 3;
-    stats.datalink.tx_packets = 3;
-
-    /* Verify different counts are possible */
-    EXPECT_EQ(stats.transport.tx_packets, 1);
-    EXPECT_EQ(stats.network.tx_packets, 3);
-    EXPECT_EQ(stats.datalink.tx_packets, 3);
 }
 
 /*---------------------------------------------------------------------------*/

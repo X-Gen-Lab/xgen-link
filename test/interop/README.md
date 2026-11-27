@@ -1,36 +1,35 @@
-# Wire v3 新旧 SDK 互通
+# Wire v1 双向互通
 
-驱动脚本连接两个独立进程，每个进程通过公开接口链接各自的 XGL 库。Boot 场景比对旧版 HELLO 字节，故意丢弃首个 ACK，检查双向重传、一次交付及重复 RESET 后拒绝同 epoch 发送。Full 场景在两个方向交换带测试认证的 HELLO 和乱序分片，检查 SACK 和重组后的完整交付。
+脚本连接两个独立进程，通过模拟字节流交换各自生产库生成的报文。
 
-## 准备固定 SDK 3
+- Boot 双向丢弃首个 ACK，检查重传、一次交付和重复 RESET 后拒绝同 epoch 发送。另将一个 DATA 改为 Wire v3 版本字节并重新计算两处 CRC，检查 Wire v1 端点拒收且不反馈。
+- Full 双向独立提交两条认证 DATA，重排完整帧，检查 SACK 和按序各交付一次。测试认证 provider 校验 nonce、AAD 和负载绑定，产品提供实际认证实现。
 
-在当前仓库根目录执行。需要 Git、C11 编译器、CMake 3.24 或以上、Ninja 和 Python 3。旧 SDK 固定为 `f09efca25abe84c344ce8c41d5645006c7b61df9`，五个基础组件固定在该修订的 `dev/dependencies.json` 中。[旧 SDK 装配说明](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/dev/README.md)
+## 使用安装包运行
 
-按 `boot` 和 `full` 分别准备。`--fetch` 在浅克隆缺少旧版 Git 对象时也会从 `origin` 获取该修订。
+在仓库根目录执行。需要 C11 编译器、CMake 3.24 或以上、Ninja 和 Python 3。分别使用 `boot` 和 `full`。示例安装当前 SDK 5，随后在两个独立构建目录中按精确安装版本链接端点。
 
 ```sh
-work="$PWD/build/wire-interop"
 profile=boot
-python3 test/interop/build_wire_interop_legacy.py \
-  --work-dir "$work" --profile "$profile" --fetch
-```
+work="$PWD/build/wire-interop-$profile"
+cmake -S . -B "$work/library" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DXGL_PROFILE="$profile"
+cmake --build "$work/library"
+cmake --install "$work/library" --prefix "$work/sdk"
+version=$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' "$work/library/CMakeCache.txt")
 
-`--fetch` 从五个公开仓库各取固定提交。离线已有 Git 对象时，用 `--deps-dir /path/to/checkouts` 代替，目录内为 `xgen-status`、`xgen-bytes`、`xgen-crc`、`xgen-memory` 和 `xgen-containers`。准备脚本从 Git 对象提取源码，在临时目录独立构建并安装 SDK 3，再静态链接旧端点。它打印并校验各提交，发布的测试端点位于 `$work/sdk3-$profile/xgl_interop_peer`。
+for endpoint in a b; do
+  cmake -S test/interop -B "$work/$endpoint" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release -DXGL_PROFILE="$profile" \
+    -DXGL_INTEROP_SDK_PREFIX="$work/sdk" -DXGL_INTEROP_SDK_VERSION="$version"
+  cmake --build "$work/$endpoint" --target xgl_interop_peer
+done
 
-## 运行双向互通
-
-当前 SDK 的端点通过纯 C11 工程编译，每个 profile 使用独立的构建目录。
-
-```sh
-cmake -S test/interop -B "$work/sdk4-$profile" -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release -DXGL_PROFILE="$profile"
-cmake --build "$work/sdk4-$profile" --target xgl_interop_peer
 python3 test/interop/test_wire_interop.py \
-  "$work/sdk3-$profile/xgl_interop_peer" \
-  "$work/sdk4-$profile/xgl_interop_peer" --profile "$profile" \
-  --transcript "$work/$profile-transcript.log"
+  "$work/a/xgl_interop_peer" "$work/b/xgl_interop_peer" --profile "$profile" \
+  --transcript "$work/exchange.log"
 ```
 
-使用安装包时，在新的构建目录配置同一工程，传入 `-DXGL_INTEROP_SDK_PREFIX=/path/to/sdk` 和 `-DXGL_INTEROP_SDK_VERSION=4.0.0`。端点要求该前缀中的 SDK 精确匹配指定的版本和 profile。
+在新的端点构建目录中同时省略两个 `XGL_INTEROP_SDK_*` 选项，即可从当前源码构建。Windows 使用可执行文件的 `.exe` 路径。
 
-Windows 使用对应的 `.exe` 路径。脚本使用确定性的模拟协议时间。每条命令及端点退出默认有 10 秒真实等待上限，可通过 `--timeout-seconds` 调整。转录按处理顺序记录命令、端点回复、丢 ACK 或重排及最终判定，保留失败前的输出。测试认证 provider 用于核对 nonce、AAD 和负载绑定，产品应使用自己的认证实现。
+每条命令及端点退出默认有 10 秒真实等待上限，可用 `--timeout-seconds` 调整。`--transcript` 记录命令、回复、模拟链路变化和最终判定。历史 Wire v3 回归保存在 [旧版测试记录](https://github.com/X-Gen-Lab/xgen-link/tree/d775c8a2fbc2dabcfc2406034e5cdc43808954bd/test/interop)。

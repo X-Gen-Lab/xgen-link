@@ -12,9 +12,8 @@ This map identifies protocol owners. Public applications include `<xgl/xgl.h>`; 
 | Atomic ACK validation and application | `src/transport/xgl_transport_ack.c` |
 | Deadline collection and periodic work | `src/transport/xgl_transport_runtime.c` |
 | Production retransmission | `src/transport/xgl_transport_runtime.c` |
-| Owned message pump | `src/transport/xgl_transport_tx_message.c` |
+| Single-frame send planning, admission and submission | `src/transport/xgl_transport_tx.c` |
 | Receive ordering and retained delivery | `src/transport/xgl_transport_rx.c`, `xgl_transport_rx_delivery.c` |
-| Fragment coverage and reassembly | `src/transport/xgl_fragment_*.c` |
 | Route lookup and local/forward delivery | `src/network/` |
 | Canonical frame layout and TLVs | `src/wire/` |
 | Directional session state and authentication | `src/security/` |
@@ -32,4 +31,4 @@ The reliable queue stores records and indexes them. It does not acknowledge scop
 
 ## Verification Boundaries
 
-Unit tests cover ACK validation, scope isolation, cancellation, owned payload lifetime and capacity rejection. Transport properties exercise the production retry path. Static workspace properties use bounded services across multi-window fragmented delivery and receiver backpressure. Wire/security tests assert byte layouts, nonce/AAD construction and replay behavior. SDK/profile smoke builds check the installed public API separately from internal unit fixtures.
+Unit tests cover ACK validation, scope isolation, cancellation, owned payload lifetime and capacity rejection. Transport properties exercise the production retry path. Static workspace properties use bounded services across reliable delivery and receiver backpressure. Wire/security tests assert byte layouts, nonce/AAD construction and replay behavior. SDK/profile smoke builds check the installed public API separately from internal unit fixtures.
