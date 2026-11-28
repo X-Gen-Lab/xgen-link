@@ -30,21 +30,23 @@ endif()
 if(XGL_BUILD_SDK_CONSUMER_SMOKE)
     # Select the active configuration without expanding flag contents into
     # generator-expression syntax.
-    set(sdk_smoke_linker_flags
-        "$<TARGET_PROPERTY:xgl_sdk_consumer_smoke,XGL_LINKER_FLAGS>"
+    set(sdk_smoke_command
+        "${CMAKE_COMMAND}"
+        "-DXGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}"
+        "-DXGL_BUILD_CONFIG=$<CONFIG>"
+        "-DXGL_C_COMPILER=${CMAKE_C_COMPILER}"
+        "-DXGL_CONSUMER_LINKER_FLAGS=$<TARGET_PROPERTY:xgl_sdk_consumer_smoke,XGL_LINKER_FLAGS>"
+        "-DXGL_CONSUMER_CONFIG_LINKER_FLAGS=$<TARGET_PROPERTY:xgl_sdk_consumer_smoke,XGL_LINKER_FLAGS_$<UPPER_CASE:$<CONFIG>>>"
     )
-    set(sdk_smoke_config_linker_flags
-        "$<TARGET_PROPERTY:xgl_sdk_consumer_smoke,XGL_LINKER_FLAGS_$<UPPER_CASE:$<CONFIG>>>"
+    set(sdk_smoke_script
+        "${PROJECT_SOURCE_DIR}/test/contracts/sdk/sdk_consumer_smoke.cmake"
     )
     add_custom_target(
         xgl_sdk_consumer_smoke
         COMMAND
-            ${CMAKE_COMMAND} -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} -D
-            XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke/$<CONFIG>
-            -D XGL_BUILD_CONFIG=$<CONFIG> -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
-            "-DXGL_CONSUMER_LINKER_FLAGS=${sdk_smoke_linker_flags}"
-            "-DXGL_CONSUMER_CONFIG_LINKER_FLAGS=${sdk_smoke_config_linker_flags}"
-            -P ${PROJECT_SOURCE_DIR}/test/contracts/sdk/sdk_consumer_smoke.cmake
+            ${sdk_smoke_command}
+            "-DXGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke/$<CONFIG>"
+            -P "${sdk_smoke_script}"
         DEPENDS xgl
         COMMENT "Validating installed xgl CMake package with a consumer project"
         VERBATIM
@@ -76,12 +78,9 @@ if(XGL_BUILD_SDK_CONSUMER_SMOKE)
     add_test(
         NAME xgl_sdk_consumer_smoke
         COMMAND
-            ${CMAKE_COMMAND} -D XGL_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} -D
-            XGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest/$<CONFIG>
-            -D XGL_BUILD_CONFIG=$<CONFIG> -D XGL_C_COMPILER=${CMAKE_C_COMPILER}
-            "-DXGL_CONSUMER_LINKER_FLAGS=${sdk_smoke_linker_flags}"
-            "-DXGL_CONSUMER_CONFIG_LINKER_FLAGS=${sdk_smoke_config_linker_flags}"
-            -P ${PROJECT_SOURCE_DIR}/test/contracts/sdk/sdk_consumer_smoke.cmake
+            ${sdk_smoke_command}
+            "-DXGL_SMOKE_DIR=${CMAKE_CURRENT_BINARY_DIR}/sdk-consumer-smoke-ctest/$<CONFIG>"
+            -P "${sdk_smoke_script}"
     )
     set_tests_properties(
         xgl_sdk_consumer_smoke
@@ -90,13 +89,7 @@ if(XGL_BUILD_SDK_CONSUMER_SMOKE)
 endif()
 
 if(XGL_BUILD_RELEASE_VALIDATION_TARGET)
-    if(
-        NOT (
-            XGL_BUILD_TESTS
-            OR XGL_BUILD_NOHEAP_SMOKE
-            OR XGL_BUILD_SDK_CONSUMER_SMOKE
-        )
-    )
+    if(NOT xgl_host_checks_enabled)
         message(
             FATAL_ERROR
             "XGL_BUILD_RELEASE_VALIDATION_TARGET requires host tests, no-heap smoke, or SDK consumer smoke"

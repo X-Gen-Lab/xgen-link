@@ -11,9 +11,9 @@ returning and RX preserves partial reads.
 Build from the repository root:
 
 ```sh
-cmake --preset gcc-test
-cmake --build build/gcc-test --target echo_server
-./build/gcc-test/examples/echo_server/echo_server
+cmake -S . -B build/examples -G Ninja -DXGL_BUILD_EXAMPLES=ON
+cmake --build build/examples --target echo_server
+./build/examples/examples/echo_server/echo_server
 ```
 
 On Windows, the executable has an `.exe` suffix. Every protocol call runs in one

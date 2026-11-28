@@ -99,7 +99,7 @@ xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
  */
 xgl_error_t xgl_route_table_add(xgl_route_table_t* table, uint16_t target_id,
                                 xgl_phy_ops_t* phy, uint16_t max_frame_size,
-                                uint32_t read_freq_hz, uint8_t metric) {
+                                uint32_t read_freq_hz) {
     if (table == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -121,8 +121,12 @@ xgl_error_t xgl_route_table_add(xgl_route_table_t* table, uint16_t target_id,
 #endif
         ++table->route_count;
     }
-    *route = (xgl_route_item_t){target_id, phy, max_frame_size, read_freq_hz,
-                                metric};
+    *route = (xgl_route_item_t){
+        .target_id = target_id,
+        .phy = phy,
+        .max_frame_size = max_frame_size,
+        .read_freq_hz = read_freq_hz,
+    };
     return XGL_OK;
 }
 
@@ -153,25 +157,6 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
                                      &table->routes[i]);
     }
 #endif
-    return XGL_OK;
-}
-
-/* Parameter order follows the documented protocol fields and units. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-/**
- * \brief           Change the metric of an existing destination
- */
-xgl_error_t xgl_route_table_update_metric(const xgl_route_table_t* table,
-                                          uint16_t target_id, uint8_t metric) {
-    /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    if (table == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    xgl_route_item_t* route = xgl_route_table_lookup(table, target_id);
-    if (route == NULL) {
-        return XGL_ERR_ROUTE_NOT_FOUND;
-    }
-    route->metric = metric;
     return XGL_OK;
 }
 

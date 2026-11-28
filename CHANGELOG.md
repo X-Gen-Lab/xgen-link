@@ -9,7 +9,8 @@
 
 ### SDK 与集成
 
-- 发布版本标识为 `0.0.1`。运行时 `xgl_version_string()` 返回 `"0.0.1"`，`xgl_version_int()` 返回 `1`。应用直接初始化 `xgl_config_t`，通过 `xgl_config_validate()` 校验。创建、工作区测量和静态初始化直接链接同名函数。使用配套头文件重新编译应用及其依赖的对象文件。
+- SDK 版本标识为 `0.0.1`，`xgl_version_int()` 返回 `1`。`<xgl/xgl.h>` 聚焦静态初始化、发送、推进、关闭和销毁，分配初始化、原地发送、运行调度、认证和诊断各有公开扩展头。工作区测量校验 `xgl_config_t`，两类初始化成功后均返回可用实例。[公开 API](docs/zh/reference/api.md)
+- 统一使用携带连接与 epoch 的接收回调，并为接收和错误回调分别配置上下文。高级运行策略通过 `config.options` 传入版本 5 描述符。升级旧快照时，使用新快照中的配套库和头文件重新编译全部消费者。此次 API 整理沿用现行 Wire v1。[迁移指南](docs/zh/guides/migration.md)
 - C11 静态库支持源码接入和安装包消费，两种方式都链接 `xgl::xgl`。安装包导出配套的公开头、档位、能力和资源身份。[构建与消费](docs/zh/guides/build-and-consume.md)
 
 ### 开发与验证

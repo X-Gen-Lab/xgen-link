@@ -9,6 +9,7 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <xgl/xgl.h>
 
@@ -85,7 +86,8 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
          ++iteration) {
         /* Test 1: NULL pointer errors */
         {
-            xgl_error_t err = xgl_init(nullptr);
+            xgl_error_t err =
+                xgl_init_allocated(nullptr, xgl_test_host_allocator(), nullptr);
             EXPECT_EQ(err, XGL_ERR_NULL_POINTER)
                 << "Expected XGL_ERR_NULL_POINTER for NULL handle in iteration "
                 << iteration;
@@ -99,7 +101,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
 
             /* Invalid window size (0) */
             config.protocol.window_size = 0;
-            xgl_error_t err = xgl_config_validate(&config);
+            xgl_error_t err = xgl_test_measure_config(&config);
             EXPECT_EQ(err, XGL_ERR_INVALID_PARAM)
                 << "Expected XGL_ERR_INVALID_PARAM for invalid window size in "
                    "iteration "
@@ -108,33 +110,22 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
             /* Invalid max_frame_size (0) */
             config.protocol.window_size = 4;
             config.protocol.max_frame_size = 0;
-            err = xgl_config_validate(&config);
+            err = xgl_test_measure_config(&config);
             EXPECT_EQ(err, XGL_ERR_INVALID_PARAM)
                 << "Expected XGL_ERR_INVALID_PARAM for invalid max_frame_size "
                    "in iteration "
                 << iteration;
         }
 
-        /* Test 3: Not initialized error */
+        /* Test 3: an invalid configuration never yields a handle. */
         {
-            xgl_config_t config;
-            config = xgl_test_config();
-            config.source_id = random_valid_source_id(gen);
-
-            /* Create instance but don't initialize */
-            xgl_test_use_host_allocator(&config);
-            xgl_handle_t handle = xgl_create(&config);
-            ASSERT_NE(handle, nullptr);
-
-            /* Try to use uninitialized instance */
-            xgl_statistics_t stats;
-            xgl_error_t err = xgl_stats_get(handle, &stats);
-            EXPECT_EQ(err, XGL_ERR_NOT_INITIALIZED)
-                << "Expected XGL_ERR_NOT_INITIALIZED for uninitialized "
-                   "instance in iteration "
-                << iteration;
-
-            xgl_destroy(handle);
+            xgl_config_t config = xgl_test_config();
+            config.source_id = 0U;
+            xgl_handle_t handle = nullptr;
+            EXPECT_EQ(
+                xgl_init_allocated(&config, xgl_test_host_allocator(), &handle),
+                XGL_ERR_INVALID_PARAM);
+            EXPECT_EQ(handle, nullptr);
         }
 
         /* Test 4: Route not found error */
@@ -163,7 +154,6 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
             route.phy = &phy;
             route.max_frame_size = 256;
             route.read_freq_hz = 100;
-            route.metric = 0;
 
             xgl_config_t config;
             config = xgl_test_config();
@@ -173,10 +163,8 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
             config.route_table = &route;
             config.route_table_len = 1;
 
-            xgl_test_use_host_allocator(&config);
-            xgl_handle_t handle = xgl_create(&config);
+            xgl_handle_t handle = xgl_test_init_allocated(&config);
             ASSERT_NE(handle, nullptr);
-            ASSERT_EQ(xgl_init(handle), XGL_OK);
 
             /* Try to send to non-existent route (target ID 99) */
             std::vector<uint8_t> test_data = gen.random_bytes(16);
@@ -208,7 +196,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
             /* RX buffer too small (less than full max_frame_size) */
             config.memory.rx_buffer_size = 100; /* Too small */
 
-            xgl_error_t err = xgl_config_validate(&config);
+            xgl_error_t err = xgl_test_measure_config(&config);
             EXPECT_EQ(err, XGL_ERR_BUFFER_TOO_SMALL)
                 << "Expected XGL_ERR_BUFFER_TOO_SMALL for insufficient RX "
                    "buffer in iteration "
@@ -299,7 +287,6 @@ TEST(XglErrorProperties, ErrorCallbackInvocation) {
         route.phy = &phy;
         route.max_frame_size = 256;
         route.read_freq_hz = 100;
-        route.metric = 0;
 
         /* Create configuration with error callback */
         xgl_config_t config;
@@ -313,14 +300,9 @@ TEST(XglErrorProperties, ErrorCallbackInvocation) {
         config.callback_user_data = &mock_error_cb;
 
         /* Create and initialize instance */
-        xgl_test_use_host_allocator(&config);
-        xgl_handle_t handle = xgl_create(&config);
+        xgl_handle_t handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr)
             << "Failed to create instance in iteration " << iteration;
-
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK)
-            << "Failed to initialize instance in iteration " << iteration;
 
         /* Clear any initialization errors */
         mock_error_cb.invocations.clear();
@@ -437,7 +419,6 @@ TEST(XglErrorProperties, ErrorStatistics) {
         route.phy = &phy;
         route.max_frame_size = 256;
         route.read_freq_hz = 100;
-        route.metric = 0;
 
         /* Create configuration */
         xgl_config_t config;
@@ -449,18 +430,13 @@ TEST(XglErrorProperties, ErrorStatistics) {
         config.route_table_len = 1;
 
         /* Create and initialize instance */
-        xgl_test_use_host_allocator(&config);
-        xgl_handle_t handle = xgl_create(&config);
+        xgl_handle_t handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr)
             << "Failed to create instance in iteration " << iteration;
 
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK)
-            << "Failed to initialize instance in iteration " << iteration;
-
         /* Get initial statistics */
         xgl_statistics_t stats_before;
-        err = xgl_stats_get(handle, &stats_before);
+        xgl_error_t err = xgl_stats_get(handle, &stats_before);
         ASSERT_EQ(err, XGL_OK)
             << "Failed to get initial statistics in iteration " << iteration;
 

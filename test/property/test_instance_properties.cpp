@@ -9,6 +9,7 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <xgl/xgl.h>
 
@@ -68,19 +69,16 @@ TEST(XglInstanceProperties, InstanceIsolation) {
         route1.phy = &phy1;
         route1.max_frame_size = 256;
         route1.read_freq_hz = 100;
-        route1.metric = 0;
 
         xgl_route_item_t route2 = {};
         route2.target_id = 3;
         route2.phy = &phy2;
         route2.max_frame_size = 512;
         route2.read_freq_hz = 100;
-        route2.metric = 0;
 
         /* Create configuration for instance 1 */
         xgl_config_t config1;
         config1 = xgl_test_config();
-        config1.name = "instance1";
         config1.source_id = 1;
         config1.protocol.max_retry_count = 3 + (gen.random_uint8() % 5);
         config1.protocol.window_size = 2 + (gen.random_uint8() % 6);
@@ -93,7 +91,6 @@ TEST(XglInstanceProperties, InstanceIsolation) {
         /* Create configuration for instance 2 with DIFFERENT values */
         xgl_config_t config2;
         config2 = xgl_test_config();
-        config2.name = "instance2";
         config2.source_id = 10; /* Different source ID */
         config2.protocol.max_retry_count =
             5 + (gen.random_uint8() % 3); /* Different retry count */
@@ -107,10 +104,8 @@ TEST(XglInstanceProperties, InstanceIsolation) {
         config2.route_table_len = 1;
 
         /* Create both instances */
-        xgl_test_use_host_allocator(&config1);
-        xgl_handle_t handle1 = xgl_create(&config1);
-        xgl_test_use_host_allocator(&config2);
-        xgl_handle_t handle2 = xgl_create(&config2);
+        xgl_handle_t handle1 = xgl_test_init_allocated(&config1);
+        xgl_handle_t handle2 = xgl_test_init_allocated(&config2);
 
         ASSERT_NE(handle1, nullptr)
             << "Failed to create instance 1 in iteration " << iteration;
@@ -120,8 +115,9 @@ TEST(XglInstanceProperties, InstanceIsolation) {
             << "Instances should have different handles";
 
         /* Initialize both instances */
-        xgl_error_t err1 = xgl_init(handle1);
-        xgl_error_t err2 = xgl_init(handle2);
+        const xgl_work_budget_t budget = {};
+        xgl_error_t err1 = xgl_step(handle1, 0U, &budget);
+        xgl_error_t err2 = xgl_step(handle2, 0U, &budget);
 
         ASSERT_EQ(err1, XGL_OK)
             << "Failed to initialize instance 1 in iteration " << iteration

@@ -15,7 +15,7 @@ cmake --build build/production
 cmake --install build/production --prefix "$PWD/build/sdk"
 ```
 
-检查安装前缀中的公开头、静态库和 `xglConfig.cmake`。保留库与同一产物的生成头。不同编译器、目标 ABI、profile 或资源组合使用独立构建目录和前缀。多配置生成器按同一个 `--config` 构建和安装，Debug 与 Release 分别安装到各自前缀。
+检查安装前缀中的公开头、静态库和 `xglConfig.cmake`。应用先包含 `<xgl/xgl.h>`，再按使用的能力选择[公开扩展头](../reference/api.md)。保留库与同一产物的生成头。不同源码快照、编译器、目标 ABI、档位或资源组合使用独立构建目录和前缀。多配置生成器按同一个 `--config` 构建和安装，Debug 与 Release 分别安装到各自前缀。
 
 ## CMake 消费
 

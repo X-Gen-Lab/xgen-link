@@ -21,7 +21,7 @@ foreach(header IN LISTS public_header_inputs private_header_inputs)
             "${CMAKE_CURRENT_BINARY_DIR}/header-contracts/${unit_name}.${language}"
         )
         set(header_usage "")
-        if(header STREQUAL "xgl/xgl_types.h")
+        if(header STREQUAL "xgl/xgl_runtime.h")
             set(header_usage
                 "xgl_instance_options_t xgl_header_options_contract(void);\n\nxgl_instance_options_t xgl_header_options_contract(void) {\n    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;\n    return options;\n}\n"
             )

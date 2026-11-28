@@ -11,6 +11,7 @@
 #include "test_host_allocator.h"
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_inplace.h>
 
 #include <gtest/gtest.h>
 
@@ -59,17 +60,15 @@ class XglTimeoutControlTest : public ::testing::Test {
         data_calls = 0U;
         last_number = UINT32_MAX;
         phy = {Transmit, Receive, this};
-        route = {2U, &phy, 128U, 1000U, 0U};
+        route = {2U, &phy, 128U, 1000U};
         xgl_config_t config = {};
         config = xgl_test_single_packet_config();
         config.protocol.ack_timeout_ms = 200U;
         config.features.peer_idle_timeout_ms = 0U;
-        config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;
-        instance = xgl_create(&config);
+        instance = xgl_test_init_allocated(&config);
         ASSERT_NE(instance, nullptr);
-        ASSERT_EQ(xgl_init(instance), XGL_OK);
     }
 
     xgl_error_t Send(uint32_t timeout, uint32_t now) {
@@ -108,26 +107,24 @@ TEST_F(XglTimeoutControlTest, ZeroTimeoutMeansDefault) {
     ExpectFirstRetry(100U, 200U);
 }
 
-TEST_F(XglTimeoutControlTest, ZeroCopyTimeoutField) {
+TEST_F(XglTimeoutControlTest, InPlaceSendDoesNotScheduleReliableRetry) {
     uint8_t buffer[128] = {};
     buffer[XGL_FRAME_HEADER_SIZE] = payload;
-    xgl_tx_data_zerocopy_t request = {};
+    xgl_tx_zerocopy_request_t request = {};
     request.buffer = buffer;
     request.buffer_size = sizeof(buffer);
     request.data_offset = XGL_FRAME_HEADER_SIZE;
     request.data_len = 1U;
     request.target_id = 2U;
-    request.timeout_ms = UINT32_MAX;
-    ASSERT_EQ(xgl_send_zerocopy_at(instance, &request, 100U), XGL_OK);
+
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(instance, &request, 100U), XGL_OK);
     EXPECT_EQ(data_calls, 1U);
     Step(101U);
     Step(100000U);
     EXPECT_EQ(data_calls, 1U);
 
-    request.reliable = true;
-    EXPECT_EQ(xgl_send_zerocopy_at(instance, &request, 100001U),
-              XGL_ERR_INVALID_PARAM);
-    EXPECT_EQ(data_calls, 1U);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(instance, &request, 100001U), XGL_OK);
+    EXPECT_EQ(data_calls, 2U);
 }
 
 TEST_F(XglTimeoutControlTest, VariousTimeoutValues) {

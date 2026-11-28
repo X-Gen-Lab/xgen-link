@@ -1,6 +1,6 @@
 /**
  * \file            xgl_types.h
- * \brief           xgen-link Protocol Core Data Types and Structures
+ * \brief           Core protocol configuration and buffer contracts
  * \author          X-Gen Lab
  */
 
@@ -10,9 +10,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
 #ifdef __cplusplus
 #include <cstddef>
 #endif
+
 #include <xgl/xgl_config.h>
 
 #include "xgl/xgl_error.h"
@@ -21,24 +23,20 @@
 extern "C" {
 #endif
 
-/*---------------------------------------------------------------------------*/
-/* Forward Declarations                                                      */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Protocol instance handle (opaque pointer)
- */
+/** \brief           Opaque protocol instance handle. */
 typedef struct xgl_instance* xgl_handle_t;
 
-/*---------------------------------------------------------------------------*/
-/* Physical Layer Interface                                                  */
-/*---------------------------------------------------------------------------*/
+/** \brief           Authentication provider declared in xgl_security.h. */
+typedef struct xgl_auth_provider xgl_auth_provider_t;
+
+/** \brief           Runtime policy declared in xgl_runtime.h. */
+typedef struct xgl_instance_options xgl_instance_options_t;
 
 /**
  * \brief           Physical layer operations
- * \details         Callbacks run during xgl_send_at() or xgl_step(). They
- *                  must be non-blocking or bounded, must not call back into the
- *                  same xgl_handle_t, and must return an xgl_error_t status.
+ * \details         Callbacks run synchronously during send and runtime calls.
+ * They must be non-blocking or bounded, must not call back into the same
+ * xgl_handle_t, and must return an xgl_error_t status.
  */
 typedef struct {
     /**
@@ -61,10 +59,6 @@ typedef struct {
     xgl_error_t (*rx)(uint8_t* buffer, size_t* len, void* user_data);
     void* user_data; /**< User data for PHY operations */
 } xgl_phy_ops_t;
-
-/*---------------------------------------------------------------------------*/
-/* Frame Header Structure                                                    */
-/*---------------------------------------------------------------------------*/
 
 /**
  * \brief           CRC16 size in bytes
@@ -111,29 +105,6 @@ typedef struct {
 #define XGL_AUTH_TAG_MAX_LEN 32U
 
 /**
- * \brief           Compression-class bits for negotiated payload handling
- */
-#define XGL_COMPRESSION_SHIFT 6
-/** Mask selecting the compression-class bits. */
-#define XGL_COMPRESSION_MASK 0xC0
-
-/** No compression. This is the only accepted production value today. */
-#define XGL_COMPRESSION_NONE 0x00
-
-/** Reserved; rejected until the codec path is wired. */
-#define XGL_COMPRESSION_RLE 0x40
-
-/** Reserved; rejected until the codec path is wired. */
-#define XGL_COMPRESSION_LZ77 0x80
-
-/** Reserved; rejected until the codec path is wired. */
-#define XGL_COMPRESSION_ZLIB 0xC0
-
-/*---------------------------------------------------------------------------*/
-/* Route Table Entry                                                         */
-/*---------------------------------------------------------------------------*/
-
-/**
  * \brief           Route table entry
  * \details         Static configuration has one entry per nonzero remote
  *                  destination; broadcast is allowed. Entries sharing a PHY
@@ -146,259 +117,7 @@ typedef struct {
     xgl_phy_ops_t* phy;      /**< Physical layer operations */
     uint16_t max_frame_size; /**< Maximum frame size for this route */
     uint32_t read_freq_hz;   /**< Positive initialization polling hint in Hz */
-    uint8_t metric;          /**< Reserved metadata, not used for selection */
 } xgl_route_item_t;
-
-/*---------------------------------------------------------------------------*/
-/* Callback Function Types                                                   */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Receive callback function type
- * \note            Runs synchronously; must not reenter, reset, or destroy the
- *                  instance. Data is borrowed only for the callback duration.
- * \param[in]       handle: Protocol instance handle
- * \param[in]       source_id: Source node ID
- * \param[in]       data_type: Data type
- * \param[in]       data: Received data buffer
- * \param[in]       len: Data length
- * \param[in]       user_data: User data
- */
-typedef void (*xgl_rx_callback_t)(xgl_handle_t handle, uint16_t source_id,
-                                  uint8_t data_type, const uint8_t* data,
-                                  size_t len, void* user_data);
-
-/**
- * \brief           Accept responsibility for a reliable application payload
- * \param[in]       handle: Delivering protocol instance
- * \param[in]       source_id: Remote sender identifier
- * \param[in]       data_type: Application payload type
- * \param[in]       data: Borrowed payload bytes
- * \param[in]       len: Number of payload bytes
- * \param[in]       user_data: Application callback context
- * \return          XGL_OK after consuming/copying; XGL_ERR_BUSY defers
- * acceptance
- * \note            Must not reenter, reset, or destroy the instance. Payload
- *                  bytes are borrowed only for the callback duration.
- */
-typedef xgl_error_t (*xgl_rx_accept_fn)(xgl_handle_t handle, uint16_t source_id,
-                                        uint8_t data_type, const uint8_t* data,
-                                        size_t len, void* user_data);
-
-/**
- * \brief           Per-link work limits for a nonblocking runtime step
- * \note            Zero RX bytes skips polling but still maintains transport.
- */
-typedef struct {
-    size_t rx_bytes; /**< Maximum PHY bytes polled per link during one step */
-    uint32_t receive_timeout_ms; /**< Partial-frame timeout in milliseconds */
-} xgl_work_budget_t;
-
-/**
- * \brief           Error callback function type
- * \note            Runs synchronously; must not reenter, reset, or destroy the
- *                  instance. Queue recovery work for after the callback
- * returns.
- * \param[in]       handle: Protocol instance handle
- * \param[in]       error: Error code
- * \param[in]       message: Non-NULL text; empty when diagnostics are disabled
- * \param[in]       user_data: User data
- */
-typedef void (*xgl_error_callback_t)(xgl_handle_t handle, xgl_error_t error,
-                                     const char* message, void* user_data);
-
-/*---------------------------------------------------------------------------*/
-/* Configuration Structure                                                   */
-/*---------------------------------------------------------------------------*/
-
-/** \brief           Storage type aligned for the target's scalar types. */
-#if defined(__cplusplus)
-typedef std::max_align_t xgl_max_align_t;
-#elif defined(_MSC_VER)
-/* The MSVC C11 headers omit max_align_t. */
-typedef union {
-    long double floating; /**< Maximum floating-point alignment. */
-    long long integer;    /**< Maximum integer alignment. */
-    void* pointer;        /**< Object pointer alignment. */
-} xgl_max_align_t;
-#else
-typedef max_align_t xgl_max_align_t;
-#endif
-
-/**
- * \brief           Explicit synchronous allocation service
- * \note            The descriptor and its context must outlive the instance.
- *                  The alloc callback receives a nonzero size and returns a
- *                  block aligned to xgl_max_align_t, or NULL on failure.
- *                  The free callback receives live blocks from the same
- *                  service, once per allocation. XGL skips zero-size requests
- *                  and NULL releases.
- */
-typedef struct {
-    void* ctx; /**< Borrowed context passed to both callbacks. */
-    void* (*alloc)(void* ctx, size_t size); /**< Allocate an aligned block. */
-    void (*free)(void* ctx, void* ptr);     /**< Release a live block. */
-} xgl_allocator_t;
-
-/**
- * \brief           Memory configuration
- */
-typedef struct {
-    size_t rx_buffer_size; /**< RX buffer size in bytes */
-    const xgl_allocator_t*
-        allocator; /**< Explicit allocator; NULL uses the API creation policy */
-} xgl_memory_config_t;
-
-/**
- * \brief           Protocol parameters configuration
- */
-typedef struct {
-    uint32_t ack_timeout_ms; /**< ACK timeout in milliseconds */
-    uint8_t max_retry_count; /**< Maximum retry count */
-    uint8_t window_size;     /**< Sliding window size */
-    uint16_t max_frame_size; /**< Maximum frame size in bytes */
-} xgl_protocol_config_t;
-
-/** Version of the provider input contract; independent from the wire version.
- */
-#define XGL_AUTH_INPUT_VERSION 1U
-/** Canonical directional nonce length in bytes. */
-#define XGL_AUTH_NONCE_SIZE 12U
-
-/**
- * \brief           Trusted bidirectional association installed by the
- * application
- * \note            Prefixes must be unique for each direction under a key.
- *                  The application must establish freshness across restarts;
- *                  reinstalling fixed parameters after RAM loss is not secure.
- */
-typedef struct {
-    uint16_t remote_id;       /**< Trusted remote node identifier */
-    uint32_t connection_id;   /**< Application association identifier */
-    uint32_t session_epoch;   /**< Trusted association generation */
-    uint32_t tx_key_id;       /**< Provider key identity for outgoing frames */
-    uint32_t rx_key_id;       /**< Provider key identity for incoming frames */
-    uint32_t tx_nonce_prefix; /**< Unique outgoing nonce domain under its key */
-    uint32_t rx_nonce_prefix; /**< Unique incoming nonce domain under its key */
-    uint64_t tx_initial_seq;  /**< First outgoing security sequence */
-    uint64_t rx_min_seq; /**< Lowest acceptable incoming security sequence */
-} xgl_security_session_config_t;
-
-/**
- * \brief           Versioned authentication vector derived from actual wire
- * bytes
- * \note            Nonce is BE32(installed directional prefix) followed by
- *                  BE64(security_seq). AAD contains the complete header/TLVs
- * with TTL and header CRC bytes zeroed. Providers must authenticate every AAD
- * and payload byte using this nonce and key identity. All pointers are borrowed
- * for the callback only. Providers are synchronous and must not reenter the
- * protocol instance.
- */
-typedef struct {
-    uint32_t version;       /**< Provider input contract version */
-    uint8_t wire_version;   /**< Encoded protocol version */
-    uint16_t source_id;     /**< Encoded sender identifier */
-    uint16_t target_id;     /**< Encoded recipient identifier */
-    uint32_t connection_id; /**< Encoded association identifier */
-    uint32_t session_epoch; /**< Encoded trusted association generation */
-    uint32_t key_id;        /**< Installed directional provider key identity */
-    uint64_t security_seq;  /**< Per-direction sequence used in the nonce */
-    uint8_t nonce[XGL_AUTH_NONCE_SIZE]; /**< Canonical authentication nonce */
-    const uint8_t* aad; /**< Borrowed canonical header and extension bytes */
-    size_t aad_len;     /**< Number of authenticated header bytes */
-    const uint8_t* payload; /**< Borrowed payload bytes */
-    size_t payload_len;     /**< Number of authenticated payload bytes */
-} xgl_auth_input_t;
-
-/**
- * \brief           Sign the complete versioned authentication vector
- * \param[in]       input: Validated, canonical protocol input
- * \param[out]      tag: Tag output buffer, borrowed for this call
- * \param[in]       tag_capacity: Available tag bytes
- * \param[out]      tag_len: Actual tag length; must equal provider.tag_len
- * \param[in]       user_data: Application provider context
- * \return          XGL_OK on success, error code otherwise
- * \note            The reserved security sequence is consumed even on failure.
- */
-typedef xgl_error_t (*xgl_auth_sign_fn)(const xgl_auth_input_t* input,
-                                        uint8_t* tag, size_t tag_capacity,
-                                        size_t* tag_len, void* user_data);
-
-/**
- * \brief           Verify a tag against the complete authentication vector
- * \param[in]       input: Validated, canonical protocol input
- * \param[in]       tag: Borrowed received tag bytes
- * \param[in]       tag_len: Expected fixed tag length
- * \param[out]      valid: True only after successful cryptographic verification
- * \param[in]       user_data: Application provider context
- * \return          XGL_OK when verification completed, error code otherwise
- */
-typedef xgl_error_t (*xgl_auth_verify_fn)(const xgl_auth_input_t* input,
-                                          const uint8_t* tag, size_t tag_len,
-                                          bool* valid, void* user_data);
-
-/** \brief           Synchronous application-supplied authentication algorithm
- */
-typedef struct {
-    xgl_auth_sign_fn sign; /**< Synchronous outgoing authentication callback */
-    xgl_auth_verify_fn
-        verify;      /**< Synchronous incoming verification callback */
-    size_t tag_len;  /**< Fixed authentication tag size in bytes */
-    void* user_data; /**< Borrowed application context passed to callbacks */
-} xgl_auth_provider_t;
-
-/**
- * \brief           Feature flags configuration
- */
-typedef struct {
-    bool
-        enable_compression; /**< Reserved; rejected until codec path is wired */
-    bool enable_encryption; /**< Reserved; rejected until codec path is wired */
-    size_t max_tx_packets;  /**< Total retained reliable packets */
-    size_t max_rx_buffered_packets; /**< Total retained out-of-order packets */
-    uint32_t
-        peer_idle_timeout_ms; /**< Idle peer reclaim timeout; 0 = disabled */
-    uint16_t max_peers;       /**< Peer/scope capacity; must be nonzero */
-} xgl_feature_config_t;
-
-/**
- * \brief           Protocol configuration structure
- */
-typedef struct {
-    /*-----------------------------------------------------------------------*/
-    /* Instance Identification                                               */
-    /*-----------------------------------------------------------------------*/
-    const char* name;   /**< Instance name (for debugging) */
-    uint16_t source_id; /**< Local node ID */
-
-    /*-----------------------------------------------------------------------*/
-    /* Grouped Configuration                                                 */
-    /*-----------------------------------------------------------------------*/
-    xgl_memory_config_t memory;     /**< Memory configuration */
-    xgl_protocol_config_t protocol; /**< Protocol parameters */
-    xgl_feature_config_t features;  /**< Feature flags */
-
-    /*-----------------------------------------------------------------------*/
-    /* Authentication Configuration                                          */
-    /*-----------------------------------------------------------------------*/
-    bool auth_required; /**< Require authentication for packets */
-    xgl_auth_provider_t* auth_provider; /**< Authentication callback provider */
-
-    /*-----------------------------------------------------------------------*/
-    /* Routing Configuration                                                 */
-    /*-----------------------------------------------------------------------*/
-    xgl_route_item_t* route_table; /**< Route table array */
-    size_t route_table_len;        /**< Number of routes in table */
-
-    /*-----------------------------------------------------------------------*/
-    /* Callbacks                                                             */
-    /*-----------------------------------------------------------------------*/
-    xgl_rx_callback_t rx_callback; /**< Receive callback */
-    xgl_rx_accept_fn
-        rx_accept_callback; /**< Optional bounded application admission */
-    xgl_error_callback_t error_callback; /**< Error callback */
-    void* callback_user_data;            /**< User data for callbacks */
-} xgl_config_t;
 
 /** \brief           Exact identity and semantics of synchronously borrowed RX.
  */
@@ -427,149 +146,88 @@ typedef xgl_error_t (*xgl_rx_scoped_fn)(xgl_handle_t handle,
                                         const uint8_t* data, size_t length,
                                         void* user_data);
 
-/** \brief           Observable scope transitions; ACK is not business
- * completion. */
-typedef enum {
-    XGL_SCOPE_FAILED,    /**< Terminal failure or explicit cancellation */
-    XGL_SCOPE_TX_DRAINED /**< All accepted reliable TX has been acknowledged */
-} xgl_scope_event_t;
-
 /**
- * \brief           Observe a scope transition synchronously without reentry
- * \param[in]       handle: Serialized instance
- * \param[in]       remote_id: Remote endpoint
- * \param[in]       connection_id: Exact connection
- * \param[in]       session_epoch: Exact generation
- * \param[in]       event: Transition kind
- * \param[in]       error: Terminal reason, or XGL_OK for drained TX
- * \param[in]       user_data: Application context
+ * \brief           Error callback function type
+ * \note            Runs synchronously; must not reenter, reset, or destroy the
+ *                  instance. Queue recovery work for after the callback
+ * returns.
+ * \param[in]       handle: Protocol instance handle
+ * \param[in]       error: Error code
+ * \param[in]       message: Non-NULL text; empty when diagnostics are disabled
+ * \param[in]       user_data: User data
  */
-typedef void (*xgl_scope_event_fn)(xgl_handle_t handle, uint16_t remote_id,
-                                   uint32_t connection_id,
-                                   uint32_t session_epoch,
-                                   xgl_scope_event_t event, xgl_error_t error,
-                                   void* user_data);
+typedef void (*xgl_error_callback_t)(xgl_handle_t handle, xgl_error_t error,
+                                     const char* message, void* user_data);
 
 /**
- * \brief           Versioned optional instance policy, borrowed until destroy
- * \note            Initialize with XGL_INSTANCE_OPTIONS_INIT. Requires the
- *                  advanced_runtime build capability. Scope callbacks cannot
- *                  reenter the instance.
+ * \brief           Per-link work limits for a nonblocking runtime step
+ * \note            Zero RX bytes skips polling but still maintains transport.
  */
 typedef struct {
-    size_t size;        /**< Exact descriptor size */
-    uint32_t version;   /**< XGL_INSTANCE_OPTIONS_VERSION */
-    size_t config_size; /**< Consumer xgl_config_t size */
+    size_t rx_bytes; /**< Maximum PHY bytes polled per link during one step */
+    uint32_t receive_timeout_ms; /**< Partial-frame timeout in milliseconds */
+} xgl_work_budget_t;
+
+/** \brief           Storage type aligned for the target's scalar types. */
+#if defined(__cplusplus)
+typedef std::max_align_t xgl_max_align_t;
+#elif defined(_MSC_VER)
+/* The MSVC C11 headers omit max_align_t. */
+typedef union {
+    long double floating; /**< Maximum floating-point alignment. */
+    long long integer;    /**< Maximum integer alignment. */
+    void* pointer;        /**< Object pointer alignment. */
+} xgl_max_align_t;
+#else
+typedef max_align_t xgl_max_align_t;
+#endif
+
+/**
+ * \brief           Memory configuration
+ */
+typedef struct {
+    size_t rx_buffer_size; /**< RX buffer size in bytes */
+} xgl_memory_config_t;
+
+/**
+ * \brief           Protocol parameters configuration
+ */
+typedef struct {
+    uint32_t ack_timeout_ms; /**< ACK timeout in milliseconds */
+    uint8_t max_retry_count; /**< Maximum retry count */
+    uint8_t window_size;     /**< Sliding window size */
+    uint16_t max_frame_size; /**< Maximum frame size in bytes */
+} xgl_protocol_config_t;
+
+/**
+ * \brief           Reliable peer and packet capacities
+ */
+typedef struct {
+    size_t max_tx_packets;          /**< Total retained reliable packets */
+    size_t max_rx_buffered_packets; /**< Total retained out-of-order packets */
     uint32_t
-        tx_lifetime_ms; /**< Reliable TX busy-period limit; 0 = unlimited */
-    bool protect_installed_scopes;       /**< Require authenticated RX/TX for
-                                            installed scopes */
-    xgl_rx_scoped_fn rx_scoped_callback; /**< Overrides legacy RX callbacks */
-    xgl_scope_event_fn
-        scope_event_callback; /**< Optional transition observer */
-    void* user_data;          /**< Borrowed callback context */
-} xgl_instance_options_t;
-
-/** \brief           Version of the optional instance policy descriptor. */
-#define XGL_INSTANCE_OPTIONS_VERSION 4U
-
-/** \brief           Compatible C11/C++17 initializer for optional policy. */
-#define XGL_INSTANCE_OPTIONS_INIT                                              \
-    {                                                                          \
-        sizeof(xgl_instance_options_t), XGL_INSTANCE_OPTIONS_VERSION,          \
-            sizeof(xgl_config_t), 0U, false, NULL, NULL, NULL                  \
-    }
-
-/** \brief           Additional limits for one bounded step; zero stops that
- * work. */
-typedef struct {
-    size_t parser_candidates; /**< Candidate checks per PHY; SIZE_MAX =
-                                 unlimited */
-    size_t tx_packets; /**< Maintenance TX attempts; SIZE_MAX = unlimited */
-} xgl_execution_limits_t;
-
-/** \brief           Bounded-step continuation, independent of the first error.
- */
-typedef struct {
-    bool pending; /**< Executable local work remains because a limit was reached
-                   */
-} xgl_execution_result_t;
-
-/** \brief           Current owned resources; this is not reserved workspace
- * size. */
-typedef struct {
-    size_t peer_count;          /**< Existing scopes */
-    size_t failed_peers;        /**< Terminal scopes requiring explicit close */
-    size_t tx_packets;          /**< Retained reliable records */
-    size_t tx_payload_bytes;    /**< Retained packet payload bytes */
-    size_t rx_buffered_packets; /**< Out-of-order retained packets */
-    size_t rx_buffered_bytes;   /**< Out-of-order payload bytes */
-} xgl_resource_snapshot_t;
-
-/*---------------------------------------------------------------------------*/
-/* Statistics Structure                                                      */
-/*---------------------------------------------------------------------------*/
+        peer_idle_timeout_ms; /**< Idle peer reclaim timeout; 0 = disabled */
+    uint16_t max_peers;       /**< Peer/scope capacity; must be nonzero */
+} xgl_feature_config_t;
 
 /**
- * \brief           Layer-specific statistics structure
- * \details         Each protocol layer maintains its own statistics to avoid
- *                  double-counting packets as they traverse the stack
+ * \brief           Immutable instance configuration borrowed until destroy
  */
 typedef struct {
-    /*-----------------------------------------------------------------------*/
-    /* Transmission Statistics                                               */
-    /*-----------------------------------------------------------------------*/
-    uint64_t tx_packets; /**< Total transmitted packets */
-    uint64_t tx_bytes;   /**< Total transmitted bytes */
-    uint64_t tx_errors;  /**< Transmission errors */
-
-    /*-----------------------------------------------------------------------*/
-    /* Reception Statistics                                                  */
-    /*-----------------------------------------------------------------------*/
-    uint64_t rx_packets; /**< Total received packets */
-    uint64_t rx_bytes;   /**< Total received bytes */
-    uint64_t rx_errors;  /**< Reception errors */
-    uint64_t rx_dropped; /**< Dropped packets */
-} xgl_layer_stats_t;
-
-/**
- * \brief           Counters read and reset under caller-serialized access
- */
-typedef struct {
-    /*-----------------------------------------------------------------------*/
-    /* Layer-Specific Statistics                                             */
-    /*-----------------------------------------------------------------------*/
-    xgl_layer_stats_t datalink;  /**< Data link layer statistics */
-    xgl_layer_stats_t network;   /**< Network layer statistics */
-    xgl_layer_stats_t transport; /**< Transport layer statistics */
-
-    /*-----------------------------------------------------------------------*/
-    /* Protocol-Specific Counters                                            */
-    /*-----------------------------------------------------------------------*/
-    uint64_t tx_retries;           /**< Retransmission count (transport) */
-    uint64_t rx_header_crc_errors; /**< Header CRC errors (datalink) */
-    uint64_t rx_crc16_errors;      /**< Frame CRC16 errors (datalink) */
-
-    /*-----------------------------------------------------------------------*/
-    /* Performance Metrics                                                   */
-    /*-----------------------------------------------------------------------*/
-    uint32_t avg_rtt_ms; /**< Average RTT in milliseconds */
-    uint32_t
-        max_rtt_ms; /**< Largest accepted first-transmission ACK sample in ms */
-    uint32_t min_rtt_ms; /**< Smallest RTT sample in ms; UINT32_MAX before a
-                            sample */
-
-    /*-----------------------------------------------------------------------*/
-    /* Memory Usage                                                          */
-    /*-----------------------------------------------------------------------*/
-    size_t memory_used; /**< Total workspace bytes reserved for the instance */
-    size_t memory_peak; /**< Peak reservation; equals memory_used for fixed
-                           workspace */
-} xgl_statistics_t;
-
-/*---------------------------------------------------------------------------*/
-/* Transmission Data Structures                                              */
-/*---------------------------------------------------------------------------*/
+    uint16_t source_id;             /**< Local node identifier */
+    xgl_memory_config_t memory;     /**< Per-PHY RX storage */
+    xgl_protocol_config_t protocol; /**< Frame, retry and window limits */
+    xgl_feature_config_t features;  /**< Reliable resource capacities */
+    bool auth_required;             /**< Require local authentication */
+    const xgl_auth_provider_t* auth_provider; /**< Optional borrowed provider */
+    xgl_route_item_t* route_table;       /**< Immutable borrowed route array */
+    size_t route_table_len;              /**< Number of route entries */
+    xgl_rx_scoped_fn rx_callback;        /**< Synchronous payload acceptance */
+    void* rx_user_data;                  /**< Context for rx_callback */
+    xgl_error_callback_t error_callback; /**< Synchronous error observer */
+    void* callback_user_data;            /**< Context for error_callback */
+    const xgl_instance_options_t* options; /**< Optional runtime policy */
+} xgl_config_t;
 
 /**
  * \brief           Standard transmission data
@@ -588,45 +246,7 @@ typedef struct {
         connection_id; /**< Connection scope for peer state (0 = default) */
     uint32_t session_epoch; /**< Session epoch for replay and peer isolation
                                (0 = default) */
-    uint8_t compression_id; /**< Reserved; must be zero until implemented */
 } xgl_tx_data_t;
-
-/**
- * \brief           Zero-copy transmission data
- */
-typedef struct {
-    uint8_t* buffer;    /**< Buffer with pre-allocated header space */
-    size_t buffer_size; /**< Total buffer size */
-    size_t data_offset; /**< Exact payload offset from the layout query */
-    size_t data_len;    /**< Actual data length */
-
-    /* Transmission parameters */
-    uint16_t target_id; /**< Target node ID */
-    uint8_t data_type;  /**< Application payload class encoded as DATA_TYPE_EXT
-                           when non-zero */
-    bool reliable;      /**< Must be false for synchronous caller-buffer TX */
-    uint8_t priority; /**< Wire priority (0-7); no local priority scheduling */
-    uint32_t timeout_ms; /**< Ignored; no ACK/retry state is retained */
-} xgl_tx_data_zerocopy_t;
-
-/**
- * \brief           Scoped synchronous caller-buffer transmission request
- * \note            Keeps the legacy request layout unchanged. Reliable sends
- *                  are unsupported; data.timeout_ms is ignored.
- */
-typedef struct {
-    xgl_tx_data_zerocopy_t
-        data;               /**< Borrowed frame storage and send metadata */
-    uint32_t connection_id; /**< Exact connection scope, zero is the default */
-    uint32_t session_epoch; /**< Exact trusted epoch, zero omits SESSION_EXT */
-} xgl_tx_zerocopy_request_t;
-
-/** \brief           Exact storage required for one synchronous frame. */
-typedef struct {
-    size_t
-        payload_offset; /**< Header bytes including all selected extensions */
-    size_t frame_size; /**< Header, payload, authentication tag and final CRC */
-} xgl_tx_frame_layout_t;
 
 #ifdef __cplusplus
 }

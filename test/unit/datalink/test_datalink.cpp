@@ -11,7 +11,10 @@
 #include <network/xgl_route.h>
 #include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
+#include <xgl/xgl_alloc.h>
 #include <xgl/xgl_config.h>
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_security.h>
 
 #include "test_host_allocator.h"
 #include <cstdlib>

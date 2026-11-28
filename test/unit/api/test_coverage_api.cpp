@@ -11,6 +11,11 @@
 #include "test_host_allocator.h"
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_inplace.h>
+#include <xgl/xgl_runtime.h>
+#include <xgl/xgl_security.h>
 
 #include "api/xgl_instance_internal.h"
 #include "test_security_helpers.h"
@@ -49,7 +54,6 @@ xgl_auth_provider_t coverage_provider() {
 xgl_config_t coverage_config() {
     xgl_config_t config;
     config = xgl_test_two_packet_config();
-    config.memory.allocator = xgl_test_host_allocator();
     return config;
 }
 
@@ -81,73 +85,31 @@ xgl_phy_ops_t coverage_phy(CoveragePhy* state) {
     return phy;
 }
 
-struct AllocationObserver {
-    const xgl_allocator_t* backing;
-    xgl_allocator_t service = {};
-    std::vector<void*> live;
-    size_t attempts = 0;
-    size_t fail_at = 0;
-    size_t allocations = 0;
-    size_t releases = 0;
-    size_t duplicate_releases = 0;
-
-    explicit AllocationObserver(const xgl_allocator_t* allocator)
-        : backing(allocator) {
-        service.ctx = this;
-        service.alloc = [](void* context, size_t size) -> void* {
-            auto& observer = *static_cast<AllocationObserver*>(context);
-            ++observer.attempts;
-            if (observer.fail_at != 0U &&
-                observer.attempts == observer.fail_at) {
-                return nullptr;
-            }
-            void* result = xgl_alloc(observer.backing, size);
-            if (result != nullptr) {
-                observer.live.push_back(result);
-                ++observer.allocations;
-            }
-            return result;
-        };
-        service.free = [](void* context, void* pointer) {
-            auto& observer = *static_cast<AllocationObserver*>(context);
-            auto found =
-                std::find(observer.live.begin(), observer.live.end(), pointer);
-            if (found == observer.live.end()) {
-                ++observer.duplicate_releases;
-                return;
-            }
-            observer.live.erase(found);
-            ++observer.releases;
-            xgl_free(observer.backing, pointer);
-        };
-    }
-};
-
 } /* namespace */
 
 TEST(XglCoverageApi, RejectsIncompleteResourceBudgets) {
     auto config = coverage_config();
     config.source_id = XGL_BROADCAST_ID;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
     config = coverage_config();
     config.features.max_peers = 0;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
     config = coverage_config();
     config.features.peer_idle_timeout_ms = UINT32_C(0x80000000);
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
     config = coverage_config();
     config.protocol.window_size = 2;
     config.features.max_rx_buffered_packets = 0;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
     auto provider = coverage_provider();
     config = coverage_config();
     config.auth_required = true;
     config.auth_provider = &provider;
     provider.sign = nullptr;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
     provider = coverage_provider();
     provider.verify = nullptr;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST(XglCoverageApi,
@@ -161,19 +123,17 @@ TEST(XglCoverageApi,
             sizeof(std::max_align_t) +
         1);
     xgl_handle_t handle = nullptr;
-    EXPECT_EQ(xgl_workspace_prepare(&config, storage.data(), required.size,
-                                    nullptr, nullptr),
+    EXPECT_EQ(xgl_init_static(&config, storage.data(), required.size, nullptr),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_workspace_prepare(&config, nullptr, required.size, nullptr,
-                                    &handle),
+    EXPECT_EQ(xgl_init_static(&config, nullptr, required.size, &handle),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_workspace_prepare(&config, storage.data(), required.size - 1,
-                                    nullptr, &handle),
-              XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(
+        xgl_init_static(&config, storage.data(), required.size - 1, &handle),
+        XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(handle, nullptr);
-    EXPECT_EQ(xgl_workspace_prepare(
-                  &config, reinterpret_cast<uint8_t*>(storage.data()) + 1,
-                  required.size, nullptr, &handle),
+    EXPECT_EQ(xgl_init_static(&config,
+                              reinterpret_cast<uint8_t*>(storage.data()) + 1,
+                              required.size, &handle),
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(xgl_init_static(&config, storage.data(), required.size, nullptr),
               XGL_ERR_NULL_POINTER);
@@ -195,52 +155,52 @@ TEST(XglCoverageApi,
         }
         xgl_memory_requirements_t required = {};
         required.size = 123;
-        ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
         EXPECT_EQ(xgl_memory_requirements(&config, &required),
                   XGL_ERR_INVALID_PARAM);
         EXPECT_EQ(required.size, 123U);
     }
 }
 
-TEST(XglCoverageApi,
-     RuntimeAndSendRejectUninitializedOrInvalidWorkWithoutProgress) {
+TEST(XglCoverageApi, RuntimeAndSendRejectInvalidWorkWithoutProgress) {
     auto config = coverage_config();
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
     uint32_t delay = 91;
     xgl_work_budget_t budget = {};
     xgl_tx_data_t tx = {};
-    xgl_tx_data_zerocopy_t zero = {};
-    EXPECT_FALSE(xgl_next_timeout(nullptr, 0, &delay));
-    EXPECT_FALSE(xgl_next_timeout(handle, 0, &delay));
+    xgl_tx_zerocopy_request_t zero = {};
+    EXPECT_FALSE(xgl_deadline_query(nullptr, 0, nullptr, &delay));
+    EXPECT_FALSE(xgl_deadline_query(handle, 0, nullptr, &delay));
     EXPECT_EQ(delay, 91U);
     EXPECT_EQ(xgl_step(nullptr, 0, &budget), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_step(handle, 0, nullptr), XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_step(handle, 0, &budget), XGL_ERR_NOT_INITIALIZED);
-    EXPECT_EQ(xgl_send_at(handle, &tx, 0), XGL_ERR_NOT_INITIALIZED);
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_NOT_INITIALIZED);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
-    EXPECT_FALSE(xgl_next_timeout(handle, 0, nullptr));
+    EXPECT_FALSE(xgl_deadline_query(handle, 0, nullptr, nullptr));
     budget.receive_timeout_ms = UINT32_C(0x80000000);
     EXPECT_EQ(xgl_step(handle, 0, &budget), XGL_ERR_INVALID_PARAM);
     tx.data_len = 1;
     EXPECT_EQ(xgl_send_at(handle, &tx, 0), XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 0),
+              XGL_ERR_NULL_POINTER);
     uint8_t buffer[64] = {};
     zero.buffer = buffer;
     zero.buffer_size = sizeof(buffer);
     zero.data_offset = XGL_WIRE_BASE_HEADER_SIZE;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 0),
+              XGL_ERR_INVALID_PARAM);
     zero.data_len = 41;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 0),
+              XGL_ERR_BUFFER_TOO_SMALL);
     zero.data_len = 40;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 0),
+              XGL_ERR_BUFFER_TOO_SMALL);
     zero.data_len = 1;
     zero.priority = 8;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 0),
+              XGL_ERR_INVALID_PARAM);
     zero.priority = 0;
     zero.target_id = 123;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_ROUTE_NOT_FOUND);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 0),
+              XGL_ERR_ROUTE_NOT_FOUND);
     xgl_destroy(handle);
     /* Value 99 is unassigned and fits the public enum's range. */
     EXPECT_NE(xgl_error_string(static_cast<xgl_error_t>(99)), nullptr);
@@ -264,13 +224,12 @@ TEST(XglCoverageApi, RuntimeUsesFastestSharedPhyAndPreservesFirstReceiveError) {
     auto config = coverage_config();
     config.route_table = routes;
     config.route_table_len = 3;
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     ASSERT_EQ(handle->link_count, 2U);
     EXPECT_EQ(handle->links[0].poll_interval_ms, 1U);
     uint32_t delay = 99;
-    ASSERT_TRUE(xgl_next_timeout(handle, 0, &delay));
+    ASSERT_TRUE(xgl_deadline_query(handle, 0, nullptr, &delay));
     EXPECT_EQ(delay, 0U);
     xgl_work_budget_t budget = {};
     budget.rx_bytes = 64;
@@ -280,14 +239,14 @@ TEST(XglCoverageApi, RuntimeUsesFastestSharedPhyAndPreservesFirstReceiveError) {
     EXPECT_EQ(xgl_step(handle, 0, &budget), XGL_ERR_TIMEOUT);
     EXPECT_EQ(first.reads, 1U);
     EXPECT_EQ(second.reads, 1U);
-    ASSERT_TRUE(xgl_next_timeout(handle, 0, &delay));
+    ASSERT_TRUE(xgl_deadline_query(handle, 0, nullptr, &delay));
     EXPECT_EQ(delay, 1U);
     first.read_error = XGL_OK;
     second.read_error = XGL_OK;
     EXPECT_EQ(xgl_step(handle, 1, &budget), XGL_OK);
     EXPECT_EQ(first.reads, 2U);
     EXPECT_EQ(second.reads, 1U);
-    ASSERT_TRUE(xgl_next_timeout(handle, 60, &delay));
+    ASSERT_TRUE(xgl_deadline_query(handle, 60, nullptr, &delay));
     EXPECT_EQ(delay, 0U);
     xgl_destroy(handle);
     xgl_instance_destroy_links(nullptr);
@@ -296,8 +255,10 @@ TEST(XglCoverageApi, RuntimeUsesFastestSharedPhyAndPreservesFirstReceiveError) {
 TEST(XglCoverageApi, InvalidAllocatorAndDriverConfigurationFailBeforeUse) {
     auto config = coverage_config();
     xgl_allocator_t allocator = {};
-    config.memory.allocator = &allocator;
-    EXPECT_EQ(xgl_create(&config), nullptr);
+    xgl_handle_t handle = nullptr;
+    EXPECT_EQ(xgl_init_allocated(&config, &allocator, &handle),
+              XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(handle, nullptr);
     CoveragePhy state;
     auto phy = coverage_phy(&state);
     xgl_route_item_t route = {};
@@ -305,14 +266,13 @@ TEST(XglCoverageApi, InvalidAllocatorAndDriverConfigurationFailBeforeUse) {
     route.phy = &phy;
     route.max_frame_size = 128;
     route.read_freq_hz = 10;
-    config.memory.allocator = xgl_test_host_allocator();
     config.route_table = &route;
     config.route_table_len = 1;
     phy.rx = nullptr;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
     phy = coverage_phy(&state);
     route.max_frame_size = 2049;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(state.reads, 0U);
     EXPECT_EQ(state.writes, 0U);
 }
@@ -328,36 +288,37 @@ TEST(XglCoverageApi, ReplayRejectsAnotherConnectionWithoutConsumingSequence) {
 
 #if XGL_FEATURE_AUTH
 TEST(XglCoverageApi, FailedInitializationReleasesEachAllocationOnlyOnce) {
-    AllocationObserver workspace(xgl_test_host_allocator());
     auto config = coverage_config();
-    CoveragePhy state;
-    auto phy = coverage_phy(&state);
-    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
-    config.route_table = &route;
-    config.route_table_len = 1U;
-    config.memory.allocator = &workspace.service;
-    ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
-    xgl_handle_t handle = xgl_create(&config);
-    ASSERT_NE(handle, nullptr);
+    xgl_memory_requirements_t requirements = {};
+    ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
+    std::vector<std::max_align_t> storage(
+        requirements.size / sizeof(std::max_align_t) + 2U);
 
-    /* Fail after initialization has acquired live route and link storage. */
-    AllocationObserver initialization(handle->allocator);
-    initialization.fail_at = 5U;
-    handle->allocator = &initialization.service;
-    EXPECT_EQ(xgl_init(handle), XGL_ERR_NO_MEMORY);
-    EXPECT_EQ(initialization.attempts, initialization.fail_at);
-    EXPECT_FALSE(handle->initialized);
-    EXPECT_GT(initialization.allocations, 0U);
-    EXPECT_EQ(initialization.releases, initialization.allocations);
-    EXPECT_TRUE(initialization.live.empty());
-    EXPECT_EQ(handle->links, nullptr);
-    EXPECT_EQ(handle->link_count, 0U);
-    xgl_destroy(handle);
-    EXPECT_EQ(initialization.duplicate_releases, 0U);
-    EXPECT_EQ(workspace.allocations, 1U);
-    EXPECT_EQ(workspace.releases, 1U);
-    EXPECT_EQ(workspace.duplicate_releases, 0U);
-    EXPECT_TRUE(workspace.live.empty());
+    struct Backend {
+        void* address;
+        size_t allocations;
+        size_t releases;
+    } backend = {reinterpret_cast<uint8_t*>(storage.data()) + 1U, 0U, 0U};
+
+    const xgl_allocator_t allocator = {&backend,
+                                       [](void* context, size_t) {
+                                           auto& state =
+                                               *static_cast<Backend*>(context);
+                                           ++state.allocations;
+                                           return state.address;
+                                       },
+                                       [](void* context, void* address) {
+                                           auto& state =
+                                               *static_cast<Backend*>(context);
+                                           EXPECT_EQ(address, state.address);
+                                           ++state.releases;
+                                       }};
+    xgl_handle_t handle = nullptr;
+    EXPECT_EQ(xgl_init_allocated(&config, &allocator, &handle),
+              XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(handle, nullptr);
+    EXPECT_EQ(backend.allocations, 1U);
+    EXPECT_EQ(backend.releases, 1U);
 }
 
 TEST(XglCoverageApi,
@@ -365,22 +326,16 @@ TEST(XglCoverageApi,
     auto config = coverage_config();
     auto provider = coverage_provider();
     config.auth_provider = &provider;
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
     auto session = test_session_config(2, 3, 4);
     EXPECT_EQ(xgl_install_security_session(nullptr, &session),
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_install_security_session(handle, nullptr),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_install_security_session(handle, &session),
-              XGL_ERR_NOT_INITIALIZED);
     EXPECT_EQ(xgl_close_security_session(nullptr, 2, 3, 4),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_close_security_session(handle, 2, 3, 4),
-              XGL_ERR_NOT_INITIALIZED);
     EXPECT_EQ(xgl_close_peer(nullptr, 2, 3, 4), XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_close_peer(handle, 2, 3, 4), XGL_ERR_NOT_INITIALIZED);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     EXPECT_EQ(xgl_close_security_session(handle, 2, 3, 4), XGL_ERR_NOT_FOUND);
     ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
     EXPECT_EQ(xgl_close_peer(handle, 2, 3, 4), XGL_ERR_INVALID_PARAM);
@@ -659,26 +614,26 @@ TEST(XglCoverageApi,
     config.route_table_len = 1;
     config.auth_required = true;
     config.auth_provider = &provider;
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     auto session = test_session_config(2);
     ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
     uint8_t buffer[128] = {};
-    xgl_tx_data_zerocopy_t zero = {};
+    xgl_tx_zerocopy_request_t zero = {};
     zero.buffer = buffer;
     zero.buffer_size = sizeof(buffer);
     zero.data_len = 1;
     zero.target_id = 2;
     zero.data_type = 9;
     zero.data_offset = XGL_WIRE_BASE_HEADER_SIZE;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 1), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 1),
+              XGL_ERR_INVALID_PARAM);
     zero.data_offset += XGL_SECURITY_EXT_SIZE + XGL_DATA_TYPE_EXT_SIZE;
     buffer[zero.data_offset] = 0x73;
-    ASSERT_EQ(xgl_send_zerocopy_at(handle, &zero, 1), XGL_OK);
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 1), XGL_OK);
     EXPECT_EQ(phy_state.writes, 1U);
     phy_state.write_error = XGL_ERR_TX_FAILED;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 1), XGL_ERR_TX_FAILED);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero, 1), XGL_ERR_TX_FAILED);
     phy_state.write_error = XGL_OK;
     xgl_tx_data_t tx = {};
     tx.target_id = 2;
@@ -720,12 +675,11 @@ class ScopedZeroCopyApiTest : public ::testing::Test {
         config.route_table_len = 1U;
         config.auth_required = true;
         config.auth_provider = &provider;
-        handle = xgl_create(&config);
+        handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr);
-        ASSERT_EQ(xgl_init(handle), XGL_OK);
-        request.data.target_id = 2U;
-        request.data.data_type = 9U;
-        request.data.data_len = 3U;
+        request.target_id = 2U;
+        request.data_type = 9U;
+        request.data_len = 3U;
         request.connection_id = 11U;
         request.session_epoch = 9U;
     }
@@ -763,9 +717,9 @@ TEST_F(ScopedZeroCopyApiTest, PlansExactHeadroomWithoutConsumingSecurityState) {
     EXPECT_EQ(sign_calls, 0U);
     EXPECT_EQ(phy_state.writes, 0U);
     std::vector<uint8_t> buffer(layout.frame_size, 0U);
-    request.data.buffer = buffer.data();
-    request.data.buffer_size = buffer.size();
-    request.data.data_offset = layout.payload_offset;
+    request.buffer = buffer.data();
+    request.buffer_size = buffer.size();
+    request.data_offset = layout.payload_offset;
     const uint8_t payload[] = {0x17U, 0x28U, 0x39U};
     std::memcpy(buffer.data() + layout.payload_offset, payload,
                 sizeof(payload));
@@ -798,37 +752,32 @@ TEST_F(ScopedZeroCopyApiTest, RejectsInvalidMetadataAndStorageBeforeSigning) {
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, nullptr),
               XGL_ERR_NULL_POINTER);
-    request.data.reliable = true;
-    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
-              XGL_ERR_INVALID_PARAM);
-    request.data.reliable = false;
-    request.data.data_len = SIZE_MAX;
+    request.data_len = SIZE_MAX;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_BUFFER_TOO_SMALL);
-    request.data.data_len = 100U;
+    request.data_len = 100U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_BUFFER_TOO_SMALL);
-    request.data.data_len = 3U;
+    request.data_len = 3U;
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     uint8_t buffer[128] = {};
-    request.data.buffer = buffer;
-    request.data.buffer_size = layout.frame_size - 1U;
-    request.data.data_offset = layout.payload_offset;
+    request.buffer = buffer;
+    request.buffer_size = layout.frame_size - 1U;
+    request.data_offset = layout.payload_offset;
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
               XGL_ERR_BUFFER_TOO_SMALL);
-    request.data.buffer_size = sizeof(buffer);
-    request.data.data_offset++;
+    request.buffer_size = sizeof(buffer);
+    request.data_offset++;
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
               XGL_ERR_INVALID_PARAM);
-    request.data.buffer = nullptr;
+    request.buffer = nullptr;
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(sign_calls, 0U);
     EXPECT_EQ(phy_state.writes, 0U);
 }
 
-TEST_F(ScopedZeroCopyApiTest,
-       LegacyEntryKeepsDefaultScopeAndOriginalRequestAbi) {
+TEST_F(ScopedZeroCopyApiTest, ExplicitZeroScopeUsesDefaultSecurityAssociation) {
     auto session = test_session_config(2U);
     ASSERT_EQ(xgl_install_security_session(handle, &session), XGL_OK);
     request.connection_id = 0U;
@@ -837,11 +786,11 @@ TEST_F(ScopedZeroCopyApiTest,
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     EXPECT_EQ(layout.payload_offset, 42U);
     uint8_t buffer[128] = {};
-    request.data.buffer = buffer;
-    request.data.buffer_size = sizeof(buffer);
-    request.data.data_offset = layout.payload_offset;
+    request.buffer = buffer;
+    request.buffer_size = sizeof(buffer);
+    request.data_offset = layout.payload_offset;
     buffer[layout.payload_offset] = 0x43U;
-    ASSERT_EQ(xgl_send_zerocopy_at(handle, &request.data, 0U), XGL_OK);
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U), XGL_OK);
     xgl_wire_frame_view_t first = {};
     ASSERT_EQ(xgl_wire_decode_frame(&first, captured.data(), captured.size(),
                                     nullptr),
@@ -857,21 +806,21 @@ TEST_F(ScopedZeroCopyApiTest, QueriesDoNotChangeStatisticsOrClosedScopeState) {
     xgl_statistics_t before = {};
     ASSERT_EQ(xgl_stats_get(handle, &before), XGL_OK);
     xgl_tx_frame_layout_t layout = {};
-    request.data.target_id = 3U;
+    request.target_id = 3U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_ROUTE_NOT_FOUND);
-    request.data.target_id = 0U;
+    request.target_id = 0U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_INVALID_PARAM);
-    request.data.target_id = 2U;
-    request.data.data_len = 0U;
+    request.target_id = 2U;
+    request.data_len = 0U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_INVALID_PARAM);
-    request.data.data_len = 3U;
-    request.data.priority = 8U;
+    request.data_len = 3U;
+    request.priority = 8U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_INVALID_PARAM);
-    request.data.priority = 0U;
+    request.priority = 0U;
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     ASSERT_EQ(xgl_close_security_session(handle, 2U, 11U, 9U), XGL_OK);
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
@@ -895,9 +844,9 @@ TEST_F(ScopedZeroCopyApiTest,
     xgl_tx_frame_layout_t layout = {};
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     uint8_t buffer[128] = {};
-    request.data.buffer = buffer;
-    request.data.buffer_size = sizeof(buffer);
-    request.data.data_offset = layout.payload_offset;
+    request.buffer = buffer;
+    request.buffer_size = sizeof(buffer);
+    request.data_offset = layout.payload_offset;
     phy_state.write_error = XGL_ERR_TX_FAILED;
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 1U),
               XGL_ERR_TX_FAILED);
@@ -919,21 +868,16 @@ TEST_F(ScopedZeroCopyApiTest, PlainScopedFramesNeedNoSecurityAssociation) {
     xgl_destroy(handle);
     config.auth_required = false;
     config.auth_provider = nullptr;
-    handle = xgl_create(&config);
+    handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
     xgl_tx_frame_layout_t layout = {};
-    EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
-              XGL_ERR_NOT_INITIALIZED);
-    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
-              XGL_ERR_NOT_INITIALIZED);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     EXPECT_EQ(layout.payload_offset, 41U);
     EXPECT_EQ(layout.frame_size, 46U);
     uint8_t buffer[128] = {};
-    request.data.buffer = buffer;
-    request.data.buffer_size = sizeof(buffer);
-    request.data.data_offset = layout.payload_offset;
+    request.buffer = buffer;
+    request.buffer_size = sizeof(buffer);
+    request.data_offset = layout.payload_offset;
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(nullptr, &request, 0U),
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, nullptr, 0U),

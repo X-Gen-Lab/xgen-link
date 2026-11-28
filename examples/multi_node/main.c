@@ -14,38 +14,34 @@
  * \brief           Count one valid application payload without calling protocol
  * APIs
  */
-static void receive_payload(xgl_handle_t handle, uint16_t source, uint8_t type,
-                            const uint8_t* data, size_t length, void* context) {
+static xgl_error_t receive_payload(xgl_handle_t handle,
+                                   const xgl_rx_info_t* info,
+                                   const uint8_t* data, size_t length,
+                                   void* context) {
     (void)handle;
-    (void)type;
-    if (source == 1U && length == 3U && memcmp(data, "hop", 3U) == 0) {
+    if (info->source_id == 1U && length == 3U && memcmp(data, "hop", 3U) == 0) {
         (*(unsigned*)context)++;
     }
+    return XGL_OK;
 }
 
 /** \brief           Forward one reliable message and its ACK through a router.
  */
 int main(void) {
     static sim_node_t a, router, b;
-    static sim_channel_t ar, ra, rb, br;
-    sim_port_t pa = {&ra, &ar, false, 0};
-    sim_port_t pr1 = {&ar, &ra, false, 0};
-    sim_port_t pr2 = {&br, &rb, false, 0};
-    sim_port_t pb = {&rb, &br, false, 0};
-    xgl_phy_ops_t phys[4] = {{sim_tx, sim_rx, &pa},
-                             {sim_tx, sim_rx, &pr1},
-                             {sim_tx, sim_rx, &pr2},
-                             {sim_tx, sim_rx, &pb}};
+    static sim_link_t west, east;
+    sim_connect(&west);
+    sim_connect(&east);
     unsigned delivered = 0;
     sim_prepare(&a, 1U);
     sim_prepare(&router, 2U);
     sim_prepare(&b, 3U);
-    sim_route(&a, 0U, 3U, &phys[0]);
-    sim_route(&router, 0U, 1U, &phys[1]);
-    sim_route(&router, 1U, 3U, &phys[2]);
-    sim_route(&b, 0U, 1U, &phys[3]);
+    sim_route(&a, 0U, 3U, &west.phys[0]);
+    sim_route(&router, 0U, 1U, &west.phys[1]);
+    sim_route(&router, 1U, 3U, &east.phys[0]);
+    sim_route(&b, 0U, 1U, &east.phys[1]);
     b.config.rx_callback = receive_payload;
-    b.config.callback_user_data = &delivered;
+    b.config.rx_user_data = &delivered;
     if (sim_init(&a) != XGL_OK || sim_init(&router) != XGL_OK ||
         sim_init(&b) != XGL_OK) {
         return 1;

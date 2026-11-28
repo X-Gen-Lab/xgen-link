@@ -24,15 +24,17 @@ cmake --build build/first-link --target echo_server
 
 示例显式将可靠窗口与 peer 容量各设为 1，完整帧上限取构建上限与 128 字节中的较小值。为两端设置各自的本地节点、到对端的路由、PHY 和应用回调。配置及引用对象保留到销毁。
 
-调用 `xgl_memory_requirements()`，检查精确大小和对齐，为 `xgl_init_static()` 提供足够容量。不同 profile 和容量需要不同空间。也可由 `xgl_create()` 通过选定后端预留相同布局，然后调用 `xgl_init()`。
+调用 `xgl_memory_requirements()`，检查精确大小和对齐，为 `xgl_init_static()` 提供足够容量。不同 profile 和容量需要不同空间。需要按需分配时，使用 `<xgl/xgl_alloc.h>` 的 `xgl_init_allocated()` 一次完成申请和初始化。
 
 ## 主循环
+
+本例用 `<xgl/xgl_runtime.h>` 查询下次唤醒时间。
 
 ```c
 const xgl_work_budget_t budget = {128U, 1000U};
 (void)xgl_step(handle, now_ms, &budget);
 uint32_t delay_ms;
-if (xgl_next_timeout(handle, now_ms, &delay_ms)) {
+if (xgl_deadline_query(handle, now_ms, &budget, &delay_ms)) {
     /* 应用决定下次唤醒时机。 */
 }
 ```

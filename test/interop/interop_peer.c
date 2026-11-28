@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_security.h>
 
 #define INTEROP_CONNECTION 83U
 #define INTEROP_EPOCH      29U
@@ -48,12 +49,15 @@ static xgl_error_t receive(uint8_t* bytes, size_t* length, void* context) {
     return XGL_OK;
 }
 
-static void deliver(xgl_handle_t handle, uint16_t source, uint8_t type,
-                    const uint8_t* bytes, size_t length, void* context) {
+static xgl_error_t deliver(xgl_handle_t handle, const xgl_rx_info_t* info,
+                           const uint8_t* bytes, size_t length, void* context) {
+    const uint16_t source = info->source_id;
+    const uint8_t type = info->data_type;
     const interop_phy_t* phy = context;
     (void)handle;
     emit(source == phy->remote && type == INTEROP_TYPE ? "rx" : "wrong", bytes,
          length);
+    return XGL_OK;
 }
 
 #if XGL_FEATURE_AUTH
@@ -171,7 +175,7 @@ int main(int argc, char** argv) {
     state.local = (uint16_t)(argv[1][0] - '0');
     state.remote = (uint16_t)(3U - state.local);
     xgl_phy_ops_t phy = {transmit, receive, &state};
-    xgl_route_item_t route = {state.remote, &phy, 128U, 1000U, 0U};
+    xgl_route_item_t route = {state.remote, &phy, 128U, 1000U};
     const bool full = strcmp(argv[2], "full") == 0;
     if (full ? !(XGL_FEATURE_AUTH && XGL_FEATURE_OUT_OF_ORDER)
              : strcmp(argv[2], "boot") != 0) {
@@ -192,7 +196,7 @@ int main(int argc, char** argv) {
     config.route_table = &route;
     config.route_table_len = 1U;
     config.rx_callback = deliver;
-    config.callback_user_data = &state;
+    config.rx_user_data = &state;
 #if XGL_FEATURE_AUTH
     xgl_auth_provider_t provider = {sign_frame, verify_frame, 4U, NULL};
     config.auth_required = full;

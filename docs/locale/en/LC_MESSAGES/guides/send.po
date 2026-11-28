@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 29efec1a5d427a3f1f590c524572caf4e512e61fda8cb26d38c62d7533c190cb\n"
+"X-XGL-Source-SHA256: 9370d4ed2eefe783d89b09dae983f4d5345109ed04bee9a8cd249464a9591f93\n"
 
 #: docs/zh/guides/send.md:8
 msgid "发送 API"
@@ -33,12 +33,11 @@ msgstr ""
 
 #: docs/zh/guides/send.md:27
 msgid ""
-"示例假定应用变量有效且 handle 已初始化。Payload 长度必须非零，`priority` 为 0–7，只编码到 wire traffic class；SDK 不据此排序本地发送或抢占其他 "
-"peer。保留字段 `compression_id` 保持零。"
+"示例假定应用变量有效且 handle 已初始化。Payload 长度必须非零，`priority` 为 0–7，只编码到 wire traffic class；SDK 不据此排序本地发送或抢占其他 peer。"
 msgstr ""
-"The example assumes valid application variables and an initialized handle. Payload length must be "
-"nonzero; `priority` is 0–7 and is encoded only in the wire traffic class. The SDK does not use it to "
-"order local sends or preempt other peers. Keep reserved `compression_id` zero."
+"The example assumes valid application variables and an initialized handle. The payload must be nonempty "
+"and `priority` must be in 0–7. Priority is encoded in the wire traffic class and does not affect local "
+"scheduling or preemption of other peers."
 
 #: docs/zh/guides/send.md:29
 msgid "调用者提供帧存储"
@@ -46,39 +45,13 @@ msgstr "Caller-Owned Frame Storage"
 
 #: docs/zh/guides/send.md:31
 msgid ""
-"`xgl_send_zerocopy_at()` 保持原请求结构布局，始终使用零 connection ID 和零 epoch。显式 scope 使用 `xgl_tx_zerocopy_request_t` "
-"与 `xgl_send_zerocopy_scoped_at()`。两个入口都只支持非空、非可靠、单帧 payload；`reliable=true` 会被拒绝，`timeout_ms` "
-"被忽略。它们不提供保留缓冲区的异步 DMA 或重传所有权。"
+"`<xgl/xgl_inplace.h>` 提供同步非可靠单帧发送。用 `xgl_send_zerocopy_layout()` 查询精确空间，再把非空载荷放入调用者帧缓冲区，通过 "
+"`xgl_send_zerocopy_scoped_at()` 提交。工作区布局、写入位置和实现示例见[零拷贝](in-place-send.md)。"
 msgstr ""
-"`xgl_send_zerocopy_at()` keeps its original request layout and always uses connection ID and epoch zero."
-" Use `xgl_send_zerocopy_scoped_at()` with `xgl_tx_zerocopy_request_t` for an explicit scope. Both "
-"entries support only nonempty, unreliable, single-frame payloads; `reliable=true` is rejected and "
-"`timeout_ms` is ignored. They do not provide retained-buffer DMA or retransmission ownership."
-
-#: docs/zh/guides/send.md:33
-msgid ""
-"放置 payload 前先调用 `xgl_send_zerocopy_layout()`。查询忽略 `data.buffer`、`data.buffer_size` 和 "
-"`data.data_offset`，验证发送元数据、路由、完整帧 MTU、已安装的认证 scope，以及终止 scope 策略。输出 `payload_offset` 与 `frame_size`，包含 "
-"DATA_TYPE、非零 SESSION、SECURITY、固定标签及末尾 CRC。查询不分配内存、不修改计数或安全序号、不调用 provider 或 "
-"PHY。查询失败会清零输出；查询成功不预留资源，发送时仍会验证当前状态。"
-msgstr ""
-"Call `xgl_send_zerocopy_layout()` before placing the payload. The query ignores `data.buffer`, "
-"`data.buffer_size` and `data.data_offset`; it validates the requested metadata, route, complete-frame "
-"MTU, installed authentication scope and terminal-scope policy. It returns `payload_offset` and "
-"`frame_size`, including DATA_TYPE, nonzero SESSION, SECURITY, the fixed tag and final CRC. It allocates "
-"nothing, changes no counters or security sequence, and calls neither the provider nor the PHY. Failure "
-"clears the output. A successful query does not reserve resources; sending validates the current state "
-"again."
-
-#: docs/zh/guides/send.md:53
-msgid ""
-"示例假定存在调用者拥有的数组 `frame_buffer`，并包含 `<string.h>`。数组容量不足时应报告容量错误，不提交发送。发送保持 payload 原位；帧头和尾部可写，即使认证或 PHY "
-"提交失败也可能已经改变。所有字节只借用到调用返回。"
-msgstr ""
-"The example assumes a caller-owned array `frame_buffer` and `<string.h>`. If the frame does not fit that"
-" array, report capacity failure instead of submitting. Sending leaves the payload at its original "
-"address; headers and trailers are writable and may change even when authentication or PHY submission "
-"fails. All bytes remain borrowed only until return."
+"`<xgl/xgl_inplace.h>` provides synchronous unreliable single-frame transmission. Use "
+"`xgl_send_zerocopy_layout()` to get the exact required space, place the nonempty payload in the caller's"
+" frame buffer and submit it with `xgl_send_zerocopy_scoped_at()`. See [Zero-Copy Send](in-place-send.md)"
+" for layout, write positions and an implementation example."
 
 #: docs/zh/guides/send.md:55
 msgid "Network TX 包数及 payload 字节数只在下层提交成功后计入，普通、原地与转发路径保持一致。这些计数不证明远端交付。"
@@ -104,16 +77,15 @@ msgstr ""
 "Reliable sends are constrained by the peer window and global TX capacity. Continue calling `xgl_step()` "
 "to receive ACKs, advance retransmissions, and report terminal failures."
 
-#: docs/zh/guides/send.md:63
+#: docs/zh/guides/send.md:41
 msgid ""
 "普通发送的 `timeout_ms` 指定每个可靠包的初始 ACK 等待时间，应用事务有独立的完成期限。零值使用当前 profile 支持的 RTT 估计，尚无估计时使用配置的 ACK "
-"等待时间，配置值也为零则回退到内建默认值；重传可调整等待时间。非可靠普通发送不创建 ACK 计时器，两个零拷贝发送入口及布局查询都忽略该字段。"
+"等待时间，配置值也为零则回退到内建默认值；重传可调整等待时间。非可靠发送不创建 ACK 计时器。"
 msgstr ""
-"For ordinary sends, `timeout_ms` sets the initial ACK wait for each reliable packet, so the application "
-"still owns any end-to-end operation deadline. Zero uses the RTT estimate supported by the current "
-"profile, falling back to the configured ACK wait when no estimate exists, or the built-in default if "
-"that configuration is also zero; retransmission may adjust the wait. Ordinary unreliable sends create no"
-" ACK timer. Both zero-copy send entries and the layout query ignore this field."
+"For ordinary reliable sends, `timeout_ms` sets the initial ACK wait per packet. The application sets a "
+"separate transaction deadline. A zero uses the current RTT estimate when supported by the profile. "
+"Without an estimate, it uses the configured ACK wait or the built-in default if the configuration is "
+"also zero. Retransmission may adjust the wait. Unreliable sends have no ACK timer."
 
 #: docs/zh/guides/send.md:65
 msgid ""
@@ -159,22 +131,23 @@ msgstr ""
 msgid "接收接纳和回调"
 msgstr "Receive Admission and Callbacks"
 
-#: docs/zh/guides/send.md:77
+#: docs/zh/guides/send.md:55
 msgid ""
-"优先使用 `rx_accept_callback`：消费或复制 payload 后返回 `XGL_OK`，临时背压返回 `XGL_ERR_BUSY`。使用 `rx_callback` 则不能拒绝交付。"
+"应用通过 `config.rx_callback` 接收借用的载荷和 `xgl_rx_info_t`。消费或复制载荷后返回 `XGL_OK`；临时背压返回 `XGL_ERR_BUSY` 或 "
+"`XGL_ERR_NO_MEMORY`。回调的 `user_data` 来自 `config.rx_user_data`。"
 msgstr ""
-"Prefer `rx_accept_callback`: return `XGL_OK` after consuming or copying the payload, or `XGL_ERR_BUSY` "
-"for temporary backpressure. `rx_callback`, if used instead, cannot refuse delivery."
+"The application receives borrowed payload and `xgl_rx_info_t` through `config.rx_callback`. Return "
+"`XGL_OK` after consuming or copying the payload, or `XGL_ERR_BUSY` or `XGL_ERR_NO_MEMORY` for temporary "
+"backpressure. The callback receives `config.rx_user_data` as its `user_data`."
 
-#: docs/zh/guides/send.md:79
+#: docs/zh/guides/send.md:57
 msgid ""
-"本地 DATA 需要配置接收回调。Advanced 的 scoped 回调优先，其次是 accept 和 legacy 回调。全部缺失时，`xgl_step*()` 对本地 DATA 返回 "
-"`XGL_ERR_UNSUPPORTED`，DATA 不进入缓存或确认。纯发送端可以保持空的接收回调并处理 ACK 和 CONTROL。有意丢弃数据的产品应配置显式接纳回调。"
+"接收回调为空时，`xgl_step()` 和 `xgl_step_bounded()` 对本地 DATA 返回 `XGL_ERR_UNSUPPORTED`，DATA "
+"不进入缓存或确认。纯发送端可以保持空的接收回调并处理 ACK 和 CONTROL。有意丢弃数据的产品应实现显式接纳回调。"
 msgstr ""
-"Local DATA requires a receive callback. The Advanced scoped callback takes precedence, followed by the "
-"accept and legacy callbacks. With all three absent, `xgl_step*()` returns `XGL_ERR_UNSUPPORTED` for "
-"local DATA before retention or acknowledgement. A send-only endpoint can leave these callbacks empty and"
-" still process ACK and CONTROL. To accept and discard DATA, install an explicit acceptance callback."
+"With no receive callback, `xgl_step()` and `xgl_step_bounded()` return `XGL_ERR_UNSUPPORTED` for local "
+"DATA, without buffering or acknowledging it. A sender-only endpoint can omit the callback and still "
+"process ACK and CONTROL. To discard data intentionally, provide a callback that accepts it explicitly."
 
 #: docs/zh/guides/send.md:81
 msgid "顺序包在应用接纳后才发送 ACK；乱序包只有进入协议自有的有界缓存才可发送 SACK。若已缓存的包暂时无法交付，继续运行 step 可重新尝试。"
@@ -200,18 +173,15 @@ msgstr ""
 "All callback buffers are borrowed only for that call. Callbacks must not reenter, close, or destroy the "
 "instance; queue recovery work for after return."
 
-#: docs/zh/guides/send.md:87
+#: docs/zh/guides/send.md:65
 msgid ""
-"现有 `rx_callback` 和 `rx_accept_callback` 只提供发送端 ID、应用 data type 和 payload，不提供 connection ID、epoch "
-"或包编号。`error_callback` 只提供实例、错误码和诊断文本，不提供失败 scope 或逐消息标识；诊断文本还可能为空。SDK 也没有逐消息发送完成回调，应用不能仅从这些回调区分同一远端的多个 "
-"scope 或确认某条消息已被远端处理。需要这种关联时应由应用协议携带标识并定义响应。"
+"`xgl_rx_info_t` 包含发送方 ID、connection ID、epoch、应用 data type 和可靠性。`error_callback` 使用独立的 "
+"`config.callback_user_data`，提供实例、错误码及诊断文本，诊断文本可以是空字符串。应用级逐消息完成需要业务消息 ID 和对应响应。"
 msgstr ""
-"The existing `rx_callback` and `rx_accept_callback` expose only the sender ID, application data type and"
-" payload, without connection ID, epoch or packet number. `error_callback` exposes only the instance, "
-"error code and diagnostic text, without the failed scope or a per-message identifier; the text can also "
-"be empty. The SDK has no per-message send-completion callback. These callbacks alone cannot distinguish "
-"multiple scopes for the same remote or confirm remote processing of a particular message. Carry "
-"correlation identifiers and define responses in the application protocol when required."
+"`xgl_rx_info_t` contains the sender ID, connection ID, epoch, application data type and reliability. The"
+" `error_callback` uses its own `config.callback_user_data` and receives the instance, error code and "
+"diagnostic text, which can be an empty string. Per-message completion at the application layer requires "
+"a business message ID and a matching response."
 
 #: docs/zh/guides/send.md:89
 msgid "失败和 Scope 恢复"
@@ -235,18 +205,15 @@ msgstr ""
 "submit that data again. Error callbacks describe scope failures and selected diagnostics; they are not a"
 " replacement for checking operation return values."
 
-#: docs/zh/guides/send.md:95
+#: docs/zh/guides/send.md:73
 msgid ""
-"可靠 scope 由远端 ID、connection ID 和 epoch 标识。现存 scope 终止后，同一精确 scope 的全部 DATA TX "
-"都会拒绝，包括普通可靠或非可靠发送、两个零拷贝发送入口；纯布局查询也会拒绝，有效请求返回 `XGL_ERR_ACK_TIMEOUT`。其他 connection ID 或 epoch "
-"不受该终止状态影响。拒绝不创建 peer、不调用认证 provider 或 PHY，也不增加发送尝试统计。"
+"可靠 scope 由远端 ID、connection ID 和 epoch 标识。现存 scope 终止后，普通发送、零拷贝发送及布局查询都会拒绝该 scope 的有效 DATA 请求，返回 "
+"`XGL_ERR_ACK_TIMEOUT`。其他 connection ID 或 epoch 不受该终止状态影响。拒绝不创建 peer、不调用认证 provider 或 PHY，也不增加发送尝试统计。"
 msgstr ""
-"A reliable scope is identified by remote ID, connection ID, and epoch. Once an existing scope becomes "
-"terminal, all DATA TX in that exact scope is rejected, including ordinary reliable or unreliable sends "
-"and both zero-copy send entries. The pure layout query is also rejected; valid requests return "
-"`XGL_ERR_ACK_TIMEOUT`. Other connection IDs or epochs are unaffected by that terminal state. Rejection "
-"creates no peer, calls neither the authentication provider nor the PHY, and adds no transmission-attempt"
-" statistics."
+"A reliable scope is identified by remote node ID, connection ID and epoch. Once a scope terminates, "
+"ordinary send, zero-copy send and layout queries reject valid DATA requests for that scope with "
+"`XGL_ERR_ACK_TIMEOUT`. Other connection IDs or epochs are unaffected. The rejection creates no peer, "
+"calls neither the provider nor the PHY, and does not increment send-attempt statistics."
 
 #: docs/zh/guides/send.md:97
 msgid ""

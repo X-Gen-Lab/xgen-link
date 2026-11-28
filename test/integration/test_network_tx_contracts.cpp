@@ -8,6 +8,8 @@
  */
 
 #include "test_config.h"
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_inplace.h>
 
 #include <xgl/xgl.h>
 
@@ -17,7 +19,7 @@
 
 namespace {
 
-enum class SendApi { Copied, LegacyZeroCopy, ScopedZeroCopy };
+enum class SendApi { Copied, ScopedZeroCopy };
 
 class XglNetworkTxContractTest : public ::testing::Test {
   protected:
@@ -33,7 +35,6 @@ class XglNetworkTxContractTest : public ::testing::Test {
         };
         phy.user_data = this;
         config = xgl_test_single_packet_config();
-        config.memory.allocator = xgl_test_host_allocator();
         route.target_id = 2U;
         route.phy = &phy;
         route.max_frame_size = config.protocol.max_frame_size;
@@ -45,9 +46,8 @@ class XglNetworkTxContractTest : public ::testing::Test {
             ++static_cast<XglNetworkTxContractTest*>(user)->error_callbacks;
         };
         config.callback_user_data = this;
-        handle = xgl_create(&config);
+        handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr);
-        ASSERT_EQ(xgl_init(handle), XGL_OK);
         buffer[XGL_FRAME_HEADER_SIZE] = 0x17U;
         buffer[XGL_FRAME_HEADER_SIZE + 1U] = 0x28U;
         buffer[XGL_FRAME_HEADER_SIZE + 2U] = 0x39U;
@@ -70,17 +70,15 @@ class XglNetworkTxContractTest : public ::testing::Test {
         copied.data_len = length;
         copied.priority = priority;
         xgl_tx_zerocopy_request_t request = {};
-        request.data.buffer = buffer.data();
-        request.data.buffer_size = buffer.size();
-        request.data.data_offset = XGL_FRAME_HEADER_SIZE;
-        request.data.data_len = length;
-        request.data.target_id = copied.target_id;
-        request.data.priority = priority;
+        request.buffer = buffer.data();
+        request.buffer_size = buffer.size();
+        request.data_offset = XGL_FRAME_HEADER_SIZE;
+        request.data_len = length;
+        request.target_id = copied.target_id;
+        request.priority = priority;
         switch (api) {
             case SendApi::Copied:
                 return xgl_send_at(handle, &copied, 0U);
-            case SendApi::LegacyZeroCopy:
-                return xgl_send_zerocopy_at(handle, &request.data, 0U);
             case SendApi::ScopedZeroCopy:
                 return xgl_send_zerocopy_scoped_at(handle, &request, 0U);
         }
@@ -113,8 +111,7 @@ class XglNetworkTxContractTest : public ::testing::Test {
 };
 
 TEST_F(XglNetworkTxContractTest, DriverFailuresCountOnceAcrossAllSendApis) {
-    for (const SendApi api :
-         {SendApi::Copied, SendApi::LegacyZeroCopy, SendApi::ScopedZeroCopy}) {
+    for (const SendApi api : {SendApi::Copied, SendApi::ScopedZeroCopy}) {
         for (const xgl_error_t failure :
              {XGL_ERR_BUSY, XGL_ERR_TX_FAILED, XGL_ERR_INVALID_PARAM}) {
             SCOPED_TRACE(::testing::Message() << "api=" << static_cast<int>(api)
@@ -131,8 +128,7 @@ TEST_F(XglNetworkTxContractTest, DriverFailuresCountOnceAcrossAllSendApis) {
 
 TEST_F(XglNetworkTxContractTest,
        SuccessfulRetryAfterDriverBusyCountsOnlyAcceptedBytes) {
-    for (const SendApi api :
-         {SendApi::Copied, SendApi::LegacyZeroCopy, SendApi::ScopedZeroCopy}) {
+    for (const SendApi api : {SendApi::Copied, SendApi::ScopedZeroCopy}) {
         SCOPED_TRACE(static_cast<int>(api));
         ResetCounters();
         driver_result = XGL_ERR_BUSY;
@@ -147,14 +143,12 @@ TEST_F(XglNetworkTxContractTest,
 
 TEST_F(XglNetworkTxContractTest,
        InvalidPublicArgumentsDoNotCountAsTransmissionFailures) {
-    for (const SendApi api :
-         {SendApi::Copied, SendApi::LegacyZeroCopy, SendApi::ScopedZeroCopy}) {
+    for (const SendApi api : {SendApi::Copied, SendApi::ScopedZeroCopy}) {
         SCOPED_TRACE(static_cast<int>(api));
         EXPECT_EQ(Send(api, 0U), XGL_ERR_INVALID_PARAM);
         EXPECT_EQ(Send(api, 3U, 8U), XGL_ERR_INVALID_PARAM);
     }
     EXPECT_EQ(xgl_send_at(handle, nullptr, 0U), XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, nullptr, 0U), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, nullptr, 0U),
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(driver_calls, 0U);
@@ -164,17 +158,17 @@ TEST_F(XglNetworkTxContractTest,
 
 TEST_F(XglNetworkTxContractTest, LayoutQueriesDoNotCountOrCallDriver) {
     xgl_tx_zerocopy_request_t request = {};
-    request.data.target_id = 2U;
-    request.data.data_len = 3U;
+    request.target_id = 2U;
+    request.data_len = 3U;
     xgl_tx_frame_layout_t layout = {};
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
-    request.data.target_id = 3U;
+    request.target_id = 3U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_ROUTE_NOT_FOUND);
     EXPECT_EQ(layout.payload_offset, 0U);
     EXPECT_EQ(layout.frame_size, 0U);
-    request.data.target_id = 2U;
-    request.data.data_len = 0U;
+    request.target_id = 2U;
+    request.data_len = 0U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(driver_calls, 0U);

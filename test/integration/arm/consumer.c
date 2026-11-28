@@ -8,6 +8,7 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_runtime.h>
 
 enum {
     SYS_WRITE0 = 0x04U,
@@ -74,7 +75,6 @@ static bool run_reference(void) {
                                      .max_frame_size = 128U,
                                      .read_freq_hz = 100U};
     static const xgl_config_t config = {
-        .name = "arm-reference",
         .source_id = 1U,
         .memory = {.rx_buffer_size = 128U},
         .protocol = {.ack_timeout_ms = 1000U,
@@ -115,8 +115,7 @@ static bool run_reference(void) {
     const xgl_work_budget_t budget = {0};
     uint32_t retry_ms = 0U;
     bool passed = false;
-    if (sent == XGL_OK &&
-        xgl_next_timeout_for_work(handle, 0U, &budget, &retry_ms)) {
+    if (sent == XGL_OK && xgl_deadline_query(handle, 0U, &budget, &retry_ms)) {
         const xgl_error_t stepped = xgl_step(handle, retry_ms, &budget);
         write_size("retry_ms=", retry_ms);
         write_size("stepped=", (size_t)stepped);

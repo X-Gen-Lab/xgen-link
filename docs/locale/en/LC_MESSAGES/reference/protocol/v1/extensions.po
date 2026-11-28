@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 17463acb8cf56bc43df340474b2283dc35aa1cc678ae14f94c30faeb0e672e8f\n"
+"X-XGL-Source-SHA256: 37175efc9b35f2f086d16eeb36731b6c8abf55cb75b063c3e6fbc226ca769868\n"
 
 #: docs/zh/reference/protocol/v1/extensions.md:8
 msgid "扩展"
@@ -152,15 +152,12 @@ msgid "验证依据：`test/unit/wire/test_wire.cpp`。"
 msgstr "Verification: `test/unit/wire/test_wire.cpp`."
 
 #: docs/zh/reference/protocol/v1/extensions.md:36
-msgid "保留的数据变换"
-msgstr "Reserved payload transforms"
+msgid "应用数据变换"
+msgstr "Application Data Transforms"
 
 #: docs/zh/reference/protocol/v1/extensions.md:38
-msgid ""
-"压缩和载荷加密为保留能力。配置启用任意一项时返回 `XGL_ERR_INVALID_PARAM`，发送请求指定非零 `compression_id` 时返回 "
-"`XGL_ERR_UNSUPPORTED`。认证标签保护完整性，其语义见[安全](security.md)。应用自行变换消息时，双方需在业务格式中约定，并在提交前检查编码后长度。"
+msgid "应用需要压缩或加密时，双方在业务格式中约定，并在提交前检查编码后的长度。Wire 认证标签提供完整性保护，详见[安全](security.md)。"
 msgstr ""
-"Compression and payload encryption are reserved capabilities. Enabling either in the configuration "
-"returns `XGL_ERR_INVALID_PARAM`. A send with nonzero `compression_id` returns `XGL_ERR_UNSUPPORTED`. For"
-" the authentication tag, see [Security](security.md). Applications that transform messages agree on a "
-"business payload format and check the encoded length before submission."
+"If the application needs compression or encryption, both endpoints agree on an application format and "
+"check the encoded length before submission. The Wire authentication tag protects integrity. See "
+"[Security](security.md)."

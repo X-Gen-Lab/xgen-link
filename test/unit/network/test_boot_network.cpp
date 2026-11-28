@@ -10,6 +10,7 @@
 #include <datalink/xgl_datalink.h>
 #include <network/xgl_network.h>
 #include <wire/xgl_frame.h>
+#include <xgl/xgl_alloc.h>
 
 #include <array>
 #include <cstring>

@@ -15,7 +15,9 @@ import unittest
 FIXTURES = Path(__file__).resolve().parent
 ARGS = None
 FORMER_PACKAGES = ("status", "bytes", "crc", "memory", "containers")
-PUBLIC_HEADERS = {"xgl.h", "xgl_config.h", "xgl_error.h", "xgl_types.h", "xgl_build_config.h"}
+PUBLIC_HEADERS = {"xgl.h", "xgl_alloc.h", "xgl_build_config.h", "xgl_config.h",
+                  "xgl_diagnostics.h", "xgl_error.h", "xgl_inplace.h",
+                  "xgl_runtime.h", "xgl_security.h", "xgl_types.h"}
 VERIFY_PREFIX = ('include("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake")\n'
                  'xgl_verify_sdk_prefix("${XGL_SDK_PREFIX}")\n')
 

@@ -27,12 +27,11 @@ typedef struct {
  * \details         Accept after copying the borrowed block. Reject a block
  *                  that exceeds application capacity.
  */
-static xgl_error_t file_accept(xgl_handle_t handle, uint16_t source,
-                               uint8_t type, const uint8_t* data, size_t length,
+static xgl_error_t file_accept(xgl_handle_t handle, const xgl_rx_info_t* info,
+                               const uint8_t* data, size_t length,
                                void* context) {
     (void)handle;
-    (void)source;
-    (void)type;
+    (void)info;
     file_receiver_t* receiver = context;
     if (length > sizeof(receiver->bytes) - receiver->used) {
         return XGL_ERR_INVALID_PARAM;
@@ -46,22 +45,19 @@ static xgl_error_t file_accept(xgl_handle_t handle, uint16_t source,
  * between sends. */
 int main(void) {
     static sim_node_t sender, receiver;
-    static sim_channel_t to_sender, to_receiver;
+    static sim_link_t link;
     static file_receiver_t application;
     uint8_t source[FILE_BYTES];
     for (size_t i = 0; i < sizeof(source); ++i) {
         source[i] = (uint8_t)i;
     }
-    sim_port_t sender_port = {&to_sender, &to_receiver, false, 0};
-    sim_port_t receiver_port = {&to_receiver, &to_sender, false, 0};
-    xgl_phy_ops_t sender_phy = {sim_tx, sim_rx, &sender_port};
-    xgl_phy_ops_t receiver_phy = {sim_tx, sim_rx, &receiver_port};
+    sim_connect(&link);
     sim_prepare(&sender, 1U);
     sim_prepare(&receiver, 2U);
-    sim_route(&sender, 0U, 2U, &sender_phy);
-    sim_route(&receiver, 0U, 1U, &receiver_phy);
-    receiver.config.rx_accept_callback = file_accept;
-    receiver.config.callback_user_data = &application;
+    sim_route(&sender, 0U, 2U, &link.phys[0]);
+    sim_route(&receiver, 0U, 1U, &link.phys[1]);
+    receiver.config.rx_callback = file_accept;
+    receiver.config.rx_user_data = &application;
     if (sim_init(&sender) != XGL_OK || sim_init(&receiver) != XGL_OK) {
         return 1;
     }

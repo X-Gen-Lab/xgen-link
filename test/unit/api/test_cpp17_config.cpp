@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
 
@@ -24,5 +25,5 @@ TEST(Cpp17ConfigTest, ValidatesStaticallyInitializedApplicationConfig) {
     static constexpr auto config = application_config();
     static_assert(config.protocol.max_frame_size == 64U);
     static_assert(config.rx_callback == nullptr);
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_OK);
 }

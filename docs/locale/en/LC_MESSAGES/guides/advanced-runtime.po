@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 0080102ece9139bc842f05922771004d8c061ff287da65471648d7cfc610f0d2\n"
+"X-XGL-Source-SHA256: 1b1ee98488cdb27eca10e30145cadfd2660d81f7cde73c2136e853202e018874\n"
 
 #: docs/zh/guides/advanced-runtime.md:8
 msgid "扩展运行选项"
@@ -16,38 +16,38 @@ msgstr "Advanced Runtime Options"
 
 #: docs/zh/guides/advanced-runtime.md:10
 msgid ""
-"构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile "
-"默认关闭；关闭时扩展入口返回 `XGL_ERR_UNSUPPORTED`。选项改变私有布局与编译资源组合，库和消费者必须使用同一生成配置头。高级运行时选项描述符的版本为 `4`。"
+"构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile 默认关闭。关闭时 "
+"`xgl_step_bounded()` 及非空 `config.options` 返回 "
+"`XGL_ERR_UNSUPPORTED`。库和消费者必须使用同一生成配置头。`<xgl/xgl_runtime.h>` 声明版本为 `5` 的策略描述符。"
 msgstr ""
-"Set `-DXGL_ENABLE_ADVANCED_RUNTIME=ON` when building. Installed consumers can request `COMPONENTS "
-"advanced_runtime`. All profiles disable it by default. When disabled, extended entry points return "
-"`XGL_ERR_UNSUPPORTED`. The option changes the private layout and compiled resources. Use the same "
-"generated configuration header for the library and consumer. The advanced instance options descriptor "
-"is version `4`."
+"Build with `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`. Installed consumers can require `COMPONENTS "
+"advanced_runtime`. All profiles disable this feature by default. Without it, `xgl_step_bounded()` and "
+"operations with a non-null `config.options` return `XGL_ERR_UNSUPPORTED`. Use the same generated "
+"configuration header for the library and consumer. `<xgl/xgl_runtime.h>` declares version `5` of the "
+"policy descriptor."
 
 #: docs/zh/guides/advanced-runtime.md:12
 msgid "创建与生命周期"
 msgstr "Creation and Lifetime"
 
-#: docs/zh/guides/advanced-runtime.md:29
+#: docs/zh/guides/advanced-runtime.md:32
 msgid ""
-"检查返回值后，提供 `report.requirements.size` 字节且满足其 alignment 的存储，调用 "
-"`xgl_init_static_with_options()`。产品可在构建阶段测量并提供固定数组，也可用显式 allocator 调用 `xgl_create_with_options()`，随后调用 "
-"`xgl_init()`。静态入口已初始化，不要重复 init。"
+"检查返回值后，提供 `required.size` 字节并满足 `required.alignment`，再调用 `xgl_init_static()`。也可包含 `<xgl/xgl_alloc.h>`，通过"
+" `xgl_init_allocated()` 申请工作区并完成初始化。两种方式读取同一个 `config.options`。"
 msgstr ""
-"Check the result, provide `report.requirements.size` bytes with its required alignment, then call "
-"`xgl_init_static_with_options()`. A product can measure its layout during the build and provide a fixed "
-"array, or use an explicit allocator with `xgl_create_with_options()` followed by `xgl_init()`. The "
-"static entry already initializes the instance."
+"Check the result, provide `required.size` bytes at `required.alignment` and call `xgl_init_static()`. To"
+" allocate and initialize in one call, include `<xgl/xgl_alloc.h>` and use `xgl_init_allocated()`. Both "
+"paths read the same `config.options`."
 
-#: docs/zh/guides/advanced-runtime.md:31
+#: docs/zh/guides/advanced-runtime.md:34
 msgid ""
-"配置、options、路由、PHY、provider 与回调上下文都必须持续有效，直到销毁；不允许与 workspace 重叠。使用初始化宏填写描述符尺寸、版本和配置尺寸，不硬编码。旧创建入口和旧 "
-"`xgl_step()` 保持可用。"
+"配置、options、路由、PHY、provider 与回调上下文都必须持续有效，直到销毁。配置和工作区不能重叠。使用初始化宏填写描述符尺寸、版本和配置尺寸。`xgl_step()` 与 "
+"`xgl_step_bounded()` 可以推进同一实例。"
 msgstr ""
-"Keep the configuration, options, routes, PHY, provider and callback contexts valid until destruction "
-"and separate from workspace storage. The initializer sets the descriptor size, version and "
-"configuration size. Existing creation calls and `xgl_step()` remain available."
+"Keep the configuration, options, routes, PHY descriptors, provider and callback contexts alive until "
+"destruction. Configuration and workspace must not overlap. Use the initializer macro to set the "
+"descriptor size, version and configuration size. `xgl_step()` and `xgl_step_bounded()` can advance the "
+"same instance."
 
 #: docs/zh/guides/advanced-runtime.md:33
 msgid "期限与观察"
@@ -68,14 +68,6 @@ msgstr "`tx_lifetime_ms`"
 #: docs/zh/guides/advanced-runtime.md:0
 msgid "scope 可靠 TX 忙期上限；零关闭"
 msgstr "Scope reliable TX busy-period limit; zero disables it"
-
-#: docs/zh/guides/advanced-runtime.md:0
-msgid "`rx_scoped_callback`"
-msgstr "`rx_scoped_callback`"
-
-#: docs/zh/guides/advanced-runtime.md:0
-msgid "优先于 accept/legacy 回调，携带完整接收 scope"
-msgstr "Precedes accept/legacy callbacks and carries the receive scope"
 
 #: docs/zh/guides/advanced-runtime.md:0
 msgid "`scope_event_callback`"
@@ -133,14 +125,14 @@ msgstr ""
 "request ID and application response where business confirmation is required. Closing a peer is a local "
 "lifecycle operation; remote notification, reset and retry policy belong to the application."
 
-#: docs/zh/guides/advanced-runtime.md:51
+#: docs/zh/guides/advanced-runtime.md:53
 msgid ""
-"scoped 接收回调可返回 BUSY。若缓存中的乱序包已经由协议接纳，应用容量恢复后由 owner 再次调度交付。应用可主动唤醒 owner。所有回调同步执行，禁止重入同一实例或在回调中销毁实例。"
+"核心 `config.rx_callback` 接收完整 scope，可返回 BUSY。若乱序包已经进入协议缓存，应用容量恢复后可唤醒 owner "
+"再次调度交付。所有回调同步执行，禁止重入同一实例或在回调中销毁实例。"
 msgstr ""
-"A scoped receive callback can return BUSY. An out-of-order DATA frame retained by the protocol keeps its"
-" scope until the owner can deliver it. The application needs a wakeup mechanism; protocol timers cannot "
-"detect changing application capacity. All callbacks are synchronous and must not reenter or destroy the "
-"instance."
+"The core `config.rx_callback` receives the full scope and can return BUSY. When out-of-order data is "
+"already buffered by the protocol, the application can wake the owner to resume delivery once it has "
+"space. All callbacks run synchronously and must not reenter or destroy the instance."
 
 #: docs/zh/guides/advanced-runtime.md:53
 msgid "资源快照"
@@ -154,14 +146,14 @@ msgstr ""
 "bytes, and retained out-of-order RX packets and payload bytes. Reading performs no allocation, requires "
 "serialization and costs work proportional to configured capacities."
 
-#: docs/zh/guides/advanced-runtime.md:57
+#: docs/zh/guides/advanced-runtime.md:59
 msgid ""
-"快照描述当前占用，`xgl_memory_report_with_options()` 测量整个 workspace 的预留。统计中的 `memory_used` 按预留 workspace 解释。对 "
-"RX cache，可显式设 `rx_buffer_size = max_frame_size` 以节省存储。"
+"在 `<xgl/xgl_diagnostics.h>` 中，`xgl_resources_get()` 描述当前占用，`xgl_memory_report()` 读取同一配置并测量整个工作区的预留。统计中的 "
+"`memory_used` 按预留工作区解释。对 RX cache，可显式设 `rx_buffer_size = max_frame_size` 以节省存储。"
 msgstr ""
-"Snapshots describe active content; `xgl_memory_report_with_options()` describes reserved workspace. "
-"Statistics `memory_used` counts reserved workspace. Set `rx_buffer_size = max_frame_size` to size "
-"the RX cache for one full frame."
+"In `<xgl/xgl_diagnostics.h>`, `xgl_resources_get()` reports current usage and `xgl_memory_report()` "
+"reads the same configuration to measure the entire reservation. The `memory_used` statistic records that"
+" reservation. To minimize RX cache storage, set `rx_buffer_size = max_frame_size` explicitly."
 
 #: docs/zh/guides/advanced-runtime.md:59
 msgid "安全 scope 策略"
@@ -208,15 +200,15 @@ msgstr ""
 msgid "调度与验证"
 msgstr "Scheduling and Validation"
 
-#: docs/zh/guides/advanced-runtime.md:71
+#: docs/zh/guides/advanced-runtime.md:73
 msgid ""
-"执行预算、pending 和 DMA owner 示例见[有界接收与运行](../explanation/runtime.md)。预算限制工作次数，不能替代完整 WCET 测量。旧 step "
-"在扩展构建中使用无限候选和维护配额，不应在需要有界运行时混用。"
+"执行预算、pending 和 DMA owner 示例见[有界接收与运行](../explanation/runtime.md)。预算限制工作次数，产品仍需测量完整 WCET。需要执行配额时调用 "
+"`xgl_step_bounded()`，因为普通 `xgl_step()` 不限制候选和维护次数。"
 msgstr ""
-"See [bounded receive and runtime](../explanation/runtime.md) for limits, pending and a DMA owner "
-"example. Work-count limits do not replace whole-step WCET measurements. Legacy step uses unlimited "
-"candidate and maintenance quotas in an advanced build; do not mix entries where bounded execution is "
-"required."
+"See [Bounded Receive and Runtime](../explanation/runtime.md) for execution budgets, pending work and a "
+"DMA owner example. Budgets cap work counts; measure the complete worst-case execution time in the "
+"product. Call `xgl_step_bounded()` when execution quotas matter, because `xgl_step()` leaves candidate "
+"and maintenance counts unlimited."
 
 #: docs/zh/guides/advanced-runtime.md:73
 msgid "主机 GoogleTest 验证行为；每个 profile 的实际 ELF、栈、DMA cache 一致性、中断延时与产品内存预算需分别验收。测量时构建实际调用扩展 API 的产品固件。"

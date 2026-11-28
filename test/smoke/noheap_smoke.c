@@ -8,6 +8,7 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
 
 #include <internal/xgl_allocator.h>
 #include <stddef.h>
@@ -57,7 +58,7 @@ static int smoke_instance(void) {
     static smoke_storage_t storage;
     xgl_allocator_t core = {&storage, smoke_alloc, smoke_free};
     xgl_phy_ops_t phy = {smoke_tx, smoke_rx, NULL};
-    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U};
     xgl_config_t config = {
         .source_id = 1U,
         .memory = {.rx_buffer_size = 160U},
@@ -69,15 +70,12 @@ static int smoke_instance(void) {
                      .max_tx_packets = 2U,
                      .max_rx_buffered_packets = 2U},
     };
-    config.memory.allocator = &core;
     config.route_table = &route;
     config.route_table_len = 1U;
-    xgl_handle_t handle = xgl_create(&config);
-    if (handle == NULL)
+    xgl_handle_t handle = NULL;
+    if (xgl_init_allocated(&config, &core, &handle) != XGL_OK ||
+        handle == NULL) {
         return 10;
-    if (xgl_init(handle) != XGL_OK) {
-        xgl_destroy(handle);
-        return 11;
     }
     const uint8_t payload[] = {1U, 2U, 3U};
     xgl_tx_data_t tx = {0};

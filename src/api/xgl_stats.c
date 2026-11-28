@@ -7,7 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
-#include <xgl/xgl.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <string.h>
 

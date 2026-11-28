@@ -11,6 +11,8 @@
 #include "test_host_allocator.h"
 #include <transport/xgl_transport_rx_internal.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <array>
 #include <cstdlib>
@@ -21,10 +23,13 @@
 TEST(XglTransportStorageTest, WorkspaceDoesNotReserveWindowAllocations) {
     xgl_config_t config = {};
     config = xgl_test_single_packet_config();
-    config.memory.allocator = xgl_test_host_allocator();
     xgl_memory_report_t report = {};
     ASSERT_EQ(xgl_memory_report(&config, &report), XGL_OK);
-    EXPECT_EQ(report.window_bytes, 0U);
+    EXPECT_EQ(report.requirements.size,
+              report.management_bytes + report.initialization_bytes +
+                  report.peer_bytes + report.tx_record_bytes +
+                  report.tx_payload_bytes + report.scratch_bytes +
+                  report.rx_buffered_bytes);
 }
 
 #if XGL_FEATURE_OUT_OF_ORDER

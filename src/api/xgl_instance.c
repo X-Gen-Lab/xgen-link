@@ -12,11 +12,13 @@
 #include <transport/xgl_rtt.h>
 #include <transport/xgl_window.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_runtime.h>
 
 #include "internal/xgl_allocator.h"
 #include <string.h>
 
-#include "xgl_instance_internal.h"
+#include "xgl_workspace_internal.h"
 
 /**
  * \brief           Unwind complete or partially initialized instance resources
@@ -36,22 +38,12 @@ static void instance_release_resources(xgl_handle_t handle) {
 /* Instance Initialization                                                   */
 /*---------------------------------------------------------------------------*/
 
-/**
- * \brief           Initialize protocol instance
- * \details         Initializes all layers and allocates resources
- */
-xgl_error_t xgl_init(xgl_handle_t handle) {
-    xgl_error_t err;
-
-    /* Validate handle */
-    if (handle == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    /* Check if already initialized */
-    if (handle->initialized) {
-        return XGL_ERR_ALREADY_INITIALIZED;
-    }
+/** \brief           Configure and bind all layers before publishing ready. */
+static xgl_error_t instance_start(xgl_handle_t handle) {
+    const xgl_config_t* config = handle->config;
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    const xgl_instance_options_t* options = config->options;
+#endif
 
 #if XGL_FEATURE_STATISTICS
     /* Initialize statistics */
@@ -63,18 +55,16 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
 #endif
 
     /* Initialize route table */
-    err = xgl_route_table_init(&handle->route_table,
-                               handle->config->route_table_len,
-                               handle->allocator);
+    xgl_error_t err = xgl_route_table_init(
+        &handle->route_table, config->route_table_len, handle->allocator);
     if (err != XGL_OK) {
         goto cleanup;
     }
 
     /* Load routes from configuration */
-    if (handle->config->route_table_len > 0) {
-        err = xgl_route_table_load(&handle->route_table,
-                                   handle->config->route_table,
-                                   handle->config->route_table_len);
+    if (config->route_table_len > 0) {
+        err = xgl_route_table_load(&handle->route_table, config->route_table,
+                                   config->route_table_len);
         if (err != XGL_OK) {
             goto cleanup;
         }
@@ -85,15 +75,14 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         goto cleanup;
     }
 #if XGL_FEATURE_AUTH
-    err = xgl_security_init(&handle->security, handle->config->source_id,
-                            handle->config->auth_required,
-                            handle->config->auth_provider);
+    err = xgl_security_init(&handle->security, config->source_id,
+                            config->auth_required, config->auth_provider);
     if (err != XGL_OK) {
         goto cleanup;
     }
 #if XGL_FEATURE_ADVANCED_RUNTIME
     handle->security.protect_installed_scopes =
-        handle->options != NULL && handle->options->protect_installed_scopes;
+        options != NULL && options->protect_installed_scopes;
 #endif
 #endif
 
@@ -103,8 +92,8 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
         .rx_header_crc_errors = XGL_INSTANCE_STAT(handle, rx_header_crc_errors),
         .rx_crc16_errors = XGL_INSTANCE_STAT(handle, rx_crc16_errors),
         .upper_layer = NULL, /* Will be set after network layer init */
-        .error_callback = handle->config->error_callback,
-        .callback_user_data = handle->config->callback_user_data,
+        .error_callback = config->error_callback,
+        .callback_user_data = config->callback_user_data,
         .owner_handle = handle,
         .allocator = handle->memory->scratch,
     };
@@ -118,13 +107,13 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
 
     /* Initialize network layer */
     xgl_network_config_t network_config = {
-        .local_id = handle->config->source_id,
-        .max_frame_size = handle->config->protocol.max_frame_size,
+        .local_id = config->source_id,
+        .max_frame_size = config->protocol.max_frame_size,
         .route_table = &handle->route_table,
         .upper_layer = NULL, /* Will be set after transport layer init */
         .lower_layer = NULL, /* Will be set after creating datalink interface */
-        .error_callback = handle->config->error_callback,
-        .callback_user_data = handle->config->callback_user_data,
+        .error_callback = config->error_callback,
+        .callback_user_data = config->callback_user_data,
         .stats = XGL_INSTANCE_STAT(handle, network),
         .allocator = handle->memory->scratch};
 #if XGL_FEATURE_AUTH
@@ -137,34 +126,30 @@ xgl_error_t xgl_init(xgl_handle_t handle) {
 
     /* Initialize transport layer */
     xgl_transport_config_t transport_config = {
-        .local_id = handle->config->source_id,
-        .max_retry_count = handle->config->protocol.max_retry_count,
-        .default_timeout_ms = handle->config->protocol.ack_timeout_ms,
-        .window_size = handle->config->protocol.window_size,
-        .max_frame_size = handle->config->protocol.max_frame_size,
+        .local_id = config->source_id,
+        .max_retry_count = config->protocol.max_retry_count,
+        .default_timeout_ms = config->protocol.ack_timeout_ms,
+        .window_size = config->protocol.window_size,
+        .max_frame_size = config->protocol.max_frame_size,
         .lower_layer = NULL, /* Will be set after creating network interface */
-        .rx_callback = handle->config->rx_callback,
-        .rx_accept_callback = handle->config->rx_accept_callback,
-        .error_callback = handle->config->error_callback,
-        .callback_user_data = handle->config->callback_user_data,
+        .rx_callback = config->rx_callback,
+        .rx_user_data = config->rx_user_data,
+        .error_callback = config->error_callback,
+        .callback_user_data = config->callback_user_data,
         .stats = XGL_INSTANCE_STAT(handle, transport),
         .tx_retries = XGL_INSTANCE_STAT(handle, tx_retries),
         .allocator = handle->allocator,
-        .peer_idle_timeout_ms = handle->config->features.peer_idle_timeout_ms,
-        .max_peers = handle->config->features.max_peers,
-        .max_tx_packets = handle->config->features.max_tx_packets,
-        .max_rx_buffered_packets =
-            handle->config->features.max_rx_buffered_packets,
+        .peer_idle_timeout_ms = config->features.peer_idle_timeout_ms,
+        .max_peers = config->features.max_peers,
+        .max_tx_packets = config->features.max_tx_packets,
+        .max_rx_buffered_packets = config->features.max_rx_buffered_packets,
         .memory = handle->memory,
     };
 #if XGL_FEATURE_ADVANCED_RUNTIME
-    if (handle->options != NULL) {
-        transport_config.tx_lifetime_ms = handle->options->tx_lifetime_ms;
-        transport_config.rx_scoped_callback =
-            handle->options->rx_scoped_callback;
-        transport_config.scope_event_callback =
-            handle->options->scope_event_callback;
-        transport_config.extended_user_data = handle->options->user_data;
+    if (options != NULL) {
+        transport_config.tx_lifetime_ms = options->tx_lifetime_ms;
+        transport_config.scope_event_callback = options->scope_event_callback;
+        transport_config.extended_user_data = options->user_data;
     }
 #endif
     err = xgl_transport_init(&handle->layers.transport_ctx, &transport_config);
@@ -209,6 +194,47 @@ cleanup:
     return err;
 }
 
+/** \brief           Publish after startup or release an owned workspace. */
+static xgl_error_t start_prepared(xgl_handle_t prepared, xgl_handle_t* handle) {
+    const xgl_error_t error = instance_start(prepared);
+    if (error == XGL_OK) {
+        *handle = prepared;
+    } else if (prepared->storage_allocator != NULL) {
+        xgl_free(prepared->storage_allocator, prepared);
+    }
+    return error;
+}
+
+xgl_error_t xgl_init_static(const xgl_config_t* config, void* storage,
+                            size_t storage_size, xgl_handle_t* handle) {
+    if (handle == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *handle = NULL;
+    if (storage == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+
+    xgl_handle_t prepared;
+    const xgl_error_t error = xgl_workspace_prepare_instance(
+        config, storage, storage_size, NULL, &prepared);
+    return error == XGL_OK ? start_prepared(prepared, handle) : error;
+}
+
+xgl_error_t xgl_init_allocated(const xgl_config_t* config,
+                               const xgl_allocator_t* allocator,
+                               xgl_handle_t* handle) {
+    if (handle == NULL) {
+        return XGL_ERR_NULL_POINTER;
+    }
+    *handle = NULL;
+
+    xgl_handle_t prepared;
+    const xgl_error_t error =
+        xgl_workspace_prepare_instance(config, NULL, 0U, allocator, &prepared);
+    return error == XGL_OK ? start_prepared(prepared, handle) : error;
+}
+
 /**
  * \brief           Release protocol resources and an owned workspace exactly
  * once
@@ -218,7 +244,7 @@ void xgl_destroy(xgl_handle_t handle) {
         return;
     }
     instance_release_resources(handle);
-    if (!handle->caller_owned) {
+    if (handle->storage_allocator != NULL) {
         xgl_free(handle->storage_allocator, handle);
     }
 }

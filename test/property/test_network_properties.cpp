@@ -8,6 +8,7 @@
  */
 
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <internal/xgl_packet.h>
 #include <network/xgl_network.h>
@@ -112,10 +113,9 @@ TEST(XglNetworkProperties, RouteLookupCorrectness) {
 
             uint16_t max_frame_size = 128 + (gen.random_uint16() % 896);
             uint32_t read_freq_hz = 100 + (gen.random_uint32() % 9900);
-            uint8_t metric = gen.random_uint8();
 
             ASSERT_EQ(xgl_route_table_add(&route_table, target_id, phy,
-                                          max_frame_size, read_freq_hz, metric),
+                                          max_frame_size, read_freq_hz),
                       XGL_OK);
 
             expected_routes[target_id] = phy;
@@ -189,7 +189,7 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
 
             phy_ops[i] = create_mock_phy();
             ASSERT_EQ(xgl_route_table_add(&route_table, target_id, &phy_ops[i],
-                                          256, 1000, 100),
+                                          256, 1000),
                       XGL_OK);
             added_routes.insert(target_id);
         }

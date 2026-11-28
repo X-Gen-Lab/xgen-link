@@ -10,6 +10,9 @@
 #include "test_config.h"
 #include "test_host_allocator.h"
 #include "test_security_helpers.h"
+#include <xgl/xgl_inplace.h>
+#include <xgl/xgl_runtime.h>
+#include <xgl/xgl_security.h>
 
 #include <api/xgl_instance_internal.h>
 #include <mock_phy.h>
@@ -148,8 +151,10 @@ struct Node {
     std::vector<Delivery> deliveries;
     std::vector<xgl_error_t> errors;
 
-    static xgl_error_t accept(xgl_handle_t, uint16_t source, uint8_t type,
+    static xgl_error_t accept(xgl_handle_t, const xgl_rx_info_t* info,
                               const uint8_t* data, size_t length, void* user) {
+        const uint16_t source = info->source_id;
+        const uint8_t type = info->data_type;
         auto& self = *static_cast<Node*>(user);
         self.deliveries.push_back({source, type, copy_bytes(data, length)});
         return XGL_OK;
@@ -181,21 +186,21 @@ class XglNetworkMultihopTest : public ::testing::Test {
         b_to_a.delegate = ab.get_phy_b();
         b_to_c.delegate = bc.get_phy_a();
         c_phy.delegate = bc.get_phy_b();
-        a.routes = {{3U, &a_phy.ops, 256U, 1000U, 1U}};
-        b.routes = {{1U, &b_to_a.ops, 256U, 1000U, 1U},
-                    {3U, &b_to_c.ops, 256U, 1000U, 1U}};
-        c.routes = {{1U, &c_phy.ops, 256U, 1000U, 1U}};
+        a.routes = {{3U, &a_phy.ops, 256U, 1000U}};
+        b.routes = {{1U, &b_to_a.ops, 256U, 1000U},
+                    {3U, &b_to_c.ops, 256U, 1000U}};
+        c.routes = {{1U, &c_phy.ops, 256U, 1000U}};
         uint16_t source = 1U;
         for (Node* node : {&a, &b, &c}) {
             node->config = xgl_test_config();
-            xgl_test_use_host_allocator(&node->config);
             node->config.source_id = source++;
             node->config.memory.rx_buffer_size = 256U;
             node->config.protocol.max_frame_size = 256U;
             node->config.protocol.window_size = 1U;
             node->config.protocol.ack_timeout_ms = 100U;
-            node->config.rx_accept_callback = Node::accept;
+            node->config.rx_callback = Node::accept;
             node->config.error_callback = Node::error;
+            node->config.rx_user_data = node;
             node->config.callback_user_data = node;
         }
     }
@@ -217,10 +222,9 @@ class XglNetworkMultihopTest : public ::testing::Test {
                 node->config.auth_required = true;
                 node->config.auth_provider = &authentication.provider;
             }
-            ASSERT_EQ(xgl_config_validate(&node->config), XGL_OK);
-            node->handle = xgl_create(&node->config);
+            ASSERT_EQ(xgl_test_measure_config(&node->config), XGL_OK);
+            node->handle = xgl_test_init_allocated(&node->config);
             ASSERT_NE(node->handle, nullptr);
-            ASSERT_EQ(xgl_init(node->handle), XGL_OK);
         }
         if (authenticated) {
             const auto tx = test_session_config(3U, connection, epoch);
@@ -241,10 +245,11 @@ class XglNetworkMultihopTest : public ::testing::Test {
                 node->config.auth_provider = &authentication.provider;
                 node->options.protect_installed_scopes = protect;
             }
-            ASSERT_EQ(xgl_create_with_options(&node->config, &node->options,
-                                              &node->handle),
+            node->config.options = &node->options;
+            ASSERT_EQ(xgl_init_allocated(&node->config,
+                                         xgl_test_host_allocator(),
+                                         &node->handle),
                       XGL_OK);
-            ASSERT_EQ(xgl_init(node->handle), XGL_OK);
         }
         if (install) {
             const auto tx = test_session_config(3U, connection, epoch);
@@ -541,7 +546,7 @@ TEST_F(XglNetworkMultihopTest,
 }
 
 TEST_F(XglNetworkMultihopTest, BroadcastIsLocalDeliveryWithoutFlooding) {
-    a.routes.push_back({XGL_BROADCAST_ID, &a_phy.ops, 256U, 1000U, 1U});
+    a.routes.push_back({XGL_BROADCAST_ID, &a_phy.ops, 256U, 1000U});
     ASSERT_NO_FATAL_FAILURE(Start());
     ASSERT_EQ(Send(a, XGL_BROADCAST_ID, 0U, false), XGL_OK);
     ASSERT_NO_FATAL_FAILURE(DeliverAndAcknowledge(1U));
@@ -602,8 +607,8 @@ TEST_F(XglNetworkMultihopTest,
     xgl_tx_zerocopy_request_t request = {};
     request.connection_id = 11U;
     request.session_epoch = 9U;
-    request.data.target_id = 3U;
-    request.data.data_len = payload.size();
+    request.target_id = 3U;
+    request.data_len = payload.size();
     xgl_tx_frame_layout_t protected_layout = {};
     ASSERT_EQ(xgl_send_zerocopy_layout(a.handle, &request, &protected_layout),
               XGL_OK);
@@ -623,9 +628,9 @@ TEST_F(XglNetworkMultihopTest,
     Bytes storage(protected_layout.frame_size);
     std::copy(payload.begin(), payload.end(),
               storage.data() + protected_layout.payload_offset);
-    request.data.buffer = storage.data();
-    request.data.buffer_size = storage.size();
-    request.data.data_offset = protected_layout.payload_offset;
+    request.buffer = storage.data();
+    request.buffer_size = storage.size();
+    request.data_offset = protected_layout.payload_offset;
     ASSERT_EQ(xgl_send_zerocopy_scoped_at(a.handle, &request, 0U), XGL_OK);
     ASSERT_NO_FATAL_FAILURE(ExpectAuthenticated(a_phy.frames));
     ASSERT_NO_FATAL_FAILURE(DeliverAndAcknowledge(1U));

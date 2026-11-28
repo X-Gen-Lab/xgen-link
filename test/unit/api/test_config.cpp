@@ -9,6 +9,7 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_security.h>
 
 #include <xgl/xgl.h>
 
@@ -60,45 +61,35 @@ class XglConfigTest : public ::testing::Test {
 /*---------------------------------------------------------------------------*/
 
 TEST_F(XglConfigTest, ValidateNullPointer) {
-    EXPECT_EQ(xgl_config_validate(NULL), XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_test_measure_config(NULL), XGL_ERR_NULL_POINTER);
 }
 
 TEST_F(XglConfigTest, ValidateValidConfig) {
     config = xgl_test_config();
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_OK);
 }
 
 TEST_F(XglConfigTest, ValidateRejectsReservedSourceId) {
     config = xgl_test_config();
     config.source_id = 0;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
-}
-
-TEST_F(XglConfigTest, ValidateRejectsReservedCodecFeatureFlags) {
-    config = xgl_test_config();
-    config.features.enable_compression = true;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
-
-    config = xgl_test_config();
-    config.features.enable_encryption = true;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateAuthRequiredNeedsProvider) {
     config = xgl_test_config();
     config.auth_required = true;
     config.auth_provider = nullptr;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 
     xgl_auth_provider_t provider = {};
     provider.sign = mock_auth_sign;
     provider.verify = mock_auth_verify;
     provider.user_data = nullptr;
     config.auth_provider = &provider;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 
     provider.tag_len = 4U;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_OK);
 }
 
 TEST_F(XglConfigTest, ValidateRejectsAuthTagLengthAboveProtocolLimit) {
@@ -112,13 +103,13 @@ TEST_F(XglConfigTest, ValidateRejectsAuthTagLengthAboveProtocolLimit) {
     provider.user_data = nullptr;
     config.auth_provider = &provider;
 
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateZeroTxPacketCapacity) {
     config = xgl_test_config();
     config.features.max_tx_packets = 0U;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, WorkspaceRejectsOverflowingTxCapacity) {
@@ -132,81 +123,81 @@ TEST_F(XglConfigTest, WorkspaceRejectsOverflowingTxCapacity) {
 TEST_F(XglConfigTest, ValidateRxBufferSizeTooSmall) {
     config = xgl_test_config();
     config.memory.rx_buffer_size = 32; /* Below minimum of 64 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRxBufferSizeTooLarge) {
     config = xgl_test_config();
     config.memory.rx_buffer_size = 8192; /* Above maximum of 4096 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateAckTimeoutTooSmall) {
     config = xgl_test_config();
     config.protocol.ack_timeout_ms = 50; /* Below minimum of 100 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateAckTimeoutTooLarge) {
     config = xgl_test_config();
     config.protocol.ack_timeout_ms = 20000; /* Above maximum of 10000 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRetryCountTooSmall) {
     config = xgl_test_config();
     config.protocol.max_retry_count = 0; /* Below minimum of 1 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRetryCountTooLarge) {
     config = xgl_test_config();
     config.protocol.max_retry_count = 20; /* Above maximum of 10 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateWindowSizeTooSmall) {
     config = xgl_test_config();
     config.protocol.window_size = 0; /* Below minimum of 1 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateWindowSizeTooLarge) {
     config = xgl_test_config();
     config.protocol.window_size = 64; /* Above maximum of 32 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateFrameSizeTooSmall) {
     config = xgl_test_config();
     config.protocol.max_frame_size = 32; /* Below minimum of 64 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateFrameSizeTooLarge) {
     config = xgl_test_config();
     config.protocol.max_frame_size = 4096; /* Above maximum of 2048 */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateFrameSizeSmallerThanHeader) {
     config = xgl_test_config();
     config.protocol.max_frame_size = 10; /* Smaller than header + CRC */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRxBufferTooSmallForFrame) {
     config = xgl_test_config();
     config.protocol.max_frame_size = 512;
     config.memory.rx_buffer_size = 256; /* Too small for full frame */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_BUFFER_TOO_SMALL);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableLengthWithoutTable) {
     config = xgl_test_config();
     config.route_table_len = 5;
     config.route_table = NULL; /* Length > 0 but table is NULL */
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableWithNullPhy) {
@@ -217,12 +208,11 @@ TEST_F(XglConfigTest, ValidateRouteTableWithNullPhy) {
     routes[0].phy = NULL; /* NULL PHY */
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
-    routes[0].metric = 1;
 
     config.route_table = routes;
     config.route_table_len = 1;
 
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableWithNullPhyOps) {
@@ -238,12 +228,11 @@ TEST_F(XglConfigTest, ValidateRouteTableWithNullPhyOps) {
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
-    routes[0].metric = 1;
 
     config.route_table = routes;
     config.route_table_len = 1;
 
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableWithInvalidFrameSize) {
@@ -265,12 +254,11 @@ TEST_F(XglConfigTest, ValidateRouteTableWithInvalidFrameSize) {
     routes[0].phy = &phy;
     routes[0].max_frame_size = 32; /* Too small */
     routes[0].read_freq_hz = 100;
-    routes[0].metric = 1;
 
     config.route_table = routes;
     config.route_table_len = 1;
 
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateRouteTableWithZeroFrequency) {
@@ -292,12 +280,11 @@ TEST_F(XglConfigTest, ValidateRouteTableWithZeroFrequency) {
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 0; /* Zero frequency */
-    routes[0].metric = 1;
 
     config.route_table = routes;
     config.route_table_len = 1;
 
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglConfigTest, ValidateValidRouteTable) {
@@ -319,12 +306,11 @@ TEST_F(XglConfigTest, ValidateValidRouteTable) {
     routes[0].phy = &phy;
     routes[0].max_frame_size = 256;
     routes[0].read_freq_hz = 100;
-    routes[0].metric = 1;
 
     config.route_table = routes;
     config.route_table_len = 1;
 
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_OK);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -334,8 +320,7 @@ TEST_F(XglConfigTest, ValidateValidRouteTable) {
 TEST_F(XglConfigTest, CreateInstanceWithValidConfig) {
     config = xgl_test_config();
 
-    xgl_test_use_host_allocator(&config);
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = xgl_test_init_allocated(&config);
     EXPECT_NE(handle, nullptr);
 
     xgl_destroy(handle);
@@ -345,7 +330,6 @@ TEST_F(XglConfigTest, CreateInstanceWithInvalidConfig) {
     config = xgl_test_config();
     config.features.max_tx_packets = 0U;
 
-    xgl_test_use_host_allocator(&config);
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = xgl_test_init_allocated(&config);
     EXPECT_EQ(handle, nullptr);
 }

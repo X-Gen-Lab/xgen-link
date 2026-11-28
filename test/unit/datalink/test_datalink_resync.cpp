@@ -9,6 +9,7 @@
 
 #include <datalink/xgl_datalink.h>
 #include <wire/xgl_frame.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <algorithm>
 #include <array>

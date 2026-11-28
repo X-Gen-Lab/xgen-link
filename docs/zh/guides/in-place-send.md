@@ -7,17 +7,16 @@ source_language: zh_CN
 
 # 零拷贝
 
-零拷贝发送 API 在调用者提供的可写存储中构造单帧非可靠消息，不引入异步缓冲所有权。
+使用 `<xgl/xgl_inplace.h>` 在调用者提供的可写存储中构造单帧非可靠消息。PHY 在返回前完成读取或复制。
 
 ## 支持范围
 
 | API | 作用域与用途 |
 | --- | --- |
-| `xgl_send_zerocopy_at()` | 保留原有描述符；connection ID 与 session epoch 均为零 |
 | `xgl_send_zerocopy_scoped_at()` | 通过 `xgl_tx_zerocopy_request_t` 指定 connection ID 与 session epoch |
 | `xgl_send_zerocopy_layout()` | 查询指定作用域请求的精确载荷偏移与完整帧大小 |
 
-两个发送 API 均只支持单帧非可靠发送。`reliable=true` 返回 `XGL_ERR_INVALID_PARAM`，`timeout_ms` 不参与处理。可靠发送使用 `xgl_send_at()`。认证发送要求已为选定的目标、connection ID 与 session epoch 安装可信会话。
+可靠发送使用 `xgl_send_at()`。认证发送要求已为选定的目标、connection ID 与 session epoch 安装可信会话。
 
 ## 缓冲布局
 
@@ -27,7 +26,7 @@ source_language: zh_CN
 | --- | ---: |
 | 基础头 | `XGL_FRAME_HEADER_SIZE`（24） |
 | 非零 data type | `XGL_DATA_TYPE_EXT_SIZE`（3） |
-| 非零 session epoch | `XGL_SESSION_EXT_SIZE`（14） |
+| 非零 session epoch | 14 |
 | 启用认证时的 security extension | 15 |
 | 启用认证时的 tag | Provider tag 长度 |
 | 末尾 CRC | `XGL_CRC16_SIZE`（2） |
@@ -40,15 +39,15 @@ Connection ID 位于基础头中，不增加扩展字节。应用通过 `xgl_sen
 
 ```c
 #include <string.h>
-#include <xgl/xgl.h>
+#include <xgl/xgl_inplace.h>
 
 xgl_error_t send_scoped_example(xgl_handle_t handle, uint32_t now_ms) {
     const uint8_t payload[] = {1U, 2U, 3U, 4U};
     uint8_t storage[128];
     xgl_tx_zerocopy_request_t request = {0};
-    request.data.target_id = 2U;
-    request.data.data_type = 1U;
-    request.data.data_len = sizeof(payload);
+    request.target_id = 2U;
+    request.data_type = 1U;
+    request.data_len = sizeof(payload);
     request.connection_id = 11U;
     request.session_epoch = 9U;
 
@@ -62,9 +61,9 @@ xgl_error_t send_scoped_example(xgl_handle_t handle, uint32_t now_ms) {
     }
 
     memcpy(storage + layout.payload_offset, payload, sizeof(payload));
-    request.data.buffer = storage;
-    request.data.buffer_size = sizeof(storage);
-    request.data.data_offset = layout.payload_offset;
+    request.buffer = storage;
+    request.buffer_size = sizeof(storage);
+    request.data_offset = layout.payload_offset;
     return xgl_send_zerocopy_scoped_at(handle, &request, now_ms);
 }
 ```
@@ -73,7 +72,7 @@ xgl_error_t send_scoped_example(xgl_handle_t handle, uint32_t now_ms) {
 
 ## 所有权
 
-任一发送 API 返回后，调用者即可复用存储。所有回调均同步借用缓冲区；即使使用 DMA，PHY TX 返回前也必须完成读取或复制。此接口减少组帧复制，驱动仍可能需要复制到自有 DMA 缓冲。不得保存借用指针，也不得传入只读存储。
+发送返回后，调用者即可复用存储。所有回调均同步借用缓冲区。此接口减少组帧复制，驱动仍可能需要复制到自有 DMA 缓冲。不得保存借用指针，也不得传入只读存储。
 
 ## 失败处理
 

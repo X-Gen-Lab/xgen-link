@@ -9,6 +9,8 @@
 
 #include <xgl/xgl.h>
 
+#include <xgl/xgl_security.h>
+
 #include "xgl_instance_internal.h"
 
 /** \brief           Install trusted parameters in the instance security state.

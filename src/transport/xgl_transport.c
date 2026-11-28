@@ -60,7 +60,6 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
 #endif
 #if XGL_FEATURE_ADVANCED_RUNTIME
     ctx->tx_lifetime_ms = config->tx_lifetime_ms;
-    ctx->rx_scoped_callback = config->rx_scoped_callback;
     ctx->scope_event_callback = config->scope_event_callback;
     ctx->extended_user_data = config->extended_user_data;
 #endif
@@ -69,10 +68,9 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->window_size = config->window_size;
     ctx->max_peers = config->max_peers;
     ctx->default_timeout_ms = config->default_timeout_ms;
-    ctx->max_frame_size = config->max_frame_size;
     ctx->lower_layer = config->lower_layer;
     ctx->rx_callback = config->rx_callback;
-    ctx->rx_accept_callback = config->rx_accept_callback;
+    ctx->rx_user_data = config->rx_user_data;
     ctx->error_callback = config->error_callback;
     ctx->callback_user_data = config->callback_user_data;
 #if XGL_FEATURE_STATISTICS
@@ -82,6 +80,7 @@ xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
     ctx->max_tx_packets = config->max_tx_packets;
 #if XGL_FEATURE_OUT_OF_ORDER
     ctx->max_rx_buffered_packets = config->max_rx_buffered_packets;
+    ctx->max_frame_size = config->max_frame_size;
 #endif
     ctx->memory.peer = config->allocator;
     ctx->memory.tx_packet = config->allocator;

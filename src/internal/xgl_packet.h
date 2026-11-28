@@ -28,13 +28,11 @@ typedef struct xgl_packet {
     /*-----------------------------------------------------------------------*/
     /* Attributes                                                            */
     /*-----------------------------------------------------------------------*/
-    uint8_t packet_type;   /**< Production packet type */
-    uint8_t flags;         /**< Production wire flags */
-    uint8_t data_type;     /**< Data type */
-    uint8_t reliable;      /**< Reliable transmission flag */
-    uint8_t priority;      /**< Priority level (0-7) */
-    uint8_t ttl;           /**< Hop limit */
-    uint8_t traffic_class; /**< Priority and traffic class */
+    uint8_t packet_type; /**< Production packet type */
+    uint8_t flags;       /**< Production wire flags */
+    uint8_t data_type;   /**< Data type */
+    uint8_t reliable;    /**< Reliable transmission flag */
+    uint8_t priority;    /**< Priority level (0-7) */
 
     /*-----------------------------------------------------------------------*/
     /* Data                                                                  */

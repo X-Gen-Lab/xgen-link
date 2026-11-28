@@ -8,6 +8,10 @@
  */
 
 #include "test_host_allocator.h"
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_inplace.h>
+#include <xgl/xgl_security.h>
 
 #include <datalink/xgl_datalink.h>
 #include <network/xgl_network.h>
@@ -253,9 +257,8 @@ class XglNetworkTest : public ::testing::Test {
 };
 
 TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100),
+              XGL_OK);
     std::vector<uint8_t> captured(256);
     xgl_frame_tx_endpoint_t lower = {};
     lower.ctx = &captured;
@@ -322,9 +325,8 @@ TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
 }
 
 TEST_F(XglNetworkTest, DefaultConnectionDoesNotUseLocalShortSession) {
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100),
+              XGL_OK);
     uint32_t connection_id = UINT32_MAX;
     xgl_frame_tx_endpoint_t lower = {};
     lower.ctx = &connection_id;
@@ -350,7 +352,7 @@ TEST_F(XglNetworkTest, DefaultConnectionDoesNotUseLocalShortSession) {
 
 TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
     ASSERT_EQ(
-        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U, 100U, 1U),
+        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U, 100U),
         XGL_OK);
     xgl_error_t phy_result = XGL_ERR_TX_FAILED;
     phy_ops.user_data = &phy_result;
@@ -366,7 +368,7 @@ TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
     packet.data = &data;
     uint8_t buffer[128] = {};
     buffer[XGL_WIRE_BASE_HEADER_SIZE] = payload;
-    xgl_tx_data_zerocopy_t inplace = {};
+    xgl_tx_zerocopy_request_t inplace = {};
     inplace.buffer = buffer;
     inplace.buffer_size = sizeof(buffer);
     inplace.data_offset = XGL_WIRE_BASE_HEADER_SIZE;
@@ -377,8 +379,8 @@ TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
         stats = {};
         phy_result = XGL_ERR_TX_FAILED;
         auto submit = [&]() {
-            return use_inplace ? xgl_network_send_zerocopy(&network_ctx,
-                                                           nullptr, &inplace)
+            return use_inplace ? xgl_network_send_zerocopy_scoped(
+                                     &network_ctx, nullptr, &inplace)
                                : xgl_network_send(&network_ctx, &packet);
         };
         EXPECT_EQ(submit(), XGL_ERR_TX_FAILED);
@@ -394,7 +396,7 @@ TEST_F(XglNetworkTest, CopiedAndInplaceTxCountersCommitOnlyAfterPhySuccess) {
 
 TEST_F(XglNetworkTest, ForwardTxCountersCommitOnlyAfterPhySuccess) {
     ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U),
         XGL_OK);
     xgl_error_t phy_result = XGL_ERR_TX_FAILED;
     phy_ops.user_data = &phy_result;
@@ -418,7 +420,7 @@ TEST_F(XglNetworkTest, ForwardTxCountersCommitOnlyAfterPhySuccess) {
 
 TEST_F(XglNetworkTest, ForwardPreservesSubmissionErrorAndInputBytes) {
     ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U),
         XGL_OK);
     xgl_error_t phy_result = XGL_ERR_BUSY;
     phy_ops.user_data = &phy_result;
@@ -442,7 +444,7 @@ TEST_F(XglNetworkTest, ForwardPreservesSubmissionErrorAndInputBytes) {
 
 TEST_F(XglNetworkTest, ForwardAllocationFailureDoesNotSubmitOrChangeInput) {
     ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U),
         XGL_OK);
     xgl_allocator_t unavailable = {};
     unavailable.alloc = [](void*, size_t) -> void* { return nullptr; };
@@ -461,7 +463,7 @@ TEST_F(XglNetworkTest, ForwardAllocationFailureDoesNotSubmitOrChangeInput) {
 
 TEST_F(XglNetworkTest, StreamForwardBorrowsAndRestoresParserStorage) {
     ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U),
         XGL_OK);
     xgl_allocator_t unavailable = {};
     unavailable.alloc = [](void*, size_t) -> void* { return nullptr; };
@@ -508,7 +510,7 @@ TEST_F(XglNetworkTest, StreamForwardBorrowsAndRestoresParserStorage) {
 
 TEST_F(XglNetworkTest, ForwardMissingLowerEndpointReleasesScratch) {
     ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U, 1U),
+        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 128U, 100U),
         XGL_OK);
     size_t live_allocations = 0U;
     xgl_allocator_t allocator = {};
@@ -555,7 +557,7 @@ TEST_F(XglNetworkTest, LocalRxCountsAdmissionBeforeTransportAcceptance) {
 
 TEST_F(XglNetworkTest, ScopedInplaceBoundaryRetainsPayloadAndWireIdentity) {
     ASSERT_EQ(
-        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U, 100U, 1U),
+        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 128U, 100U),
         XGL_OK);
     uint8_t buffer[128] = {};
     phy_ops.user_data = buffer;
@@ -566,15 +568,15 @@ TEST_F(XglNetworkTest, ScopedInplaceBoundaryRetainsPayloadAndWireIdentity) {
     xgl_tx_zerocopy_request_t request = {};
     request.connection_id = 7U;
     request.session_epoch = 9U;
-    request.data.target_id = REMOTE_ID;
-    request.data.data_type = 3U;
-    request.data.data_len = 1U;
+    request.target_id = REMOTE_ID;
+    request.data_type = 3U;
+    request.data_len = 1U;
     xgl_tx_frame_layout_t layout = {};
     ASSERT_EQ(xgl_network_zerocopy_layout(&network_ctx, &request, &layout),
               XGL_OK);
-    request.data.buffer = buffer;
-    request.data.buffer_size = sizeof(buffer);
-    request.data.data_offset = layout.payload_offset;
+    request.buffer = buffer;
+    request.buffer_size = sizeof(buffer);
+    request.data_offset = layout.payload_offset;
     buffer[layout.payload_offset] = 0x47U;
 
     EXPECT_EQ(xgl_network_send_zerocopy_scoped(&network_ctx, nullptr, nullptr),
@@ -589,7 +591,7 @@ TEST_F(XglNetworkTest, ScopedInplaceBoundaryRetainsPayloadAndWireIdentity) {
     EXPECT_EQ(view.data_type, 3U);
     EXPECT_EQ(view.payload, buffer + layout.payload_offset);
     EXPECT_EQ(view.payload[0], 0x47U);
-    request.data.buffer_size = layout.frame_size - 1U;
+    request.buffer_size = layout.frame_size - 1U;
     EXPECT_EQ(xgl_network_send_zerocopy_scoped(&network_ctx, nullptr, &request),
               XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(stats.tx_packets, 1U);
@@ -597,9 +599,8 @@ TEST_F(XglNetworkTest, ScopedInplaceBoundaryRetainsPayloadAndWireIdentity) {
 
 TEST_F(XglNetworkTest, EpochExtensionCountsAgainstRouteMtu) {
     const uint16_t mtu = XGL_WIRE_BASE_HEADER_SIZE + XGL_CRC16_SIZE + 1;
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, mtu, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, mtu, 100),
+              XGL_OK);
     unsigned sends = 0;
     xgl_frame_tx_endpoint_t lower = {};
     lower.ctx = &sends;
@@ -697,7 +698,7 @@ TEST_F(XglNetworkTest, InitializeNetworkContext) {
 
 TEST_F(XglNetworkTest, AddRoute) {
     xgl_error_t err =
-        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1);
+        xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100);
     EXPECT_EQ(err, XGL_OK);
 
     xgl_route_item_t* found = xgl_route_table_lookup(&route_table, REMOTE_ID);
@@ -706,7 +707,7 @@ TEST_F(XglNetworkTest, AddRoute) {
 }
 
 TEST_F(XglNetworkTest, RemoveRoute) {
-    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1);
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100);
 
     xgl_error_t err = xgl_route_table_remove(&route_table, REMOTE_ID);
     EXPECT_EQ(err, XGL_OK);
@@ -805,7 +806,7 @@ TEST_F(XglNetworkTest, SendPacketWithoutRoute) {
 
 TEST_F(XglNetworkTest, SendPacketWithRoute) {
     /* Add route */
-    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1);
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100);
 
     xgl_packet_data_t packet_data = {};
     packet_data.data_len = 10;
@@ -839,7 +840,7 @@ TEST_F(XglNetworkTest, SendPacketWithRoute) {
 
 TEST_F(XglNetworkTest, SendPacketEncodesApplicationTypeAsHeaderExtension) {
     constexpr uint8_t kAppTypeThatCollidesWithAck = XGL_PACKET_TYPE_ACK;
-    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1);
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100);
 
     const uint8_t payload[] = {'a', 'p', 'p'};
     xgl_packet_data_t packet_data = {};
@@ -899,7 +900,7 @@ TEST_F(XglNetworkTest, SendPacketEncodesApplicationTypeAsHeaderExtension) {
 }
 
 TEST_F(XglNetworkTest, SendPacketRejectsConflictingDataTypeExtension) {
-    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100, 1);
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 256, 100);
 
     uint8_t ext_buf[XGL_DATA_TYPE_EXT_SIZE] = {};
     uint8_t ext_data_type = 7U;
@@ -941,7 +942,7 @@ TEST_F(XglNetworkTest, SendPacketRouteMtuIncludesAuthenticationOverhead) {
     session.rx_nonce_prefix = 2U;
     ASSERT_EQ(xgl_security_session_install(&security, &session), XGL_OK);
     network_ctx.security = &security;
-    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 60, 100, 1);
+    xgl_route_table_add(&route_table, REMOTE_ID, &phy_ops, 60, 100);
 
     const uint8_t payload[20] = {};
     xgl_packet_data_t packet_data = {};
@@ -1008,7 +1009,7 @@ TEST_F(XglNetworkTest, ReceivePacketForLocalNode) {
 
 TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
     /* Add route for forwarding */
-    xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1);
+    xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100);
 
     std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID);
 
@@ -1021,9 +1022,8 @@ TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
 }
 
 TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100),
+              XGL_OK);
     xgl_layer_stats_t forwarded_stats = {};
     xgl_datalink_config_t config = {};
     config.stats = &forwarded_stats;
@@ -1044,9 +1044,8 @@ TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
 
 TEST_F(XglNetworkTest, ForwardingRejectsMissingPhyTransmitOperation) {
     phy_ops.tx = nullptr;
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100),
+              XGL_OK);
     const auto frame = make_frame(REMOTE_ID, FORWARD_ID);
 
     EXPECT_EQ(
@@ -1067,9 +1066,9 @@ TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
     second_phy.rx = test_phy_rx;
     second_phy.user_data = &second_phy_count;
 
-    ASSERT_EQ(xgl_route_table_add(&route_table, 4, &first_phy, 256, 100, 10),
+    ASSERT_EQ(xgl_route_table_add(&route_table, 4, &first_phy, 256, 100),
               XGL_OK);
-    ASSERT_EQ(xgl_route_table_add(&route_table, 5, &second_phy, 256, 100, 1),
+    ASSERT_EQ(xgl_route_table_add(&route_table, 5, &second_phy, 256, 100),
               XGL_OK);
 
     std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, 5);
@@ -1083,9 +1082,8 @@ TEST_F(XglNetworkTest, ForwardingUsesTargetRouteEgressPhy) {
 }
 
 TEST_F(XglNetworkTest, ForwardingDropsExpiredTtl) {
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100),
+              XGL_OK);
 
     std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID, 0);
 
@@ -1097,9 +1095,8 @@ TEST_F(XglNetworkTest, ForwardingDropsExpiredTtl) {
 }
 
 TEST_F(XglNetworkTest, ForwardingDropsPacketWithTtlOneBeforeForwarding) {
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100),
+              XGL_OK);
 
     std::vector<uint8_t> frame_buf = make_frame(REMOTE_ID, FORWARD_ID, 1);
 
@@ -1111,9 +1108,8 @@ TEST_F(XglNetworkTest, ForwardingDropsPacketWithTtlOneBeforeForwarding) {
 }
 
 TEST_F(XglNetworkTest, ForwardingRejectsRouteMtuOverflow) {
-    ASSERT_EQ(
-        xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 32, 100, 1),
-        XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 32, 100),
+              XGL_OK);
 
     std::vector<uint8_t> frame_buf =
         make_frame(REMOTE_ID, FORWARD_ID, XGL_DEFAULT_TTL,
@@ -1151,7 +1147,7 @@ TEST_F(XglNetworkTest, ForwardingAllocatesWholeFrameFromNetworkResource) {
     capture_phy.rx = test_phy_rx;
     capture_phy.user_data = &capture;
     ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &capture_phy,
-                                  XGL_DATALINK_MAX_FRAME_SIZE, 100, 1),
+                                  XGL_DATALINK_MAX_FRAME_SIZE, 100),
               XGL_OK);
 
     std::vector<uint8_t> payload(512U, 0xA5U);
@@ -1197,9 +1193,9 @@ TEST_F(XglNetworkTest,
         return *static_cast<xgl_error_t*>(user_data);
     };
     forward_phy.user_data = &transmit_result;
-    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &forward_phy, 256,
-                                  100, 1),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &forward_phy, 256, 100),
+        XGL_OK);
     const std::vector<uint8_t> bytes = make_frame(REMOTE_ID, FORWARD_ID);
 
     EXPECT_EQ(
@@ -1231,9 +1227,9 @@ TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
     capture_phy.tx = capture_phy_tx;
     capture_phy.rx = test_phy_rx;
     capture_phy.user_data = &capture;
-    ASSERT_EQ(xgl_route_table_add(&route_table, FORWARD_ID, &capture_phy, 256,
-                                  100, 1),
-              XGL_OK);
+    ASSERT_EQ(
+        xgl_route_table_add(&route_table, FORWARD_ID, &capture_phy, 256, 100),
+        XGL_OK);
 
     const char payload[] = "signed-hop";
     xgl_frame_t frame = {};

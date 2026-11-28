@@ -8,7 +8,9 @@
  */
 
 #include <network/xgl_network.h>
-#include <xgl/xgl.h>
+#include <xgl/xgl_runtime.h>
+
+#include "xgl_instance_internal.h"
 
 #if XGL_FEATURE_AUTH
 #include <wire/xgl_frame.h>
@@ -71,16 +73,50 @@ static bool config_measure_required_auth_frame(size_t tag_len,
 }
 #endif
 
-/**
- * \brief           Validate configuration parameters
- * \details         Checks all configuration parameters for validity
- *                  Returns specific error codes for different validation
- * failures
- */
-xgl_error_t xgl_config_validate(const xgl_config_t* config) {
-    /* Check for NULL pointer */
+/** \brief           Resolve the optional policy before walking any routes. */
+static xgl_error_t config_validate_options(const xgl_config_t* config,
+                                           bool* auth_required) {
+    *auth_required = config->auth_required;
+    const xgl_instance_options_t* options = config->options;
+    if (options == NULL) {
+        return XGL_OK;
+    }
+    if (options->size != sizeof(*options) ||
+        options->version != XGL_INSTANCE_OPTIONS_VERSION ||
+        options->config_size != sizeof(*config)) {
+        return XGL_ERR_INVALID_VERSION;
+    }
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    if (options->tx_lifetime_ms >= UINT32_C(0x80000000)) {
+        return XGL_ERR_INVALID_PARAM;
+    }
+    if (options->protect_installed_scopes) {
+#if XGL_FEATURE_AUTH
+        if (config->auth_provider == NULL) {
+            return XGL_ERR_INVALID_PARAM;
+        }
+        *auth_required = true;
+#else
+        return XGL_ERR_UNSUPPORTED;
+#endif
+    }
+    return XGL_OK;
+#else
+    return XGL_ERR_UNSUPPORTED;
+#endif
+}
+
+/** \brief           Validate the configuration used to plan the workspace. */
+xgl_error_t xgl_instance_validate_config(const xgl_config_t* config) {
     if (config == NULL) {
         return XGL_ERR_NULL_POINTER;
+    }
+
+    bool auth_required;
+    const xgl_error_t option_error =
+        config_validate_options(config, &auth_required);
+    if (option_error != XGL_OK) {
+        return option_error;
     }
 
     /* Validate memory configuration */
@@ -132,13 +168,8 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (config->features.enable_compression ||
-        config->features.enable_encryption) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
 #if !XGL_FEATURE_AUTH
-    if (config->auth_required) {
+    if (auth_required) {
         return XGL_ERR_UNSUPPORTED;
     }
 #endif
@@ -151,7 +182,7 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
 
 #if XGL_FEATURE_AUTH
     size_t required_auth_frame_size = 0U;
-    if ((config->auth_required && config->auth_provider == NULL) ||
+    if ((auth_required && config->auth_provider == NULL) ||
         (config->auth_provider != NULL &&
          (config->auth_provider->sign == NULL ||
           config->auth_provider->verify == NULL ||
@@ -159,7 +190,7 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config) {
           config->auth_provider->tag_len > XGL_AUTH_TAG_MAX_LEN))) {
         return XGL_ERR_INVALID_PARAM;
     }
-    if (config->auth_required &&
+    if (auth_required &&
         (!config_measure_required_auth_frame(config->auth_provider->tag_len,
                                              &required_auth_frame_size) ||
          config->protocol.max_frame_size < required_auth_frame_size)) {

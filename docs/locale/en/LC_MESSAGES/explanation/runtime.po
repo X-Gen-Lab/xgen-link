@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 4eadd53a5cff979bc17b0c8bd99b2b0a3421f64c8e2bf476278749ee6143ea53\n"
+"X-XGL-Source-SHA256: 8e059e061ec3ddc6af1a347b37d3096875f497d4cb0e857887caad821d61343d\n"
 
 #: docs/zh/explanation/runtime.md:8
 msgid "接收与运行时工作预算"
@@ -16,13 +16,13 @@ msgstr "Bounded Receive and Runtime Work"
 
 #: docs/zh/explanation/runtime.md:10
 msgid ""
-"`XGL_ENABLE_ADVANCED_RUNTIME=ON` 启用可续跑的接收校验和 `xgl_step_bounded()`。这是显式构建选项，所有 profile 默认均为 OFF。关闭时保留 原 "
-"parser 布局，有界入口返回 `XGL_ERR_UNSUPPORTED`。库和消费者必须使用一致的 选项，以生成的构建配置为准。"
+"`XGL_ENABLE_ADVANCED_RUNTIME=ON` 启用可续跑的接收校验和 `<xgl/xgl_runtime.h>` 的 `xgl_step_bounded()`。这是显式构建选项，所有 "
+"profile 默认均为 OFF。关闭时保留 原 parser 布局，有界入口返回 `XGL_ERR_UNSUPPORTED`。库和消费者必须使用一致的 选项，以生成的构建配置为准。"
 msgstr ""
-"`XGL_ENABLE_ADVANCED_RUNTIME=ON` enables resumable receive validation and `xgl_step_bounded()`. It is an"
-" explicit build option and defaults to OFF for every profile. An OFF build retains the original parser "
-"layout and returns `XGL_ERR_UNSUPPORTED` from the bounded entry. Select the option consistently for the "
-"library and its consumers; use the generated build configuration."
+"`XGL_ENABLE_ADVANCED_RUNTIME=ON` enables resumable receive validation and `xgl_step_bounded()` from "
+"`<xgl/xgl_runtime.h>`. Every profile defaults to OFF. When disabled, the parser keeps its ordinary "
+"layout and the bounded entry returns `XGL_ERR_UNSUPPORTED`. The library and consumer must agree with the"
+" generated build configuration."
 
 #: docs/zh/explanation/runtime.md:15
 msgid "预算计量对象"

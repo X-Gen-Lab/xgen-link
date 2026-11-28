@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "xgl/xgl_alloc.h"
 #include "xgl/xgl_build_config.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
@@ -31,16 +32,6 @@ extern "C" {
  * \brief           Default route table size (must be power of 2)
  */
 #define XGL_ROUTE_TABLE_DEFAULT_SIZE 16
-
-/**
- * \brief           Maximum reserved route metadata value
- */
-#define XGL_ROUTE_METRIC_MAX 255
-
-/**
- * \brief           Default reserved route metadata value
- */
-#define XGL_ROUTE_METRIC_DEFAULT 100
 
 /*---------------------------------------------------------------------------*/
 /* Route Table Structure                                                     */
@@ -97,14 +88,13 @@ void xgl_route_table_destroy(xgl_route_table_t* table);
  * \param[in]       phy: Physical layer operations
  * \param[in]       max_frame_size: Maximum frame size for this route
  * \param[in]       read_freq_hz: Retained metadata; does not reschedule PHY RX
- * \param[in]       metric: Reserved metadata; does not affect route selection
  * \return          XGL_OK on success, error code otherwise
  * \note            An existing destination is updated even at full capacity.
  *                  Runtime changes do not register or replace receive links.
  */
 xgl_error_t xgl_route_table_add(xgl_route_table_t* table, uint16_t target_id,
                                 xgl_phy_ops_t* phy, uint16_t max_frame_size,
-                                uint32_t read_freq_hz, uint8_t metric);
+                                uint32_t read_freq_hz);
 
 /**
  * \brief           Remove route from table
@@ -127,16 +117,6 @@ xgl_error_t xgl_route_table_remove(xgl_route_table_t* table,
  */
 xgl_route_item_t* xgl_route_table_lookup(const xgl_route_table_t* table,
                                          uint16_t target_id);
-
-/**
- * \brief           Update retained metric metadata without changing selection
- * \param[in,out]   table: Route table structure
- * \param[in]       target_id: Target node ID
- * \param[in]       metric: New metric value
- * \return          XGL_OK on success, XGL_ERR_ROUTE_NOT_FOUND if not found
- */
-xgl_error_t xgl_route_table_update_metric(const xgl_route_table_t* table,
-                                          uint16_t target_id, uint8_t metric);
 
 /**
  * \brief           Clear all routes from table
