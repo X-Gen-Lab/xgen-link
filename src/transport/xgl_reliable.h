@@ -12,6 +12,7 @@
 
 #include "internal/xgl_list.h"
 #include "wire/xgl_wire.h"
+#include "xgl/xgl_alloc.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 

@@ -7,10 +7,8 @@
  * \date            2026-10-01
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
-#include <wire/xgl_crc16.h>
-#include <wire/xgl_wire_bytes.h>
-
 #include <stdio.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include "../common/sim_link.h"
 
@@ -49,6 +47,32 @@ typedef struct {
     unsigned errors;
 } host_app_t;
 
+/* Offset and commit messages use the update application's own byte format. */
+static uint32_t update_read_u32(const uint8_t* data) {
+    return (uint32_t)data[0] | ((uint32_t)data[1] << 8U) |
+           ((uint32_t)data[2] << 16U) | ((uint32_t)data[3] << 24U);
+}
+
+static void update_write_u32(uint8_t* data, uint32_t value) {
+    data[0] = (uint8_t)value;
+    data[1] = (uint8_t)(value >> 8U);
+    data[2] = (uint8_t)(value >> 16U);
+    data[3] = (uint8_t)(value >> 24U);
+}
+
+/* Compare the images independently of the protocol frame checks. */
+static uint16_t image_crc16(const uint8_t* image, size_t length) {
+    uint16_t crc = UINT16_MAX;
+    for (size_t offset = 0; offset < length; ++offset) {
+        crc = (uint16_t)(crc ^ image[offset]);
+        for (unsigned bit = 0; bit < 8U; ++bit) {
+            const uint16_t polynomial = (crc & 1U) != 0U ? 0xA001U : 0U;
+            crc = (uint16_t)((crc >> 1U) ^ polynomial);
+        }
+    }
+    return crc;
+}
+
 /**
  * \brief           Admit one copied block; Flash writes happen outside this
  * callback
@@ -56,12 +80,12 @@ typedef struct {
  *                  size block. Return BUSY while the staging slot is occupied
  *                  and accept only after copying the block.
  */
-static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
-                                uint8_t type, const uint8_t* data,
-                                size_t length, void* context) {
+static xgl_error_t flash_accept(xgl_handle_t handle, const xgl_rx_info_t* info,
+                                const uint8_t* data, size_t length,
+                                void* context) {
     (void)handle;
     flash_app_t* app = context;
-    if (source != 1U || type != BLOCK_TYPE ||
+    if (info->source_id != 1U || info->data_type != BLOCK_TYPE ||
         length != FLASH_OFFSET_BYTES + FLASH_BLOCK_BYTES) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -69,7 +93,7 @@ static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
         app->busy_returns++;
         return XGL_ERR_BUSY;
     }
-    uint32_t offset = xgl_deserialize_u32_le(data);
+    uint32_t offset = update_read_u32(data);
     if (offset != app->committed || offset > IMAGE_BYTES - FLASH_BLOCK_BYTES) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -91,15 +115,16 @@ static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
  *                  committed byte count. Accept only monotonic, block-aligned
  *                  progress.
  */
-static xgl_error_t host_accept(xgl_handle_t handle, uint16_t source,
-                               uint8_t type, const uint8_t* data, size_t length,
+static xgl_error_t host_accept(xgl_handle_t handle, const xgl_rx_info_t* info,
+                               const uint8_t* data, size_t length,
                                void* context) {
     (void)handle;
     host_app_t* app = context;
-    if (source != 2U || type != COMMIT_TYPE || length != 4U) {
+    if (info->source_id != 2U || info->data_type != COMMIT_TYPE ||
+        length != 4U) {
         return XGL_ERR_INVALID_PARAM;
     }
-    uint32_t committed = xgl_deserialize_u32_le(data);
+    uint32_t committed = update_read_u32(data);
     if (committed > IMAGE_BYTES || committed < app->confirmed ||
         committed % FLASH_BLOCK_BYTES != 0U) {
         return XGL_ERR_INVALID_PARAM;
@@ -109,27 +134,15 @@ static xgl_error_t host_accept(xgl_handle_t handle, uint16_t source,
 }
 
 /**
- * \brief           Record a host error without reentering the instance
+ * \brief           Increment the endpoint's error count without reentry
  * \details         Diagnostic text is borrowed for the callback.
  */
-static void host_error(xgl_handle_t handle, xgl_error_t error,
-                       const char* message, void* context) {
-    (void)handle;
-    (void)error;
-    (void)message;
-    ((host_app_t*)context)->errors++;
-}
-
-/**
- * \brief           Record a device error without reentering the instance
- * \details         Diagnostic text is borrowed for the callback.
- */
-static void flash_error(xgl_handle_t handle, xgl_error_t error,
+static void count_error(xgl_handle_t handle, xgl_error_t error,
                         const char* message, void* context) {
     (void)handle;
     (void)error;
     (void)message;
-    ((flash_app_t*)context)->errors++;
+    (*(unsigned*)context)++;
 }
 
 /**
@@ -150,30 +163,29 @@ static void flash_complete(flash_app_t* app) {
  * allocation. */
 int main(void) {
     static sim_node_t host, device;
-    static sim_channel_t to_host, to_device;
+    static sim_link_t link;
     static uint8_t image[IMAGE_BYTES];
     static flash_app_t flash;
     host_app_t host_app = {0};
-    sim_port_t host_port = {&to_host, &to_device, false, 0};
-    sim_port_t device_port = {&to_device, &to_host, false, 0};
-    xgl_phy_ops_t host_phy = {sim_tx, sim_rx, &host_port};
-    xgl_phy_ops_t device_phy = {sim_tx, sim_rx, &device_port};
+    sim_connect(&link);
     for (size_t i = 0; i < sizeof(image); ++i) {
         image[i] = (uint8_t)(i * 17U + 3U);
     }
     memset(flash.flash, 0xFF, sizeof(flash.flash));
     flash.ready_at = 25U; /* Initial erase keeps the receiver BUSY. */
-    flash.port = &device_port;
+    flash.port = &link.ports[1];
     sim_prepare(&host, 1U);
     sim_prepare(&device, 2U);
-    sim_route(&host, 0U, 2U, &host_phy);
-    sim_route(&device, 0U, 1U, &device_phy);
-    host.config.rx_accept_callback = host_accept;
-    host.config.callback_user_data = &host_app;
-    device.config.rx_accept_callback = flash_accept;
-    device.config.callback_user_data = &flash;
-    host.config.error_callback = host_error;
-    device.config.error_callback = flash_error;
+    sim_route(&host, 0U, 2U, &link.phys[0]);
+    sim_route(&device, 0U, 1U, &link.phys[1]);
+    host.config.rx_callback = host_accept;
+    host.config.rx_user_data = &host_app;
+    device.config.rx_callback = flash_accept;
+    device.config.rx_user_data = &flash;
+    host.config.error_callback = count_error;
+    host.config.callback_user_data = &host_app.errors;
+    device.config.error_callback = count_error;
+    device.config.callback_user_data = &flash.errors;
     if (sim_init(&host) != XGL_OK || sim_init(&device) != XGL_OK) {
         return 1;
     }
@@ -184,7 +196,7 @@ int main(void) {
         flash_complete(&flash);
         if (flash.notice_pending) {
             uint8_t committed[4];
-            xgl_serialize_u32_le(committed, (uint32_t)flash.committed);
+            update_write_u32(committed, (uint32_t)flash.committed);
             const xgl_tx_data_t notice = {.target_id = 1U,
                                           .data_type = COMMIT_TYPE,
                                           .data = committed,
@@ -201,7 +213,7 @@ int main(void) {
          * commit. */
         if (submitted == host_app.confirmed && submitted < IMAGE_BYTES) {
             uint8_t block[FLASH_OFFSET_BYTES + FLASH_BLOCK_BYTES];
-            xgl_serialize_u32_le(block, (uint32_t)submitted);
+            update_write_u32(block, (uint32_t)submitted);
             memcpy(block + FLASH_OFFSET_BYTES, image + submitted,
                    FLASH_BLOCK_BYTES);
             const xgl_tx_data_t tx = {.target_id = 2U,
@@ -229,12 +241,12 @@ int main(void) {
     xgl_statistics_t statistics = {0};
     (void)xgl_stats_get(host.handle, &statistics);
 #endif
-    uint16_t expected_crc = xgl_crc16_modbus(image, sizeof(image));
-    uint16_t actual_crc = xgl_crc16_modbus(flash.flash, sizeof(flash.flash));
+    uint16_t expected_crc = image_crc16(image, sizeof(image));
+    uint16_t actual_crc = image_crc16(flash.flash, sizeof(flash.flash));
     bool complete = host_app.confirmed == IMAGE_BYTES &&
                     flash.committed == IMAGE_BYTES &&
                     flash.flash_writes == IMAGE_BYTES / FLASH_BLOCK_BYTES &&
-                    flash.busy_returns > 0U && device_port.dropped == 1U &&
+                    flash.busy_returns > 0U && flash.port->dropped == 1U &&
                     host_app.errors == 0U && flash.errors == 0U &&
                     expected_crc == actual_crc &&
                     memcmp(image, flash.flash, sizeof(image)) == 0;
@@ -243,7 +255,7 @@ int main(void) {
 #endif
     printf("Boot update simulation: %s; blocks=%u, BUSY=%u, dropped_ACK=%u, ",
            complete ? "PASS" : "FAIL", flash.flash_writes, flash.busy_returns,
-           device_port.dropped);
+           flash.port->dropped);
 #if XGL_FEATURE_STATISTICS
     printf("retries=%llu, ", (unsigned long long)statistics.tx_retries);
 #else

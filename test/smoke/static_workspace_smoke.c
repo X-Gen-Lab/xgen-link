@@ -8,6 +8,7 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <stdalign.h>
 #include <string.h>
@@ -72,9 +73,10 @@ static xgl_error_t smoke_rx(uint8_t* data, size_t* len, void* ctx) {
 /**
  * \brief           Model a boot application with a busy flash staging slot.
  */
-static xgl_error_t smoke_accept(xgl_handle_t handle, uint16_t source_id,
-                                uint8_t type, const uint8_t* data, size_t len,
-                                void* ctx) {
+static xgl_error_t smoke_accept(xgl_handle_t handle, const xgl_rx_info_t* info,
+                                const uint8_t* data, size_t len, void* ctx) {
+    const uint16_t source_id = info->source_id;
+    const uint8_t type = info->data_type;
     (void)handle;
     (void)source_id;
     smoke_endpoint_t* endpoint = ctx;
@@ -120,8 +122,8 @@ int main(void) {
     b.remote = &a;
     xgl_phy_ops_t phy_a = {smoke_tx, smoke_rx, &a};
     xgl_phy_ops_t phy_b = {smoke_tx, smoke_rx, &b};
-    xgl_route_item_t route_a = {2U, &phy_a, 128U, 1000U, 0U};
-    xgl_route_item_t route_b = {1U, &phy_b, 128U, 1000U, 0U};
+    xgl_route_item_t route_a = {2U, &phy_a, 128U, 1000U};
+    xgl_route_item_t route_b = {1U, &phy_b, 128U, 1000U};
     xgl_config_t config_a = {
         .source_id = 1U,
         .memory = {.rx_buffer_size = 160U},
@@ -135,12 +137,14 @@ int main(void) {
     };
     config_a.route_table = &route_a;
     config_a.route_table_len = 1U;
-    config_a.rx_accept_callback = smoke_accept;
+    config_a.rx_callback = smoke_accept;
     config_a.error_callback = smoke_error;
+    config_a.rx_user_data = &a;
     config_a.callback_user_data = &a;
     xgl_config_t config_b = config_a;
     config_b.source_id = 2U;
     config_b.route_table = &route_b;
+    config_b.rx_user_data = &b;
     config_b.callback_user_data = &b;
     xgl_memory_requirements_t required;
     if (xgl_memory_requirements(&config_a, &required) != XGL_OK ||

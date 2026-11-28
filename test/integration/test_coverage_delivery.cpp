@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <network/xgl_network.h>
 #include <wire/xgl_wire.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <algorithm>
 #include <cstddef>

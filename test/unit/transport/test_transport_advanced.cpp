@@ -10,6 +10,8 @@
 #include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_runtime.h>
 
 #include <algorithm>
 #include <array>
@@ -76,7 +78,8 @@ class XglTransportAdvancedTest : public ::testing::Test {
         config.stats = &stats;
         config.allocator = xgl_test_host_allocator();
         config.tx_lifetime_ms = lifetime;
-        config.rx_scoped_callback = Accept;
+        config.rx_callback = Accept;
+        config.rx_user_data = this;
         config.scope_event_callback = Event;
         config.extended_user_data = this;
         ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);

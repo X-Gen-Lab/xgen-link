@@ -8,6 +8,8 @@
  */
 
 #include "test_host_allocator.h"
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <network/xgl_route.h>
 #include <transport/xgl_reliable.h>
@@ -108,9 +110,11 @@ static void always_fail_free(void*, void* ptr) {
     std::free(ptr);
 }
 
-static void spy_receive(xgl_handle_t handle, uint16_t source_id,
-                        uint8_t data_type, const uint8_t* data, size_t len,
-                        void* user_data) {
+static xgl_error_t spy_receive(xgl_handle_t handle, const xgl_rx_info_t* info,
+                               const uint8_t* data, size_t len,
+                               void* user_data) {
+    const uint16_t source_id = info->source_id;
+    const uint8_t data_type = info->data_type;
     (void)handle;
     (void)source_id;
     (void)data_type;
@@ -123,6 +127,7 @@ static void spy_receive(xgl_handle_t handle, uint16_t source_id,
             tracker->payloads.emplace_back();
         }
     }
+    return XGL_OK;
 }
 
 static xgl_transport_config_t
@@ -213,7 +218,7 @@ class TransportRegressionTest : public ::testing::Test {
             error);
     }
 
-    static xgl_error_t Accept(xgl_handle_t, uint16_t, uint8_t,
+    static xgl_error_t Accept(xgl_handle_t, const xgl_rx_info_t* /*info*/,
                               const uint8_t* data, size_t len,
                               void* user_data) {
         auto* test = static_cast<TransportRegressionTest*>(user_data);
@@ -251,8 +256,9 @@ class TransportRegressionTest : public ::testing::Test {
         auto config = make_transport_config(&lower, &stats, &retries);
         config.window_size = window;
         config.max_retry_count = 1;
-        config.rx_accept_callback = Accept;
+        config.rx_callback = Accept;
         config.error_callback = Error;
+        config.rx_user_data = this;
         config.callback_user_data = this;
         ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
         ctx.current_time_ms = s_regression_time_ms;
@@ -430,6 +436,11 @@ TEST_F(TransportRegressionTest, SackCommitsAllAcknowledgementsBeforeBusyRetry) {
 TEST_F(TransportRegressionTest, InvalidSendPlanDoesNotConsumePeerOrEmitHello) {
     Init();
     ctx.max_peers = 1;
+    lower.check_data = [](void*, xgl_handle_t, const xgl_tx_data_t* data,
+                          bool need_hello) {
+        EXPECT_TRUE(need_hello);
+        return data->data_len > 128U ? XGL_ERR_BUFFER_TOO_SMALL : XGL_OK;
+    };
     const uint8_t payload[256] = {};
     xgl_tx_data_t tx = {};
     tx.target_id = 2;
@@ -601,21 +612,6 @@ TEST_F(TransportRegressionTest,
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 120), XGL_OK);
     EXPECT_EQ(retries, 1U);
     EXPECT_EQ(packet->send_timestamp, 120U);
-}
-
-TEST_F(TransportRegressionTest,
-       UnsupportedCodecCannotSilentlyTransmitPlainBytes) {
-#if !XGL_FEATURE_CODEC
-    Init();
-    const uint8_t payload = 'a';
-    xgl_tx_data_t tx = {};
-    tx.target_id = 2;
-    tx.data = &payload;
-    tx.data_len = 1;
-    tx.compression_id = 1;
-    EXPECT_EQ(xgl_transport_send(&ctx, nullptr, &tx), XGL_ERR_UNSUPPORTED);
-    EXPECT_EQ(spy.send_count, 0);
-#endif
 }
 
 TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
@@ -1201,6 +1197,7 @@ TEST(XglTransportTest, HelloCreatesExactPeerWithoutDeliveringToApplication) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1241,6 +1238,7 @@ TEST(XglTransportTest,
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1279,6 +1277,7 @@ TEST(XglTransportTest, FirstReliableDataCreatesExactPeerState) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1318,6 +1317,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketSendsSackForExpectedSequence) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1357,6 +1357,7 @@ TEST(XglTransportTest, OutOfOrderReliablePacketIsBufferedAndDeliveredAfterGap) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
     config.window_size = 8;
 
@@ -1421,6 +1422,7 @@ TEST(XglTransportTest, ReliableReceiveSendsAckRangeExtensionForPacketNumber) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1481,6 +1483,7 @@ TEST(XglTransportTest, AckRangeUsesHeaderExtensionNotPayload) {
         make_transport_config(&lower_layer, &stats, &tx_retries);
     RxTracker rx_tracker;
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     xgl_transport_ctx_t ctx = {};
@@ -1529,6 +1532,7 @@ TEST(XglTransportTest, ReliableReceiveAckPreservesConnectionScope) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1570,6 +1574,7 @@ TEST(XglTransportTest, ReliableReceiveIsolatesPacketNumbersByConnectionScope) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1623,6 +1628,7 @@ TEST(XglTransportTest, ReliableReceiveRejectsPacketNumberOutsideReceiveWindow) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1798,6 +1804,7 @@ TEST(XglTransportTest, UnreliablePacketsWithSameSequenceAreDelivered) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1834,6 +1841,7 @@ TEST(XglTransportTest, ReliableDuplicateDetectionIsScopedBySource) {
     xgl_transport_config_t config =
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.rx_callback = spy_receive;
+    config.rx_user_data = &rx_tracker;
     config.callback_user_data = &rx_tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
@@ -1876,6 +1884,7 @@ TEST(XglTransportTest, PeerIdleTimeoutRetainsReceiveDuplicateHistory) {
         make_transport_config(&lower_layer, &stats, &tx_retries);
     config.peer_idle_timeout_ms = 1000;
     config.rx_callback = spy_receive;
+    config.rx_user_data = &tracker;
     config.callback_user_data = &tracker;
 
     ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);

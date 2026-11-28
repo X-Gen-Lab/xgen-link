@@ -23,25 +23,7 @@ xgl_error_t xgl_network_check_feedback(void* ctx, const xgl_packet_t* received,
 
 /** \brief           Validate caller storage before DATA admission policy. */
 xgl_error_t
-xgl_network_validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data);
-
-/**
- * \brief           Submit caller storage and distinguish request validation
- * \param[in,out]   ctx: Network policy and counters
- * \param[in]       handle: Instance passed to synchronous callbacks
- * \param[in]       request: Borrowed caller buffer and send metadata
- * \param[in]       connection_id: Requested connection identity
- * \param[in]       session_epoch: Requested session epoch
- * \param[out]      attempted: Optional flag, false on basic request rejection,
- *                  true once entering the common network send path
- * \return          Request validation or network submission result
- * \note            Attempted does not imply PHY success or reliable admission.
- */
-xgl_error_t
-xgl_network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                                const xgl_tx_data_zerocopy_t* request,
-                                uint32_t connection_id, uint32_t session_epoch,
-                                bool* attempted);
+xgl_network_validate_zerocopy_request(const xgl_tx_zerocopy_request_t* request);
 
 #if XGL_FEATURE_FORWARDING
 xgl_error_t xgl_network_forward(xgl_network_ctx_t* ctx, xgl_handle_t handle,

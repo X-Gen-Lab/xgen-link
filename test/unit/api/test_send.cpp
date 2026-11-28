@@ -9,6 +9,9 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_inplace.h>
+#include <xgl/xgl_security.h>
 
 #include <network/xgl_network.h>
 #include <wire/xgl_wire.h>
@@ -128,21 +131,15 @@ class XglSendTest : public ::testing::Test {
         route.phy = &phy_ops;
         route.max_frame_size = 256;
         route.read_freq_hz = 100;
-        route.metric = 100;
 
         config = xgl_test_config();
         config.source_id = 1;
         config.route_table = &route;
         config.route_table_len = 1;
-        config.memory.allocator = xgl_test_host_allocator();
 
         /* Create and initialize instance */
-        xgl_test_use_host_allocator(&config);
-        handle = xgl_create(&config);
+        handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr);
-
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK);
     }
 
     void TearDown() override {
@@ -299,7 +296,15 @@ TEST_F(XglSendTest, OrdinaryRejectsPayloadAboveRouteMtu) {
 
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
     EXPECT_EQ(xgl_send_at(handle, &tx_data, 0U), XGL_ERR_BUFFER_TOO_SMALL);
+    tx_data.reliable = true;
+    EXPECT_EQ(xgl_send_at(handle, &tx_data, 0U), XGL_ERR_BUFFER_TOO_SMALL);
+#if XGL_FEATURE_ADVANCED_RUNTIME
+    xgl_resource_snapshot_t resources{};
+    ASSERT_EQ(xgl_resources_get(handle, &resources), XGL_OK);
+    EXPECT_EQ(resources.peer_count, 0U);
+#endif
     ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(mock_phy));
+    tx_data.reliable = false;
     tx_data.data_len = capacity;
     EXPECT_CALL(*mock_phy, tx(testing::_, route.max_frame_size, testing::_))
         .WillOnce(testing::Return(XGL_OK));
@@ -320,9 +325,8 @@ TEST_F(XglSendTest, ScopedAuthenticatedCopyAndZeroCopyHonorExactRouteMtu) {
     provider.tag_len = tag_length;
     config.auth_provider = &provider;
     config.auth_required = true;
-    handle = xgl_create(&config);
+    handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     constexpr uint32_t connection = 17U;
     constexpr uint32_t epoch = 42U;
     const auto session = test_session_config(2U, connection, epoch);
@@ -340,12 +344,12 @@ TEST_F(XglSendTest, ScopedAuthenticatedCopyAndZeroCopyHonorExactRouteMtu) {
     xgl_tx_zerocopy_request_t zero_copy = {};
     zero_copy.connection_id = connection;
     zero_copy.session_epoch = epoch;
-    zero_copy.data.target_id = copy.target_id;
-    zero_copy.data.data_type = copy.data_type;
-    zero_copy.data.buffer = frame;
-    zero_copy.data.buffer_size = sizeof(frame);
-    zero_copy.data.data_offset = payload_offset;
-    zero_copy.data.data_len = copy.data_len;
+    zero_copy.target_id = copy.target_id;
+    zero_copy.data_type = copy.data_type;
+    zero_copy.buffer = frame;
+    zero_copy.buffer_size = sizeof(frame);
+    zero_copy.data_offset = payload_offset;
+    zero_copy.data_len = copy.data_len;
     const std::vector<uint8_t> original(frame, frame + sizeof(frame));
 
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
@@ -361,7 +365,7 @@ TEST_F(XglSendTest, ScopedAuthenticatedCopyAndZeroCopyHonorExactRouteMtu) {
     ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(mock_phy));
 
     copy.data_len = capacity;
-    zero_copy.data.data_len = capacity;
+    zero_copy.data_len = capacity;
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &zero_copy, &layout), XGL_OK);
     EXPECT_EQ(layout.payload_offset, payload_offset);
     EXPECT_EQ(layout.frame_size, mtu);
@@ -421,18 +425,17 @@ TEST_F(XglSendTest, SendToNonExistentRoute) {
  */
 TEST_F(XglSendTest, ZeroCopySendWithNullHandle) {
     uint8_t buffer[128];
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = XGL_FRAME_HEADER_SIZE;
     tx_data.data_len = 10;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
-    xgl_error_t err = xgl_send_zerocopy_at(nullptr, &tx_data, 0U);
+    tx_data.priority = 0;
+
+    xgl_error_t err = xgl_send_zerocopy_scoped_at(nullptr, &tx_data, 0U);
 
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
@@ -441,7 +444,7 @@ TEST_F(XglSendTest, ZeroCopySendWithNullHandle) {
  * \brief           Test zero-copy send with NULL tx_data
  */
 TEST_F(XglSendTest, ZeroCopySendWithNullTxData) {
-    xgl_error_t err = xgl_send_zerocopy_at(handle, nullptr, 0U);
+    xgl_error_t err = xgl_send_zerocopy_scoped_at(handle, nullptr, 0U);
 
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
 }
@@ -451,7 +454,7 @@ TEST_F(XglSendTest, ZeroCopySendWithNullTxData) {
  */
 TEST_F(XglSendTest, ZeroCopySendWithInvalidDataOffset) {
     uint8_t buffer[128];
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = 10;
@@ -459,11 +462,10 @@ TEST_F(XglSendTest, ZeroCopySendWithInvalidDataOffset) {
     tx_data.data_len = 10;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
-    xgl_error_t err = xgl_send_zerocopy_at(handle, &tx_data, 0U);
+    tx_data.priority = 0;
+
+    xgl_error_t err = xgl_send_zerocopy_scoped_at(handle, &tx_data, 0U);
 
     EXPECT_EQ(err, XGL_ERR_INVALID_PARAM);
 }
@@ -473,7 +475,7 @@ TEST_F(XglSendTest, ZeroCopySendWithInvalidDataOffset) {
  */
 TEST_F(XglSendTest, ZeroCopySendWithBufferTooSmall) {
     uint8_t buffer[20];
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = XGL_FRAME_HEADER_SIZE;
@@ -481,11 +483,10 @@ TEST_F(XglSendTest, ZeroCopySendWithBufferTooSmall) {
     /* Too large for buffer */
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
-    xgl_error_t err = xgl_send_zerocopy_at(handle, &tx_data, 0U);
+    tx_data.priority = 0;
+
+    xgl_error_t err = xgl_send_zerocopy_scoped_at(handle, &tx_data, 0U);
 
     EXPECT_EQ(err, XGL_ERR_BUFFER_TOO_SMALL);
 }
@@ -496,16 +497,15 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     memcpy(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
            sizeof(payload) - 1U);
 
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = sizeof(payload) - 1U;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
+
     tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
     EXPECT_CALL(*mock_phy, tx(buffer,
                               XGL_TEST_ZERO_COPY_APP_HEADER_LEN +
@@ -514,7 +514,7 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
 
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &tx_data, 0U), XGL_OK);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &tx_data, 0U), XGL_OK);
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
     EXPECT_EQ(std::memcmp(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
@@ -528,16 +528,15 @@ TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
     memcpy(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
            sizeof(payload) - 1U);
 
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = sizeof(payload) - 1U;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
+
     tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
     const size_t expected_frame_len =
         XGL_TEST_ZERO_COPY_APP_HEADER_LEN + tx_data.data_len + XGL_CRC16_SIZE;
@@ -545,7 +544,7 @@ TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
 
-    ASSERT_EQ(xgl_send_zerocopy_at(handle, &tx_data, 0U), XGL_OK);
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &tx_data, 0U), XGL_OK);
 
     xgl_statistics_t stats = {};
     ASSERT_EQ(xgl_stats_get(handle, &stats), XGL_OK);
@@ -555,27 +554,6 @@ TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
     EXPECT_EQ(stats.network.tx_bytes, tx_data.data_len);
     EXPECT_EQ(stats.datalink.tx_packets, 1U);
     EXPECT_EQ(stats.datalink.tx_bytes, expected_frame_len);
-}
-
-TEST_F(XglSendTest, ZeroCopyReliableIsRejectedInsteadOfImplicitCopyFallback) {
-    uint8_t buffer[64] = {};
-    const char payload[] = "reliable";
-    memcpy(buffer + XGL_FRAME_HEADER_SIZE, payload, sizeof(payload) - 1U);
-
-    xgl_tx_data_zerocopy_t tx_data = {};
-    tx_data.buffer = buffer;
-    tx_data.buffer_size = sizeof(buffer);
-    tx_data.data_offset = XGL_FRAME_HEADER_SIZE;
-    tx_data.data_len = sizeof(payload) - 1U;
-    tx_data.target_id = 2;
-    tx_data.data_type = 1;
-    tx_data.reliable = true;
-    tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
-
-    EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &tx_data, 0U),
-              XGL_ERR_INVALID_PARAM);
 }
 
 TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
@@ -589,12 +567,9 @@ TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
     provider.user_data = nullptr;
     config.auth_required = true;
     config.auth_provider = &provider;
-    config.memory.allocator = xgl_test_host_allocator();
 
-    xgl_test_use_host_allocator(&config);
-    handle = xgl_create(&config);
+    handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     auto trusted = test_session_config(2U);
     ASSERT_EQ(xgl_install_security_session(handle, &trusted), XGL_OK);
 
@@ -605,16 +580,15 @@ TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
     const char payload[] = "auth-zcopy";
     memcpy(buffer + auth_header_len, payload, sizeof(payload) - 1U);
 
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = auth_header_len;
     tx_data.data_len = sizeof(payload) - 1U;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
+
     tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
     const size_t expected_frame_len =
         auth_header_len + tx_data.data_len + 8U + XGL_CRC16_SIZE;
@@ -622,7 +596,7 @@ TEST_F(XglSendTest, ZeroCopyAuthenticatesFrameWhenAuthenticationRequired) {
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
 
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &tx_data, 0U), XGL_OK);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &tx_data, 0U), XGL_OK);
 
     xgl_wire_header_t header = {};
     ASSERT_EQ(xgl_wire_decode_header(&header, buffer, expected_frame_len),
@@ -666,26 +640,23 @@ TEST_F(XglSendTest, ZeroCopyUnreliableRejectsPayloadExceedingRouteMtu) {
     xgl_destroy(handle);
     handle = nullptr;
     route.max_frame_size = 64;
-    xgl_test_use_host_allocator(&config);
-    handle = xgl_create(&config);
+    handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
 
     uint8_t buffer[128] = {};
     memset(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, 0xAB, 60);
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = 60;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
+
     tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &tx_data, 0U),
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &tx_data, 0U),
               XGL_ERR_BUFFER_TOO_SMALL);
 }
 
@@ -695,22 +666,21 @@ TEST_F(XglSendTest, ZeroCopyUnreliableWritesDefaultTtlAndEmptySession) {
     memcpy(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
            sizeof(payload) - 1U);
 
-    xgl_tx_data_zerocopy_t tx_data = {};
+    xgl_tx_zerocopy_request_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
     tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = sizeof(payload) - 1U;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
-    tx_data.reliable = false;
+
     tx_data.priority = 0;
-    tx_data.timeout_ms = 0;
 
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_))
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
 
-    ASSERT_EQ(xgl_send_zerocopy_at(handle, &tx_data, 0U), XGL_OK);
+    ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &tx_data, 0U), XGL_OK);
 
     xgl_wire_header_t header = {};
     ASSERT_EQ(xgl_wire_decode_header(&header, buffer, sizeof(buffer)), XGL_OK);
@@ -792,7 +762,8 @@ static xgl_error_t static_auth_rx(uint8_t* bytes, size_t* length,
 
 /** \brief           Count application deliveries without reentering the
  * protocol. */
-static xgl_error_t static_auth_accept(xgl_handle_t, uint16_t, uint8_t,
+static xgl_error_t static_auth_accept(xgl_handle_t,
+                                      const xgl_rx_info_t* /*info*/,
                                       const uint8_t* bytes, size_t length,
                                       void* context) {
     if (length != 3U || std::memcmp(bytes, "abc", 3U) != 0) {
@@ -813,8 +784,8 @@ TEST(XglStaticAuthenticatedSendTest,
     b.drop_first_ack = true;
     xgl_phy_ops_t phy_a = {static_auth_tx, static_auth_rx, &a};
     xgl_phy_ops_t phy_b = {static_auth_tx, static_auth_rx, &b};
-    xgl_route_item_t route_a = {2U, &phy_a, 128U, 1000U, 1U};
-    xgl_route_item_t route_b = {1U, &phy_b, 128U, 1000U, 1U};
+    xgl_route_item_t route_a = {2U, &phy_a, 128U, 1000U};
+    xgl_route_item_t route_b = {1U, &phy_b, 128U, 1000U};
     xgl_auth_provider_t provider_a = {static_auth_sign, send_test_auth_verify,
                                       8U, &a};
     xgl_auth_provider_t provider_b = {static_auth_sign, send_test_auth_verify,
@@ -826,13 +797,13 @@ TEST(XglStaticAuthenticatedSendTest,
     config_a.route_table_len = 1U;
     config_a.auth_required = true;
     config_a.auth_provider = &provider_a;
-    config_a.rx_accept_callback = static_auth_accept;
-    config_a.callback_user_data = &a;
+    config_a.rx_callback = static_auth_accept;
+    config_a.rx_user_data = &a;
     xgl_config_t config_b = config_a;
     config_b.source_id = 2U;
     config_b.route_table = &route_b;
     config_b.auth_provider = &provider_b;
-    config_b.callback_user_data = &b;
+    config_b.rx_user_data = &b;
     xgl_handle_t handle_a = nullptr, handle_b = nullptr;
     ASSERT_EQ(
         xgl_init_static(&config_a, storage_a, sizeof(storage_a), &handle_a),
@@ -883,17 +854,16 @@ TEST_F(XglSendTest, ZeroCopyRejectsFrameAboveInstanceMtuEvenWhenRouteAllowsIt) {
     handle = nullptr;
     config.protocol.max_frame_size = 128U;
     route.max_frame_size = 256U;
-    xgl_test_use_host_allocator(&config);
-    handle = xgl_create(&config);
+    handle = xgl_test_init_allocated(&config);
     ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     uint8_t buffer[256] = {};
-    xgl_tx_data_zerocopy_t tx = {};
+    xgl_tx_zerocopy_request_t tx = {};
     tx.buffer = buffer;
     tx.buffer_size = sizeof(buffer);
     tx.data_offset = XGL_WIRE_BASE_HEADER_SIZE;
     tx.data_len = 160U;
     tx.target_id = 2U;
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_)).Times(0);
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &tx, 0U), XGL_ERR_BUFFER_TOO_SMALL);
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &tx, 0U),
+              XGL_ERR_BUFFER_TOO_SMALL);
 }

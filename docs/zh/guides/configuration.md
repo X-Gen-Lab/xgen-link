@@ -19,13 +19,13 @@ xgl_config_t config = {
 };
 ```
 
-通信前填写路由、PHY 和接收回调。用 `xgl_config_validate(&config)` 检查参数，再用 `xgl_memory_requirements()` 查询目标上的工作区字节数和对齐要求。
+通信前填写路由、PHY 和接收回调。`xgl_memory_requirements()` 校验已填写的配置并返回目标上的工作区字节数与对齐要求。
 
 ## 生命周期和身份
 
-实例借用不可变的 `xgl_config_t`，直到 `xgl_destroy()`。其路由数组、PHY 描述符、分配器服务、认证 provider、名称和回调上下文也必须持续有效。创建后不得修改配置，也不能让配置与 workspace 重叠。
+实例借用不可变的 `xgl_config_t`，直到 `xgl_destroy()`。路由数组、PHY 描述符、可选运行策略、认证 provider 和回调上下文也必须持续有效。分配初始化时显式传入的 allocator 描述符和上下文也遵循这个寿命。配置和工作区不能重叠。
 
-`source_id` 必须非零且不同于 `XGL_BROADCAST_ID`。路由决定可达目标。接收应用数据需要接收处理函数；`rx_accept_callback` 优先于返回 void 的旧式 `rx_callback`。
+`source_id` 必须非零且不同于 `XGL_BROADCAST_ID`。路由决定可达目标。接收 DATA 的实例通过 `rx_callback` 接纳载荷，回调使用 `rx_user_data`；错误回调使用 `callback_user_data`。
 
 ## 路由和帧
 
@@ -35,7 +35,6 @@ xgl_config_t config = {
 | `phy` | 借用的同步 TX、非阻塞 RX 回调 |
 | `max_frame_size` | 此路由允许的完整序列化帧上限 |
 | `read_freq_hz` | owner 调度时的读取频率提示，不创建定时器或任务 |
-| `metric` | 保留的度量字段，当前不参与路径选择 |
 
 路由容量在初始化时固定。共享同一 PHY 描述符的路由共享 parser/link；不同 PHY 描述符拥有独立 RX 状态。
 
@@ -60,11 +59,11 @@ xgl_config_t config = {
 
 workspace 为各类包预留固定大小的槽位。需要减少预留 RAM 时，重新核算完整帧上限和各资源的槽位数量。参见[资源模型](../explanation/resource-model.md)。
 
-显式编译 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 后，可通过独立版本化描述符限制可靠发送的忙期并接收带 scope 的回调，见[扩展运行选项](advanced-runtime.md)。该能力默认关闭。安装消费可要求 `advanced_runtime` 能力。
+显式编译 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 后，可通过 `config.options` 指定版本化描述符，限制可靠发送的忙期并观察 scope 事件。该能力默认关闭。安装消费可要求 `advanced_runtime` 能力，详见[扩展运行选项](advanced-runtime.md)。
 
 ## 认证
 
-启用认证能力的 profile 要求所有非空 `auth_provider` 都包含同步 sign/verify 回调以及 `1..XGL_AUTH_TAG_MAX_LEN` 的 tag 长度，即使 `auth_required` 为 false。`auth_required` 为 true 时还要求 provider 非空。无效 provider 在配置校验和工作区测量阶段被拒绝，创建不会先分配工作区。发送认证流量前，用 `xgl_install_security_session()` 安装可信的双向参数。
+启用认证能力的 profile 要求所有非空 `auth_provider` 都包含同步 sign/verify 回调以及 `1..XGL_AUTH_TAG_MAX_LEN` 的 tag 长度，即使 `auth_required` 为 false。`auth_required` 为 true 时还要求 provider 非空。工作区测量和两类初始化均在申请存储前校验 provider。发送认证流量前，使用 `<xgl/xgl_security.h>` 的 `xgl_install_security_session()` 安装可信的双向参数。
 
 `auth_required` 为 true 时，`protocol.max_frame_size` 必须支持本机基本认证收发能力。校验复用 wire 编码与帧测量，检查一个普通 `ACK_RANGE` 的完整认证帧；它覆盖零 epoch 的基本 HELLO 和最小 DATA 所需空间。32 字节 tag 对应的当前基础门槛为 88 字节，64 字节协议上限会被前置拒绝。
 
@@ -89,4 +88,4 @@ Boot 允许一个 peer、最多一条路由、窗口一。Embedded Lite 默认�
 
 安装包导出 `xgl_PROFILE`、`xgl_RESOURCE_CONFIG_ID`、`xgl_CAPABILITIES` 和实际资源选项，目标 `xgl::xgl` 同时具有对应的 档位、资源标识和能力属性。消费者可用 `find_package(xgl CONFIG REQUIRED COMPONENTS reliable out_of_order)` 要求能力；不支持的必需能力在配置阶段拒绝。可请求名称为 `wire`、`reliable`、`authentication`、`forwarding`、`out_of_order`、`statistics`、`diagnostics` 和 `advanced_runtime`。
 
-压缩和 payload 加密仍是保留项，启用会被拒绝；两个 feature flag 保持 false，`compression_id` 保持零。通过 `xgl_memory_requirements()` 检查 workspace 算术溢出并查询依赖 ABI 的真实大小。库、CMake target 与消费者必须使用匹配的生成 profile 和资源头文件。
+`xgl_memory_requirements()` 检查工作区算术溢出，并查询当前 ABI 对应的实际大小。库、CMake target 与消费者必须使用配套的生成档位和资源配置头。

@@ -10,6 +10,7 @@
 #include <internal/xgl_allocator.h>
 #include <internal/xgl_protocol_memory.h>
 #include <wire/xgl_wire.h>
+#include <xgl/xgl_alloc.h>
 
 #include <string.h>
 
@@ -151,7 +152,7 @@ static bool plan_rx_resources(const xgl_config_t* config,
  */
 static xgl_error_t make_plan(const xgl_config_t* config,
                              xgl_workspace_plan_t* plan) {
-    xgl_error_t error = xgl_config_validate(config);
+    xgl_error_t error = xgl_instance_validate_config(config);
     if (error != XGL_OK) {
         return error;
     }
@@ -216,56 +217,6 @@ static size_t resource_bytes(const xgl_workspace_plan_t* plan,
     return spec->block_size * spec->block_count;
 }
 
-/** \brief           Reject foreign descriptors before inspecting their policy.
- */
-xgl_error_t xgl_options_validate(const xgl_config_t* config,
-                                 const xgl_instance_options_t* options) {
-    if (options == NULL || config == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    if (options->size != sizeof(*options) ||
-        options->version != XGL_INSTANCE_OPTIONS_VERSION ||
-        options->config_size != sizeof(xgl_config_t)) {
-        return XGL_ERR_INVALID_VERSION;
-    }
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    if (options->tx_lifetime_ms >= UINT32_C(0x80000000)) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-    if (options->protect_installed_scopes) {
-#if XGL_FEATURE_AUTH
-        if (config->auth_provider == NULL) {
-            return XGL_ERR_INVALID_PARAM;
-        }
-        xgl_config_t authenticated = *config;
-        authenticated.auth_required = true;
-        xgl_error_t error = xgl_config_validate(&authenticated);
-        if (error != XGL_OK) {
-            return error;
-        }
-#else
-        return XGL_ERR_UNSUPPORTED;
-#endif
-    }
-    return XGL_OK;
-#else
-    return XGL_ERR_UNSUPPORTED;
-#endif
-}
-
-#if XGL_FEATURE_ADVANCED_RUNTIME
-/** \brief           Validate policy and calculate the shared storage layout. */
-static xgl_error_t make_options_plan(const xgl_config_t* config,
-                                     const xgl_instance_options_t* options,
-                                     xgl_workspace_plan_t* plan) {
-    xgl_error_t error = xgl_options_validate(config, options);
-    if (error != XGL_OK) {
-        return error;
-    }
-    return make_plan(config, plan);
-}
-#endif
-
 /** \brief           Describe an already validated storage plan. */
 static void report_plan(const xgl_workspace_plan_t* plan,
                         xgl_memory_report_t* report) {
@@ -274,7 +225,6 @@ static void report_plan(const xgl_workspace_plan_t* plan,
         .management_bytes = plan->prefix_size,
         .initialization_bytes = plan->initialization_size,
         .peer_bytes = resource_bytes(plan, XGL_RESOURCE_PEER),
-        .window_bytes = 0U,
         .tx_record_bytes = resource_bytes(plan, XGL_RESOURCE_TX_PACKET),
         .tx_payload_bytes = resource_bytes(plan, XGL_RESOURCE_TX_PAYLOAD),
         .scratch_bytes = resource_bytes(plan, XGL_RESOURCE_SCRATCH),
@@ -302,11 +252,8 @@ xgl_error_t xgl_memory_report(const xgl_config_t* config,
 }
 
 /** \brief           Populate caller storage from a validated plan. */
-static xgl_error_t prepare_storage(const xgl_config_t* config,
-                                   const xgl_workspace_plan_t* plan,
-                                   void* storage, size_t storage_size,
-                                   const xgl_allocator_t* storage_allocator,
-                                   xgl_handle_t* handle) {
+static xgl_error_t prepare_storage(const xgl_workspace_plan_t* plan,
+                                   void* storage, size_t storage_size) {
     if (storage_size < plan->requirements.size) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
@@ -336,187 +283,53 @@ static xgl_error_t prepare_storage(const xgl_config_t* config,
             xgl_pool_allocator(&workspace->runtime_pools[i]);
     }
     bind_services(workspace);
-    workspace->instance.config = config;
     workspace->instance.allocator = &workspace->initialization.service;
-    workspace->instance.storage_allocator = storage_allocator;
     workspace->instance.memory = &workspace->memory;
-    workspace->instance.caller_owned = storage_allocator == NULL;
 #if XGL_FEATURE_STATISTICS
     workspace->instance.stats.memory_used = plan->requirements.size;
     workspace->instance.stats.memory_peak = plan->requirements.size;
 #endif
-    *handle = &workspace->instance;
     return XGL_OK;
 }
 
-/** \brief           Reserve and prepare one workspace from the same plan. */
-static xgl_error_t reserve_storage(const xgl_config_t* config,
-                                   const xgl_workspace_plan_t* plan,
-                                   xgl_handle_t* handle) {
-    const xgl_allocator_t* allocator = config->memory.allocator;
+xgl_error_t xgl_workspace_prepare_instance(const xgl_config_t* config,
+                                           void* storage, size_t storage_size,
+                                           const xgl_allocator_t* allocator,
+                                           xgl_handle_t* prepared) {
+    xgl_workspace_plan_t plan;
+    xgl_error_t error = make_plan(config, &plan);
+    if (error != XGL_OK) {
+        return error;
+    }
+    if (storage == NULL) {
 #if XGL_ALLOW_FALLBACK_MALLOC
-    if (allocator == NULL) {
-        allocator = xgl_allocator_libc();
-    }
+        if (allocator == NULL) {
+            allocator = xgl_allocator_libc();
+        }
 #endif
-    if (!xgl_allocator_is_valid(allocator)) {
-        return XGL_ERR_INVALID_PARAM;
+        if (!xgl_allocator_is_valid(allocator)) {
+            return XGL_ERR_INVALID_PARAM;
+        }
+        storage_size = plan.requirements.size;
+        storage = xgl_alloc(allocator, storage_size);
+        if (storage == NULL) {
+            return XGL_ERR_NO_MEMORY;
+        }
+    } else {
+        allocator = NULL;
     }
-    void* storage = xgl_alloc(allocator, plan->requirements.size);
-    if (storage == NULL) {
-        return XGL_ERR_NO_MEMORY;
-    }
-    xgl_error_t error = prepare_storage(
-        config, plan, storage, plan->requirements.size, allocator, handle);
-    if (error != XGL_OK) {
-        xgl_free(allocator, storage);
-    }
-    return error;
-}
 
-/** \brief           Reserve one workspace through the selected backend. */
-xgl_error_t xgl_create_with_error(const xgl_config_t* config,
-                                  xgl_handle_t* handle) {
-    if (handle == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    *handle = NULL;
-    xgl_workspace_plan_t plan;
-    xgl_error_t error = make_plan(config, &plan);
+    error = prepare_storage(&plan, storage, storage_size);
     if (error != XGL_OK) {
+        if (allocator != NULL) {
+            xgl_free(allocator, storage);
+        }
         return error;
     }
-    return reserve_storage(config, &plan, handle);
-}
 
-/** \brief           Preserve the legacy pointer-only reservation result. */
-xgl_handle_t xgl_create(const xgl_config_t* config) {
-    xgl_handle_t handle;
-    (void)xgl_create_with_error(config, &handle);
-    return handle;
-}
-
-/**
- * \brief           Prepare bounded pools and an uninitialized protocol instance
- * \details         The aligned storage must cover the measured layout. A
- *                  backend owns dynamically reserved storage. Caller-owned
- *                  storage has no backend. Clear the handle on failure.
- */
-xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
-                                  size_t storage_size,
-                                  const xgl_allocator_t* storage_allocator,
-                                  xgl_handle_t* handle) {
-    if (handle == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    *handle = NULL;
-    if (storage == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    xgl_workspace_plan_t plan;
-    xgl_error_t error = make_plan(config, &plan);
-    if (error != XGL_OK) {
-        return error;
-    }
-    return prepare_storage(config, &plan, storage, storage_size,
-                           storage_allocator, handle);
-}
-
-/**
- * \brief           Initialize the shared layout inside caller-owned storage
- */
-xgl_error_t xgl_init_static(const xgl_config_t* config, void* storage,
-                            size_t storage_size, xgl_handle_t* handle) {
-    if (handle == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    *handle = NULL;
-    xgl_handle_t prepared;
-    xgl_error_t error =
-        xgl_workspace_prepare(config, storage, storage_size, NULL, &prepared);
-    if (error != XGL_OK) {
-        return error;
-    }
-    error = xgl_init(prepared);
-    if (error == XGL_OK) {
-        *handle = prepared;
-    }
-    return error;
-}
-
-xgl_error_t
-xgl_memory_report_with_options(const xgl_config_t* config,
-                               const xgl_instance_options_t* options,
-                               xgl_memory_report_t* report) {
-    if (report == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    xgl_workspace_plan_t plan;
-    xgl_error_t error = make_options_plan(config, options, &plan);
-    if (error == XGL_OK) {
-        report_plan(&plan, report);
-    }
-    return error;
-#else
-    return xgl_options_validate(config, options);
-#endif
-}
-
-xgl_error_t xgl_create_with_options(const xgl_config_t* config,
-                                    const xgl_instance_options_t* options,
-                                    xgl_handle_t* handle) {
-    if (handle == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    *handle = NULL;
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    xgl_workspace_plan_t plan;
-    xgl_error_t error = make_options_plan(config, options, &plan);
-    if (error != XGL_OK) {
-        return error;
-    }
-    error = reserve_storage(config, &plan, handle);
-    if (error == XGL_OK) {
-        (*handle)->options = options;
-    }
-    return error;
-#else
-    return xgl_options_validate(config, options);
-#endif
-}
-
-xgl_error_t xgl_init_static_with_options(const xgl_config_t* config,
-                                         const xgl_instance_options_t* options,
-                                         void* storage, size_t storage_size,
-                                         xgl_handle_t* handle) {
-    if (handle == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    *handle = NULL;
-    if (storage == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    xgl_workspace_plan_t plan;
-    xgl_error_t error = make_options_plan(config, options, &plan);
-    if (error != XGL_OK) {
-        return error;
-    }
-    xgl_handle_t prepared;
-    error =
-        prepare_storage(config, &plan, storage, storage_size, NULL, &prepared);
-    if (error != XGL_OK) {
-        return error;
-    }
-    prepared->options = options;
-    error = xgl_init(prepared);
-    if (error == XGL_OK) {
-        *handle = prepared;
-    }
-    return error;
-#else
-    (void)storage_size;
-    return xgl_options_validate(config, options);
-#endif
+    xgl_workspace_t* workspace = storage;
+    workspace->instance.config = config;
+    workspace->instance.storage_allocator = allocator;
+    *prepared = &workspace->instance;
+    return XGL_OK;
 }

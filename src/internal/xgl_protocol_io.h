@@ -50,7 +50,7 @@ typedef struct {
 typedef struct {
     void* ctx;
     xgl_error_t (*send)(void* ctx, xgl_handle_t handle, xgl_packet_t* packet);
-    /** Check DATA and any first HELLO before transport reserves resources. */
+    /** Optional egress policy for DATA and its first HELLO. */
     xgl_error_t (*check_data)(void* ctx, xgl_handle_t handle,
                               const xgl_tx_data_t* data, bool need_hello);
     /** Check local ACK egress from received DATA without sending it. */
@@ -146,18 +146,6 @@ static inline xgl_error_t xgl_packet_send(const xgl_packet_tx_endpoint_t* iface,
         return XGL_ERR_NULL_POINTER;
     }
     return iface->send(iface->ctx, handle, packet);
-}
-
-/**
- * \brief           Deliver a borrowed packet and return receive acceptance
- */
-static inline xgl_error_t
-xgl_packet_receive(const xgl_packet_rx_endpoint_t* iface, xgl_handle_t handle,
-                   const xgl_packet_t* packet) {
-    if (iface == NULL || iface->receive == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    return iface->receive(iface->ctx, handle, packet);
 }
 
 #ifdef __cplusplus

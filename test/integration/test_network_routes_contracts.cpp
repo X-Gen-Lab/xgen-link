@@ -8,6 +8,7 @@
  */
 
 #include "test_config.h"
+#include <xgl/xgl_alloc.h>
 
 #include <gtest/gtest.h>
 
@@ -42,7 +43,6 @@ xgl_error_t route_rx(uint8_t*, size_t* len, void* user_data) {
 xgl_config_t route_config(xgl_route_item_t* routes, size_t count) {
     xgl_config_t config = {};
     config = xgl_test_single_packet_config();
-    config.memory.allocator = xgl_test_host_allocator();
     config.route_table = routes;
     config.route_table_len = count;
     return config;
@@ -53,7 +53,7 @@ using Instance = std::unique_ptr<xgl_instance, decltype(&xgl_destroy)>;
 TEST(XglNetworkRoutesContract, ReservedAndLocalTargetsFailBeforeWorkspaceUse) {
     RoutePhy state;
     xgl_phy_ops_t phy = {route_tx, route_rx, &state};
-    xgl_route_item_t route = {2U, &phy, 128U, 100U, 0U};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U};
     auto config = route_config(&route, 1U);
     xgl_memory_requirements_t requirements = {};
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
@@ -67,7 +67,7 @@ TEST(XglNetworkRoutesContract, ReservedAndLocalTargetsFailBeforeWorkspaceUse) {
         std::memset(storage.get(), 0xA5, requirements.size);
         const std::vector<uint8_t> before(requirements.size, 0xA5);
         xgl_memory_requirements_t unchanged = requirements;
-        EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+        EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
         EXPECT_EQ(xgl_memory_requirements(&config, &unchanged),
                   XGL_ERR_INVALID_PARAM);
         EXPECT_EQ(std::memcmp(&unchanged, &requirements, sizeof(unchanged)), 0);
@@ -80,7 +80,7 @@ TEST(XglNetworkRoutesContract, ReservedAndLocalTargetsFailBeforeWorkspaceUse) {
             xgl_destroy(handle);
         }
         EXPECT_EQ(std::memcmp(storage.get(), before.data(), before.size()), 0);
-        Instance owned(xgl_create(&config), &xgl_destroy);
+        Instance owned(xgl_test_init_allocated(&config), &xgl_destroy);
         EXPECT_EQ(owned, nullptr);
     }
     EXPECT_EQ(state.reads, 0U);
@@ -89,12 +89,11 @@ TEST(XglNetworkRoutesContract, ReservedAndLocalTargetsFailBeforeWorkspaceUse) {
 TEST(XglNetworkRoutesContract, BroadcastRemainsAnExplicitEgressDestination) {
     RoutePhy state;
     xgl_phy_ops_t phy = {route_tx, route_rx, &state};
-    xgl_route_item_t route = {UINT16_MAX, &phy, 128U, 100U, 255U};
+    xgl_route_item_t route = {UINT16_MAX, &phy, 128U, 100U};
     auto config = route_config(&route, 1U);
-    ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
-    Instance instance(xgl_create(&config), &xgl_destroy);
+    ASSERT_EQ(xgl_test_measure_config(&config), XGL_OK);
+    Instance instance(xgl_test_init_allocated(&config), &xgl_destroy);
     ASSERT_NE(instance, nullptr);
-    ASSERT_EQ(xgl_init(instance.get()), XGL_OK);
     const auto* selected =
         xgl_route_table_lookup(&instance->route_table, UINT16_MAX);
     ASSERT_NE(selected, nullptr);
@@ -106,21 +105,17 @@ TEST(XglNetworkRoutesContract, RuntimeRouteUpdatesLeaveRegisteredLinksIntact) {
     RoutePhy original_state, replacement_state;
     xgl_phy_ops_t original = {route_tx, route_rx, &original_state};
     xgl_phy_ops_t replacement = {route_tx, route_rx, &replacement_state};
-    xgl_route_item_t route = {2U, &original, 128U, 100U, 1U};
+    xgl_route_item_t route = {2U, &original, 128U, 100U};
     auto config = route_config(&route, 1U);
-    Instance instance(xgl_create(&config), &xgl_destroy);
+    Instance instance(xgl_test_init_allocated(&config), &xgl_destroy);
     ASSERT_NE(instance, nullptr);
-    ASSERT_EQ(xgl_init(instance.get()), XGL_OK);
     ASSERT_EQ(xgl_route_table_add(&instance->route_table, 2U, &replacement, 64U,
-                                  1000U, 0U),
-              XGL_OK);
-    ASSERT_EQ(xgl_route_table_update_metric(&instance->route_table, 2U, 255U),
+                                  1000U),
               XGL_OK);
     const auto* selected = xgl_route_table_lookup(&instance->route_table, 2U);
     ASSERT_NE(selected, nullptr);
     EXPECT_EQ(selected->phy, &replacement);
     EXPECT_EQ(selected->max_frame_size, 64U);
-    EXPECT_EQ(selected->metric, 255U);
     ASSERT_EQ(instance->link_count, 1U);
     EXPECT_EQ(instance->links[0].phy, &original);
     EXPECT_EQ(instance->links[0].poll_interval_ms, 10U);
@@ -143,13 +138,13 @@ TEST(XglNetworkRoutesContract, InvalidLoadedSetPreservesExistingRoute) {
     xgl_route_table_t table = {};
     ASSERT_EQ(xgl_route_table_init(&table, 2U, xgl_test_host_allocator()),
               XGL_OK);
-    ASSERT_EQ(xgl_route_table_add(&table, 9U, &phy, 128U, 100U, 1U), XGL_OK);
+    ASSERT_EQ(xgl_route_table_add(&table, 9U, &phy, 128U, 100U), XGL_OK);
     const std::array<std::array<uint16_t, 2>, 2> invalid_targets = {
         {{{2U, 2U}}, {{2U, 0U}}}};
     for (const auto& targets : invalid_targets) {
         SCOPED_TRACE(targets[1]);
-        xgl_route_item_t routes[] = {{targets[0], &phy, 128U, 100U, 1U},
-                                     {targets[1], &phy, 128U, 100U, 1U}};
+        xgl_route_item_t routes[] = {{targets[0], &phy, 128U, 100U},
+                                     {targets[1], &phy, 128U, 100U}};
         EXPECT_EQ(xgl_route_table_load(&table, routes, 2U),
                   XGL_ERR_INVALID_PARAM);
         EXPECT_EQ(xgl_route_table_count(&table), 1U);
@@ -194,8 +189,8 @@ TEST(XglNetworkRoutesContract, LinkAllocationFailureReleasesPartialSetup) {
     RoutePhy first_state, second_state;
     xgl_phy_ops_t first = {route_tx, route_rx, &first_state};
     xgl_phy_ops_t second = {route_tx, route_rx, &second_state};
-    xgl_route_item_t routes[] = {{2U, &first, 128U, 100U, 0U},
-                                 {3U, &second, 128U, 50U, 0U}};
+    xgl_route_item_t routes[] = {{2U, &first, 128U, 100U},
+                                 {3U, &second, 128U, 50U}};
     auto config = route_config(routes, 2U);
     for (size_t failure : {1U, 2U, 3U}) {
         SCOPED_TRACE(failure);
@@ -225,8 +220,8 @@ TEST(XglNetworkRoutesContract, DuplicateTargetsFailWithoutWorkspaceMutation) {
     RoutePhy first_state, second_state;
     xgl_phy_ops_t first = {route_tx, route_rx, &first_state};
     xgl_phy_ops_t second = {route_tx, route_rx, &second_state};
-    xgl_route_item_t routes[] = {{2U, &first, 128U, 100U, 1U},
-                                 {3U, &second, 128U, 50U, 0U}};
+    xgl_route_item_t routes[] = {{2U, &first, 128U, 100U},
+                                 {3U, &second, 128U, 50U}};
     auto config = route_config(routes, 2U);
     xgl_memory_requirements_t requirements = {};
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
@@ -239,7 +234,7 @@ TEST(XglNetworkRoutesContract, DuplicateTargetsFailWithoutWorkspaceMutation) {
         routes[1].phy = other_phy;
         std::memset(storage.get(), 0xA5, requirements.size);
         const std::vector<uint8_t> before(requirements.size, 0xA5);
-        EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+        EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
         xgl_handle_t handle = nullptr;
         EXPECT_EQ(
             xgl_init_static(&config, storage.get(), requirements.size, &handle),
@@ -259,9 +254,9 @@ TEST(XglNetworkRoutesContract, SharedPhyPlanUsesFastestFrequencyInEitherOrder) {
         xgl_phy_ops_t first = {route_tx, route_rx, &first_state};
         xgl_phy_ops_t second = {route_tx, route_rx, &second_state};
         xgl_route_item_t routes[] = {
-            {2U, &first, 128U, fast_first ? 500U : 100U, 1U},
-            {3U, &second, 128U, 50U, 1U},
-            {4U, &first, 128U, fast_first ? 100U : 500U, 0U}};
+            {2U, &first, 128U, fast_first ? 500U : 100U},
+            {3U, &second, 128U, 50U},
+            {4U, &first, 128U, fast_first ? 100U : 500U}};
         auto config = route_config(routes, 3U);
         EXPECT_EQ(xgl_instance_count_links(&config), 2U);
         xgl_memory_requirements_t requirements = {};
@@ -304,13 +299,12 @@ TEST(XglNetworkRoutesContract, SharedPhyHighFrequencyHasOneMillisecondMinimum) {
             xgl_phy_ops_t first = {route_tx, route_rx, &first_state};
             xgl_phy_ops_t second = {route_tx, route_rx, &second_state};
             xgl_route_item_t routes[] = {
-                {2U, &first, 128U, fast_first ? frequency : 100U, 1U},
-                {3U, &second, 128U, 50U, 1U},
-                {4U, &first, 128U, fast_first ? 100U : frequency, 0U}};
+                {2U, &first, 128U, fast_first ? frequency : 100U},
+                {3U, &second, 128U, 50U},
+                {4U, &first, 128U, fast_first ? 100U : frequency}};
             auto config = route_config(routes, 3U);
-            Instance instance(xgl_create(&config), &xgl_destroy);
+            Instance instance(xgl_test_init_allocated(&config), &xgl_destroy);
             ASSERT_NE(instance, nullptr);
-            ASSERT_EQ(xgl_init(instance.get()), XGL_OK);
             ASSERT_EQ(instance->link_count, 2U);
             EXPECT_EQ(instance->links[0].phy, &first);
             EXPECT_EQ(instance->links[0].poll_interval_ms, 1U);

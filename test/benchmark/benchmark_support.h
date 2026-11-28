@@ -49,22 +49,20 @@ class BenchmarkPair {
         config_b = preset;
         config_a.source_id = 1U;
         config_b.source_id = 2U;
-        route_a = {2U, &phy_a, preset.protocol.max_frame_size, 1000U, 1U};
-        route_b = {1U, &phy_b, preset.protocol.max_frame_size, 1000U, 1U};
+        route_a = {2U, &phy_a, preset.protocol.max_frame_size, 1000U};
+        route_b = {1U, &phy_b, preset.protocol.max_frame_size, 1000U};
         config_a.route_table = &route_a;
         config_b.route_table = &route_b;
         config_a.route_table_len = config_b.route_table_len = 1U;
-        config_a.memory.allocator = config_b.memory.allocator =
-            xgl_test_host_allocator();
-        config_b.rx_callback = [](xgl_handle_t, uint16_t, uint8_t,
+        config_b.rx_callback = [](xgl_handle_t, const xgl_rx_info_t*,
                                   const uint8_t*, size_t, void* context) {
             ++static_cast<BenchmarkPair*>(context)->delivered;
+            return XGL_OK;
         };
-        config_b.callback_user_data = this;
-        a = xgl_create(&config_a);
-        b = xgl_create(&config_b);
-        return a != nullptr && b != nullptr && xgl_init(a) == XGL_OK &&
-               xgl_init(b) == XGL_OK;
+        config_b.rx_user_data = this;
+        a = xgl_test_init_allocated(&config_a);
+        b = xgl_test_init_allocated(&config_b);
+        return a != nullptr && b != nullptr;
     }
 
     /**

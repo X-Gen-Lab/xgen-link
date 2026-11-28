@@ -11,6 +11,8 @@
 #include "test_host_allocator.h"
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -66,21 +68,18 @@ TEST(XglFootprintTest, CreateReservesExactlyTheMeasuredWorkspaceOnce) {
     CountingAllocator counter;
     xgl_allocator_t allocator = {&counter, counting_alloc, counting_free};
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
-    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U};
     xgl_config_t config;
     config = xgl_test_two_packet_config();
-    config.memory.allocator = &allocator;
     config.route_table = &route;
     config.route_table_len = 1U;
     xgl_memory_requirements_t requirements{};
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
-
-    xgl_test_use_host_allocator(&config);
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = nullptr;
+    ASSERT_EQ(xgl_init_allocated(&config, &allocator, &handle), XGL_OK);
     ASSERT_NE(handle, nullptr);
     EXPECT_EQ(counter.allocations, 1U);
     EXPECT_EQ(counter.bytes, requirements.size);
-    EXPECT_EQ(xgl_init(handle), XGL_OK);
     EXPECT_EQ(counter.allocations, 1U);
     EXPECT_EQ(counter.frees, 0U);
     xgl_destroy(handle);
@@ -91,16 +90,14 @@ TEST(XglFootprintTest, SendsReuseReservedStorageWithoutBackendAllocations) {
     CountingAllocator counter;
     xgl_allocator_t allocator = {&counter, counting_alloc, counting_free};
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
-    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U};
     xgl_config_t config;
     config = xgl_test_two_packet_config();
-    config.memory.allocator = &allocator;
     config.route_table = &route;
     config.route_table_len = 1U;
-    xgl_test_use_host_allocator(&config);
-    xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = nullptr;
+    ASSERT_EQ(xgl_init_allocated(&config, &allocator, &handle), XGL_OK);
     ASSERT_NE(handle, nullptr);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
     ASSERT_EQ(counter.allocations, 1U);
 
     const uint8_t payload[] = {1U, 2U, 3U, 4U};
@@ -127,9 +124,9 @@ TEST(XglFootprintTest, SharedPhyReservesOnlyOneReceiveLink) {
     xgl_phy_ops_t phys[] = {{null_tx, null_rx, nullptr},
                             {null_tx, null_rx, nullptr},
                             {null_tx, null_rx, nullptr}};
-    xgl_route_item_t routes[] = {{2U, &phys[0], 128U, 100U, 1U},
-                                 {3U, &phys[0], 128U, 50U, 1U},
-                                 {4U, &phys[0], 128U, 25U, 1U}};
+    xgl_route_item_t routes[] = {{2U, &phys[0], 128U, 100U},
+                                 {3U, &phys[0], 128U, 50U},
+                                 {4U, &phys[0], 128U, 25U}};
     xgl_config_t config;
     config = xgl_test_two_packet_config();
     config.route_table = routes;
@@ -163,7 +160,7 @@ TEST(XglFootprintTest, SharedPhyReservesOnlyOneReceiveLink) {
 
 TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
-    xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U};
     xgl_config_t config;
     config = xgl_test_single_packet_config();
     config.route_table = &route;
@@ -172,9 +169,8 @@ TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
     ASSERT_EQ(xgl_memory_report(&config, &report), XGL_OK);
     const size_t explained = report.management_bytes +
                              report.initialization_bytes + report.peer_bytes +
-                             report.window_bytes + report.tx_record_bytes +
-                             report.tx_payload_bytes + report.scratch_bytes +
-                             report.rx_buffered_bytes;
+                             report.tx_record_bytes + report.tx_payload_bytes +
+                             report.scratch_bytes + report.rx_buffered_bytes;
     EXPECT_EQ(explained, report.requirements.size);
     EXPECT_GT(report.management_bytes, 0U);
     EXPECT_GT(report.initialization_bytes, 0U);

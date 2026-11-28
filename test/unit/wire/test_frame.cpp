@@ -10,6 +10,7 @@
 #include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_security.h>
 
 #include <cstring>
 #include <gtest/gtest.h>

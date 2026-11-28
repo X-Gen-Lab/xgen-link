@@ -24,33 +24,11 @@ tx.session_epoch = session_epoch;
 xgl_error_t result = xgl_send_at(handle, &tx, now_ms);
 ```
 
-示例假定应用变量有效且 handle 已初始化。Payload 长度必须非零，`priority` 为 0–7，只编码到 wire traffic class；SDK 不据此排序本地发送或抢占其他 peer。保留字段 `compression_id` 保持零。
+示例假定应用变量有效且 handle 已初始化。Payload 长度必须非零，`priority` 为 0–7，只编码到 wire traffic class；SDK 不据此排序本地发送或抢占其他 peer。
 
 ## 调用者提供帧存储
 
-`xgl_send_zerocopy_at()` 保持原请求结构布局，始终使用零 connection ID 和零 epoch。显式 scope 使用 `xgl_tx_zerocopy_request_t` 与 `xgl_send_zerocopy_scoped_at()`。两个入口都只支持非空、非可靠、单帧 payload；`reliable=true` 会被拒绝，`timeout_ms` 被忽略。它们不提供保留缓冲区的异步 DMA 或重传所有权。
-
-放置 payload 前先调用 `xgl_send_zerocopy_layout()`。查询忽略 `data.buffer`、`data.buffer_size` 和 `data.data_offset`，验证发送元数据、路由、完整帧 MTU、已安装的认证 scope，以及终止 scope 策略。输出 `payload_offset` 与 `frame_size`，包含 DATA_TYPE、非零 SESSION、SECURITY、固定标签及末尾 CRC。查询不分配内存、不修改计数或安全序号、不调用 provider 或 PHY。查询失败会清零输出；查询成功不预留资源，发送时仍会验证当前状态。
-
-```c
-xgl_tx_zerocopy_request_t request = {0};
-request.data.target_id = 2;
-request.data.data_type = 9;
-request.data.data_len = payload_len;
-request.connection_id = connection_id;
-request.session_epoch = session_epoch;
-xgl_tx_frame_layout_t layout;
-xgl_error_t result = xgl_send_zerocopy_layout(handle, &request, &layout);
-if (result == XGL_OK && layout.frame_size <= sizeof(frame_buffer)) {
-    request.data.buffer = frame_buffer;
-    request.data.buffer_size = sizeof(frame_buffer);
-    request.data.data_offset = layout.payload_offset;
-    memcpy(frame_buffer + layout.payload_offset, payload, payload_len);
-    result = xgl_send_zerocopy_scoped_at(handle, &request, now_ms);
-}
-```
-
-示例假定存在调用者拥有的数组 `frame_buffer`，并包含 `<string.h>`。数组容量不足时应报告容量错误，不提交发送。发送保持 payload 原位；帧头和尾部可写，即使认证或 PHY 提交失败也可能已经改变。所有字节只借用到调用返回。
+`<xgl/xgl_inplace.h>` 提供同步非可靠单帧发送。用 `xgl_send_zerocopy_layout()` 查询精确空间，再把非空载荷放入调用者帧缓冲区，通过 `xgl_send_zerocopy_scoped_at()` 提交。工作区布局、写入位置和实现示例见[零拷贝](in-place-send.md)。
 
 Network TX 包数及 payload 字节数只在下层提交成功后计入，普通、原地与转发路径保持一致。这些计数不证明远端交付。
 
@@ -60,7 +38,7 @@ Network TX 包数及 payload 字节数只在下层提交成功后计入，普通
 
 可靠发送同时受单 peer 窗口和全局 TX 容量约束。持续调用 `xgl_step()` 以接收 ACK、推进重传并报告最终失败。
 
-普通发送的 `timeout_ms` 指定每个可靠包的初始 ACK 等待时间，应用事务有独立的完成期限。零值使用当前 profile 支持的 RTT 估计，尚无估计时使用配置的 ACK 等待时间，配置值也为零则回退到内建默认值；重传可调整等待时间。非可靠普通发送不创建 ACK 计时器，两个零拷贝发送入口及布局查询都忽略该字段。
+普通发送的 `timeout_ms` 指定每个可靠包的初始 ACK 等待时间，应用事务有独立的完成期限。零值使用当前 profile 支持的 RTT 估计，尚无估计时使用配置的 ACK 等待时间，配置值也为零则回退到内建默认值；重传可调整等待时间。非可靠发送不创建 ACK 计时器。
 
 `reliable=true` 要求单播目标。广播目标 `0xFFFF` 会在分配 peer 或重传状态前以 `XGL_ERR_INVALID_PARAM` 拒绝。认证策略允许时，普通非可靠广播仍可通过显式路由发送。
 
@@ -74,9 +52,9 @@ Network TX 包数及 payload 字节数只在下层提交成功后计入，普通
 
 ## 接收接纳和回调
 
-优先使用 `rx_accept_callback`：消费或复制 payload 后返回 `XGL_OK`，临时背压返回 `XGL_ERR_BUSY`。使用 `rx_callback` 则不能拒绝交付。
+应用通过 `config.rx_callback` 接收借用的载荷和 `xgl_rx_info_t`。消费或复制载荷后返回 `XGL_OK`；临时背压返回 `XGL_ERR_BUSY` 或 `XGL_ERR_NO_MEMORY`。回调的 `user_data` 来自 `config.rx_user_data`。
 
-本地 DATA 需要配置接收回调。Advanced 的 scoped 回调优先，其次是 accept 和 legacy 回调。全部缺失时，`xgl_step*()` 对本地 DATA 返回 `XGL_ERR_UNSUPPORTED`，DATA 不进入缓存或确认。纯发送端可以保持空的接收回调并处理 ACK 和 CONTROL。有意丢弃数据的产品应配置显式接纳回调。
+接收回调为空时，`xgl_step()` 和 `xgl_step_bounded()` 对本地 DATA 返回 `XGL_ERR_UNSUPPORTED`，DATA 不进入缓存或确认。纯发送端可以保持空的接收回调并处理 ACK 和 CONTROL。有意丢弃数据的产品应实现显式接纳回调。
 
 顺序包在应用接纳后才发送 ACK；乱序包只有进入协议自有的有界缓存才可发送 SACK。若已缓存的包暂时无法交付，继续运行 step 可重新尝试。
 
@@ -84,7 +62,7 @@ ACK/SACK 提交错误会返回，但不撤销已接纳字节或接收编号；�
 
 回调缓冲只在当前调用期间借用。回调不能重入、关闭或销毁实例，应把恢复动作排队，返回后执行。
 
-现有 `rx_callback` 和 `rx_accept_callback` 只提供发送端 ID、应用 data type 和 payload，不提供 connection ID、epoch 或包编号。`error_callback` 只提供实例、错误码和诊断文本，不提供失败 scope 或逐消息标识；诊断文本还可能为空。SDK 也没有逐消息发送完成回调，应用不能仅从这些回调区分同一远端的多个 scope 或确认某条消息已被远端处理。需要这种关联时应由应用协议携带标识并定义响应。
+`xgl_rx_info_t` 包含发送方 ID、connection ID、epoch、应用 data type 和可靠性。`error_callback` 使用独立的 `config.callback_user_data`，提供实例、错误码及诊断文本，诊断文本可以是空字符串。应用级逐消息完成需要业务消息 ID 和对应响应。
 
 ## 失败和 Scope 恢复
 
@@ -92,7 +70,7 @@ ACK/SACK 提交错误会返回，但不撤销已接纳字节或接收编号；�
 
 `xgl_step()` 返回首个接收错误或维护硬错误，同时继续独立工作。维护重试在临时背压后仍持有数据时，应用无需再次提交该数据。错误回调描述 scope 失败和指定诊断，不能替代检查操作返回值。
 
-可靠 scope 由远端 ID、connection ID 和 epoch 标识。现存 scope 终止后，同一精确 scope 的全部 DATA TX 都会拒绝，包括普通可靠或非可靠发送、两个零拷贝发送入口；纯布局查询也会拒绝，有效请求返回 `XGL_ERR_ACK_TIMEOUT`。其他 connection ID 或 epoch 不受该终止状态影响。拒绝不创建 peer、不调用认证 provider 或 PHY，也不增加发送尝试统计。
+可靠 scope 由远端 ID、connection ID 和 epoch 标识。现存 scope 终止后，普通发送、零拷贝发送及布局查询都会拒绝该 scope 的有效 DATA 请求，返回 `XGL_ERR_ACK_TIMEOUT`。其他 connection ID 或 epoch 不受该终止状态影响。拒绝不创建 peer、不调用认证 provider 或 PHY，也不增加发送尝试统计。
 
 已使用可靠包编号的 scope 不会因空闲超时被静默回收。硬失败或 RESET 不能导致序列号复用。未认证 scope 使用 `xgl_close_peer()` 关闭，排空旧链路流量后以新 epoch 重连；显式关闭时，尚有待发数据会报告 `XGL_ERR_CANCELLED`。认证 peer 则必须关闭安全会话并安装新的可信参数。
 

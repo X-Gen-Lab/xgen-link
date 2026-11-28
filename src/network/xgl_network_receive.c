@@ -44,8 +44,6 @@ network_deliver_local(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                            .data_type = metadata->data_type,
                            .reliable = metadata->reliable,
                            .priority = metadata->priority,
-                           .ttl = metadata->header.ttl,
-                           .traffic_class = metadata->header.traffic_class,
                            .data = &packet_data,
                            .extensions = metadata->extensions,
                            .extensions_len = metadata->extensions_len};

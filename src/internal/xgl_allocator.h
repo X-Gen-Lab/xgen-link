@@ -7,7 +7,7 @@
 #ifndef XGL_ALLOCATOR_H
 #define XGL_ALLOCATOR_H
 
-#include <xgl/xgl_types.h>
+#include <xgl/xgl_alloc.h>
 
 #ifdef __cplusplus
 extern "C" {

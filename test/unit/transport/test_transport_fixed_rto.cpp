@@ -10,6 +10,7 @@
 #include "test_host_allocator.h"
 #include <transport/xgl_transport.h>
 #include <wire/xgl_wire.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <array>
 #include <gtest/gtest.h>

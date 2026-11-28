@@ -15,6 +15,7 @@
 #include <wire/xgl_wire.h>
 #include <wire/xgl_wire_bytes.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <algorithm>
 #include <cstring>
@@ -42,7 +43,7 @@ class XglTransportRxContract : public ::testing::Test {
         return self.feedback_error;
     }
 
-    static xgl_error_t Accept(xgl_handle_t, uint16_t, uint8_t,
+    static xgl_error_t Accept(xgl_handle_t, const xgl_rx_info_t* /*info*/,
                               const uint8_t* data, size_t len, void* opaque) {
         auto& self = *static_cast<XglTransportRxContract*>(opaque);
         if (self.application_error == XGL_OK) {
@@ -66,8 +67,8 @@ class XglTransportRxContract : public ::testing::Test {
         config.lower_layer = &lower;
         config.stats = &statistics;
         config.tx_retries = &retries;
-        config.rx_accept_callback = Accept;
-        config.callback_user_data = this;
+        config.rx_callback = Accept;
+        config.rx_user_data = this;
         ASSERT_EQ(xgl_transport_init(&context, &config), XGL_OK);
         initialized = true;
     }
@@ -115,31 +116,29 @@ struct PublicReceiver {
         return self.feedback_error;
     }
 
-    static xgl_error_t Accept(xgl_handle_t, uint16_t, uint8_t, const uint8_t*,
-                              size_t, void* opaque) {
+    static xgl_error_t Accept(xgl_handle_t, const xgl_rx_info_t* /*info*/,
+                              const uint8_t*, size_t, void* opaque) {
         ++static_cast<PublicReceiver*>(opaque)->delivered;
         return XGL_OK;
     }
 
     xgl_phy_ops_t phy = {Write, Read, this};
-    xgl_route_item_t route = {2U, &phy, 128U, 1000U, 0U};
+    xgl_route_item_t route = {2U, &phy, 128U, 1000U};
     xgl_config_t config = {};
     std::unique_ptr<xgl_instance, decltype(&xgl_destroy)> instance{
         nullptr, &xgl_destroy};
 
     void Init(bool with_handler = true) {
         config = xgl_test_config();
-        config.memory.allocator = xgl_test_host_allocator();
         config.protocol.max_frame_size = 128U;
         config.memory.rx_buffer_size = 128U;
         config.route_table = &route;
         config.route_table_len = 1U;
-        config.rx_accept_callback = with_handler ? Accept : nullptr;
-        config.callback_user_data = this;
-        ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
-        instance.reset(xgl_create(&config));
+        config.rx_callback = with_handler ? Accept : nullptr;
+        config.rx_user_data = this;
+        ASSERT_EQ(xgl_test_measure_config(&config), XGL_OK);
+        instance.reset(xgl_test_init_allocated(&config));
         ASSERT_NE(instance, nullptr);
-        ASSERT_EQ(xgl_init(instance.get()), XGL_OK);
     }
 
     xgl_error_t Feed(const std::vector<uint8_t>& frame) {
@@ -414,7 +413,7 @@ TEST_F(XglTransportRxContract, AdmissionErrorPrecedesFeedbackError) {
 
 #if XGL_FEATURE_OUT_OF_ORDER
 TEST_F(XglTransportRxContract, MissingHandlerCannotCacheFutureData) {
-    context.rx_accept_callback = nullptr;
+    context.rx_callback = nullptr;
     auto* peer = transport_get_or_create_peer_scope(&context, 2U, 0U, 0U);
     ASSERT_NE(peer, nullptr);
     EXPECT_EQ(Receive(1U, 0x41U), XGL_ERR_UNSUPPORTED);

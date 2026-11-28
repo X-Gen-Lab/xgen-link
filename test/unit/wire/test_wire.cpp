@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 #include <vector>
 #include <wire/xgl_crc16.h>
+#include <wire/xgl_frame.h>
 #include <wire/xgl_wire_bytes.h>
 
 TEST(XglWireViewTest, AckRangesBorrowWireBytesWithoutAnOutputArray) {
@@ -225,6 +226,94 @@ TEST(XglWireTest, MatchCompleteDataFrameAgainstIndependentGoldenBytes) {
     encoded[42] = 0x87U;
     xgl_serialize_u16_le(encoded.data() + 43U,
                          xgl_crc16_modbus(encoded.data(), 43U));
+    EXPECT_EQ(encoded, golden);
+}
+
+TEST(XglWireTest, MatchCompleteAckFrameAgainstIndependentGoldenBytes) {
+    constexpr std::array<uint8_t, 41U> golden = {
+        0xA5U, 0x5AU, 0x01U, 0x27U, 0x02U, 0x02U, 0x09U, 0x87U, 0x34U,
+        0x12U, 0xCDU, 0xABU, 0x04U, 0x03U, 0x02U, 0x01U, 0x00U, 0x00U,
+        0x00U, 0x00U, 0x00U, 0x00U, 0xADU, 0xFAU, 0x02U, 0x0DU, 0x11U,
+        0x00U, 0x00U, 0x00U, 0xFAU, 0x00U, 0x00U, 0x00U, 0x01U, 0x00U,
+        0x00U, 0x01U, 0x00U, 0x4DU, 0xFCU};
+
+    const xgl_wire_ack_range_t range = {0U, 1U};
+    uint8_t value[13] = {};
+    size_t value_size = 0U;
+    ASSERT_EQ(xgl_wire_encode_ack_range_ext_value(
+                  value, sizeof(value), 17U, 250U, &range, 1U, &value_size),
+              XGL_OK);
+    uint8_t extension[15] = {};
+    size_t extension_size = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(extension, sizeof(extension),
+                                  XGL_WIRE_EXT_ACK_RANGE, value, value_size,
+                                  &extension_size),
+              XGL_OK);
+
+    xgl_frame_params_t params = {};
+    params.source_id = 0x1234U;
+    params.target_id = 0xABCDU;
+    params.packet_type = XGL_PACKET_TYPE_ACK;
+    params.connection_id = 0x01020304U;
+    params.extensions = extension;
+    params.extensions_len = extension_size;
+    params.reliability_class = XGL_RELIABILITY_ACK_ONLY;
+    params.priority = 7U;
+    params.ttl = 9U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    std::array<uint8_t, golden.size()> encoded = {};
+    size_t written = 0U;
+    ASSERT_EQ(
+        xgl_frame_serialize(encoded.data(), encoded.size(), &frame, &written),
+        XGL_OK);
+    EXPECT_EQ(written, golden.size());
+    EXPECT_EQ(encoded, golden);
+}
+
+TEST(XglWireTest, MatchCompleteControlFrameAgainstIndependentGoldenBytes) {
+    constexpr std::array<uint8_t, 43U> golden = {
+        0xA5U, 0x5AU, 0x01U, 0x29U, 0x03U, 0x0AU, 0x09U, 0x07U, 0x34U,
+        0x12U, 0xCDU, 0xABU, 0x04U, 0x03U, 0x02U, 0x01U, 0x00U, 0x00U,
+        0x00U, 0x00U, 0x00U, 0x00U, 0xFCU, 0x8CU, 0x05U, 0x01U, 0x0EU,
+        0x01U, 0x0CU, 0x0DU, 0x0CU, 0x0BU, 0x0AU, 0x00U, 0x00U, 0x00U,
+        0x00U, 0x00U, 0x00U, 0x00U, 0x00U, 0xFFU, 0x64U};
+
+    const uint8_t hello = 0x0EU;
+    uint8_t extensions[17] = {};
+    size_t type_size = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(extensions, sizeof(extensions),
+                                  XGL_WIRE_EXT_DATA_TYPE, &hello, sizeof(hello),
+                                  &type_size),
+              XGL_OK);
+    uint8_t session[12] = {};
+    size_t value_size = 0U;
+    ASSERT_EQ(xgl_wire_encode_session_ext_value(session, sizeof(session),
+                                                0x0A0B0C0DU, 0U, &value_size),
+              XGL_OK);
+    size_t session_size = 0U;
+    ASSERT_EQ(xgl_wire_encode_ext(
+                  extensions + type_size, sizeof(extensions) - type_size,
+                  XGL_WIRE_EXT_SESSION, session, value_size, &session_size),
+              XGL_OK);
+
+    xgl_frame_params_t params = {};
+    params.source_id = 0x1234U;
+    params.target_id = 0xABCDU;
+    params.packet_type = XGL_PACKET_TYPE_CONTROL;
+    params.connection_id = 0x01020304U;
+    params.extensions = extensions;
+    params.extensions_len = type_size + session_size;
+    params.priority = 7U;
+    params.ttl = 9U;
+    xgl_frame_t frame = {};
+    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    std::array<uint8_t, golden.size()> encoded = {};
+    size_t written = 0U;
+    ASSERT_EQ(
+        xgl_frame_serialize(encoded.data(), encoded.size(), &frame, &written),
+        XGL_OK);
+    EXPECT_EQ(written, golden.size());
     EXPECT_EQ(encoded, golden);
 }
 

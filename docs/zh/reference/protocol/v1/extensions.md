@@ -33,6 +33,6 @@ Network 组合或校验 DATA_TYPE 与非零 SESSION epoch 扩展。重传保留�
 
 验证依据：`test/unit/wire/test_wire.cpp`。
 
-## 保留的数据变换
+## 应用数据变换
 
-压缩和载荷加密为保留能力。配置启用任意一项时返回 `XGL_ERR_INVALID_PARAM`，发送请求指定非零 `compression_id` 时返回 `XGL_ERR_UNSUPPORTED`。认证标签保护完整性，其语义见[安全](security.md)。应用自行变换消息时，双方需在业务格式中约定，并在提交前检查编码后长度。
+应用需要压缩或加密时，双方在业务格式中约定，并在提交前检查编码后的长度。Wire 认证标签提供完整性保护，详见[安全](security.md)。

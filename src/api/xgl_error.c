@@ -7,9 +7,8 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
-#include "xgl/xgl_error.h"
-
 #include <xgl/xgl_build_config.h>
+#include <xgl/xgl_diagnostics.h>
 
 #if XGL_FEATURE_DIAGNOSTICS
 

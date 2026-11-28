@@ -172,7 +172,7 @@ TEST(XglWireRxContractTest, StreamKeepsCrcClassificationAndRecoversAfterReset) {
     ASSERT_EQ(xgl_parser_init(&parser, cache.data(), cache.size()), XGL_OK);
     for (const bool corrupt_header : {true, false}) {
         auto bytes = valid;
-        bytes[corrupt_header ? 6U : XGL_WIRE_BASE_HEADER_SIZE] ^= 1U;
+        bytes.at(corrupt_header ? 6U : XGL_WIRE_BASE_HEADER_SIZE) ^= 1U;
         xgl_wire_frame_view_t view = {};
         xgl_wire_decode_status_t status = XGL_WIRE_DECODE_OK;
         xgl_parse_result_t result = XGL_PARSE_RESULT_INCOMPLETE;

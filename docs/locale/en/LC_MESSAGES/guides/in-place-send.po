@@ -8,17 +8,17 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: eb69f228ef937a2feb17c3fdda3ce8e60f7b82191876f57b542a272264037f24\n"
+"X-XGL-Source-SHA256: 3954c5031501925420a46ecc2c67ff9ac2ff4e16b58fe75ac5663757eef378dc\n"
 
 #: docs/zh/guides/in-place-send.md:8
 msgid "零拷贝"
 msgstr "Zero-Copy"
 
 #: docs/zh/guides/in-place-send.md:10
-msgid "零拷贝发送 API 在调用者提供的可写存储中构造单帧非可靠消息，不引入异步缓冲所有权。"
+msgid "使用 `<xgl/xgl_inplace.h>` 在调用者提供的可写存储中构造单帧非可靠消息。PHY 在返回前完成读取或复制。"
 msgstr ""
-"The zero-copy send APIs build a single unreliable frame in caller-owned writable storage. They do not "
-"introduce asynchronous buffer ownership."
+"Use `<xgl/xgl_inplace.h>` to build one unreliable frame in writable caller storage. The PHY finishes "
+"reading or copying the buffer before returning."
 
 #: docs/zh/guides/in-place-send.md:12
 msgid "支持范围"
@@ -31,14 +31,6 @@ msgstr "API"
 #: docs/zh/guides/in-place-send.md:0
 msgid "作用域与用途"
 msgstr "Scope and purpose"
-
-#: docs/zh/guides/in-place-send.md:0
-msgid "`xgl_send_zerocopy_at()`"
-msgstr "`xgl_send_zerocopy_at()`"
-
-#: docs/zh/guides/in-place-send.md:0
-msgid "保留原有描述符；connection ID 与 session epoch 均为零"
-msgstr "Legacy descriptor; connection ID and session epoch are both zero"
 
 #: docs/zh/guides/in-place-send.md:0
 msgid "`xgl_send_zerocopy_scoped_at()`"
@@ -56,15 +48,11 @@ msgstr "`xgl_send_zerocopy_layout()`"
 msgid "查询指定作用域请求的精确载荷偏移与完整帧大小"
 msgstr "Queries the exact payload offset and complete frame size for the scoped request"
 
-#: docs/zh/guides/in-place-send.md:20
-msgid ""
-"两个发送 API 均只支持单帧非可靠发送。`reliable=true` 返回 `XGL_ERR_INVALID_PARAM`，`timeout_ms` 不参与处理。可靠发送使用 "
-"`xgl_send_at()`。认证发送要求已为选定的目标、connection ID 与 session epoch 安装可信会话。"
+#: docs/zh/guides/in-place-send.md:19
+msgid "可靠发送使用 `xgl_send_at()`。认证发送要求已为选定的目标、connection ID 与 session epoch 安装可信会话。"
 msgstr ""
-"Both send APIs support only single-frame, unreliable transmission. `reliable=true` is rejected with "
-"`XGL_ERR_INVALID_PARAM`, and `timeout_ms` is ignored. Use `xgl_send_at()` for reliable DATA. "
-"Authenticated sending requires a trusted session installed for the selected target, connection ID and "
-"session epoch."
+"Use `xgl_send_at()` for reliable transmission. For authenticated sends, install a trusted session for "
+"the selected destination, connection ID and session epoch first."
 
 #: docs/zh/guides/in-place-send.md:22
 msgid "缓冲布局"
@@ -103,8 +91,8 @@ msgid "非零 session epoch"
 msgstr "Nonzero session epoch"
 
 #: docs/zh/guides/in-place-send.md:0
-msgid "`XGL_SESSION_EXT_SIZE`（14）"
-msgstr "`XGL_SESSION_EXT_SIZE` (14)"
+msgid "14"
+msgstr "14"
 
 #: docs/zh/guides/in-place-send.md:0
 msgid "启用认证时的 security extension"
@@ -165,15 +153,12 @@ msgstr ""
 msgid "所有权"
 msgstr "Ownership"
 
-#: docs/zh/guides/in-place-send.md:76
-msgid ""
-"任一发送 API 返回后，调用者即可复用存储。所有回调均同步借用缓冲区；即使使用 DMA，PHY TX 返回前也必须完成读取或复制。此接口减少组帧复制，驱动仍可能需要复制到自有 DMA "
-"缓冲。不得保存借用指针，也不得传入只读存储。"
+#: docs/zh/guides/in-place-send.md:75
+msgid "发送返回后，调用者即可复用存储。所有回调均同步借用缓冲区。此接口减少组帧复制，驱动仍可能需要复制到自有 DMA 缓冲。不得保存借用指针，也不得传入只读存储。"
 msgstr ""
-"The caller may reuse storage after either send API returns. All callbacks borrow it synchronously. PHY "
-"TX must finish reading or copying it before returning, even when backed by DMA. This interface reduces "
-"frame assembly copies; a driver's private DMA copy may still be necessary. Do not retain borrowed "
-"pointers or pass immutable storage."
+"The caller may reuse the buffer once the send returns. All callbacks borrow the buffer synchronously. "
+"This interface saves a framing copy; a driver may still need to copy into its own DMA buffer. Pass "
+"writable storage and release borrowed pointers when the callback returns."
 
 #: docs/zh/guides/in-place-send.md:78
 msgid "失败处理"

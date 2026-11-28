@@ -13,7 +13,7 @@ source_language: zh_CN
 
 检查头文件与静态库是否来自同一 SDK 安装前缀，节点/peer/TX 容量是否有效，路由回调是否齐全，RX 容量是否覆盖完整帧上限。Workspace 地址和大小必须满足 `xgl_memory_requirements()`。
 
-保证配置及引用对象持续有效。`xgl_create()` 只预留存储，还要调用 `xgl_init()`；`xgl_init_static()` 本身包含初始化。无 heap 的动态创建必须提供有效的显式上下文分配器。
+保证配置及引用对象持续有效。`xgl_init_static()` 和 `<xgl/xgl_alloc.h>` 的 `xgl_init_allocated()` 成功后均返回可立即使用的实例。禁用 libc 回退的构建需要向分配初始化函数提供显式 allocator。
 
 ## 发送和接收
 
@@ -32,7 +32,7 @@ source_language: zh_CN
 
 ## 诊断和回调
 
-在相同的实例串行化策略下使用 `xgl_stats_get()`、`xgl_stats_reset()` 和应用 `error_callback`。Boot 诊断文本裁剪后可记录数值状态。
+在相同的实例串行化策略下使用 `<xgl/xgl_diagnostics.h>` 的 `xgl_stats_get()`、`xgl_stats_reset()` 和应用 `error_callback`。Boot 诊断文本裁剪后可记录数值状态。
 
 回调不能重入或销毁实例，应将恢复动作推迟到返回后。应用 BUSY 不能通过丢弃已被协议接纳到自有存储的数据来“解决”。
 

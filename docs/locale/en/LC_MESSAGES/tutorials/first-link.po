@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 7ff959e7652b9a5b43212585588d92d78f280741fa68daf15dc9421f6c161442\n"
+"X-XGL-Source-SHA256: 19e905521b687a70c1c3228bc7ef3151f5aec63dbffd9e3f8b043f71a63b4692\n"
 
 #: docs/zh/tutorials/first-link.md:8
 msgid "跑通首次收发"
@@ -44,16 +44,20 @@ msgstr ""
 
 #: docs/zh/tutorials/first-link.md:27
 msgid ""
-"调用 `xgl_memory_requirements()`，检查精确大小和对齐，为 `xgl_init_static()` 提供足够容量。不同 profile 和容量需要不同空间。也可由 "
-"`xgl_create()` 通过选定后端预留相同布局，然后调用 `xgl_init()`。"
+"调用 `xgl_memory_requirements()`，检查精确大小和对齐，为 `xgl_init_static()` 提供足够容量。不同 profile 和容量需要不同空间。需要按需分配时，使用 "
+"`<xgl/xgl_alloc.h>` 的 `xgl_init_allocated()` 一次完成申请和初始化。"
 msgstr ""
-"Call `xgl_memory_requirements()`, check the exact size and alignment, and supply that capacity to "
-"`xgl_init_static()`. Different profiles and limits require different sizes. Alternatively, "
-"`xgl_create()` reserves the same layout through the selected backend and requires `xgl_init()`."
+"Call `xgl_memory_requirements()` to check the exact size and alignment, then supply that storage to "
+"`xgl_init_static()`. Requirements depend on the profile and capacities. When allocating storage on "
+"demand, use `xgl_init_allocated()` from `<xgl/xgl_alloc.h>` to allocate and initialize in one call."
 
 #: docs/zh/tutorials/first-link.md:29
 msgid "主循环"
 msgstr "Main loop"
+
+#: docs/zh/tutorials/first-link.md:31
+msgid "本例用 `<xgl/xgl_runtime.h>` 查询下次唤醒时间。"
+msgstr "This example uses `<xgl/xgl_runtime.h>` to query the next wakeup."
 
 #: docs/zh/tutorials/first-link.md:40
 msgid ""

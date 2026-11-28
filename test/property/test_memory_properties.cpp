@@ -9,6 +9,7 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <xgl/xgl.h>
 
@@ -23,7 +24,6 @@
 #include "property_framework.h"
 
 using ::testing::_;
-using ::testing::AtLeast;
 using ::testing::Return;
 
 static uint8_t random_valid_source_id(PropertyTestGenerator& gen) {
@@ -73,7 +73,7 @@ static xgl_error_t workspace_rx(uint8_t* data, size_t* size, void* ctx) {
 /**
  * \brief           Retain a delivered message or apply application backpressure
  */
-static xgl_error_t workspace_accept(xgl_handle_t, uint16_t, uint8_t,
+static xgl_error_t workspace_accept(xgl_handle_t, const xgl_rx_info_t* /*info*/,
                                     const uint8_t* data, size_t size,
                                     void* ctx) {
     auto* endpoint = static_cast<WorkspaceEndpoint*>(ctx);
@@ -91,29 +91,24 @@ TEST(XglMemoryProperties, StaticWindowResourcesAreRecycledWithoutBackend) {
     b.remote = &a;
     xgl_phy_ops_t phy_a = {workspace_tx, workspace_rx, &a};
     xgl_phy_ops_t phy_b = {workspace_tx, workspace_rx, &b};
-    xgl_route_item_t route_a = {2U, &phy_a, 96U, 1000U, 0U};
-    xgl_route_item_t route_b = {1U, &phy_b, 96U, 1000U, 0U};
-    MockAllocator backend;
-    EXPECT_CALL(backend, malloc_impl(_)).Times(0);
-    EXPECT_CALL(backend, free_impl(_)).Times(0);
-
+    xgl_route_item_t route_a = {2U, &phy_a, 96U, 1000U};
+    xgl_route_item_t route_b = {1U, &phy_b, 96U, 1000U};
     xgl_config_t config_a;
     config_a = xgl_test_two_packet_config();
     config_a.protocol.window_size = 2U;
     config_a.protocol.max_frame_size = 96U;
     config_a.memory.rx_buffer_size = 96U;
-    config_a.memory.allocator = backend.get_allocator();
     config_a.features.max_peers = 1U;
     config_a.features.max_tx_packets = 2U;
     config_a.features.max_rx_buffered_packets = 1U;
     config_a.route_table = &route_a;
     config_a.route_table_len = 1U;
-    config_a.rx_accept_callback = workspace_accept;
-    config_a.callback_user_data = &a;
+    config_a.rx_callback = workspace_accept;
+    config_a.rx_user_data = &a;
     xgl_config_t config_b = config_a;
     config_b.source_id = 2U;
     config_b.route_table = &route_b;
-    config_b.callback_user_data = &b;
+    config_b.rx_user_data = &b;
 
     xgl_memory_requirements_t required{};
     ASSERT_EQ(xgl_memory_requirements(&config_a, &required), XGL_OK);
@@ -163,47 +158,28 @@ TEST(XglMemoryProperties, CustomAllocatorUsage) {
          ++iteration) {
         MockAllocator mock_alloc;
 
-        /* Setup expectations: all allocations should go through custom
-         * allocator */
-        EXPECT_CALL(mock_alloc, malloc_impl(_))
-            .Times(AtLeast(1))
-            .WillRepeatedly([](size_t size) { return std::malloc(size); });
+        EXPECT_CALL(mock_alloc, malloc_impl(_)).WillOnce([](size_t size) {
+            return std::malloc(size);
+        });
 
-        EXPECT_CALL(mock_alloc, free_impl(_))
-            .Times(AtLeast(1))
-            .WillRepeatedly([](void* ptr) { std::free(ptr); });
+        EXPECT_CALL(mock_alloc, free_impl(_)).WillOnce([](void* ptr) {
+            std::free(ptr);
+        });
 
         /* Create configuration with custom allocator */
         xgl_config_t config;
         config = xgl_test_config();
         config.source_id = random_valid_source_id(gen);
-        config.memory.allocator = mock_alloc.get_allocator();
 
-        /* Track allocations before instance creation */
-        size_t alloc_count_before = mock_alloc.get_alloc_count();
-
-        /* Create instance - should use custom allocator */
-        xgl_test_use_host_allocator(&config);
-        xgl_handle_t handle = xgl_create(&config);
-        ASSERT_NE(handle, nullptr)
-            << "Failed to create instance with custom allocator";
-
-        /* Verify that allocations occurred through custom allocator */
-        EXPECT_GT(mock_alloc.get_alloc_count(), alloc_count_before)
-            << "No allocations went through custom allocator during "
-               "xgl_create()";
-        EXPECT_GT(mock_alloc.get_total_allocated(), 0)
-            << "Custom allocator was not used for memory allocation";
-
-        /* Initialization consumes the workspace already reserved at creation.
-         */
-        size_t alloc_count_before_init = mock_alloc.get_alloc_count();
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK)
-            << "Failed to initialize instance: " << xgl_error_string(err);
-
-        EXPECT_EQ(mock_alloc.get_alloc_count(), alloc_count_before_init)
-            << "xgl_init() requested storage beyond the reserved workspace";
+        xgl_handle_t handle = nullptr;
+        ASSERT_EQ(
+            xgl_init_allocated(&config, mock_alloc.get_allocator(), &handle),
+            XGL_OK);
+        ASSERT_NE(handle, nullptr);
+        EXPECT_EQ(mock_alloc.get_alloc_count(), 1U);
+        const xgl_work_budget_t budget = {};
+        ASSERT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+        EXPECT_EQ(mock_alloc.get_alloc_count(), 1U);
 
         /* Track memory state before destroy */
         size_t allocated_before_destroy = mock_alloc.get_current_allocated();
@@ -252,31 +228,23 @@ TEST(XglMemoryProperties, MemoryLeakPrevention) {
         config.protocol.window_size = 1 + (gen.random_uint8() % 16);
         config.protocol.max_frame_size = 64 + (gen.random_uint16() % 960);
         config.memory.rx_buffer_size = config.protocol.max_frame_size;
-        config.memory.allocator = mock_alloc.get_allocator();
 
         /* Create instance */
-        xgl_test_use_host_allocator(&config);
-        xgl_handle_t handle = xgl_create(&config);
+        xgl_handle_t handle =
+            xgl_test_init_allocated(&config, mock_alloc.get_allocator());
         ASSERT_NE(handle, nullptr)
             << "Failed to create instance in iteration " << iteration;
 
         /* Verify allocations occurred */
         size_t allocated_after_create = mock_alloc.get_current_allocated();
         EXPECT_GT(allocated_after_create, 0)
-            << "No memory allocated after xgl_create() in iteration "
+            << "No memory allocated after xgl_test_init_allocated() in "
+               "iteration "
             << iteration;
 
-        /* Initialize instance */
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK) << "Failed to initialize instance in iteration "
-                               << iteration << ": " << xgl_error_string(err);
-
-        /* Runtime resources were all reserved by the one creation allocation.
-         */
-        size_t allocated_after_init = mock_alloc.get_current_allocated();
-        EXPECT_EQ(allocated_after_init, allocated_after_create)
-            << "Initialization allocated outside the workspace in iteration "
-            << iteration;
+        const xgl_work_budget_t budget = {};
+        ASSERT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+        EXPECT_EQ(mock_alloc.get_current_allocated(), allocated_after_create);
 
         /* Destroy instance */
         xgl_destroy(handle);
@@ -306,66 +274,36 @@ TEST(XglMemoryProperties, AllocationFailureHandling) {
          ++iteration) {
         MockAllocator mock_alloc;
 
-        /* Creation is the only backend allocation; cover failure and success.
-         */
-        int fail_after_count = iteration % 2;
-        int alloc_count = 0;
-
-        /* Setup expectations: fail allocation after N successful allocations */
-        EXPECT_CALL(mock_alloc, malloc_impl(_))
-            .WillRepeatedly(
-                [&alloc_count, fail_after_count](size_t size) -> void* {
-                    if (alloc_count >= fail_after_count) {
-                        return nullptr; /* Simulate allocation failure */
-                    }
-                    alloc_count++;
-                    return std::malloc(size);
-                });
-
-        EXPECT_CALL(mock_alloc, free_impl(_)).WillRepeatedly([](void* ptr) {
-            if (ptr != nullptr) {
-                std::free(ptr);
-            }
-        });
-
-        /* Create configuration */
-        xgl_config_t config;
-        config = xgl_test_config();
-        config.source_id = random_valid_source_id(gen);
-        config.memory.allocator = mock_alloc.get_allocator();
-
-        /* Track memory before operation */
-        size_t allocated_before = mock_alloc.get_current_allocated();
-
-        /* Try to create instance - may fail due to allocation failure */
-        xgl_test_use_host_allocator(&config);
-        xgl_handle_t handle = xgl_create(&config);
-
-        if (handle == nullptr) {
-            /* Creation failed - verify all partial allocations were cleaned up
-             */
-            EXPECT_EQ(mock_alloc.get_current_allocated(), allocated_before)
-                << "Memory leak after failed xgl_create() in iteration "
-                << iteration << ": partial allocations not cleaned up";
+        const bool fail = iteration % 2 == 0;
+        if (fail) {
+            EXPECT_CALL(mock_alloc, malloc_impl(_)).WillOnce(Return(nullptr));
+            EXPECT_CALL(mock_alloc, free_impl(_)).Times(0);
         } else {
-            /* Creation succeeded - try initialization */
-            xgl_error_t err = xgl_init(handle);
-
-            EXPECT_EQ(err, XGL_OK)
-                << "Pre-reserved workspace could not initialize";
-            EXPECT_EQ(alloc_count, 1)
-                << "Initialization called the backend after workspace creation";
-            xgl_destroy(handle);
-            EXPECT_EQ(mock_alloc.get_current_allocated(), 0)
-                << "Workspace was not released after destruction";
+            EXPECT_CALL(mock_alloc, malloc_impl(_)).WillOnce([](size_t size) {
+                return std::malloc(size);
+            });
+            EXPECT_CALL(mock_alloc, free_impl(_)).WillOnce([](void* ptr) {
+                std::free(ptr);
+            });
         }
 
-        /* Final verification: no memory leaks regardless of success/failure */
-        EXPECT_EQ(mock_alloc.get_current_allocated(), 0)
-            << "Memory leak detected in iteration " << iteration
-            << " after handling allocation failure";
+        xgl_config_t config = xgl_test_config();
+        config.source_id = random_valid_source_id(gen);
+        xgl_handle_t handle = nullptr;
+        const xgl_error_t error =
+            xgl_init_allocated(&config, mock_alloc.get_allocator(), &handle);
+        if (fail) {
+            EXPECT_EQ(error, XGL_ERR_NO_MEMORY);
+            EXPECT_EQ(handle, nullptr);
+        } else {
+            ASSERT_EQ(error, XGL_OK);
+            ASSERT_NE(handle, nullptr);
+            const xgl_work_budget_t budget = {};
+            EXPECT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
+        }
 
-        testing::Mock::VerifyAndClearExpectations(&mock_alloc);
+        xgl_destroy(handle);
+        EXPECT_EQ(mock_alloc.get_current_allocated(), 0) << iteration;
     }
 }
 
@@ -399,7 +337,6 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
         route.phy = &phy;
         route.max_frame_size = 96;
         route.read_freq_hz = 100;
-        route.metric = 0;
 
         /* Create configuration with very small memory pool */
         xgl_config_t config;
@@ -413,18 +350,13 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
         config.route_table_len = 1;
 
         /* Create and initialize instance */
-        xgl_test_use_host_allocator(&config);
-        xgl_handle_t handle = xgl_create(&config);
+        xgl_handle_t handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr)
             << "Failed to create instance in iteration " << iteration;
 
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK) << "Failed to initialize instance in iteration "
-                               << iteration << ": " << xgl_error_string(err);
-
         /* Get initial statistics */
         xgl_statistics_t stats_before;
-        err = xgl_stats_get(handle, &stats_before);
+        xgl_error_t err = xgl_stats_get(handle, &stats_before);
         ASSERT_EQ(err, XGL_OK)
             << "Failed to get statistics in iteration " << iteration;
 
@@ -503,16 +435,12 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
             << "Statistics inconsistent after memory pressure in iteration "
             << iteration;
 
-        /* Verify we attempted to send packets and some succeeded */
         EXPECT_EQ(send_attempts, 200)
             << "Did not attempt all sends in iteration " << iteration;
         EXPECT_GT(successful_sends, 0)
             << "No successful sends in iteration " << iteration;
-
-        /* The key property: system handled memory pressure without corruption
-         */
-        /* Whether we got resource errors or not, the system should remain
-         * functional */
+        EXPECT_GT(resource_errors, 0)
+            << "No resource exhaustion in iteration " << iteration;
 
         /* Clean up */
         xgl_destroy(handle);

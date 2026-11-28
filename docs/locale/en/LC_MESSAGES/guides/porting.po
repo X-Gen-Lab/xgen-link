@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: e1dcc1912abcdfb8d06d77c7cc4e74ddedeea4598109ac9f55bfe24498ca530a\n"
+"X-XGL-Source-SHA256: 6d3b4673c0eb6dee134637d6c983e244e164d5f1623c3127c9b1810d6b4c840e\n"
 
 #: docs/zh/guides/porting.md:8
 msgid "移植"
@@ -50,10 +50,13 @@ msgstr ""
 "elapsed comparisons must stay below `2^31` milliseconds."
 
 #: docs/zh/guides/porting.md:27
-msgid "定期或在 RX/定时事件到达时调用 `xgl_step()`。`xgl_next_timeout()` 返回下次唤醒的相对延迟。不需要注册全局时间函数，也不需要协议定时器线程。"
+msgid ""
+"定期或在 RX/定时事件到达时调用 `xgl_step()`。`<xgl/xgl_runtime.h>` 的 `xgl_deadline_query()` "
+"返回下次唤醒的相对延迟。不需要注册全局时间函数，也不需要协议定时器线程。"
 msgstr ""
-"Call `xgl_step()` regularly or on RX/timer events. `xgl_next_timeout()` provides the next relative "
-"wakeup. No global time registration or protocol timer thread is required."
+"Call `xgl_step()` periodically or on RX and timer events. `xgl_deadline_query()` from "
+"`<xgl/xgl_runtime.h>` gives the relative delay to the next wakeup. The application drives timing through"
+" the owner loop for each instance."
 
 #: docs/zh/guides/porting.md:29
 msgid "存储和生命周期"
@@ -61,12 +64,12 @@ msgstr "Storage and Lifetime"
 
 #: docs/zh/guides/porting.md:31
 msgid ""
-"优先使用对齐的调用者存储与 `xgl_init_static()`。先查询目标 ABI 的精确需求，不能将宿主机结构体大小直接复制到固件。动态创建接受显式 `xgl_allocator_t`：回调接收其 "
-"`ctx`，返回满足对齐要求的存储，并在销毁时释放唯一 workspace。"
+"优先使用对齐的调用者存储与 `xgl_init_static()`。先查询目标 ABI 的精确需求，不能将宿主机结构体大小直接复制到固件。需要由 allocator 提供存储时，使用 "
+"`<xgl/xgl_alloc.h>` 的 `xgl_init_allocated()`。显式 allocator 的回调接收其 `ctx`，返回满足对齐要求的存储，并在销毁时释放工作区。"
 msgstr ""
-"Prefer aligned caller storage with `xgl_init_static()`. Query the exact target requirements first; do "
-"not copy a host ABI size into firmware. Dynamic creation accepts an explicit `xgl_allocator_t` whose "
-"callbacks receive its `ctx`, return suitably aligned storage, and release the one workspace at destroy."
+"Prefer aligned caller storage with `xgl_init_static()`. Query the exact size for the target ABI. When an"
+" allocator supplies storage, use `xgl_init_allocated()` from `<xgl/xgl_alloc.h>`. The explicit allocator"
+" callbacks receive their `ctx`, supply aligned storage and release the workspace at destruction."
 
 #: docs/zh/guides/porting.md:33
 msgid "Workspace、不可变配置、PHY 描述符、provider 描述符及上下文必须保持地址固定且活到销毁。不同实例需要不同 workspace，以及独立管理的上下文。"

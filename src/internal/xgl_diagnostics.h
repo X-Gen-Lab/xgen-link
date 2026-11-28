@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#ifndef XGL_DIAGNOSTICS_H
-#define XGL_DIAGNOSTICS_H
+#ifndef XGL_DIAGNOSTICS_INTERNAL_H
+#define XGL_DIAGNOSTICS_INTERNAL_H
 
 #include <xgl/xgl_build_config.h>
 
@@ -17,4 +17,4 @@
 #define XGL_ERROR_MESSAGE(text) ""
 #endif
 
-#endif /* XGL_DIAGNOSTICS_H */
+#endif /* XGL_DIAGNOSTICS_INTERNAL_H */

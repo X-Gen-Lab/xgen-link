@@ -43,9 +43,8 @@ xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
         }
 
         uint32_t packet_number = buffered->packet.packet_number;
-        xgl_error_t err = transport_deliver_packet(
-            ctx, handle, &buffered->packet, buffered->packet_data.data,
-            buffered->packet_data.data_len);
+        xgl_error_t err =
+            transport_deliver_packet(ctx, handle, &buffered->packet);
         if (err != XGL_OK) {
             /* Already advertised through SACK: retain it without depending on
              * another sender retransmission when the application is busy. */
@@ -80,15 +79,6 @@ typedef enum {
     TRANSPORT_RX_HANDLED,
     TRANSPORT_RX_DELIVER
 } transport_rx_decision_t;
-
-static bool transport_has_rx_handler(const xgl_transport_ctx_t* ctx) {
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    if (ctx->rx_scoped_callback != NULL) {
-        return true;
-    }
-#endif
-    return ctx->rx_accept_callback != NULL || ctx->rx_callback != NULL;
-}
 
 /**
  * \brief           Classify duplicates and retain supported out-of-order
@@ -194,19 +184,13 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_SEQUENCE_ERROR;
     }
 
-    const uint8_t* data = NULL;
-    size_t data_len = 0U;
-    if (packet->data != NULL) {
-        data = packet->data->data;
-        data_len = packet->data->data_len;
-    }
-    if (data == NULL) {
+    if (packet->data == NULL || packet->data->data == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
     /* No application can take responsibility for these bytes. Reject before
      * reliable ordering can cache or acknowledge them. */
-    if (!transport_has_rx_handler(ctx)) {
+    if (ctx->rx_callback == NULL) {
 #if XGL_FEATURE_STATISTICS
         if (ctx->stats != NULL) {
             ctx->stats->rx_dropped++;
@@ -260,7 +244,7 @@ xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
     }
 #endif
 
-    err = transport_deliver_packet(ctx, handle, packet, data, data_len);
+    err = transport_deliver_packet(ctx, handle, packet);
     if (err != XGL_OK) {
         transport_release_rejected_scope(ctx, handle, packet, scope_was_absent);
         return err;

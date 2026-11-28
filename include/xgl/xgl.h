@@ -39,40 +39,6 @@ extern "C" {
     (XGL_VERSION_INT >= ((major)*10000 + (minor)*100 + (patch)))
 
 /**
- * \brief           Reserve an instance and return the exact failure reason
- * \param[in]       config: Immutable configuration borrowed until destruction
- * \param[out]      handle: Reserved instance; cleared on every failure
- * \return          XGL_OK or a configuration, backend or allocation error
- * \note            Successful reservation still requires xgl_init().
- */
-xgl_error_t xgl_create_with_error(const xgl_config_t* config,
-                                  xgl_handle_t* handle);
-
-/**
- * \brief           Create a new protocol instance
- * \param[in]       config: Configuration structure
- * \return          Instance handle on success, NULL on failure
- * \note            The immutable configuration is borrowed until xgl_destroy()
- * \note            Use xgl_init() to initialize the instance after creation
- * \note            Memory is allocated through config.memory.allocator. When
- *                  XGL_ALLOW_FALLBACK_MALLOC is enabled, NULL allocator uses
- *                  the default malloc/free wrapper; strict embedded builds can
- *                  disable that fallback.
- * \warning         Must call xgl_destroy() to free resources
- *
- * \par Example
- * Given an initialized application-owned xgl_config_t named config:
- * \code{.c}
- * xgl_handle_t handle = xgl_create(&config);
- * if (handle == NULL) {
- *     printf("Failed to create instance\n");
- *     return -1;
- * }
- * \endcode
- */
-xgl_handle_t xgl_create(const xgl_config_t* config);
-
-/**
  * \brief           Storage requirements for a static protocol instance
  */
 typedef struct {
@@ -82,23 +48,6 @@ typedef struct {
     size_t runtime_block_size; /**< Largest aligned runtime slot; pools have
                                   different strides */
 } xgl_memory_requirements_t;
-
-/**
- * \brief           Exact reserved bytes by ownership and resource category
- * \note            Category bytes include alignment and sum to
- * requirements.size.
- */
-typedef struct {
-    xgl_memory_requirements_t requirements; /**< Complete storage contract */
-    size_t management_bytes;     /**< Instance and allocator descriptors */
-    size_t initialization_bytes; /**< Routes, links and per-PHY RX caches */
-    size_t peer_bytes;           /**< Reliable scope records */
-    size_t window_bytes;         /**< Zero; windows belong to peer_bytes */
-    size_t tx_record_bytes;      /**< Outstanding reliable packet records */
-    size_t tx_payload_bytes;     /**< Reserved reliable payload copies */
-    size_t scratch_bytes;        /**< Synchronous frame scratch storage */
-    size_t rx_buffered_bytes;    /**< Out-of-order records, payload and TLVs */
-} xgl_memory_report_t;
 
 /**
  * \brief           Measure storage for the supplied configuration
@@ -112,15 +61,6 @@ typedef struct {
  */
 xgl_error_t xgl_memory_requirements(const xgl_config_t* config,
                                     xgl_memory_requirements_t* requirements);
-
-/**
- * \brief           Explain reserved storage without allocating or initializing
- * \param[in]       config: Configuration supported by the static storage plan
- * \param[out]      report: Byte breakdown; unchanged on failure
- * \return          XGL_OK or a configuration or capacity error
- */
-xgl_error_t xgl_memory_report(const xgl_config_t* config,
-                              xgl_memory_report_t* report);
 
 /**
  * \brief           Initialize the protocol inside caller-owned storage
@@ -138,38 +78,13 @@ xgl_error_t xgl_init_static(const xgl_config_t* config, void* workspace,
                             size_t workspace_size, xgl_handle_t* handle);
 
 /**
- * \brief           Initialize the layers in a previously reserved workspace
- * \param[in]       handle: Instance returned by xgl_create()
- * \return          XGL_OK, NULL_POINTER, ALREADY_INITIALIZED, or resource error
- */
-xgl_error_t xgl_init(xgl_handle_t handle);
-
-/**
- * \brief           Release protocol resources without freeing borrowed storage
+ * \brief           Release the instance and its protocol resources
  * \param[in]       handle: Instance to destroy; NULL is ignored
  * \pre             No operation or callback may still be using the instance.
+ * \note            Caller storage can be reused after return. Owned storage
+ *                  is freed through the original allocator.
  */
 void xgl_destroy(xgl_handle_t handle);
-
-/**
- * \brief           Read the library version used at link time
- * \return          Read-only version string with static lifetime
- */
-const char* xgl_version_string(void);
-
-/**
- * \brief           Read the library version as an integer
- * \return          MAJOR * 10000 + MINOR * 100 + PATCH
- */
-uint32_t xgl_version_int(void);
-
-/**
- * \brief           Validate configuration and the compiled capability ceiling
- * \param[in]       config: Configuration to validate without modifying it
- * \return          XGL_OK, NULL_POINTER, INVALID_PARAM, UNSUPPORTED, or
- *                  BUFFER_TOO_SMALL when RX storage is smaller than the MTU
- */
-xgl_error_t xgl_config_validate(const xgl_config_t* config);
 
 /**
  * \brief           Submit one DATA frame at the caller's monotonic time
@@ -184,52 +99,6 @@ xgl_error_t xgl_config_validate(const xgl_config_t* config);
  */
 xgl_error_t xgl_send_at(xgl_handle_t handle, const xgl_tx_data_t* tx_data,
                         uint32_t now_ms);
-
-/**
- * \brief           Send with caller-provided synchronous frame workspace
- * \param[in]       handle: Initialized instance
- * \param[in]       tx_data: Writable frame workspace and payload description
- * \param[in]       now_ms: Same clock used by xgl_step()
- * \return          XGL_OK on acceptance, or validation/capacity/driver error
- * \note            The PHY must stop reading before tx returns. Reliable data
- *                  sends are unsupported; timeout_ms is ignored. This legacy
- *                  entry always uses connection ID and session epoch zero.
- */
-xgl_error_t xgl_send_zerocopy_at(xgl_handle_t handle,
-                                 const xgl_tx_data_zerocopy_t* tx_data,
-                                 uint32_t now_ms);
-
-/**
- * \brief           Query exact frame storage without transmitting or allocating
- * \param[in]       handle: Initialized instance, serialized by the caller
- * \param[in]       request: Scope and send metadata; buffer, buffer_size and
- *                  data_offset are ignored, data_len must be nonzero
- * \param[out]      layout: Exact headroom and frame size, cleared on failure
- * \return          XGL_OK or an argument, route, MTU, security
- *                  or terminal-scope error
- * \note            Does not call the provider or PHY, reserve storage or
- * consume a security sequence. An authenticated scope must already be
- *                  installed. The eventual send revalidates current state.
- */
-xgl_error_t xgl_send_zerocopy_layout(xgl_handle_t handle,
-                                     const xgl_tx_zerocopy_request_t* request,
-                                     xgl_tx_frame_layout_t* layout);
-
-/**
- * \brief           Send one caller-owned frame within an explicit peer scope
- * \param[in]       handle: Initialized instance, serialized by the caller
- * \param[in]       request: Writable frame storage and exact connection/epoch
- * \param[in]       now_ms: Same monotonic clock used by xgl_step()
- * \return          XGL_OK or a validation, capacity, security or driver error
- * \note            Use xgl_send_zerocopy_layout() before filling the payload.
- *                  The payload stays at its original address. All callbacks
- *                  borrow it synchronously; no pointer may outlive this call.
- *                  Reliable sends are unsupported; timeout_ms is ignored.
- */
-xgl_error_t
-xgl_send_zerocopy_scoped_at(xgl_handle_t handle,
-                            const xgl_tx_zerocopy_request_t* request,
-                            uint32_t now_ms);
 
 /**
  * \brief           Poll due links and advance protocol deadlines
@@ -252,63 +121,7 @@ xgl_error_t xgl_step(xgl_handle_t handle, uint32_t now_ms,
                      const xgl_work_budget_t* budget);
 
 /**
- * \brief           Query the next relative protocol or link deadline
- * \param[in]       handle: Initialized instance
- * \param[in]       now_ms: Current monotonic time
- * \param[out]      delay_ms: Relative delay; zero means work is already due
- * \return          True if a deadline exists; false leaves delay_ms unchanged
- * \note            Always includes PHY polling and the most recent step's
- *                  parser policy. Use xgl_next_timeout_for_work() when the
- *                  next step's work budget differs.
- */
-bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms, uint32_t* delay_ms);
-
-/**
- * \brief           Query deadlines for a proposed step without changing state
- * \param[in]       handle: Initialized instance, serialized by the caller
- * \param[in]       now_ms: Same monotonic millisecond clock used by xgl_step()
- * \param[in]       budget: Proposed per-link RX budget and parser timeout
- * \param[out]      delay_ms: Relative delay; unchanged when no deadline exists
- * \return          True if a deadline exists; false for invalid input or none
- * \note            Zero rx_bytes excludes PHY polling deadlines. Parser expiry
- *                  uses this budget's receive_timeout_ms, without changing the
- *                  last step policy or restarting a partial frame. Transport
- *                  deadlines remain active. A timeout of 2^31 or more is
- * invalid.
- */
-bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
-                               const xgl_work_budget_t* budget,
-                               uint32_t* delay_ms);
-
-/**
- * \brief           Install an explicitly trusted directional security session
- * \param[in]       handle: Initialized instance
- * \param[in]       config: Trusted session parameters copied into the instance
- * \return          XGL_OK, UNSUPPORTED, or validation/capacity error
- * \note            The application must prevent key/nonce-domain reuse across
- *                  restarts using persistent state or fresh trusted keys.
- *                  Ordinary received frames cannot install sessions.
- *                  Installation does not revoke previously admitted data.
- *                  Use a new trusted scope for a business trust transition.
- */
-xgl_error_t
-xgl_install_security_session(xgl_handle_t handle,
-                             const xgl_security_session_config_t* config);
-
-/**
- * \brief           Close a session while retaining its nonce-domain tombstone
- * \param[in]       handle: Initialized instance
- * \param[in]       remote_id: Peer identifier
- * \param[in]       connection_id: Connection identifier
- * \param[in]       session_epoch: Installed trusted epoch
- * \return          XGL_OK, UNSUPPORTED, NOT_FOUND, or validation error
- */
-xgl_error_t xgl_close_security_session(xgl_handle_t handle, uint16_t remote_id,
-                                       uint32_t connection_id,
-                                       uint32_t session_epoch);
-
-/**
- * \brief           Cancel a peer's pending TX and release its capacity
+ * \brief           Cancel and release one unprotected peer scope
  * \param[in]       handle: Initialized instance
  * \param[in]       remote_id: Peer identifier
  * \param[in]       connection_id: Connection identifier
@@ -316,93 +129,11 @@ xgl_error_t xgl_close_security_session(xgl_handle_t handle, uint16_t remote_id,
  * \return          XGL_OK, NOT_FOUND, or validation error
  * \note            For authenticated peers, close the security session instead.
  *                  Otherwise the caller must drain old link traffic and choose
- *                  a new epoch before reconnecting. Pending TX reports
- * CANCELLED.
+ *                  a new epoch before reconnecting. Pending TX and retained RX
+ * are released. Cancellation is observable through configured callbacks.
  */
 xgl_error_t xgl_close_peer(xgl_handle_t handle, uint16_t remote_id,
                            uint32_t connection_id, uint32_t session_epoch);
-
-/**
- * \brief           Copy counters under caller-serialized instance access
- * \param[in]       handle: Initialized instance
- * \param[out]      stats: Snapshot destination; unchanged when unsupported
- * \return          XGL_OK, XGL_ERR_NULL_POINTER, XGL_ERR_NOT_INITIALIZED, or
- *                  XGL_ERR_UNSUPPORTED when statistics are compiled out
- */
-xgl_error_t xgl_stats_get(xgl_handle_t handle, xgl_statistics_t* stats);
-
-/**
- * \brief           Reset observations while preserving the workspace
- * reservation
- * \param[in]       handle: Initialized instance
- * \return          XGL_OK, XGL_ERR_NULL_POINTER, XGL_ERR_NOT_INITIALIZED, or
- *                  XGL_ERR_UNSUPPORTED when statistics are compiled out
- */
-xgl_error_t xgl_stats_reset(xgl_handle_t handle);
-
-/**
- * \brief           Validate versioned instance policy and measure storage
- * \param[in]       config: Immutable instance configuration
- * \param[in]       options: Initialized versioned policy
- * \param[out]      report: Exact reservation, unchanged on failure
- * \return          XGL_OK, validation error, or UNSUPPORTED without capability
- */
-xgl_error_t
-xgl_memory_report_with_options(const xgl_config_t* config,
-                               const xgl_instance_options_t* options,
-                               xgl_memory_report_t* report);
-
-/**
- * \brief           Reserve an instance borrowing versioned optional policy
- * \param[in]       config: Immutable configuration borrowed until destroy
- * \param[in]       options: Immutable policy borrowed until destroy
- * \param[out]      handle: Reserved instance, cleared on failure
- * \return          XGL_OK or validation/allocation error; call xgl_init next
- */
-xgl_error_t xgl_create_with_options(const xgl_config_t* config,
-                                    const xgl_instance_options_t* options,
-                                    xgl_handle_t* handle);
-
-/**
- * \brief           Initialize caller storage with explicit optional policy
- * \param[in]       config: Immutable configuration borrowed until destroy
- * \param[in]       options: Immutable policy borrowed until destroy
- * \param[in,out]   storage: Aligned caller-owned workspace
- * \param[in]       storage_size: Available bytes from the options-aware report
- * \param[out]      handle: Initialized instance, cleared on failure
- * \return          XGL_OK or validation, storage or initialization error
- */
-xgl_error_t xgl_init_static_with_options(const xgl_config_t* config,
-                                         const xgl_instance_options_t* options,
-                                         void* storage, size_t storage_size,
-                                         xgl_handle_t* handle);
-
-/**
- * \brief           Run a step with additional candidate and TX-attempt limits
- * \param[in,out]   handle: Caller-serialized initialized instance
- * \param[in]       now_ms: Same monotonic clock as all instance operations
- * \param[in]       budget: Per-PHY read and parser timeout policy
- * \param[in]       limits: Per-link candidate and whole-maintenance TX limits
- * \param[out]      result: Continuation flag, initialized even on failure
- * \return          First processing error, or XGL_OK; UNSUPPORTED if disabled
- * \note            Timers still run with zero limits. Callback time, a single
- *                  CRC, receive ACKs and application send calls are not bounded
- *                  by these limits. Pending work requires another step with
- *                  positive limits; application BUSY requires an external wake.
- */
-xgl_error_t xgl_step_bounded(xgl_handle_t handle, uint32_t now_ms,
-                             const xgl_work_budget_t* budget,
-                             const xgl_execution_limits_t* limits,
-                             xgl_execution_result_t* result);
-
-/**
- * \brief           Inspect currently owned resources without allocation
- * \param[in]       handle: Caller-serialized initialized instance
- * \param[out]      snapshot: Current resource counts, unchanged on error
- * \return          XGL_OK, argument error, or UNSUPPORTED if disabled
- */
-xgl_error_t xgl_resources_get(xgl_handle_t handle,
-                              xgl_resource_snapshot_t* snapshot);
 
 #ifdef __cplusplus
 }

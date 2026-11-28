@@ -41,8 +41,21 @@ def verify_site(root, site, languages):
             if missing:
                 raise ValueError(f"{page.relative_to(site)}: missing legacy fragments {sorted(missing)}")
             aliases += len(expected)
-            if docname == "reference/c-api" and "c.xgl_init" not in parser.identifiers:
-                raise ValueError(f"{page.relative_to(site)}: generated C API is missing definitions")
+            if docname == "reference/c-api":
+                required_api = {
+                    "c.xgl_init_static",
+                    "c.xgl_init_allocated",
+                    "c.xgl_deadline_query",
+                    "c.xgl_install_security_session",
+                    "c.xgl_memory_report",
+                    "c.xgl_send_zerocopy_layout",
+                }
+                missing_api = required_api - parser.identifiers
+                if missing_api:
+                    raise ValueError(
+                        f"{page.relative_to(site)}: missing C API definitions "
+                        f"{sorted(missing_api)}"
+                    )
         index = text_at(destination / "searchindex.js")
         if language == "zh_CN" and "xglcjk_" not in index:
             raise ValueError("Chinese search index has no Han search terms")

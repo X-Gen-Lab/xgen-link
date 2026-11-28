@@ -8,6 +8,7 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <stdalign.h>
 
@@ -29,7 +30,7 @@ static xgl_error_t consumer_receive(uint8_t* data, size_t* size, void* ctx) {
 int main(void) {
     alignas(xgl_max_align_t) static uint8_t workspace[16384];
     xgl_phy_ops_t phy = {consumer_transmit, consumer_receive, NULL};
-    xgl_route_item_t route = {2U, &phy, 64U, 100U, 0U};
+    xgl_route_item_t route = {2U, &phy, 64U, 100U};
     static xgl_config_t config;
     config.memory.rx_buffer_size = 128U;
     config.protocol.ack_timeout_ms = 1000U;

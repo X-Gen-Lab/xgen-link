@@ -6,6 +6,8 @@
 #ifndef XGL_WORKSPACE_INTERNAL_H
 #define XGL_WORKSPACE_INTERNAL_H
 
+#include <xgl/xgl_alloc.h>
+
 #include "internal/xgl_size_class_allocator.h"
 
 #include "xgl_instance_internal.h"
@@ -40,5 +42,23 @@ typedef struct {
     xgl_pool_t runtime_pools[XGL_RESOURCE_COUNT];
     xgl_allocator_t runtime_services[XGL_RESOURCE_COUNT];
 } xgl_workspace_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * \brief           Bind workspace resources before the protocol layers start
+ * \note            NULL storage selects an owned workspace using allocator.
+ *                  Returning before layer startup bounds temporary stack use.
+ */
+xgl_error_t xgl_workspace_prepare_instance(const xgl_config_t* config,
+                                           void* storage, size_t storage_size,
+                                           const xgl_allocator_t* allocator,
+                                           xgl_handle_t* prepared);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* XGL_WORKSPACE_INTERNAL_H */

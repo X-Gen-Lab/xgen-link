@@ -8,6 +8,9 @@
  */
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_runtime.h>
 
 #include <stdalign.h>
 
@@ -68,12 +71,15 @@ static xgl_error_t smoke_receive(uint8_t* data, size_t* length, void* context) {
 }
 
 /** \brief           Check optional APIs with the installed SDK. */
-static int smoke_optional_runtime(const xgl_config_t* config,
+static int smoke_optional_runtime(const xgl_config_t* base,
+                                  const xgl_allocator_t* allocator,
                                   smoke_state_t* state) {
+    xgl_config_t config = *base;
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
+    config.options = &options;
     xgl_handle_t handle = NULL;
     options.version ^= 1U;
-    if (xgl_create_with_options(config, &options, &handle) !=
+    if (xgl_init_allocated(&config, allocator, &handle) !=
             XGL_ERR_INVALID_VERSION ||
         handle != NULL || state->allocations != 2U) {
         return 12;
@@ -81,14 +87,13 @@ static int smoke_optional_runtime(const xgl_config_t* config,
     options.version ^= 1U;
     xgl_memory_report_t report = {0};
 #if XGL_FEATURE_ADVANCED_RUNTIME
-    if (xgl_memory_report_with_options(config, &options, &report) != XGL_OK ||
+    if (xgl_memory_report(&config, &report) != XGL_OK ||
         report.requirements.size == 0U ||
         report.requirements.size > sizeof(state->storage)) {
         return 13;
     }
-    if (xgl_create_with_options(config, &options, &handle) != XGL_OK ||
-        handle == NULL || state->allocations != 3U ||
-        xgl_init(handle) != XGL_OK) {
+    if (xgl_init_allocated(&config, allocator, &handle) != XGL_OK ||
+        handle == NULL || state->allocations != 3U) {
         return 14;
     }
     xgl_resource_snapshot_t snapshot = {0};
@@ -106,9 +111,8 @@ static int smoke_optional_runtime(const xgl_config_t* config,
         return 16;
     }
     handle = NULL;
-    if (xgl_init_static_with_options(config, &options, state->storage,
-                                     report.requirements.size,
-                                     &handle) != XGL_OK ||
+    if (xgl_init_static(&config, state->storage, report.requirements.size,
+                        &handle) != XGL_OK ||
         handle == NULL || state->allocations != 3U) {
         return 17;
     }
@@ -122,9 +126,8 @@ static int smoke_optional_runtime(const xgl_config_t* config,
                ? 19
                : 0;
 #else
-    return xgl_memory_report_with_options(config, &options, &report) !=
-                       XGL_ERR_UNSUPPORTED ||
-                   xgl_create_with_options(config, &options, &handle) !=
+    return xgl_memory_report(&config, &report) != XGL_ERR_UNSUPPORTED ||
+                   xgl_init_allocated(&config, allocator, &handle) !=
                        XGL_ERR_UNSUPPORTED ||
                    handle != NULL || state->allocations != 2U
                ? 20
@@ -139,7 +142,7 @@ int main(void) {
     const xgl_allocator_t allocator = {
         .alloc = smoke_allocate, .free = smoke_release, .ctx = &state};
     xgl_phy_ops_t phy = {smoke_transmit, smoke_receive, &state};
-    xgl_route_item_t route = {2U, &phy, 128U, 100U, 0U};
+    xgl_route_item_t route = {2U, &phy, 128U, 100U};
     xgl_config_t config = {
         .source_id = 1U,
         .memory = {.rx_buffer_size = 128U},
@@ -149,50 +152,45 @@ int main(void) {
                      .max_frame_size = 128U},
         .features = {.max_peers = 1U, .max_tx_packets = 1U},
     };
-    config.memory.allocator = &allocator;
     config.route_table = &route;
     config.route_table_len = 1U;
 
     xgl_handle_t handle = NULL;
-    if (xgl_create_with_error(NULL, &handle) != XGL_ERR_NULL_POINTER ||
+    if (xgl_init_allocated(NULL, &allocator, &handle) != XGL_ERR_NULL_POINTER ||
         handle != NULL || state.allocations != 0U) {
         return 1;
     }
 
     state.fail = true;
-    if (xgl_create_with_error(&config, &handle) != XGL_ERR_NO_MEMORY ||
+    if (xgl_init_allocated(&config, &allocator, &handle) != XGL_ERR_NO_MEMORY ||
         handle != NULL || state.allocations != 1U || state.allocated) {
         return 4;
     }
     state.fail = false;
-    if (xgl_create_with_error(&config, &handle) != XGL_OK || handle == NULL ||
-        state.allocations != 2U || !state.allocated) {
+    if (xgl_init_allocated(&config, &allocator, &handle) != XGL_OK ||
+        handle == NULL || state.allocations != 2U || !state.allocated) {
         return 5;
     }
 
     const xgl_work_budget_t enabled = {128U, 100U};
     const xgl_work_budget_t disabled = {0U, 100U};
     uint32_t delay = 77U;
-    if (xgl_next_timeout_for_work(handle, 0U, &enabled, &delay) ||
-        delay != 77U || xgl_init(handle) != XGL_OK) {
-        return 6;
-    }
-    if (xgl_next_timeout_for_work(handle, 0U, &disabled, &delay) ||
-        delay != 77U || state.reads != 0U) {
+    if (xgl_deadline_query(handle, 0U, &disabled, &delay) || delay != 77U ||
+        state.reads != 0U) {
         return 7;
     }
-    if (!xgl_next_timeout_for_work(handle, 0U, &enabled, &delay) ||
-        delay != 0U || state.reads != 0U ||
-        xgl_step(handle, 10U, &enabled) != XGL_OK || state.reads != 1U) {
+    if (!xgl_deadline_query(handle, 0U, &enabled, &delay) || delay != 0U ||
+        state.reads != 0U || xgl_step(handle, 10U, &enabled) != XGL_OK ||
+        state.reads != 1U) {
         return 8;
     }
-    if (!xgl_next_timeout_for_work(handle, 12U, &enabled, &delay) ||
-        delay != 8U || state.reads != 1U) {
+    if (!xgl_deadline_query(handle, 12U, &enabled, &delay) || delay != 8U ||
+        state.reads != 1U) {
         return 9;
     }
     delay = 77U;
-    if (xgl_next_timeout_for_work(handle, 12U, &disabled, &delay) ||
-        delay != 77U || state.reads != 1U) {
+    if (xgl_deadline_query(handle, 12U, &disabled, &delay) || delay != 77U ||
+        state.reads != 1U) {
         return 10;
     }
 
@@ -201,5 +199,5 @@ int main(void) {
         state.releases != 1U) {
         return 11;
     }
-    return smoke_optional_runtime(&config, &state);
+    return smoke_optional_runtime(&config, &allocator, &state);
 }

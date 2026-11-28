@@ -8,6 +8,7 @@
 
 #include <cstdlib>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
 
 inline const xgl_allocator_t* xgl_test_host_allocator() {
     static const xgl_allocator_t service = {
@@ -17,15 +18,16 @@ inline const xgl_allocator_t* xgl_test_host_allocator() {
 }
 
 /**
- * \brief           Supply host storage without overriding a fault-injection
- * backend.
- * \param[in,out]   config: Fixture-owned configuration that outlives its
+ * \brief           Start a fixture using an explicit host allocation backend.
+ * \param[in]       config: Fixture-owned configuration that outlives the
  * instance.
  */
-inline void xgl_test_use_host_allocator(xgl_config_t* config) {
-    if (config->memory.allocator == nullptr) {
-        config->memory.allocator = xgl_test_host_allocator();
-    }
+inline xgl_handle_t xgl_test_init_allocated(
+    const xgl_config_t* config,
+    const xgl_allocator_t* allocator = xgl_test_host_allocator()) {
+    xgl_handle_t handle = nullptr;
+    (void)xgl_init_allocated(config, allocator, &handle);
+    return handle;
 }
 
 #endif

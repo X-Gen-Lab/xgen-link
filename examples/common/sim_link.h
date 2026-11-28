@@ -36,6 +36,12 @@ typedef struct {
 } sim_port_t;
 
 typedef struct {
+    sim_channel_t channels[2];
+    sim_port_t ports[2];
+    xgl_phy_ops_t phys[2];
+} sim_link_t;
+
+typedef struct {
     xgl_config_t config;
     xgl_route_item_t routes[2];
     xgl_handle_t handle;
@@ -91,6 +97,19 @@ static inline xgl_error_t sim_rx(uint8_t* data, size_t* length, void* context) {
     return XGL_OK;
 }
 
+/** \brief           Connect the endpoints of a zero-initialized simulated link.
+ */
+static inline void sim_connect(sim_link_t* link) {
+    for (size_t endpoint = 0; endpoint < 2U; ++endpoint) {
+        link->ports[endpoint] = (sim_port_t){
+            .input = &link->channels[endpoint],
+            .output = &link->channels[1U - endpoint],
+        };
+        link->phys[endpoint] =
+            (xgl_phy_ops_t){sim_tx, sim_rx, &link->ports[endpoint]};
+    }
+}
+
 /**
  * \brief           Prepare persistent configuration; set routes and callbacks
  * before init
@@ -122,7 +141,11 @@ static inline void sim_prepare(sim_node_t* node, uint16_t id) {
 static inline void sim_route(sim_node_t* node, size_t index, uint16_t target,
                              xgl_phy_ops_t* phy) {
     node->routes[index] = (xgl_route_item_t){
-        target, phy, node->config.protocol.max_frame_size, 1000U, 1U};
+        .target_id = target,
+        .phy = phy,
+        .max_frame_size = node->config.protocol.max_frame_size,
+        .read_freq_hz = 1000U,
+    };
     node->config.route_table_len = index + 1U;
 }
 

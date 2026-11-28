@@ -64,13 +64,6 @@ typedef enum {
     XGL_ERR_CANCELLED = 403,   /**< Explicitly closed pending transmission */
 } xgl_error_t;
 
-/**
- * \brief           Get error string description
- * \param[in]       error: Error code
- * \return          Error description string (never NULL)
- */
-const char* xgl_error_string(xgl_error_t error);
-
 #ifdef __cplusplus
 }
 #endif

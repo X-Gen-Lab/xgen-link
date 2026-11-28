@@ -9,6 +9,7 @@
 
 #include <cstring>
 #include <gtest/gtest.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include "wire/xgl_wire.h"
 #include "xgl/xgl.h"
@@ -71,7 +72,6 @@ TEST(XglTypesTest, ConfigStructure) {
     std::memset(&config, 0, sizeof(config));
 
     /* Set basic fields */
-    config.name = "test";
     config.source_id = 0x1234;
     config.features.max_tx_packets = 4U;
     config.memory.rx_buffer_size = 256;
@@ -81,7 +81,6 @@ TEST(XglTypesTest, ConfigStructure) {
     config.protocol.max_frame_size = 256;
 
     /* Verify fields */
-    EXPECT_STREQ(config.name, "test");
     EXPECT_EQ(config.source_id, 0x1234);
     EXPECT_EQ(config.memory.rx_buffer_size, 256);
     EXPECT_EQ(config.protocol.ack_timeout_ms, 1000);
@@ -194,14 +193,12 @@ TEST(XglTypesTest, RouteTableEntry) {
     route.phy = &phy_ops;
     route.max_frame_size = 512;
     route.read_freq_hz = 1000;
-    route.metric = 10;
 
     /* Verify fields */
     EXPECT_EQ(route.target_id, 0x3456);
     EXPECT_EQ(route.phy, &phy_ops);
     EXPECT_EQ(route.max_frame_size, 512);
     EXPECT_EQ(route.read_freq_hz, 1000);
-    EXPECT_EQ(route.metric, 10);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -233,8 +230,6 @@ TEST(XglTypesTest, PacketUsesProductionAddressAndPacketNumberFields) {
     packet.session_epoch = 0x11223344;
     packet.packet_type = XGL_PACKET_TYPE_DATA;
     packet.flags = XGL_WIRE_FLAG_ACK_ELICITING;
-    packet.ttl = 8;
-    packet.traffic_class = 3;
 
     EXPECT_EQ(packet.source_id, 0x4567);
     EXPECT_EQ(packet.target_id, 0x5678);
@@ -243,8 +238,6 @@ TEST(XglTypesTest, PacketUsesProductionAddressAndPacketNumberFields) {
     EXPECT_EQ(packet.session_epoch, 0x11223344U);
     EXPECT_EQ(packet.packet_type, XGL_PACKET_TYPE_DATA);
     EXPECT_EQ(packet.flags, XGL_WIRE_FLAG_ACK_ELICITING);
-    EXPECT_EQ(packet.ttl, 8U);
-    EXPECT_EQ(packet.traffic_class, 3U);
 }
 
 /*---------------------------------------------------------------------------*/

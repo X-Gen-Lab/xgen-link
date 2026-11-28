@@ -10,6 +10,7 @@
 #include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <gtest/gtest.h>
 
@@ -61,8 +62,8 @@ class XglTransportAdmissionIntegrationTest : public ::testing::Test {
         return XGL_OK;
     }
 
-    static xgl_error_t Accept(xgl_handle_t, uint16_t, uint8_t, const uint8_t*,
-                              size_t, void* context) {
+    static xgl_error_t Accept(xgl_handle_t, const xgl_rx_info_t* /*info*/,
+                              const uint8_t*, size_t, void* context) {
         return static_cast<XglTransportAdmissionIntegrationTest*>(context)
             ->application_admission;
     }
@@ -88,8 +89,8 @@ class XglTransportAdmissionIntegrationTest : public ::testing::Test {
         config.local_id = 2U;
         config.lower_layer = &receiver_endpoint;
         config.stats = &receiver_stats;
-        config.rx_accept_callback = Accept;
-        config.callback_user_data = this;
+        config.rx_callback = Accept;
+        config.rx_user_data = this;
         ASSERT_EQ(xgl_transport_init(&receiver, &config), XGL_OK);
         receiver_initialized = true;
     }

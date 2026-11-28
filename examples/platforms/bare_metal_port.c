@@ -53,6 +53,6 @@ xgl_error_t xgl_bare_metal_poll_example(xgl_handle_t handle) {
         if (error != XGL_OK) {
             return error;
         }
-        /* The board may sleep until RX IRQ or xgl_next_timeout() expires. */
+        /* The board may sleep until RX IRQ or the next protocol deadline. */
     }
 }

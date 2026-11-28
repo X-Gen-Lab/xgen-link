@@ -2,7 +2,7 @@
 # Breathe and adds HTML output to keep the published Doxygen links working.
 PROJECT_NAME           = xgen-link
 OUTPUT_DIRECTORY       = out/reports/doxygen
-INPUT                  = include/xgl/xgl.h include/xgl/xgl_config.h include/xgl/xgl_types.h include/xgl/xgl_error.h
+INPUT                  = include/xgl
 FILE_PATTERNS          = *.h
 RECURSIVE              = NO
 EXTRACT_ALL            = NO

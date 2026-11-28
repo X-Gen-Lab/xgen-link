@@ -7,7 +7,7 @@ source_language: zh_CN
 
 # 错误
 
-`xgl_error_t` 定义公开协议错误。公共入口在出错时返回本表的状态；私有资源操作的失败由相应的协议边界转换。
+`xgl_error_t` 定义公开协议错误。用 `<xgl/xgl_diagnostics.h>` 的 `xgl_error_string()` 查询状态码描述。
 
 ## 处理
 
@@ -17,6 +17,6 @@ source_language: zh_CN
 - `CANCELLED`：显式关闭或 RESET 终止了待发送操作。
 - `UNSUPPORTED`：所选 profile 或 API 路径不提供该能力。
 
-接收接纳回调在接受数据前返回 `BUSY`；transport 不确认无法保留或交付的数据。完成回调不得重入实例。参见 `test/property/test_error_properties.cpp`。
+接收回调在暂时无法接纳数据时返回 `BUSY`。Transport 不确认无法保留或交付的数据。实例回调不得重入实例。参见 `test/property/test_error_properties.cpp`。
 
 错误回调的 `message` 始终非空指针。Boot 关闭 `XGL_FEATURE_DIAGNOSTICS` 时传入空字符串以裁掉详细诊断文本；错误码和回调时机保留，应用应按错误码决策。

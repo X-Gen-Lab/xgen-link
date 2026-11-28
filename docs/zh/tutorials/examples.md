@@ -16,7 +16,7 @@ source_language: zh_CN
 | `multi_node` | 经中间节点路由，需要转发能力 |
 | `boot_update` | 有界块、慢 Flash BUSY 及丢 ACK 恢复 |
 
-示例通过 `xgl::xgl` 使用协议，并提供显式时间和固定应用存储。`boot_update` 另用内部字节和 CRC 辅助函数。公共同步主机 PHY 把帧复制到有界字节队列。
+示例通过 `xgl::xgl` 和公开 SDK 头使用协议，应用负责时间和存储。公共同步主机 PHY 把帧复制到有界字节队列。`boot_update` 在应用内编码块位置并校验镜像 CRC，从公开诊断头读取重传计数。
 
 ## 运行
 

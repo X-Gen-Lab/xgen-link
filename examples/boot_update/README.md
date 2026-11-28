@@ -26,20 +26,23 @@ arrives; the host handles that status without losing the pending block.
 The PHY deliberately drops the first ACK after a block is accepted. The host
 retransmits, transport suppresses duplicate application delivery, and the device
 sends another ACK. The program requires one Flash write per image block, at least one
-BUSY result and retransmission, one dropped ACK, matching image bytes, and a
-matching core CRC16/MODBUS checksum before printing PASS. A successful send means
-submission was accepted, not that Flash has committed it. Protocol failures are
-reported through the error callback and make the final check fail.
+BUSY result, one dropped ACK, matching image bytes and a matching image
+CRC16/MODBUS checksum before printing PASS. Profiles with statistics also check
+the retransmission count through the public diagnostics header. The application
+implements its own block encoding and image checksum. A successful send records
+local admission; a commit notification records Flash completion. Protocol errors
+reported through the error callback make the final check fail.
 
 Build and run the Boot profile as pure C:
 
 ```sh
-cmake -S . -B build/boot-example -G Ninja -DCMAKE_C_COMPILER=gcc   -DXGL_PROFILE=boot -DXGL_BUILD_TESTS=OFF -DXGL_BUILD_EXAMPLES=ON   -DXGL_ALLOW_FALLBACK_MALLOC=OFF -DXGL_BUILD_NOHEAP_SMOKE=ON
+cmake -S . -B build/boot-example -G Ninja -DXGL_PROFILE=boot \
+  -DXGL_BUILD_EXAMPLES=ON -DXGL_ALLOW_FALLBACK_MALLOC=OFF
 cmake --build build/boot-example --target boot_update
 ./build/boot-example/examples/boot_update/boot_update
 ```
 
-The full-profile `gcc-test` build also provides `boot_update`. On Windows append
+The Full `build/examples` configuration also provides `boot_update`. On Windows append
 `.exe`. Its deterministic clock is a caller-supplied `uint32_t` millisecond value;
 no wall-clock service or sleeping is required.
 

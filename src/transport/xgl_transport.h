@@ -13,13 +13,17 @@
 #include "internal/xgl_packet.h"
 #include "internal/xgl_protocol_io.h"
 #include "internal/xgl_protocol_memory.h"
-#include "network/xgl_route.h"
 #include "transport/xgl_reliable.h"
 #include "transport/xgl_rtt.h"
 #include "transport/xgl_window.h"
 #include "xgl/xgl_config.h"
+#include "xgl/xgl_diagnostics.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
+
+#if XGL_FEATURE_ADVANCED_RUNTIME
+#include "xgl/xgl_runtime.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,13 +35,6 @@ extern "C" {
  */
 #define XGL_TRANSPORT_CONTROL_HELLO 0x0E
 #define XGL_TRANSPORT_CONTROL_RESET 0x0F
-
-/**
- * \brief           Application admission callback using borrowed payload bytes
- * \details         XGL_OK transfers delivery responsibility to the application.
- *                  XGL_ERR_BUSY requests a later retry without acknowledging.
- */
-typedef xgl_rx_accept_fn xgl_transport_accept_fn;
 
 /*---------------------------------------------------------------------------*/
 /* Transport Layer Context                                                   */
@@ -112,10 +109,10 @@ typedef struct xgl_transport_ctx_s {
     size_t max_tx_packets;   /**< Global reliable packet capacity */
 #if XGL_FEATURE_OUT_OF_ORDER
     size_t max_rx_buffered_packets; /**< Global out-of-order capacity */
+    uint16_t max_frame_size;        /**< Instance frame limit for buffered RX */
 #endif
     uint32_t current_time_ms;    /**< Caller-provided runtime clock */
     uint32_t default_timeout_ms; /**< Default timeout in milliseconds */
-    uint16_t max_frame_size;     /**< Maximum frame size */
     uint32_t
         peer_idle_timeout_ms; /**< Unused peer reclaim timeout; 0 = disabled */
 
@@ -125,7 +122,6 @@ typedef struct xgl_transport_ctx_s {
 
 #if XGL_FEATURE_ADVANCED_RUNTIME
     uint32_t tx_lifetime_ms;
-    xgl_rx_scoped_fn rx_scoped_callback;
     xgl_scope_event_fn scope_event_callback;
     void* extended_user_data;
     xgl_transport_peer_state_t* maintenance_cursor;
@@ -137,11 +133,10 @@ typedef struct xgl_transport_ctx_s {
         lower_layer; /**< Lower layer interface (network) */
 
     /* Callbacks */
-    xgl_rx_callback_t rx_callback; /**< Receive callback */
-    xgl_transport_accept_fn
-        rx_accept_callback; /**< Optional application admission callback */
+    xgl_rx_scoped_fn rx_callback; /**< Application admission callback */
+    void* rx_user_data;           /**< User data for application admission */
     xgl_error_callback_t error_callback; /**< Error callback */
-    void* callback_user_data;            /**< User data for callbacks */
+    void* callback_user_data; /**< User data for the error callback */
 
     /* Statistics */
 #if XGL_FEATURE_STATISTICS
@@ -168,14 +163,13 @@ typedef struct {
     uint8_t max_retry_count;     /**< Maximum retry count */
     uint32_t default_timeout_ms; /**< Default timeout in milliseconds */
     uint8_t window_size;         /**< Sliding window size */
-    uint16_t max_frame_size;     /**< Maximum frame size */
+    uint16_t max_frame_size;     /**< Instance frame limit for buffered RX */
     xgl_packet_tx_endpoint_t*
-        lower_layer;               /**< Lower layer interface (network) */
-    xgl_rx_callback_t rx_callback; /**< Receive callback (can be NULL) */
-    xgl_transport_accept_fn
-        rx_accept_callback; /**< Overrides rx_callback; borrowed input */
+        lower_layer;              /**< Lower layer interface (network) */
+    xgl_rx_scoped_fn rx_callback; /**< Optional application admission */
+    void* rx_user_data;           /**< User data for application admission */
     xgl_error_callback_t error_callback; /**< Error callback (can be NULL) */
-    void* callback_user_data; /**< User data for callbacks (can be NULL) */
+    void* callback_user_data; /**< User data for the error callback */
     xgl_layer_stats_t* stats; /**< Layer statistics pointer */
     uint64_t* tx_retries; /**< Retransmission counter pointer (can be NULL) */
     const xgl_allocator_t* allocator; /**< Required allocator service */
@@ -188,7 +182,6 @@ typedef struct {
     size_t max_rx_buffered_packets; /**< Explicit global capacity */
 #if XGL_FEATURE_ADVANCED_RUNTIME
     uint32_t tx_lifetime_ms; /**< Zero leaves the TX busy period unlimited */
-    xgl_rx_scoped_fn rx_scoped_callback;
     xgl_scope_event_fn scope_event_callback;
     void* extended_user_data;
 #endif
