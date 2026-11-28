@@ -2,6 +2,9 @@
  * \file            test_instance.cpp
  * \brief           Unit tests for protocol instance management
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -727,13 +730,13 @@ TEST_F(XglInstanceTest, WorkspaceBackendFailureAndInitializationIsolation) {
     xgl_allocator_t service = {
         &state,
         [](void* ctx, size_t size) -> void* {
-            auto* state = static_cast<FailureAllocator*>(ctx);
-            if (++state->calls == state->fail_at) {
+            auto* allocator = static_cast<FailureAllocator*>(ctx);
+            if (++allocator->calls == allocator->fail_at) {
                 return nullptr;
             }
             void* result = std::malloc(size);
             if (result != nullptr) {
-                ++state->live;
+                ++allocator->live;
             }
             return result;
         },

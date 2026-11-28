@@ -1,9 +1,13 @@
-#include "test_host_allocator.h"
 /**
  * \file            test_network_properties.cpp
  * \brief           Network layer property tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
+
+#include "test_host_allocator.h"
 
 #include <internal/xgl_packet.h>
 #include <network/xgl_network.h>
@@ -55,16 +59,16 @@ static xgl_phy_ops_t create_mock_phy() {
 /**
  * \brief           Test callback for error handling
  */
-static bool error_callback_invoked = false;
-static xgl_error_t last_error_code = XGL_OK;
+static bool s_error_callback_invoked = false;
+static xgl_error_t s_last_error_code = XGL_OK;
 
 static void test_error_callback(xgl_handle_t handle, xgl_error_t error,
                                 const char* message, void* user_data) {
     (void)handle;
     (void)message;
     (void)user_data;
-    error_callback_invoked = true;
-    last_error_code = error;
+    s_error_callback_invoked = true;
+    s_last_error_code = error;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -214,11 +218,11 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
             << (int)missing_target_id << " at iteration " << iteration;
 
         /* Test network layer error reporting */
-        xgl_layer_stats_t stats = {0};
+        xgl_layer_stats_t stats = {};
         xgl_network_ctx_t ctx;
 
-        error_callback_invoked = false;
-        last_error_code = XGL_OK;
+        s_error_callback_invoked = false;
+        s_last_error_code = XGL_OK;
 
         xgl_network_config_t config = {};
         config.local_id = 1;
@@ -243,12 +247,12 @@ TEST(XglNetworkProperties, RouteNotFoundHandling) {
         EXPECT_EQ(stats.tx_errors, 1U);
 
         /* Verify error callback was invoked */
-        EXPECT_TRUE(error_callback_invoked)
+        EXPECT_TRUE(s_error_callback_invoked)
             << "Error callback should be invoked for missing route at "
                "iteration "
             << iteration;
 
-        EXPECT_EQ(last_error_code, XGL_ERR_ROUTE_NOT_FOUND)
+        EXPECT_EQ(s_last_error_code, XGL_ERR_ROUTE_NOT_FOUND)
             << "Error callback should receive XGL_ERR_ROUTE_NOT_FOUND at "
                "iteration "
             << iteration;
@@ -284,7 +288,7 @@ TEST(XglNetworkProperties, PacketForwardingToSelf) {
             XGL_OK);
 
         /* Create network context */
-        xgl_layer_stats_t stats = {0};
+        xgl_layer_stats_t stats = {};
         xgl_network_ctx_t ctx;
 
         xgl_network_config_t config = {};

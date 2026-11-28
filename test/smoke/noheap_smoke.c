@@ -1,3 +1,12 @@
+/**
+ * \file            noheap_smoke.c
+ * \brief           Exercise the public runtime with libc fallback disabled
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-07
+ * \copyright       Copyright (c) 2026 X-Gen Lab
+ */
+
 #include <xgl/xgl.h>
 
 #include <internal/xgl_allocator.h>
@@ -27,13 +36,13 @@ static void smoke_free(void* ctx, void* ptr) {
     (void)ptr;
 }
 
-static unsigned transmitted;
+static unsigned s_transmitted;
 
 static xgl_error_t smoke_tx(const uint8_t* data, size_t len, void* ctx) {
     (void)ctx;
     if (data == NULL || len < XGL_FRAME_HEADER_SIZE)
         return XGL_ERR_INVALID_FRAME;
-    ++transmitted;
+    ++s_transmitted;
     return XGL_OK;
 }
 
@@ -71,7 +80,7 @@ static int smoke_instance(void) {
     tx.data_len = sizeof(payload);
     tx.reliable = true;
     int result =
-        xgl_send_at(handle, &tx, 0U) == XGL_OK && transmitted != 0U ? 0 : 12;
+        xgl_send_at(handle, &tx, 0U) == XGL_OK && s_transmitted != 0U ? 0 : 12;
     const xgl_work_budget_t budget = {128U, 1000U};
     (void)xgl_step(handle, 0U, &budget);
     xgl_destroy(handle);

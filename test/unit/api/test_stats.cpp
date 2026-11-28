@@ -2,6 +2,9 @@
  * \file            test_stats.cpp
  * \brief           Unit tests for statistics API
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -45,7 +48,7 @@ xgl_error_t statistics_accept(xgl_handle_t, uint16_t source_id, uint8_t,
     return XGL_OK;
 }
 
-}  // namespace
+} /* namespace */
 
 TEST(XglStatisticsBehavior,
      ReportsAcceptedAckSamplesAndResetKeepsReservations) {

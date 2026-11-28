@@ -1,0 +1,100 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 40b8dea02ec79fb81931963498800a364c1b09cf040c9aa40b392299d601a936\n"
+
+#: docs/zh/guides/build-and-consume.md:8
+msgid "构建与消费"
+msgstr "Build and consume"
+
+#: docs/zh/guides/build-and-consume.md:10
+msgid "生产库由 C11 编译器和 CMake 3.24 或以上构建。从 xgen-link 仓库根目录执行下列命令。默认构建只生成静态库和匹配的配置头。"
+msgstr ""
+"Build the production library with a C11 compiler and CMake 3.24 or later. Run these commands from the "
+"xgen-link repository root. The default build produces the static library and matching configuration "
+"header."
+
+#: docs/zh/guides/build-and-consume.md:18
+msgid ""
+"检查安装前缀中的公开头、静态库和 `xglConfig.cmake`。保留库与同一产物的生成头。不同编译器、目标 ABI、profile 或资源组合使用独立构建目录和前缀。多配置生成器按同一个 "
+"`--config` 构建和安装，Debug 与 Release 分别安装到各自前缀。"
+msgstr ""
+"Inspect the install prefix for the public headers, the static library and `xglConfig.cmake`. Use the "
+"generated header and library from the same build. Use separate build directories and prefixes for "
+"different compilers, target ABIs, profiles or resource selections. With a multi-config generator, use "
+"the same `--config` for build and install. Install Debug and Release into separate prefixes."
+
+#: docs/zh/guides/build-and-consume.md:20
+msgid "CMake 消费"
+msgstr "CMake consumption"
+
+#: docs/zh/guides/build-and-consume.md:22
+msgid ""
+"从源代码装配时，父工程先确定工具链和所需的 [编译档位](../reference/profiles.md)，再调用 `add_subdirectory(path/to/xgen-"
+"link)`。安装消费使用以下入口。两种入口均提供 `xgl::xgl`。"
+msgstr ""
+"For source composition, the parent selects the toolchain and [build profile](../reference/profiles.md), "
+"then calls `add_subdirectory(path/to/xgen-link)`. Use the following entry for an installed SDK. Both "
+"entries provide `xgl::xgl`."
+
+#: docs/zh/guides/build-and-consume.md:29
+msgid ""
+"在消费工程配置时通过 `CMAKE_PREFIX_PATH` 指定 SDK 前缀。安装包按编译能力选择 `COMPONENTS`，其中 `wire` 和 `reliable` "
+"适用于所有档位。成功配置后再编译并运行实际消费者。"
+msgstr ""
+"Set `CMAKE_PREFIX_PATH` to the SDK install prefix when configuring the consumer. Installed packages "
+"accept `COMPONENTS` for compiled capabilities. All profiles support `wire` and `reliable`. Compile and "
+"run the actual consumer after it configures successfully."
+
+#: docs/zh/guides/build-and-consume.md:31
+msgid "同一 CMake 作用域可重复查找已经绑定的 SDK 前缀。需要切换前缀时使用新的消费者构建目录，确保 `xgl::xgl` 的归档和头文件都来自本次选择的 SDK。"
+msgstr ""
+"Repeat a lookup in the same CMake scope using the already bound SDK prefix. To switch prefixes, "
+"configure a fresh consumer build so the archive and headers of `xgl::xgl` both come from the selected "
+"SDK."
+
+#: docs/zh/guides/build-and-consume.md:33
+msgid "编译资源选项"
+msgstr "Compiled resource options"
+
+#: docs/zh/guides/build-and-consume.md:35
+msgid "裸机 Boot 示例配置使用 `cmake --preset boot`，生成器为 Ninja。若同一镜像需要固定 RTO 和编译窗口 1，使用独立构建目录并显式选择资源："
+msgstr ""
+"The bare-metal Boot example configuration uses `cmake --preset boot` with Ninja. For a compiled capacity"
+" of one window slot and fixed RTO, choose the resources explicitly in a separate build directory:"
+
+#: docs/zh/guides/build-and-consume.md:44
+msgid "资源身份及窗口、可靠索引桶、帧长上限、读取块和扩展运行时选项见[编译档位](../reference/profiles.md)。目标板还需选定实际交叉工具链及应用容量。"
+msgstr ""
+"See [Build profiles](../reference/profiles.md) for the resource identity and window, reliable index, "
+"frame ceiling, read chunk and advanced runtime options. For real hardware, also select the cross "
+"compiler and the application capacities."
+
+#: docs/zh/guides/build-and-consume.md:46
+msgid "主机验证"
+msgstr "Host validation"
+
+#: docs/zh/guides/build-and-consume.md:48
+msgid ""
+"显式准备包含 GoogleMock 的 GoogleTest 1.16.0。`prepare` 输出与当前编译器相符的 `GTest_DIR` 路径，配置消费已安装包。也可提供同版本、同工具链的独立安装。"
+msgstr ""
+"Explicitly prepare GoogleTest 1.16.0 with GoogleMock. The prepare step prints the `GTest_DIR` path for "
+"the current compiler, and configuration uses that installed package. An independent installation is also"
+" supported when its version and toolchain match."
+
+#: docs/zh/guides/build-and-consume.md:57
+msgid ""
+"使用 `boot-host-test`、`embedded-lite-host-test` 或 `embedded-host-test` 验证对应能力。C11 "
+"示例、无堆检查、文档及发布验证各自显式开启。完整验证流程见[开发工作流](../development/workflow.md)。"
+msgstr ""
+"Use `boot-host-test`, `embedded-lite-host-test` or `embedded-host-test` for the corresponding "
+"capabilities. C11 examples, no-heap checks, documentation and release validation each require explicit "
+"selection. See the [development workflow](../development/workflow.md) for the complete verification "
+"path."

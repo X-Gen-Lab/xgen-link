@@ -3,6 +3,9 @@
  * \brief           Host CPU throughput for completed simulated application
  * deliveries
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-07-10
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <chrono>
 #include <cstdio>
@@ -13,9 +16,6 @@
 /**
  * \brief           Measure complete unreliable exchanges with an explicit
  * logical clock
- * \param[in]       payload_size: Application payload bytes
- * \param[in]       iterations: Number of delivered packets
- * \return          True when every exchange completed
  */
 static bool run_throughput_benchmark(size_t payload_size, int iterations) {
     xgl_config_t config = XGL_CONFIG_PRESET_TINY;
@@ -37,11 +37,13 @@ static bool run_throughput_benchmark(size_t payload_size, int iterations) {
                        std::chrono::steady_clock::now() - start)
                        .count();
     const double packets_per_second =
-        elapsed > 0 ? static_cast<double>(iterations) * 1000000.0 / elapsed
+        elapsed > 0 ? static_cast<double>(iterations) * 1000000.0 /
+                          static_cast<double>(elapsed)
                     : 0.0;
     std::printf("%zu,%d,%lld,%.0f,%.1f\n", payload_size, iterations,
                 static_cast<long long>(elapsed), packets_per_second,
-                packets_per_second * payload_size * 8.0 / 1000.0);
+                packets_per_second * static_cast<double>(payload_size) * 8.0 /
+                    1000.0);
     return true;
 }
 

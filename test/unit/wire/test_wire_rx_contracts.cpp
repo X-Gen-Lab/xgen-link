@@ -1,6 +1,10 @@
 /**
  * \file            test_wire_rx_contracts.cpp
  * \brief           Complete-frame failure and stream validation contracts
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>
@@ -25,7 +29,9 @@ std::vector<uint8_t> make_frame(const std::vector<uint8_t>& extensions = {}) {
     header.packet_type = XGL_PACKET_TYPE_DATA;
     header.flags = XGL_WIRE_FLAG_ACK_ELICITING;
     header.traffic_class = XGL_RELIABILITY_ACK_ELICITING;
-    header.flags |= extensions.empty() ? 0U : XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    if (!extensions.empty()) {
+        header.flags |= XGL_WIRE_FLAG_HAS_EXTENSIONS;
+    }
     header.source_id = 0x1234U;
     header.target_id = 0x5678U;
     header.connection_id = 9U;
@@ -53,7 +59,7 @@ void expect_cleared_failure(const uint8_t* bytes, size_t size) {
     EXPECT_EQ(std::memcmp(&view, cleared.data(), cleared.size()), 0);
 }
 
-}  // namespace
+} /* namespace */
 
 TEST(XglWireRxContractTest,
      HeaderEncodingOverwritesEveryByteAndPreservesOutsideSentinels) {

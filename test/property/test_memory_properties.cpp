@@ -2,6 +2,9 @@
  * \file            test_memory_properties.cpp
  * \brief           Memory management property tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -20,7 +23,6 @@
 
 using ::testing::_;
 using ::testing::AtLeast;
-using ::testing::Invoke;
 using ::testing::Return;
 
 static uint8_t random_valid_source_id(PropertyTestGenerator& gen) {
@@ -164,12 +166,11 @@ TEST(XglMemoryProperties, CustomAllocatorUsage) {
          * allocator */
         EXPECT_CALL(mock_alloc, malloc_impl(_))
             .Times(AtLeast(1))
-            .WillRepeatedly(
-                Invoke([](size_t size) -> void* { return std::malloc(size); }));
+            .WillRepeatedly([](size_t size) { return std::malloc(size); });
 
         EXPECT_CALL(mock_alloc, free_impl(_))
             .Times(AtLeast(1))
-            .WillRepeatedly(Invoke([](void* ptr) { std::free(ptr); }));
+            .WillRepeatedly([](void* ptr) { std::free(ptr); });
 
         /* Create configuration with custom allocator */
         xgl_config_t config;
@@ -234,12 +235,13 @@ TEST(XglMemoryProperties, MemoryLeakPrevention) {
         MockAllocator mock_alloc;
 
         /* Setup expectations: track all allocations and frees */
-        EXPECT_CALL(mock_alloc, malloc_impl(_))
-            .WillRepeatedly(
-                Invoke([](size_t size) -> void* { return std::malloc(size); }));
+        EXPECT_CALL(mock_alloc, malloc_impl(_)).WillRepeatedly([](size_t size) {
+            return std::malloc(size);
+        });
 
-        EXPECT_CALL(mock_alloc, free_impl(_))
-            .WillRepeatedly(Invoke([](void* ptr) { std::free(ptr); }));
+        EXPECT_CALL(mock_alloc, free_impl(_)).WillRepeatedly([](void* ptr) {
+            std::free(ptr);
+        });
 
         /* Generate random configuration */
         xgl_config_t config;
@@ -311,20 +313,19 @@ TEST(XglMemoryProperties, AllocationFailureHandling) {
         /* Setup expectations: fail allocation after N successful allocations */
         EXPECT_CALL(mock_alloc, malloc_impl(_))
             .WillRepeatedly(
-                Invoke([&alloc_count, fail_after_count](size_t size) -> void* {
+                [&alloc_count, fail_after_count](size_t size) -> void* {
                     if (alloc_count >= fail_after_count) {
                         return nullptr; /* Simulate allocation failure */
                     }
                     alloc_count++;
                     return std::malloc(size);
-                }));
+                });
 
-        EXPECT_CALL(mock_alloc, free_impl(_))
-            .WillRepeatedly(Invoke([](void* ptr) {
-                if (ptr != nullptr) {
-                    std::free(ptr);
-                }
-            }));
+        EXPECT_CALL(mock_alloc, free_impl(_)).WillRepeatedly([](void* ptr) {
+            if (ptr != nullptr) {
+                std::free(ptr);
+            }
+        });
 
         /* Create configuration */
         xgl_config_t config;
@@ -394,7 +395,6 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
 
         /* Setup route table */
         xgl_route_item_t route = {};
-        route.target_id = 1;
         route.phy = &phy;
         route.max_frame_size = 96;
         route.read_freq_hz = 100;
@@ -405,6 +405,8 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
         xgl_config_get_preset_tiny(
             &config); /* Use tiny preset for minimal pool */
         config.source_id = random_valid_source_id(gen);
+        /* The route must remain remote for every replay seed. */
+        route.target_id = config.source_id == 1U ? 2U : 1U;
         config.protocol.max_frame_size = 96;
         config.memory.rx_buffer_size = config.protocol.max_frame_size;
         config.route_table = &route;
@@ -438,8 +440,7 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
         /* Attempt to send many packets to the configured route */
         for (int i = 0; i < 200; ++i) { /* Many packets to stress memory */
             xgl_tx_data_t tx_data = {};
-            tx_data.target_id = 1;
-            /* Use configured route */
+            tx_data.target_id = route.target_id;
             tx_data.data_type = gen.random_uint8();
             tx_data.data = test_data.data();
             tx_data.data_len = test_data.size();

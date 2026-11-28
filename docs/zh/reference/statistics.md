@@ -1,3 +1,10 @@
+---
+id: reference/statistics
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 统计
 
 `xgl_statistics_t` 分别记录 datalink、network、transport 计数器，以及重传、CRC 错误和 RTT 指标。

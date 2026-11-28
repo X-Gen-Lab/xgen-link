@@ -1,0 +1,213 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 7db0716e20d4ab440d9319ff8b899d21d47318464f21f2c7655273a48a914c55\n"
+
+#: docs/zh/reference/protocol/v1/reliability.md:8
+msgid "可靠传输"
+msgstr "Reliability"
+
+#: docs/zh/reference/protocol/v1/reliability.md:10
+msgid ""
+"每个 peer 独占一个 TX 窗口、可靠队列和 RX 排序状态；启用自适应 RTO 时还拥有 RTT 估计器。唯一键为 `(remote_id, connection_id, "
+"session_epoch)`，没有实例级回退窗口，也没有独立的 PHY 直接重传通道。"
+msgstr ""
+"One peer owns one TX window, one reliable queue and one RX ordering state, plus an RTT estimator when "
+"adaptive RTO is enabled. The sole key is `(remote_id, connection_id, session_epoch)`. There is no "
+"instance-global fallback window or separate PHY retransmission engine."
+
+#: docs/zh/reference/protocol/v1/reliability.md:12
+msgid "发送生命周期"
+msgstr "Transmit Lifecycle"
+
+#: docs/zh/reference/protocol/v1/reliability.md:14
+msgid ""
+"可靠 DATA 在提交前复制。接纳失败不会消耗包号。下层首次发送成功后，将保留的包标记为已发送，时间戳零也是合法值，然后推进 DATA 包号。ACK 完成释放队列记录，只推进所属 peer 的窗口。"
+msgstr ""
+"Reliable DATA is copied before submission. Failed admission does not consume its packet number. A "
+"successful first lower-layer send marks the retained packet sent, including at timestamp zero, then "
+"advances the DATA number. ACK completion frees the queue record and advances only the owning window."
+
+#: docs/zh/reference/protocol/v1/reliability.md:16
+msgid ""
+"首次发送 HELLO 前，Transport 与 Network 检查 DATA 和 HELLO 的完整帧大小、scope 状态、编号空间、窗口和全局 TX 容量，并预留可靠记录与载荷。须认证时，预检确认精确"
+" scope 有两个可用安全序号。预检不消耗序号。本地接纳失败时不发送 HELLO。HELLO 成功并不保证 DATA 已到达远端，接收端仍需要未使用预约的有界生命周期。"
+msgstr ""
+"Before sending the first HELLO, Transport and Network check the complete DATA and HELLO frame sizes, "
+"scope state, number space, window and global TX capacity, then reserve the reliable record and payload. "
+"If authentication is required, preflight checks that the exact scope has two available security "
+"sequences without consuming them. A local admission failure sends no HELLO. A successful HELLO does not "
+"guarantee DATA has reached the receiver, so unused receive reservations still need a bounded lifetime."
+
+#: docs/zh/reference/protocol/v1/reliability.md:18
+msgid ""
+"初始 ACK 超时优先使用请求中非零的 `timeout_ms`。没有单次覆盖时，已有有效 RTT 样本的 peer 使用估算 RTO；尚无样本时使用配置的 "
+"`protocol.ack_timeout_ms`。RTT 先用宽位中间值计算，再限制结果范围，包含合法 32 位毫秒样本的最大值。"
+msgstr ""
+"The initial ACK timeout uses the request's nonzero `timeout_ms` override first. Without an override, a "
+"peer with an accepted RTT sample uses its estimated RTO; a peer without samples uses the configured "
+"`protocol.ack_timeout_ms`. RTT arithmetic uses a wide intermediate before clamping, including the "
+"largest accepted 32-bit millisecond sample."
+
+#: docs/zh/reference/protocol/v1/reliability.md:20
+msgid ""
+"构建时选择 `XGL_ENABLE_ADAPTIVE_RTO=OFF` 后，peer 不保存 RTT 估计器，ACK 不采集 RTT 样本；没有单次覆盖时始终使用配置的 ACK 超时。单次 "
+"`timeout_ms` 覆盖、重试次数和指数退避仍生效。该选项只改变超时选择，不改变 ACK/SACK 或 wire 格式；编译资源与 SDK "
+"身份见[构建与测试](../../../guides/build-and-consume.md)。"
+msgstr ""
+"With the compiled option `XGL_ENABLE_ADAPTIVE_RTO=OFF`, peers retain no RTT estimator and ACKs collect "
+"no RTT samples. Without a request override, the configured ACK timeout remains effective. Request "
+"`timeout_ms` overrides, retry limits and exponential backoff still apply. This changes timeout selection"
+" without changing ACK/SACK or the wire format. See [build and test](../../../guides/build-and-"
+"consume.md#compiled-resource-options) for compiled resources and SDK identities."
+
+#: docs/zh/reference/protocol/v1/reliability.md:22
+msgid ""
+"超时重传与 SACK 重传使用同一 transport 过程，再次经过 network 和 datalink。DATA 包号和载荷保持不变，认证获得新的安全序号。暂时 BUSY 或 NO_MEMORY "
+"会保留已接纳字节，并安排正的重试延迟：默认超时限制到 1–100 ms。重传成功更新时间戳、次数和指数退避，退避上限为 30000 ms。下层硬错误或次数耗尽使整个 peer 失败，并报告一次。"
+msgstr ""
+"Timeout and SACK retries use the same transport routine and pass through network and datalink again. "
+"DATA number and payload remain stable; authentication obtains a fresh sequence. Temporary BUSY or "
+"NO_MEMORY retains accepted bytes and schedules a positive delay of the configured default timeout "
+"clamped to 1–100 ms. Successful retries update timestamp, retry count and exponential backoff, capped at"
+" 30000 ms. A hard lower-layer failure or exhausted retry count fails the entire peer and reports once."
+
+#: docs/zh/reference/protocol/v1/reliability.md:24
+msgid ""
+"ACK 处理负责校验反馈并释放已确认记录。SACK 只标记允许快重传的缺口，不在接收调用链中递归发送 DATA。同一次或后续 `xgl_step()` 的 transport 维护阶段执行重传。ACK "
+"释放的槽可供应用提交后续 DATA。可执行工作参与 `xgl_next_timeout()`；已安排的本地容量重试仍保持正延迟。"
+msgstr ""
+"ACK handling validates feedback and releases acknowledged records. SACK only marks eligible gaps for "
+"fast retransmission; it does not transmit DATA recursively from the receive path. Transport maintenance "
+"in the same or a later `xgl_step()` performs retries. Ready work participates in `xgl_next_timeout()`; a"
+" retained local-capacity retry keeps its positive delay."
+
+#: docs/zh/reference/protocol/v1/reliability.md:26
+msgid ""
+"SACK 只为尚未成功重传的待确认包请求快重传。一旦任意重传成功，该记录后续恢复由 RTO 驱动，重复反馈不会消耗剩余重试预算；新反馈仍可调度其他尚未重传的缺口。BUSY "
+"不消耗次数。每次成功重传都在提交点更新聚合计数，即使后续缺口遇到失败或背压，也不遗漏已完成的重传。"
+msgstr ""
+"SACK can request fast retransmission only before an outstanding packet has been successfully "
+"retransmitted. Once any retry succeeds, later recovery for that record uses its RTO. Duplicate feedback "
+"therefore cannot consume the remaining retry budget; newly reported gaps can still schedule other "
+"original transmissions. BUSY does not consume a retry. Each successful retry updates the aggregate "
+"counter at the send commit point, even when a later gap encounters failure or backpressure."
+
+#: docs/zh/reference/protocol/v1/reliability.md:28
+msgid "接收与确认"
+msgstr "Receive and Acknowledgement"
+
+#: docs/zh/reference/protocol/v1/reliability.md:30
+msgid ""
+"顺序 DATA 只有在应用接纳或 transport 已持有数据后才确认。应用返回 BUSY 时，尚未保留的顺序包不确认。乱序包复制成功后才能 "
+"SACK；一旦持有，临时应用背压不会丢弃它。重复包不再次交付。重传过的包不用于 RTT 采样。"
+msgstr ""
+"The receiver acknowledges in-order DATA after application acceptance. An application BUSY response "
+"leaves an unretained in-order packet unacknowledged. Out-of-order packets are SACKed only after a "
+"successful copy; once retained, they survive temporary application backpressure. Duplicates are not "
+"delivered again. RTT samples exclude retransmitted packets."
+
+#: docs/zh/reference/protocol/v1/reliability.md:32
+msgid ""
+"本地 transport 只接纳 DATA、ACK 和 CONTROL 报文类型。可靠广播在 peer 接纳前拒绝，不能消耗单播 scope 的接收编号。可靠 DATA 的 `UINT32_MAX` "
+"为保留编号，在缓存或确认前拒绝。耗尽的 scope 不会将接收历史回绕到零。"
+msgstr ""
+"Local transport admits only DATA, ACK and CONTROL packet types. Reliable broadcast is rejected before "
+"peer admission; it cannot consume a unicast scope's receive numbers. Reliable DATA number `UINT32_MAX` "
+"is reserved and rejected before caching or acknowledgement. An exhausted scope never wraps its receive "
+"history to zero."
+
+#: docs/zh/reference/protocol/v1/reliability.md:34
+msgid "ACK 或 SACK 发送失败会返回错误，但不回滚已接纳的载荷、接收编号或保留字节。连续的自有缓存仍继续处理，并保留首个错误。对已接纳 DATA 的重传可以再次 ACK，不会重复交付应用。"
+msgstr ""
+"An ACK or SACK transmission failure is returned without undoing accepted payloads, receive numbers or "
+"retained bytes. Contiguous owned packets are still processed, retaining the first error. Retransmitted "
+"accepted DATA can receive another ACK without duplicate application delivery."
+
+#: docs/zh/reference/protocol/v1/reliability.md:36
+msgid ""
+"首包拒绝不提交可靠 RX 历史。如果本次接收创建了新 peer，但没有接纳数据且未使 scope 失败，立即归还其预留槽，关闭空闲回收时也一样。已有 peer、已接纳或保留数据的 "
+"scope，以及失败身份均保留。该回滚不得清除已确认历史或认证重放状态。"
+msgstr ""
+"A rejected first packet does not commit reliable RX history. If processing created a new peer but "
+"admitted no data and did not fail the scope, its reservation is returned immediately, including when "
+"idle reclamation is disabled. Existing peers and scopes with accepted, retained or failed state are "
+"preserved. This rollback must never erase acknowledged history or authentication replay state."
+
+#: docs/zh/reference/protocol/v1/reliability.md:38
+msgid "ACK 精确匹配 scope，先校验完整 TLV 流和确认范围，再修改状态；不能完成未发送或未来的包。重复有效 ACK 幂等。ACK 帧头包号不表示确认目标。"
+msgstr ""
+"ACKs match the exact scope, validate the complete TLV stream and acknowledgement claims before mutation,"
+" and cannot complete unsent or future packets. Repeated valid ACKs are idempotent. Header packet number "
+"is never an ACK target."
+
+#: docs/zh/reference/protocol/v1/reliability.md:40
+msgid "失败与恢复"
+msgstr "Failure and Recovery"
+
+#: docs/zh/reference/protocol/v1/reliability.md:42
+msgid ""
+"HELLO 确保 peer 存在，不重置已有状态。仅由 HELLO 预留且仍未使用的空 peer 有独立的 5000 ms 租期，从首次接收时刻开始，重复 HELLO 不续期。租期参与 "
+"`xgl_next_timeout()`；到期后，调用方提供显式时间的 transport 维护会回收空预约，即使 "
+"`peer_idle_timeout_ms=0`。普通空闲回收期限更早时可提前回收。已使用可靠编号、已失败或仍拥有数据的 scope 不因 HELLO 租期回收。"
+msgstr ""
+"HELLO ensures a peer without resetting existing state. An empty, unused peer reserved by HELLO has an "
+"independent 5000 ms lease starting at its first reception. Duplicate HELLO does not renew it. The lease "
+"participates in `xgl_next_timeout()`; transport maintenance with caller-supplied explicit time reclaims "
+"an expired empty reservation even when `peer_idle_timeout_ms=0`. An earlier ordinary idle deadline can "
+"reclaim it sooner. Reliable numbering history, failure state or owned data prevents HELLO lease "
+"reclamation."
+
+#: docs/zh/reference/protocol/v1/reliability.md:44
+msgid "RESET 只作用于已存在的精确 scope；首次将其终止并报告取消，重复请求不产生额外状态转换或错误回调。未知 RESET 不分配 peer。"
+msgstr ""
+"RESET only targets an existing exact scope; its first effect is terminal cancellation, with repeated "
+"requests producing no extra transition or error callback. Unknown RESET does not allocate a peer."
+
+#: docs/zh/reference/protocol/v1/reliability.md:46
+msgid ""
+"失败的可靠 scope 不能继续接纳新的可靠工作。`xgl_close_peer` 释放未认证 scope；如仍有已接纳工作，则报告一次 CANCELLED。认证模式关闭 security "
+"session，同时退休 transport 所有权，但保留 nonce 域的关闭记录。重新连接必须建立新 epoch。无认证模式要求调用方排空旧链路数据；仅选择 epoch 不构成安全机制。"
+msgstr ""
+"Failed reliable scopes cannot accept new reliable work. `xgl_close_peer` releases an unauthenticated "
+"scope and reports CANCELLED once if accepted work remains. With authentication, close the security "
+"session, which also retires transport ownership while retaining the nonce-domain tombstone. Establish a "
+"new epoch before reconnecting. Without authentication, the caller must drain old link traffic; epoch "
+"selection alone is not a security mechanism."
+
+#: docs/zh/reference/protocol/v1/reliability.md:48
+msgid ""
+"Transport 维护优先返回首个硬错误，同时继续维护其他 scope；没有硬错误时，返回首个即时反馈失败。重试已持有工作时遇到 BUSY 或 "
+"NO_MEMORY，会保留工作，视为正常维护背压；这不隐藏即时接收接纳或 ACK 提交错误。缓存已交付后的 ACK BUSY/NO_MEMORY 不属于仍持有数据的背压，维护会返回该错误。维护重投已缓存的 "
+"DATA 时，应用硬错误使所属 scope 失败并释放缓存。"
+msgstr ""
+"Transport maintenance prioritizes its first hard error while continuing other scopes; without a hard "
+"error, it returns the first immediate feedback failure. BUSY or NO_MEMORY encountered while retrying "
+"already-owned work retains that work and is normal maintenance backpressure. This does not hide an "
+"immediate receive admission or ACK submission error. ACK BUSY/NO_MEMORY after a buffered packet has been"
+" delivered is not retained-data backpressure and is returned by maintenance. A retained out-of-order "
+"packet whose application callback later returns a hard error fails its scope, releases owned bytes and "
+"reports once."
+
+#: docs/zh/reference/protocol/v1/reliability.md:50
+msgid "Scope 任一方向使用过可靠编号后，空闲时间不能回收其历史。仅未使用且无保留数据的 peer 可以自动回收，已使用 scope 必须显式 close。"
+msgstr ""
+"Once a scope has used TX or RX reliable numbering, idle time never reclaims its history. Only unused, "
+"empty peers may be reclaimed automatically; used scopes require explicit close."
+
+#: docs/zh/reference/protocol/v1/reliability.md:52
+msgid ""
+"验证依据：`test/unit/transport/test_reliable.cpp`、`test/unit/transport/test_reliable_owned.cpp`、`test/unit/transport/test_transport.cpp`、`test/unit/transport/test_transport_rx_contracts.cpp`、`test/unit/transport/test_transport_runtime_contracts.cpp`、`test/unit/transport/test_transport_fixed_rto.cpp`"
+" 与 `test/integration/test_transport_admission.cpp`。"
+msgstr ""
+"Verification: `test/unit/transport/test_reliable.cpp`, `test/unit/transport/test_reliable_owned.cpp`, "
+"`test/unit/transport/test_transport.cpp`, `test/unit/transport/test_transport_rx_contracts.cpp`, "
+"`test/unit/transport/test_transport_runtime_contracts.cpp`, "
+"`test/unit/transport/test_transport_fixed_rto.cpp` and `test/integration/test_transport_admission.cpp`."

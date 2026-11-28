@@ -1,10 +1,15 @@
 /**
  * \file            test_extended_options.cpp
  * \brief           Versioned optional runtime policy
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <vector>
@@ -67,7 +72,8 @@ class XglBoundedPollingTest : public ::testing::Test {
             if (*length != 0U) {
                 std::memcpy(bytes, self.input.data(), *length);
                 self.input.erase(self.input.begin(),
-                                 self.input.begin() + *length);
+                                 self.input.begin() +
+                                     static_cast<std::ptrdiff_t>(*length));
             }
             return XGL_OK;
         };

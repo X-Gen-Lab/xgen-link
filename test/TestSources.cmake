@@ -2,7 +2,8 @@ set(XGL_TEST_SOURCES support/test_main.cpp)
 
 # Preserve the complete historical suite on profiles with authentication.
 if(XGL_FEATURE_AUTH)
-    list(APPEND XGL_TEST_SOURCES
+    list(
+        APPEND XGL_TEST_SOURCES
         unit/api/test_cpp17_presets.cpp
         unit/wire/test_coverage_wire.cpp
         unit/api/test_coverage_api.cpp
@@ -24,21 +25,24 @@ endif()
 
 list(APPEND XGL_TEST_SOURCES unit/wire/test_wire.cpp)
 if(XGL_FEATURE_AUTH)
-    list(APPEND XGL_TEST_SOURCES
+    list(
+        APPEND XGL_TEST_SOURCES
         unit/datalink/test_parser.cpp
         unit/datalink/test_datalink.cpp
         unit/network/test_network.cpp
     )
 endif()
 
-list(APPEND XGL_TEST_SOURCES
+list(
+    APPEND XGL_TEST_SOURCES
     unit/transport/test_rtt.cpp
     unit/transport/test_window.cpp
     unit/transport/test_window_storage.cpp
 )
 
 if(XGL_FEATURE_AUTH)
-    list(APPEND XGL_TEST_SOURCES
+    list(
+        APPEND XGL_TEST_SOURCES
         unit/transport/test_reliable.cpp
         unit/transport/test_transport.cpp
         integration/test_integration.cpp
@@ -61,7 +65,8 @@ else()
 endif()
 
 # These suites select their supported protocol cases at compile time.
-list(APPEND XGL_TEST_SOURCES
+list(
+    APPEND XGL_TEST_SOURCES
     unit/api/test_api_contracts.cpp
     unit/api/test_extended_options.cpp
     unit/transport/test_transport_advanced.cpp

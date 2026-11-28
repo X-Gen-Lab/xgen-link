@@ -2,6 +2,9 @@
  * \file            test_network_tx_contracts.cpp
  * \brief           Public send admission and cross-layer TX statistics
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <xgl/xgl.h>
@@ -177,4 +180,4 @@ TEST_F(XglNetworkTxContractTest, LayoutQueriesDoNotCountOrCallDriver) {
     ExpectStatistics(0U, 0U);
 }
 
-}  // namespace
+} /* namespace */

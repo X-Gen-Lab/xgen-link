@@ -1,9 +1,13 @@
-#include "test_host_allocator.h"
 /**
  * \file            test_transport.cpp
  * \brief           Transport layer unit tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
+
+#include "test_host_allocator.h"
 
 #include <network/xgl_route.h>
 #include <transport/xgl_reliable.h>
@@ -51,8 +55,8 @@ struct RxTracker {
     std::vector<std::vector<uint8_t>> payloads;
 };
 
-constexpr uint8_t kTransportControlHello = 0x0E;
-constexpr uint8_t kTransportControlReset = 0x0F;
+constexpr uint8_t XGL_TEST_CONTROL_HELLO = 0x0E;
+constexpr uint8_t XGL_TEST_CONTROL_RESET = 0x0F;
 
 static xgl_error_t spy_send(void* ctx, xgl_handle_t handle,
                             xgl_packet_t* packet) {
@@ -188,7 +192,7 @@ static void expect_sack_packet_for_base(const LowerLayerSpy& spy,
     ASSERT_GT(view.bitmap_len, 0U);
 }
 
-static uint32_t regression_time_ms;
+static uint32_t s_regression_time_ms;
 
 class TransportRegressionTest : public ::testing::Test {
   protected:
@@ -233,7 +237,7 @@ class TransportRegressionTest : public ::testing::Test {
     }
 
     void SetUp() override {
-        regression_time_ms = 100;
+        s_regression_time_ms = 100;
         xgl_packet_tx_endpoint_init(&lower, &spy, spy_send);
     }
 
@@ -251,7 +255,7 @@ class TransportRegressionTest : public ::testing::Test {
         config.error_callback = Error;
         config.callback_user_data = this;
         ASSERT_EQ(xgl_transport_init(&ctx, &config), XGL_OK);
-        ctx.current_time_ms = regression_time_ms;
+        ctx.current_time_ms = s_regression_time_ms;
         initialized = true;
     }
 
@@ -323,26 +327,26 @@ class TransportRegressionTest : public ::testing::Test {
     }
 };
 
-}  // namespace
+} /* namespace */
 
 TEST_F(TransportRegressionTest, RetryExhaustionRequiresNewEpochAfterReset) {
     Init(1);
     ASSERT_EQ(Send(), XGL_OK);
-    regression_time_ms = 201;
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms), XGL_OK);
-    regression_time_ms = 402;
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms),
+    s_regression_time_ms = 201;
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, s_regression_time_ms), XGL_OK);
+    s_regression_time_ms = 402;
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, s_regression_time_ms),
               XGL_ERR_ACK_TIMEOUT);
     ASSERT_NE(ctx.peers, nullptr);
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 0U);
     EXPECT_EQ(Send(), XGL_ERR_ACK_TIMEOUT);
-    const auto errors = stats.tx_errors;
+    const auto previous_tx_errors = stats.tx_errors;
     ASSERT_EQ(xgl_transport_run(&ctx, nullptr, 1000), XGL_OK);
-    EXPECT_EQ(stats.tx_errors, errors);
+    EXPECT_EQ(stats.tx_errors, previous_tx_errors);
     xgl_packet_t reset = {};
     reset.source_id = 2;
     reset.packet_type = XGL_PACKET_TYPE_CONTROL;
-    reset.data_type = kTransportControlReset;
+    reset.data_type = XGL_TEST_CONTROL_RESET;
     ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &reset), XGL_OK);
     EXPECT_EQ(Send(), XGL_ERR_ACK_TIMEOUT);
     EXPECT_EQ(Send(0, 1), XGL_OK);
@@ -414,7 +418,7 @@ TEST_F(TransportRegressionTest, SackCommitsAllAcknowledgementsBeforeBusyRetry) {
 
     spy.busy_data_attempts = 1;
     EXPECT_EQ(xgl_transport_receive(&ctx, nullptr, &packet), XGL_OK);
-    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, regression_time_ms), XGL_OK);
+    ASSERT_EQ(xgl_transport_run(&ctx, nullptr, s_regression_time_ms), XGL_OK);
     EXPECT_EQ(xgl_reliable_get_count(&ctx.peers->reliable_queue), 1U);
     EXPECT_EQ(ctx.peers->tx_window.send_base_packet_number, 0U);
     EXPECT_EQ(retries, 0U);
@@ -641,7 +645,7 @@ TEST(XglTransportTest, ReliableSendQueuesPacketAndAckReleasesWindow) {
     EXPECT_EQ(spy.send_count, 2);
     ASSERT_NE(find_peer(&ctx, 2), nullptr);
     ASSERT_EQ(spy.sent_packets.size(), 2U);
-    EXPECT_EQ(spy.sent_packets[0].data_type, kTransportControlHello);
+    EXPECT_EQ(spy.sent_packets[0].data_type, XGL_TEST_CONTROL_HELLO);
     EXPECT_EQ(spy.sent_packets[1].data_type, 1U);
     EXPECT_EQ(xgl_reliable_get_count(&find_peer(&ctx, 2)->reliable_queue), 1);
     EXPECT_FALSE(xgl_transport_can_send_to(&ctx, 2, 0, 0));
@@ -832,7 +836,7 @@ TEST(XglTransportTest, SackExtensionFastRetransmitsMissingPacketAndKeepsHole) {
     uint8_t sack_value[16] = {};
     size_t sack_value_len = 0;
     const uint8_t bitmap[] = {
-        0x0BU};  // Received packets 0, 1, and 3; packet 2 is the hole.
+        0x0BU}; /* Received packets 0, 1, and 3; packet 2 is the hole. */
     ASSERT_EQ(xgl_wire_encode_sack_ext_value(sack_value, sizeof(sack_value), 0,
                                              bitmap, sizeof(bitmap),
                                              &sack_value_len),
@@ -1209,7 +1213,7 @@ TEST(XglTransportTest, HelloCreatesExactPeerWithoutDeliveringToApplication) {
     hello_packet.source_id = 2;
     hello_packet.target_id = 1;
     hello_packet.packet_type = XGL_PACKET_TYPE_CONTROL;
-    hello_packet.data_type = kTransportControlHello;
+    hello_packet.data_type = XGL_TEST_CONTROL_HELLO;
     hello_packet.reliable = XGL_RELIABILITY_NONE;
     hello_packet.priority = 7;
     hello_packet.data = &packet_data;
@@ -1249,7 +1253,7 @@ TEST(XglTransportTest,
     data_packet.source_id = 2;
     data_packet.target_id = 1;
     data_packet.packet_type = XGL_PACKET_TYPE_DATA;
-    data_packet.data_type = kTransportControlHello;
+    data_packet.data_type = XGL_TEST_CONTROL_HELLO;
     data_packet.reliable = XGL_RELIABILITY_NONE;
     data_packet.priority = 0;
     data_packet.data = &packet_data;
@@ -1661,10 +1665,10 @@ TEST(XglTransportTest, SingleFrameSendChecksLowerPolicyBeforeSubmission) {
     xgl_transport_config_t config =
         make_transport_config(&lower, &stats, &tx_retries);
     config.max_frame_size = 128;
-    lower.check_data = [](void* ctx, xgl_handle_t, const xgl_tx_data_t* tx,
+    lower.check_data = [](void* user, xgl_handle_t, const xgl_tx_data_t* tx,
                           bool need_hello) {
-        const auto* spy = static_cast<const LowerLayerSpy*>(ctx);
-        EXPECT_EQ(spy->send_count, 0);
+        const auto* observed = static_cast<const LowerLayerSpy*>(user);
+        EXPECT_EQ(observed->send_count, 0);
         EXPECT_FALSE(need_hello);
         EXPECT_EQ(tx->target_id, 2U);
         return tx->data_len > 32U ? XGL_ERR_BUFFER_TOO_SMALL : XGL_OK;
@@ -2136,7 +2140,7 @@ TEST_F(TransportRegressionTest, IdlePeerWithoutReliableHistoryCanBeReclaimed) {
     hello.source_id = 2;
     hello.target_id = 1;
     hello.packet_type = XGL_PACKET_TYPE_CONTROL;
-    hello.data_type = kTransportControlHello;
+    hello.data_type = XGL_TEST_CONTROL_HELLO;
     ASSERT_EQ(xgl_transport_receive(&ctx, nullptr, &hello), XGL_OK);
     ASSERT_NE(ctx.peers, nullptr);
     uint32_t timeout = 0;

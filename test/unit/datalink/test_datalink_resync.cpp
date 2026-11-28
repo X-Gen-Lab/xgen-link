@@ -2,6 +2,9 @@
  * \file            test_datalink_resync.cpp
  * \brief           Cached receive recovery and complete-frame consumption
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_datalink.h>
@@ -433,4 +436,4 @@ TEST_F(XglDatalinkResyncTest, RecoveryRestoresEarliestPartialAcrossPauses) {
 
 #endif
 
-}  // namespace
+} /* namespace */

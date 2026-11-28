@@ -2,6 +2,9 @@
  * \file            test_datalink.cpp
  * \brief           Unit tests for data link layer
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_datalink.h>
@@ -33,10 +36,10 @@ class MockPhyOps {
     MOCK_METHOD(xgl_error_t, tx,
                 (const uint8_t* data, size_t len, void* user_data));
     MOCK_METHOD(xgl_error_t, rx,
-                (uint8_t* buffer, size_t* len, void* user_data));
+                (uint8_t * buffer, size_t* len, void* user_data));
 };
 
-static MockPhyOps* g_mock_phy = nullptr;
+static MockPhyOps* s_mock_phy = nullptr;
 
 TEST(XglDatalinkMetadataTest, RejectsDuplicateSessionExtensions) {
     uint8_t bytes[64] = {};
@@ -77,11 +80,11 @@ TEST(XglDatalinkMetadataTest, RejectsDuplicateSessionExtensions) {
 
 static xgl_error_t mock_phy_tx(const uint8_t* data, size_t len,
                                void* user_data) {
-    return g_mock_phy->tx(data, len, user_data);
+    return s_mock_phy->tx(data, len, user_data);
 }
 
 static xgl_error_t mock_phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
-    return g_mock_phy->rx(buffer, len, user_data);
+    return s_mock_phy->rx(buffer, len, user_data);
 }
 
 struct CountingAllocatorState {
@@ -89,18 +92,18 @@ struct CountingAllocatorState {
     size_t free_count = 0;
 };
 
-static CountingAllocatorState* g_counting_allocator_state = nullptr;
+static CountingAllocatorState* s_counting_allocator_state = nullptr;
 
-static void* counting_malloc(void* user, size_t size) {
-    if (g_counting_allocator_state != nullptr) {
-        g_counting_allocator_state->alloc_count++;
+static void* counting_malloc(void*, size_t size) {
+    if (s_counting_allocator_state != nullptr) {
+        s_counting_allocator_state->alloc_count++;
     }
     return std::malloc(size);
 }
 
-static void counting_free(void* user, void* ptr) {
-    if (ptr != nullptr && g_counting_allocator_state != nullptr) {
-        g_counting_allocator_state->free_count++;
+static void counting_free(void*, void* ptr) {
+    if (ptr != nullptr && s_counting_allocator_state != nullptr) {
+        s_counting_allocator_state->free_count++;
     }
     std::free(ptr);
 }
@@ -244,7 +247,7 @@ TEST(XglDatalinkMetadataTest, SeparateParsersPreserveInterleavedPhyFrames) {
 class XglDatalinkTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        g_mock_phy = &mock_phy;
+        s_mock_phy = &mock_phy;
 
         /* Initialize PHY operations */
         phy_ops.tx = mock_phy_tx;
@@ -269,7 +272,7 @@ class XglDatalinkTest : public ::testing::Test {
     }
 
     void TearDown() override {
-        g_mock_phy = nullptr;
+        s_mock_phy = nullptr;
     }
 
     MockPhyOps mock_phy;
@@ -289,7 +292,7 @@ class XglDatalinkTest : public ::testing::Test {
 
 TEST_F(XglDatalinkTest, InitSuccess) {
     xgl_datalink_ctx_t test_ctx;
-    xgl_layer_stats_t test_stats = {0};
+    xgl_layer_stats_t test_stats = {};
     uint64_t header_crc = 0, crc16 = 0;
 
     xgl_datalink_config_t config = {};
@@ -305,7 +308,7 @@ TEST_F(XglDatalinkTest, InitSuccess) {
 }
 
 TEST_F(XglDatalinkTest, InitNullPointer) {
-    xgl_layer_stats_t test_stats = {0};
+    xgl_layer_stats_t test_stats = {};
     uint64_t header_crc = 0, crc16 = 0;
 
     xgl_datalink_config_t config = {};
@@ -405,7 +408,7 @@ TEST_F(XglDatalinkTest, SendFrameSuccess) {
 }
 
 TEST_F(XglDatalinkTest, SendFrameNullPointer) {
-    xgl_frame_t frame;
+    xgl_frame_t frame = {};
 
     EXPECT_EQ(xgl_datalink_send(nullptr, &phy_ops, &frame),
               XGL_ERR_NULL_POINTER);
@@ -511,7 +514,7 @@ TEST_F(XglDatalinkTest, SendFramePhyError) {
 
 TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     CountingAllocatorState allocator_state;
-    g_counting_allocator_state = &allocator_state;
+    s_counting_allocator_state = &allocator_state;
     xgl_allocator_t allocator = {};
     allocator.ctx = &allocator_state;
     allocator.alloc = counting_malloc;
@@ -548,13 +551,13 @@ TEST_F(XglDatalinkTest, SendLargeFrameUsesConfiguredAllocator) {
     EXPECT_EQ(allocator_state.alloc_count, 1U);
     EXPECT_EQ(allocator_state.free_count, 1U);
 
-    g_counting_allocator_state = nullptr;
+    s_counting_allocator_state = nullptr;
 }
 
 TEST_F(XglDatalinkTest,
        SmallFrameReleasesAllocatorBufferAfterSuccessAndFailure) {
     CountingAllocatorState allocator_state;
-    g_counting_allocator_state = &allocator_state;
+    s_counting_allocator_state = &allocator_state;
     xgl_allocator_t allocator = {};
     allocator.ctx = &allocator_state;
     allocator.alloc = counting_malloc;
@@ -581,7 +584,7 @@ TEST_F(XglDatalinkTest,
     EXPECT_EQ(allocator_state.free_count, 2U);
     EXPECT_EQ(stats.tx_packets, 1U);
     EXPECT_EQ(stats.tx_errors, 1U);
-    g_counting_allocator_state = nullptr;
+    s_counting_allocator_state = nullptr;
 }
 
 TEST_F(XglDatalinkTest, SendFrameAuthenticatesWhenConfigured) {

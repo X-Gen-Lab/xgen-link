@@ -2,6 +2,9 @@
  * \file            test_transport_admission.cpp
  * \brief           Two-endpoint reliable admission and HELLO lease contracts
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -209,4 +212,4 @@ TEST_F(XglTransportAdmissionIntegrationTest,
     EXPECT_EQ(receiver.peers, nullptr);
 }
 
-}  // namespace
+} /* namespace */

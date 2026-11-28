@@ -1,3 +1,10 @@
+---
+id: guides/boot
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # Boot 接入
 
 Boot 编译档位保留静态 workspace、单 peer、最多一条路由和包窗口 1。它支持可靠单播，应用自行分块。认证、转发、乱序、统计和详细诊断文字由其他档位提供。

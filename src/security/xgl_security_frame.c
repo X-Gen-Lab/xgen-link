@@ -2,6 +2,9 @@
  * \file            xgl_security_frame.c
  * \brief           Trusted authentication orchestration over the wire codec
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <security/xgl_security.h>
@@ -27,12 +30,8 @@ xgl_error_t xgl_security_frame_tag_len(bool required,
 /**
  * \brief           Serialize with one fresh security sequence per provider
  * invocation
- * \param[out]      buffer: Caller-owned output buffer
- * \param[in]       buffer_size: Available output capacity
- * \param[in]       frame: Borrowed frame data
- * \param[in,out]   security: Explicit trusted association state
- * \param[out]      bytes_written: Complete frame length on success
- * \return          XGL_OK on success, error code otherwise
+ * \details         Write into caller-owned storage. Borrow the frame for the
+ *                  duration of serialization.
  */
 xgl_error_t xgl_security_serialize_frame(uint8_t* buffer, size_t buffer_size,
                                          const xgl_frame_t* frame,

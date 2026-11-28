@@ -1,3 +1,10 @@
+---
+id: reference/protocol/v1/security
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 安全
 
 embedded、full profile 编译认证能力，Boot 和 embedded-lite 不包含认证。认证保护单播流量；本实现不提供载荷加密或密钥建立协议。

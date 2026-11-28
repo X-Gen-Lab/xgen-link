@@ -1,0 +1,74 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: a496889f6bb90a61ebf00b52bfc26b9f114afaf845becb4001b062a007403582\n"
+
+#: docs/zh/tutorials/first-link.md:8
+msgid "跑通首次收发"
+msgstr "Run your first link"
+
+#: docs/zh/tutorials/first-link.md:10
+msgid "构建并运行"
+msgstr "Build and run"
+
+#: docs/zh/tutorials/first-link.md:12
+msgid "使用 CMake 3.24 或以上、Ninja 和 C11 编译器，从仓库根目录构建双端 echo 示例。"
+msgstr ""
+"From the repository root, build the two-endpoint echo example with CMake 3.24 or later, Ninja and a C11 "
+"compiler."
+
+#: docs/zh/tutorials/first-link.md:21
+msgid "程序应输出 `Deferred echo: PASS`。本例验证同步模拟 PHY 下的双端交付。Windows 的可执行文件带 `.exe` 后缀。"
+msgstr ""
+"The program should print `Deferred echo: PASS`. It exercises two endpoints over a synchronous simulated "
+"PHY. The executable has an `.exe` suffix on Windows."
+
+#: docs/zh/tutorials/first-link.md:23
+msgid "存储与生命周期"
+msgstr "Storage and lifetime"
+
+#: docs/zh/tutorials/first-link.md:25
+msgid "示例从 Tiny preset 开始，将可靠窗口与 peer 容量各设为 1，使用 128 字节 MTU。为两端设置各自的本地节点、到对端的路由、PHY 和应用回调。配置及引用对象保留到销毁。"
+msgstr ""
+"The example starts with the Tiny preset and sets the reliable window and peer count to one with a "
+"128-byte MTU. Configure each node's ID, route to the other endpoint, PHY and application callback. Keep "
+"the configuration and referenced objects alive until destruction."
+
+#: docs/zh/tutorials/first-link.md:27
+msgid ""
+"调用 `xgl_memory_requirements()`，检查精确大小和对齐，为 `xgl_init_static()` 提供足够容量。不同 profile 和容量需要不同空间。也可由 "
+"`xgl_create()` 通过选定后端预留相同布局，然后调用 `xgl_init()`。"
+msgstr ""
+"Call `xgl_memory_requirements()`, check the exact size and alignment, and supply that capacity to "
+"`xgl_init_static()`. Different profiles and limits require different sizes. Alternatively, "
+"`xgl_create()` reserves the same layout through the selected backend and requires `xgl_init()`."
+
+#: docs/zh/tutorials/first-link.md:29
+msgid "主循环"
+msgstr "Main loop"
+
+#: docs/zh/tutorials/first-link.md:40
+msgid ""
+"在回调之外使用 `xgl_send_at()`。应用存储忙时，接收接纳回调可返回 BUSY。PHY TX 返回前必须完成整帧读取或复制。产品处理 `xgl_step()` 返回的接收或维护错误，详见[发送 "
+"API](../guides/send.md)。"
+msgstr ""
+"Use `xgl_send_at()` outside callbacks. The receive acceptance callback can return BUSY while application"
+" storage is occupied. PHY TX finishes reading or copying the complete frame before returning. Handle "
+"`xgl_step()` receive and maintenance errors as described in the [send API](../guides/send.md)."
+
+#: docs/zh/tutorials/first-link.md:42
+msgid "可运行程序"
+msgstr "Runnable programs"
+
+#: docs/zh/tutorials/first-link.md:44
+msgid "[示例](examples.md)提供生命周期完整的程序，包含可靠应用块和多跳收发。"
+msgstr ""
+"See [examples](examples.md) for complete programs, including reliable application chunks and multihop "
+"delivery."

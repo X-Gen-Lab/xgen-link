@@ -1,0 +1,21 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: ad8a0a63bdc75ace4ef348e1b6079be798bff88039a4ace517612cb8b82458f3\n"
+
+#: docs/zh/reference/protocol/v3/fragmentation.md:9
+msgid "分片"
+msgstr "Fragmentation"
+
+#: docs/zh/reference/protocol/v3/fragmentation.md:11
+msgid "请查阅[当前的应用分块方式](../../../guides/send.md)。"
+msgstr ""
+"See [application blocks](../../../guides/send.md#application-blocks) for transferring payloads larger "
+"than one frame."

@@ -1,6 +1,10 @@
 /**
  * \file            test_send_policy.cpp
  * \brief           Shared DATA admission across public send paths
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -13,10 +17,10 @@
 #include <cstring>
 #include <vector>
 
-static constexpr uint16_t kMtu = 64U;
-static constexpr size_t kPlainPayloadAtMtu =
-    kMtu - XGL_FRAME_HEADER_SIZE - XGL_CRC16_SIZE;
-static constexpr size_t kAuthTagSize = 4U;
+static constexpr uint16_t XGL_TEST_MTU = 64U;
+static constexpr size_t XGL_TEST_PLAIN_PAYLOAD_AT_MTU =
+    XGL_TEST_MTU - XGL_FRAME_HEADER_SIZE - XGL_CRC16_SIZE;
+static constexpr size_t XGL_TEST_AUTH_TAG_SIZE = 4U;
 
 class XglSendPolicyTest : public ::testing::Test {
   protected:
@@ -32,7 +36,7 @@ class XglSendPolicyTest : public ::testing::Test {
         xgl_test_use_host_allocator(&config);
         phy = {Transmit, Receive, this};
         route = {2U, &phy, 128U, 100U, 1U};
-        provider = {Sign, Verify, kAuthTagSize, this};
+        provider = {Sign, Verify, XGL_TEST_AUTH_TAG_SIZE, this};
         payload.fill(0x5AU);
     }
 
@@ -154,11 +158,11 @@ class XglSendPolicyTest : public ::testing::Test {
                             size_t capacity, size_t* length, void* context) {
         auto& self = *static_cast<XglSendPolicyTest*>(context);
         ++self.sign_calls;
-        if (capacity < kAuthTagSize) {
+        if (capacity < XGL_TEST_AUTH_TAG_SIZE) {
             return XGL_ERR_BUFFER_TOO_SMALL;
         }
-        std::memset(tag, 0xA5U, kAuthTagSize);
-        *length = kAuthTagSize;
+        std::memset(tag, 0xA5U, XGL_TEST_AUTH_TAG_SIZE);
+        *length = XGL_TEST_AUTH_TAG_SIZE;
         return XGL_OK;
     }
 
@@ -194,18 +198,18 @@ class XglSendPolicyTest : public ::testing::Test {
 };
 
 TEST_F(XglSendPolicyTest, OrdinaryRejectsSingleFrameAboveMtu) {
-    Initialize(false, kMtu);
+    Initialize(false, XGL_TEST_MTU);
     for (bool reliable : {false, true}) {
         SCOPED_TRACE(reliable);
-        const auto tx = Ordinary(kPlainPayloadAtMtu + 1U, reliable);
+        const auto tx = Ordinary(XGL_TEST_PLAIN_PAYLOAD_AT_MTU + 1U, reliable);
         EXPECT_EQ(xgl_send_at(handle, &tx, 0U), XGL_ERR_BUFFER_TOO_SMALL);
     }
     EXPECT_EQ(tx_calls, 0U);
 }
 
 TEST_F(XglSendPolicyTest, LegacyZeroCopyRejectsSingleFrameAboveMtu) {
-    Initialize(false, kMtu);
-    const auto request = CallerFrame(kPlainPayloadAtMtu + 1U);
+    Initialize(false, XGL_TEST_MTU);
+    const auto request = CallerFrame(XGL_TEST_PLAIN_PAYLOAD_AT_MTU + 1U);
     const auto before = frame;
     EXPECT_EQ(xgl_send_zerocopy_at(handle, &request.data, 0U),
               XGL_ERR_BUFFER_TOO_SMALL);
@@ -214,8 +218,8 @@ TEST_F(XglSendPolicyTest, LegacyZeroCopyRejectsSingleFrameAboveMtu) {
 }
 
 TEST_F(XglSendPolicyTest, ScopedZeroCopyRejectsSingleFrameAboveMtu) {
-    Initialize(false, kMtu);
-    const auto request = CallerFrame(kPlainPayloadAtMtu + 1U);
+    Initialize(false, XGL_TEST_MTU);
+    const auto request = CallerFrame(XGL_TEST_PLAIN_PAYLOAD_AT_MTU + 1U);
     const auto before = frame;
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U),
               XGL_ERR_BUFFER_TOO_SMALL);
@@ -224,8 +228,8 @@ TEST_F(XglSendPolicyTest, ScopedZeroCopyRejectsSingleFrameAboveMtu) {
 }
 
 TEST_F(XglSendPolicyTest, LayoutRejectsSingleFrameAboveMtu) {
-    Initialize(false, kMtu);
-    const auto request = CallerFrame(kPlainPayloadAtMtu + 1U);
+    Initialize(false, XGL_TEST_MTU);
+    const auto request = CallerFrame(XGL_TEST_PLAIN_PAYLOAD_AT_MTU + 1U);
     xgl_tx_frame_layout_t layout = {19U, 23U};
     const auto before = Snapshot();
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
@@ -237,8 +241,9 @@ TEST_F(XglSendPolicyTest, LayoutRejectsSingleFrameAboveMtu) {
 }
 
 TEST_F(XglSendPolicyTest, AllSendPathsAcceptMtuBoundary) {
-    Initialize(false, kMtu);
-    for (size_t length : {kPlainPayloadAtMtu - 1U, kPlainPayloadAtMtu}) {
+    Initialize(false, XGL_TEST_MTU);
+    for (size_t length :
+         {XGL_TEST_PLAIN_PAYLOAD_AT_MTU - 1U, XGL_TEST_PLAIN_PAYLOAD_AT_MTU}) {
         SCOPED_TRACE(length);
         auto tx = Ordinary(length);
         ASSERT_EQ(xgl_send_at(handle, &tx, 0U), XGL_OK);
@@ -374,15 +379,16 @@ TEST_F(XglSendPolicyTest, ZeroCopyValidatesRequestsBeforeTerminalPolicy) {
 
 #if XGL_FEATURE_AUTH
 TEST_F(XglSendPolicyTest, AuthenticatedPolicyQueriesNeverSignOrSubmit) {
-    Initialize(true, kMtu);
-    constexpr size_t payload_at_mtu =
-        kPlainPayloadAtMtu - XGL_SECURITY_EXT_SIZE - kAuthTagSize;
+    Initialize(true, XGL_TEST_MTU);
+    constexpr size_t payload_at_mtu = XGL_TEST_PLAIN_PAYLOAD_AT_MTU -
+                                      XGL_SECURITY_EXT_SIZE -
+                                      XGL_TEST_AUTH_TAG_SIZE;
     auto request = CallerFrame(payload_at_mtu);
     xgl_tx_frame_layout_t layout = {};
     const auto before = Snapshot();
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
-    EXPECT_EQ(layout.frame_size, kMtu);
+    EXPECT_EQ(layout.frame_size, XGL_TEST_MTU);
     request.data.data_len = payload_at_mtu + 1U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_BUFFER_TOO_SMALL);

@@ -3,7 +3,9 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -40,13 +42,26 @@ class DeliveryPresets(unittest.TestCase):
             "project(delivery_preset_contract NONE)\n"
             "enable_testing()\n"
             "if(XGL_REQUIRE_HOST_TESTS)\n"
-            "  if(NOT XGL_BUILD_TESTS OR NOT XGL_PROFILE STREQUAL XGL_REQUIRE_PROFILE)\n"
+            "  if(NOT XGL_BUILD_TESTS OR (XGL_REQUIRE_PROFILE AND NOT XGL_PROFILE STREQUAL XGL_REQUIRE_PROFILE))\n"
             "    message(FATAL_ERROR \"Host preset did not select protocol regressions\")\n"
             "  endif()\n"
+            "endif()\n"
+            "if(XGL_REQUIRE_PRODUCTION_BOOT AND (XGL_BUILD_TESTS OR NOT XGL_PROFILE STREQUAL \"boot\"))\n"
+            "  message(FATAL_ERROR \"Production preset must select Boot with tests off\")\n"
             "endif()\n"
             "if(XGL_REQUIRE_BOOT_SMALL AND NOT (XGL_RELIABLE_INDEX_BUCKETS EQUAL 1 AND\n"
             "    XGL_TRANSPORT_WINDOW_CAPACITY EQUAL 1 AND NOT XGL_ENABLE_ADAPTIVE_RTO))\n"
             "  message(FATAL_ERROR \"Boot Small preset did not select compact fixed RTO\")\n"
+            "endif()\n"
+            "if(XGL_REQUIRE_CONFIGURATION AND NOT CMAKE_BUILD_TYPE STREQUAL XGL_REQUIRE_CONFIGURATION)\n"
+            "  message(FATAL_ERROR \"Unexpected build configuration\")\n"
+            "endif()\n"
+            "if(XGL_REQUIRE_SANITIZER)\n"
+            "  foreach(flags CMAKE_C_FLAGS CMAKE_CXX_FLAGS CMAKE_EXE_LINKER_FLAGS)\n"
+            "    if(NOT ${flags} MATCHES \"-fsanitize=${XGL_REQUIRE_SANITIZER}([ ]|$)\")\n"
+            "      message(FATAL_ERROR \"Missing sanitizer flags in ${flags}\")\n"
+            "    endif()\n"
+            "  endforeach()\n"
             "endif()\n", encoding="utf-8")
         return source, presets
 
@@ -62,8 +77,11 @@ class DeliveryPresets(unittest.TestCase):
 
     def test_test_presets_reject_an_empty_selection(self):
         source, presets = self.prepare("empty")
+        listed = self.execute(source, "ctest", "--list-presets")
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        available = set(re.findall(r'^\s+"([^"]+)"', listed.stdout, re.MULTILINE))
         for preset in presets["testPresets"]:
-            if preset.get("hidden"):
+            if preset["name"] not in available:
                 continue
             with self.subTest(preset=preset["name"]):
                 configured = self.execute(
@@ -90,6 +108,40 @@ class DeliveryPresets(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn(name, build_names)
                 self.assertIn(name, test_names)
+
+    def test_native_modes_select_regressions_and_instrumentation(self):
+        source, presets = self.prepare("native")
+        build_names = {preset["name"] for preset in presets["buildPresets"]}
+        test_names = {preset["name"] for preset in presets["testPresets"]}
+        listed = self.execute(source, "cmake", "--list-presets")
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        self.assertEqual('"native-tsan"' in listed.stdout, sys.platform == "linux")
+        for name, config, sanitizer in (
+                ("native-debug", "Debug", ""),
+                ("native-release", "Release", ""),
+                ("native-asan", "Debug", "address,undefined"),
+                ("native-tsan", "Debug", "thread")):
+            with self.subTest(preset=name):
+                self.assertIn(name, build_names)
+                self.assertIn(name, test_names)
+                if name == "native-tsan" and f'"{name}"' not in listed.stdout:
+                    continue
+                result = self.execute(
+                    source, "cmake", "--preset", name,
+                    "-DXGL_REQUIRE_HOST_TESTS=ON",
+                    f"-DXGL_REQUIRE_CONFIGURATION={config}",
+                    f"-DXGL_REQUIRE_SANITIZER={sanitizer}")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_boot_small_preset_is_production_only(self):
+        source, presets = self.prepare("boot-small")
+        build_names = {preset["name"] for preset in presets["buildPresets"]}
+        test_names = {preset["name"] for preset in presets["testPresets"]}
+        result = self.execute(source, "cmake", "--preset", "boot-small",
+                              "-DXGL_REQUIRE_BOOT_SMALL=ON", "-DXGL_REQUIRE_PRODUCTION_BOOT=ON")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("boot-small", build_names)
+        self.assertNotIn("boot-small", test_names)
 
 
 if __name__ == "__main__":

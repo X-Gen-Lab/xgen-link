@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 9b32ec4f6c301f50eb3046d538d8c4de0bb2fb8445df6a621b1278aeecf822e2\n"
+
+#: docs/zh/reference/protocol/v3/interoperability.md:9
+msgid "互操作"
+msgstr "Interoperability"
+
+#: docs/zh/reference/protocol/v3/interoperability.md:11
+msgid "请查阅 [Wire v1 文档](../v1/interoperability.md)。"
+msgstr "See the [Wire v1 documentation](../v1/interoperability.md)."

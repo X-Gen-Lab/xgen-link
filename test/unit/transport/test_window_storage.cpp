@@ -2,6 +2,9 @@
  * \file            test_window_storage.cpp
  * \brief           Compact ACK storage and repeated window reuse contracts
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <gtest/gtest.h>

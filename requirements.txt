@@ -1,0 +1,3 @@
+# Opt-in maintenance environment. The production CMake build uses C11 only.
+-r dependencies/development-tools.txt
+-r dependencies/environment-tools.txt

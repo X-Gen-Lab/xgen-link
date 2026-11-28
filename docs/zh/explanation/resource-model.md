@@ -1,3 +1,10 @@
+---
+id: explanation/resource-model
+type: explanation
+audience: user
+source_language: zh_CN
+---
+
 # 资源模型
 
 每个实例拥有一个有界 workspace。协议用私有固定池管理独立资源类别及容量。

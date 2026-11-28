@@ -2,6 +2,9 @@
  * \file            main.c
  * \brief           Three-node forwarding across two independent PHY parsers
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <stdio.h>
 
@@ -10,12 +13,6 @@
 /**
  * \brief           Count one valid application payload without calling protocol
  * APIs
- * \param[in]       handle: Callback instance, unused
- * \param[in]       source: End-to-end sender
- * \param[in]       type: Application type
- * \param[in]       data: Borrowed payload
- * \param[in]       length: Payload length
- * \param[in,out]   context: Delivery counter
  */
 static void receive_payload(xgl_handle_t handle, uint16_t source, uint8_t type,
                             const uint8_t* data, size_t length, void* context) {

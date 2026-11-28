@@ -1,0 +1,143 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 1e10f7b640da07cfd32af8ce4a9a8a71d05e42506410c395db0888e91369cd58\n"
+
+#: docs/zh/explanation/transport-internals.md:8
+msgid "Transport 内部结构"
+msgstr "Transport Internals"
+
+#: docs/zh/explanation/transport-internals.md:10
+msgid "Transport 唯一负责可靠状态转换。辅助模块按状态所有者及借用/自有数据契约划分，而不按可替换的通用算法划分。"
+msgstr ""
+"Transport is the sole owner of reliable transitions. Its helpers are grouped by their state owner and "
+"borrowed/owned data contract, rather than by interchangeable generic algorithms."
+
+#: docs/zh/explanation/transport-internals.md:12
+msgid "Peer 状态与辅助模块"
+msgstr "Peer State and Helpers"
+
+#: docs/zh/explanation/transport-internals.md:14
+msgid ""
+"`xgl_transport_peer.c` 完成精确查找、有界创建、终态失败与显式 close。每个 peer 包含 TX 窗口、等待 ACK 队列、RTT 估计器、下一 RX "
+"编号与可选的乱序接收状态。上下文保存配置容量、显式当前时间、资源服务与 peer 列表。不存在第二个全局窗口或短会话身份。"
+msgstr ""
+"`xgl_transport_peer.c` performs exact lookup, bounded creation, terminal failure and explicit close. "
+"Each peer contains its TX window, wait-ACK queue, RTT estimator, next RX number and optional retained "
+"receive packets. The context stores configured capacities, explicit current time, resource services and "
+"the peer list. There is no second global window or short-session identity."
+
+#: docs/zh/explanation/transport-internals.md:16
+msgid ""
+"队列、索引和窗口辅助模块操作已选 peer 的对象，不选择回退 peer、不重置 scope，也不提交原始 PHY 字节。`xgl_transport_ack.c` 在改变记录、窗口或 RTT "
+"前验证全部声明。大于等于下一未分配 TX 编号的包不能成为有效 ACK 目标。"
+msgstr ""
+"Queue/index/window helpers operate on the selected peer's objects. They do not choose a fallback peer, "
+"reset scopes or submit raw PHY bytes. `xgl_transport_ack.c` validates all claims before changing "
+"records, window or RTT. Packet numbers at or beyond the next unassigned TX number are invalid ACK "
+"targets."
+
+#: docs/zh/explanation/transport-internals.md:18
+msgid "跨调用所有权"
+msgstr "Ownership Across Calls"
+
+#: docs/zh/explanation/transport-internals.md:20
+msgid ""
+"实现按生命周期划分。入口负责初始化和销毁，`peer` 管理身份、回收和发送资格，`tx` 预检、接纳并提交单帧请求。`rx` 判定接收顺序，`rx_buffer` 保存乱序包，`rx_delivery` "
+"统一应用交付。`ack` 与 `ack_send` 分别处理和组织反馈，`runtime` 处理重传与期限，`control` 处理控制帧。`reliable`、`window` 和 `rtt` "
+"提供对应的状态操作。"
+msgstr ""
+"Implementation files follow lifetimes. The entry owns initialization and destruction; `peer` owns "
+"identity, reclamation and send eligibility; `tx` owns complete-request preflight, admission and "
+"submission. `rx` decides ordering, `rx_buffer` retains out-of-order packets, and `rx_delivery` owns "
+"application delivery. `ack` interprets feedback, `ack_send` composes ACK/SACK, `runtime` processes "
+"retries and deadlines, and `control` handles control packets. `reliable`, `window`, `rtt` have distinct "
+"algorithm boundaries."
+
+#: docs/zh/explanation/transport-internals.md:22
+msgid ""
+"发送预检在创建 peer 或发送 HELLO 前完成。可靠接纳直接返回拥有的记录，不再二次查找。ACK 扩展只扫描一次 TLV；通过全量校验后先应用全部确认，再执行快重传，因此 PHY BUSY "
+"不会阻断同一反馈中的后续有效确认。"
+msgstr ""
+"Send preflight finishes before creating a peer or emitting HELLO. Reliable admission returns its owned "
+"record without a second lookup. ACK extensions use one TLV scan. After complete validation, all "
+"acknowledgments are applied before fast retransmission, so PHY BUSY cannot prevent later valid "
+"acknowledgments in the same feedback from being committed."
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "输入或保留状态"
+msgstr "Input or retained state"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "契约"
+msgstr "Contract"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "发送请求"
+msgstr "Send request"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "调用期间借用；已接纳可靠字节被复制"
+msgstr "Borrowed for the call; accepted reliable bytes are copied"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "接收包/帧"
+msgstr "Received packet/frame"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "借用至同步回调返回"
+msgstr "Borrowed until the synchronous callback returns"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "可靠记录"
+msgstr "Reliable record"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "持有载荷，直到确认或终止"
+msgstr "Owns the payload until acknowledgement or termination"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "乱序包"
+msgstr "Out-of-order packet"
+
+#: docs/zh/explanation/transport-internals.md:0
+msgid "发送 SACK 前保留载荷与交付所需的已解析元数据，TLV 校验后无需保留副本"
+msgstr "Owns payload and decoded scope and packet metadata before it may be SACKed"
+
+#: docs/zh/explanation/transport-internals.md:31
+msgid "每次分配通过同一资源服务释放。清理 peer 数据不重置其身份、已消耗 DATA 编号或终态失败标志。安全重放与认证计数器不属于此清理过程。"
+msgstr ""
+"Each allocation is released through the same resource service. Clearing a peer's data does not reset its"
+" identity, consumed DATA numbers or terminal failure state. Security replay and authentication counters "
+"are never owned by this cleanup."
+
+#: docs/zh/explanation/transport-internals.md:33
+msgid "调度与可观察结果"
+msgstr "Scheduling and Observability"
+
+#: docs/zh/explanation/transport-internals.md:35
+msgid ""
+"`xgl_transport_run` 接收公开 step 操作传来的显式时间。超时汇总器组合等待 ACK 的期限、正数本地重试延迟、可回收未使用 peer 的空闲期限及可选的可靠发送忙期期限。不存在可能随 "
+"peer 队列变化而失效的全局最早期限缓存。"
+msgstr ""
+"`xgl_transport_run` receives explicit time from the public step operation. The timeout collector "
+"combines wait-ACK timers, positive local-retry delays, unused-peer leases, idle reclamation and reliable"
+" TX lifetime limits. No cached global earliest deadline can become stale when a peer queue changes."
+
+#: docs/zh/explanation/transport-internals.md:37
+msgid ""
+"超时重试和 SACK 触发重试经过相同逻辑包路径。临时 BUSY 或内存压力保留已接纳存储并安排再次尝试。硬失败、重试耗尽与 RESET 都会可观察地终止 "
+"scope。错误回调同步执行，不得重入实例。应用恢复容量后，应再次 step 以投递因 BUSY 保留的接收数据。"
+msgstr ""
+"Timeout retries and SACK-triggered retries use the same logical packet path. Temporary BUSY or memory "
+"pressure keeps accepted storage and schedules another attempt. Hard failure, retry exhaustion and RESET "
+"terminate the scope observably. Error callbacks run synchronously and must not reenter the instance. A "
+"receiver retaining data during application BUSY needs another step after application capacity becomes "
+"available."

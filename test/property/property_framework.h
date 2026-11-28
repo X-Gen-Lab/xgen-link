@@ -41,7 +41,8 @@ class PropertyTestGenerator {
      * \brief           Generate random uint8_t in range
      */
     uint8_t random_uint8(uint8_t min, uint8_t max) {
-        return min + (rng_() % (max - min + 1));
+        const auto span = static_cast<std::mt19937::result_type>(max - min + 1);
+        return static_cast<uint8_t>(min + (rng_() % span));
     }
 
     /**
@@ -55,23 +56,26 @@ class PropertyTestGenerator {
      * \brief           Generate random uint16_t in range
      */
     uint16_t random_uint16(uint16_t min, uint16_t max) {
-        return min + (rng_() % (max - min + 1));
+        const auto span = static_cast<std::mt19937::result_type>(max - min + 1);
+        return static_cast<uint16_t>(min + (rng_() % span));
     }
 
     /**
      * \brief           Generate random uint32_t
      */
     uint32_t random_uint32() {
-        return rng_();
+        return static_cast<uint32_t>(rng_());
     }
 
     /**
      * \brief           Generate random uint32_t in range
      */
     uint32_t random_uint32(uint32_t min, uint32_t max) {
-        if (max <= min)
+        if (max <= min) {
             return min;
-        return min + (rng_() % (max - min + 1));
+        }
+        const uint64_t span = static_cast<uint64_t>(max) - min + 1U;
+        return static_cast<uint32_t>(min + (rng_() % span));
     }
 
     /**
@@ -144,7 +148,7 @@ class PropertyTestGenerator {
             return;
         size_t byte_index = rng_() % data.size();
         uint8_t bit_index = rng_() % 8;
-        data[byte_index] ^= (1 << bit_index);
+        data[byte_index] ^= static_cast<uint8_t>(1U << bit_index);
     }
 
     /**

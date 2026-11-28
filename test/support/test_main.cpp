@@ -2,6 +2,9 @@
  * \file            test_main.cpp
  * \brief           GoogleTest entry with explicit property-test seed replay
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "property/property_seed.h"
@@ -9,13 +12,14 @@
 #include <cstdio>
 #include <cstdlib>
 #include <gmock/gmock.h>
+#include <memory>
 #include <string>
 
 class PropertySeedListener : public ::testing::EmptyTestEventListener {
   public:
     void OnTestStart(const ::testing::TestInfo&) override {
         ::testing::Test::RecordProperty("xgl_property_seed",
-                                        std::to_string(property_base_seed));
+                                        std::to_string(g_property_base_seed));
         ::testing::Test::RecordProperty("xgl_property_stream",
                                         std::to_string(property_test_seed()));
     }
@@ -26,7 +30,7 @@ class PropertySeedListener : public ::testing::EmptyTestEventListener {
                          "Replay: --gtest_filter=%s.%s "
                          "--xgl_property_seed=%u\n",
                          info.test_suite_name(), info.name(),
-                         static_cast<unsigned int>(property_base_seed));
+                         static_cast<unsigned int>(g_property_base_seed));
         }
     }
 };
@@ -54,11 +58,27 @@ int main(int argc, char** argv) {
     }
     argc = retained;
     argv[retained] = nullptr;
+#if defined(_MSC_VER)
+    std::unique_ptr<char, decltype(&std::free)> environment_seed(nullptr,
+                                                                 &std::free);
+#endif
     if (requested == nullptr) {
+#if defined(_MSC_VER)
+        char* value = nullptr;
+        size_t length = 0;
+        const auto status = _dupenv_s(&value, &length, "XGL_PROPERTY_SEED");
+        environment_seed.reset(value);
+        if (status != 0) {
+            std::fputs("Unable to read XGL_PROPERTY_SEED\n", stderr);
+            return 2;
+        }
+        requested = environment_seed.get();
+#else
         requested = std::getenv("XGL_PROPERTY_SEED");
+#endif
     }
     if (requested != nullptr &&
-        !property_parse_seed(requested, property_base_seed)) {
+        !property_parse_seed(requested, g_property_base_seed)) {
         std::fprintf(stderr,
                      "Invalid property seed: use decimal 0..4294967295\n");
         return 2;
@@ -66,7 +86,7 @@ int main(int argc, char** argv) {
     ::testing::InitGoogleMock(&argc, argv);
     if (!::testing::GTEST_FLAG(list_tests)) {
         std::printf("XGL_PROPERTY_SEED=%u\n",
-                    static_cast<unsigned int>(property_base_seed));
+                    static_cast<unsigned int>(g_property_base_seed));
     }
     ::testing::UnitTest::GetInstance()->listeners().Append(
         new PropertySeedListener);

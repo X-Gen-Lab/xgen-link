@@ -1,6 +1,10 @@
 /**
  * \file            test_window.cpp
  * \brief           Unit tests for production packet-number sliding window
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <cstring>

@@ -1,0 +1,8 @@
+<nav class="xgl-language" aria-label="Documentation language">
+  <a href="{{ xgl_languages }}">XGen Link</a>
+  {% if xgl_chinese %}<a href="{{ xgl_chinese }}" lang="zh-CN">简体中文</a>{% endif %}
+  {% if xgl_english %}<a href="{{ xgl_english }}" lang="en">English</a>{% endif %}
+</nav>
+{% if xgl_source_preview %}
+<p class="xgl-preview">预览 / Preview · English pages with incomplete catalogs can show the Chinese source.</p>
+{% endif %}

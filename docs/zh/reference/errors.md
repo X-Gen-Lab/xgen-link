@@ -1,3 +1,10 @@
+---
+id: reference/errors
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 错误
 
 `xgl_error_t` 定义公开协议错误。公共入口在出错时返回本表的状态；私有资源操作的失败由相应的协议边界转换。

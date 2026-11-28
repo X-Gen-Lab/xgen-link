@@ -1,0 +1,95 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 8f84c68f4d99d532905f0ff849e8f64982b55401c2b3a8f92e9e63bf99c5bc2c\n"
+
+#: docs/zh/reference/glossary.md:8
+msgid "术语表"
+msgstr "Glossary"
+
+#: docs/zh/reference/glossary.md:0
+msgid "术语"
+msgstr "Term"
+
+#: docs/zh/reference/glossary.md:0
+msgid "含义"
+msgstr "Meaning"
+
+#: docs/zh/reference/glossary.md:0
+msgid "Peer scope"
+msgstr "Peer scope"
+
+#: docs/zh/reference/glossary.md:0
+msgid "`(remote_id, connection_id, session_epoch)`，拥有可靠状态"
+msgstr "`(remote_id, connection_id, session_epoch)`; owns reliability state"
+
+#: docs/zh/reference/glossary.md:0
+msgid "可靠包序号"
+msgstr "Reliable packet number"
+
+#: docs/zh/reference/glossary.md:0
+msgid "仅由可靠 DATA 消耗的序号"
+msgstr "Sequence consumed only by reliable DATA"
+
+#: docs/zh/reference/glossary.md:0
+msgid "安全序号"
+msgstr "Security sequence"
+
+#: docs/zh/reference/glossary.md:0
+msgid "每次签名尝试消耗的独立 64 位序号"
+msgstr "Independent 64-bit sequence consumed per signing attempt"
+
+#: docs/zh/reference/glossary.md:0
+msgid "Session"
+msgstr "Session"
+
+#: docs/zh/reference/glossary.md:0
+msgid "显式可信的方向性安全关联"
+msgstr "Explicit trusted directional security association"
+
+#: docs/zh/reference/glossary.md:0
+msgid "工作区"
+msgstr "Workspace"
+
+#: docs/zh/reference/glossary.md:0
+msgid "调用者或后端预留的实例及有界资源池存储"
+msgstr "Caller or backend reserved storage for instance and bounded pools"
+
+#: docs/zh/reference/glossary.md:0
+msgid "Profile"
+msgstr "Profile"
+
+#: docs/zh/reference/glossary.md:0
+msgid "编译能力和结构体布局"
+msgstr "Compile-time capability and structure layout"
+
+#: docs/zh/reference/glossary.md:0
+msgid "PHY"
+msgstr "PHY"
+
+#: docs/zh/reference/glossary.md:0
+msgid "同步帧消费与有界流读取"
+msgstr "Synchronous frame consumption and bounded stream reads"
+
+#: docs/zh/reference/glossary.md:0
+msgid "背压"
+msgstr "Backpressure"
+
+#: docs/zh/reference/glossary.md:0
+msgid "存储或应用繁忙时，在接纳前拒绝"
+msgstr "Rejection before acceptance when storage or application is busy"
+
+#: docs/zh/reference/glossary.md:0
+msgid "墓碑"
+msgstr "Tombstone"
+
+#: docs/zh/reference/glossary.md:0
+msgid "关闭后保留的安全槽，用于防止 nonce 域复用"
+msgstr "Closed security slot retained to prevent nonce-domain reuse"

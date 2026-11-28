@@ -1,6 +1,10 @@
 /**
  * \file            test_reliable_owned.cpp
  * \brief           Owned reliable record removal and queue isolation
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -36,7 +40,7 @@ class XglReliableOwnedTest : public ::testing::Test {
     }
 };
 
-}  // namespace
+} /* namespace */
 
 TEST_F(XglReliableOwnedTest, RemovesKnownRecord) {
     auto* first = Add(queue, 10U);

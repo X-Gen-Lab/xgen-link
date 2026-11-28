@@ -1,0 +1,184 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 717ff6a27f1e9e65060514534068fdc484795d48b26bf2244f9057beedccf2b8\n"
+
+#: docs/zh/explanation/resource-model.md:8
+msgid "资源模型"
+msgstr "Resource Model"
+
+#: docs/zh/explanation/resource-model.md:10
+msgid "每个实例拥有一个有界 workspace。协议用私有固定池管理独立资源类别及容量。"
+msgstr ""
+"Every instance owns one bounded workspace. Private fixed pools manage the protocol's independently "
+"bounded resource classes."
+
+#: docs/zh/explanation/resource-model.md:12
+msgid "分配阶段"
+msgstr "Allocation Phases"
+
+#: docs/zh/explanation/resource-model.md:14
+msgid "`xgl_memory_requirements()` 校验配置，返回精确的 `size` 和 `alignment`。布局包括实例、池描述符、初始化对象和全部运行时槽位。"
+msgstr ""
+"`xgl_memory_requirements()` validates the configuration and returns exact `size` and `alignment`. The "
+"layout includes the instance, pool descriptors, initialization objects, and all runtime slots."
+
+#: docs/zh/explanation/resource-model.md:16
+msgid ""
+"`xgl_init_static()` 准备并初始化调用者提供的对齐存储，不调用 `memory.allocator`。`xgl_create()` 通过配置的 `xgl_allocator_t` "
+"一次性申请整个 workspace，返回尚未初始化的 handle，随后须调用 `xgl_init()`。两条路径共用同一分区计划。"
+msgstr ""
+"`xgl_init_static()` prepares and initializes caller-owned aligned storage without calling "
+"`memory.allocator`. `xgl_create()` uses the configured `xgl_allocator_t` once for the entire workspace, "
+"then returns an uninitialized handle; call `xgl_init()` next. Both paths use the same partition plan."
+
+#: docs/zh/explanation/resource-model.md:18
+msgid ""
+"准备完成后，初始化、发送、接收处理及清理都只使用 workspace。`xgl_destroy()` 将动态存储一次性归还原 backend；静态存储仍归调用者所有。借用的配置和上下文必须活到销毁结束。"
+msgstr ""
+"After preparation, init, sends, receive processing, and cleanup use only the workspace. `xgl_destroy()` "
+"returns dynamic storage to the original backend once; static storage remains owned by the caller. "
+"Borrowed configuration and contexts must outlive destruction."
+
+#: docs/zh/explanation/resource-model.md:20
+msgid ""
+"`xgl_memory_report()` 无分配地解释同一份规划，分别报告管理区、初始化区、peer、窗口、可靠记录及载荷、帧 scratch 和乱序 RX 占用。类别字节数包含对齐，合计恰好等于 "
+"`report.requirements.size`。失败不改写输出；内联入口检查消费者的配置 ABI 和编译能力身份。"
+msgstr ""
+"`xgl_memory_report()` explains the same plan without allocating: management, initialization, peers, "
+"windows, reliable records and payloads, frame scratch and buffered RX. Category bytes include alignment "
+"and sum exactly to `report.requirements.size`. Failure leaves the report unchanged. Its inline entry "
+"checks the consumer's configuration ABI and compiled profile identity."
+
+#: docs/zh/explanation/resource-model.md:29
+msgid "独立资源池"
+msgstr "Independent Resource Pools"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "资源"
+msgstr "Resource"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "预留方式"
+msgstr "Reservation"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "路由和链路"
+msgstr "Routes and links"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "固定路由数组；每个独立 PHY 一个 parser cache"
+msgstr "Fixed route arrays; one parser cache per distinct PHY"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "路由索引"
+msgstr "Route index"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "embedded-lite/embedded/full 预分配 hash 桶和节点；boot 不包含"
+msgstr "Preallocated hash buckets/nodes in embedded-lite/embedded/full; absent in boot"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "Peer 和窗口"
+msgstr "Peer and window"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "每个 peer 容量一个 peer 对象及窗口存储"
+msgstr "One peer object and window storage per peer capacity"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "可靠 TX"
+msgstr "Reliable TX"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "按全局 TX 容量分别预留包记录和 payload 槽"
+msgstr "Separate packet and payload slots per global TX capacity"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "帧 scratch"
+msgstr "Frame scratch"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "同步且不可重入的 I/O 共用一个完整帧槽"
+msgstr "One complete-frame scratch slot for synchronous, non-reentrant I/O"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "乱序 RX"
+msgstr "Out-of-order RX"
+
+#: docs/zh/explanation/resource-model.md:0
+msgid "按 RX 容量预留记录和载荷槽，槽大小按帧载荷上限计算"
+msgstr ""
+"Reserve a record and payload slot for each RX capacity. Payload slots use the configured frame payload "
+"upper bound."
+
+#: docs/zh/explanation/resource-model.md:40
+msgid "每类运行时资源拥有独立固定池，小 payload 不能占用 peer 或控制记录的预留容量。释放的槽位可以复用，不回退 heap，也不在运行期扩容。"
+msgstr ""
+"Each category has its own fixed pool. A small payload cannot consume a peer or control-record "
+"reservation. Freed slots are reusable with no heap fallback or runtime expansion."
+
+#: docs/zh/explanation/resource-model.md:42
+msgid "容量和失败"
+msgstr "Capacity and Failure"
+
+#: docs/zh/explanation/resource-model.md:44
+msgid "窗口容量属于单个 peer，TX 和乱序容量属于整个实例。耗尽时返回有界失败或延后推进，不自动扩容。ACK 释放的可靠 TX 槽可供应用提交新的 DATA。"
+msgstr ""
+"Window capacity is per peer; TX and out-of-order capacity are global. Exhaustion yields a bounded "
+"failure or deferred work, not an automatic resize. An ACK releases a reliable TX slot for a new DATA "
+"submission."
+
+#: docs/zh/explanation/resource-model.md:46
+msgid ""
+"scope 由远端节点、connection ID 和 epoch 标识。恢复时不能在旧 scope 内静默重置序列号。应关闭旧 scope、排空未认证链路旧流量并使用新 "
+"epoch；认证模式则关闭可信会话并安装新的可信参数。参见[发送 API](../guides/send.md)。"
+msgstr ""
+"A scope is identified by remote node, connection ID, and epoch. Recovery must not silently restart "
+"sequence numbers within an old scope. Close the old scope, drain old unauthenticated traffic, and use a "
+"new epoch; authenticated recovery closes the trusted session and installs fresh trusted parameters. See "
+"[Send API](../guides/send.md)."
+
+#: docs/zh/explanation/resource-model.md:48
+msgid "无 Heap 构建"
+msgstr "No-Heap Builds"
+
+#: docs/zh/explanation/resource-model.md:50
+msgid ""
+"生产构建使用 `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` 禁止 libc 分配。采用静态初始化，或提供带上下文的显式分配器，只申请一次 workspace。启用 NULL "
+"fallback 时，也只在 create 边界解析。"
+msgstr ""
+"Select `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` for production without libc allocation. Use static "
+"initialization, or provide an explicit context allocator for the single workspace reservation. NULL "
+"fallback, when enabled, is resolved only at the create boundary."
+
+#: docs/zh/explanation/resource-model.md:52
+msgid "协议的无 heap 结论不涵盖应用驱动和认证 provider，应检查包含这些组件的最终固件链接结果。"
+msgstr ""
+"A protocol no-heap claim does not cover application drivers or authentication providers. Inspect the "
+"final linked firmware, including those components."
+
+#: docs/zh/explanation/resource-model.md:54
+msgid "测量"
+msgstr "Measurement"
+
+#: docs/zh/explanation/resource-model.md:56
+msgid ""
+"只有 `requirements.size` 表示总字节数。`runtime_blocks` 是所有类别槽数之和；`runtime_block_size` 是最大槽位步长，两者相乘不能描述实际分区布局。"
+msgstr ""
+"Only `requirements.size` is the total byte count. `runtime_blocks` counts slots across all categories; "
+"`runtime_block_size` is the largest stride. Multiplying them does not describe the partitioned layout."
+
+#: docs/zh/explanation/resource-model.md:58
+msgid "ABI、profile、路由数、帧大小及全部容量都会影响 RAM。用产品工具链测量 workspace 并检查最终链接固件。核算 BSP、应用缓冲、ISR 嵌套和完整调用链所需的栈。"
+msgstr ""
+"ABI, profile, route count, frame size, and all capacities affect RAM. Use the product toolchain to "
+"measure workspace size and inspect the linked firmware. Account for BSP memory, application buffers, ISR"
+" nesting and total call-stack depth."

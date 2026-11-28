@@ -36,7 +36,7 @@ class MockPhy {
      * \param[in,out]   len: Buffer size / received length
      * \return          XGL_OK on success
      */
-    MOCK_METHOD(xgl_error_t, rx_impl, (uint8_t* buffer, size_t* len));
+    MOCK_METHOD(xgl_error_t, rx_impl, (uint8_t * buffer, size_t* len));
 
     /**
      * \brief           Get C-style PHY operations interface

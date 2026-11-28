@@ -1,6 +1,10 @@
 /**
  * \file            test_api_contracts.cpp
  * \brief           Explicit creation errors and budget-aware scheduling
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"

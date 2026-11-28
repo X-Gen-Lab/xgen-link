@@ -2,6 +2,9 @@
  * \file            test_rtt.cpp
  * \brief           RTT estimator unit tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <gtest/gtest.h>

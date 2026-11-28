@@ -2,6 +2,9 @@
  * \file            test_frame.cpp
  * \brief           Frame encapsulation unit tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <wire/xgl_frame.h>
@@ -449,7 +452,7 @@ TEST(XglFrameTest, SerializeFrameBufferTooSmall) {
 }
 
 TEST(XglFrameTest, SerializeFrameNullPointers) {
-    xgl_frame_t frame;
+    xgl_frame_t frame = {};
     uint8_t buffer[256];
     size_t bytes_written;
 
@@ -729,7 +732,7 @@ TEST(XglFrameTest, MeasureClearsFailedLayoutAndPreservesErrorPriority) {
     xgl_frame_t frame = {};
     auto expect_failure = [](const xgl_frame_t* input, size_t tag_length,
                              xgl_error_t expected) {
-        xgl_frame_layout_t layout = {42U, 43U, 44U, 45U};
+        xgl_frame_layout_t layout = {42U, 43U, 44U, 45U, 0U};
         EXPECT_EQ(xgl_frame_measure(input, tag_length, &layout), expected);
         EXPECT_EQ(layout.header_len, 0U);
         EXPECT_EQ(layout.payload_len, 0U);

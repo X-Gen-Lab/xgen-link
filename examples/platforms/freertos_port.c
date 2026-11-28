@@ -3,6 +3,9 @@
  * \brief           Single-task FreeRTOS integration with caller-owned driver
  * copies
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-06
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <xgl/xgl.h>
 #ifdef XGL_PORT_FREERTOS_EXAMPLE
@@ -16,10 +19,8 @@ extern size_t board_rx_copy_available(uint8_t* data, size_t capacity);
 
 /**
  * \brief           Copy TX bytes into bounded driver-owned DMA storage
- * \param[in]       data: Borrowed frame bytes
- * \param[in]       length: Complete frame length
- * \param[in]       context: Driver context, unused by the skeleton
- * \return          Board driver acceptance status
+ * \details         The driver takes ownership of the copy before the borrowed
+ *                  frame is released.
  */
 static xgl_error_t freertos_tx(const uint8_t* data, size_t length,
                                void* context) {
@@ -29,10 +30,8 @@ static xgl_error_t freertos_tx(const uint8_t* data, size_t length,
 
 /**
  * \brief           Drain available RX bytes without blocking the protocol task
- * \param[out]      data: Caller RX buffer
- * \param[in,out]   length: Capacity on entry, produced bytes on return
- * \param[in]       context: Driver context, unused by the skeleton
- * \return          XGL_OK
+ * \details         Replace the supplied capacity with the number of bytes
+ *                  copied before returning.
  */
 static xgl_error_t freertos_rx(uint8_t* data, size_t* length, void* context) {
     (void)context;
@@ -44,8 +43,8 @@ xgl_phy_ops_t xgl_freertos_phy = {freertos_tx, freertos_rx, NULL};
 
 /**
  * \brief           Run all protocol operations for one instance in one task
- * \param[in]       context: Handle initialized from storage owned by the
- * application
+ * \details         The task receives a handle initialized in application-owned
+ *                  storage.
  * \note            Other tasks and ISRs queue commands; they do not call this
  * handle.
  */

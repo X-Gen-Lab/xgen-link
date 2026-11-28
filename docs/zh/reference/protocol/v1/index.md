@@ -1,3 +1,10 @@
+---
+id: reference/protocol/v1/index
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 协议概览
 
 XGen Link 实现面向有界、同步嵌入式通信的 Wire v1。各 profile 使用相同的帧头和扩展编码。收发与转发只接受版本字段为 1 的帧。

@@ -2,6 +2,9 @@
  * \file            bench_latency.cpp
  * \brief           Host CPU latency for reliable simulated exchanges
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-07-10
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <chrono>
 #include <cstdio>

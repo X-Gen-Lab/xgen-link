@@ -2,6 +2,9 @@
  * \file            xgl_config.c
  * \brief           Configuration management implementation
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <network/xgl_network.h>
@@ -62,7 +65,6 @@ void xgl_config_get_default_v5(xgl_config_t* config) {
 
 /**
  * \brief           Configure the bounded single-peer boot transport
- * \param[out]      config: Destination configuration, or NULL
  */
 void xgl_config_get_preset_boot_v5(xgl_config_t* config) {
     if (config == NULL) {
@@ -153,9 +155,8 @@ void xgl_config_get_preset_production_v5(xgl_config_t* config) {
 #if XGL_FEATURE_AUTH
 /**
  * \brief           Measure the largest mandatory authenticated base frame
- * \param[in]       tag_len: Validated fixed authentication trailer size
- * \param[out]      frame_size: Required bytes for one ordinary ACK_RANGE
- * \return          True when the wire encoder accepts the base frame
+ * \details         Use one ordinary ACK_RANGE and the validated fixed trailer
+ *                  length to measure the required capacity.
  * \note            The base ACK exceeds HELLO and one-byte DATA overhead.
  *                  Optional SESSION and DATA_TYPE extensions are
  *                  measured separately for each actual transmission.

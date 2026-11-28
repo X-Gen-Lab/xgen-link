@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 5f395a42c0e39cff485c34b5d91d7bedd6b17c56eded69040b7d8a437130bd85\n"
+
+#: docs/zh/getting-started/quick-start.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/getting-started/quick-start.md:11
+msgid "请查阅[当前文档](../tutorials/first-link.md)。"
+msgstr "See the [current documentation](../tutorials/first-link.md)."

@@ -1,0 +1,24 @@
+# Owned C and C++ source selected from the Git index.
+include
+src
+test
+examples
+
+!build
+!build-*
+!cmake-build-*
+!out
+!vendor
+!vendors
+!ext
+!*/vendor
+!*/vendors
+
+[extensions]
+.c
+.h
+.cpp
+.hpp
+.cc
+.hh
+.inc

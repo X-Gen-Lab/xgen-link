@@ -2,6 +2,9 @@
  * \file            test_boot_network.cpp
  * \brief           Boot logical TX bounds retain the complete wire decoder
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_datalink.h>

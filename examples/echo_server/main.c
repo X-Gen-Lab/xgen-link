@@ -2,6 +2,9 @@
  * \file            main.c
  * \brief           Deferred two-node echo with explicit time and static storage
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <stdio.h>
 
@@ -18,13 +21,8 @@ typedef struct {
 /**
  * \brief           Copy borrowed data into a bounded slot without reentering
  * the instance
- * \param[in]       handle: Callback instance, deliberately unused
- * \param[in]       source: Remote node
- * \param[in]       type: Application type
- * \param[in]       data: Borrowed payload
- * \param[in]       length: Payload size
- * \param[in,out]   context: Pending application slot
- * \return          XGL_OK after copying, BUSY if an echo is still pending
+ * \details         Return BUSY while an earlier echo remains pending. Accept
+ *                  only after copying the borrowed payload.
  */
 static xgl_error_t echo_accept(xgl_handle_t handle, uint16_t source,
                                uint8_t type, const uint8_t* data, size_t length,

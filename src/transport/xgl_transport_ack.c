@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_ack.c
  * \brief           Acknowledgement validation and reliable completion
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-15
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "wire/xgl_wire.h"
@@ -21,9 +25,8 @@ typedef struct {
 
 /**
  * \brief           Initialize a bounded cursor over an ACK range extension
- * \param[out]      cursor: Range cursor
- * \param[in]       ext: Fully contained ACK range extension
- * \return          XGL_OK if the extension length and count are valid
+ * \details         Check the extension length and range count before opening
+ *                  the cursor.
  */
 static xgl_error_t ack_ranges_init(ack_ranges_t* cursor,
                                    const xgl_wire_ext_t* ext) {
@@ -39,10 +42,8 @@ static xgl_error_t ack_ranges_init(ack_ranges_t* cursor,
 
 /**
  * \brief           Read the next inclusive ACK range without numeric wraparound
- * \param[in,out]   cursor: Range cursor
- * \param[out]      low: Lowest acknowledged packet number
- * \param[out]      high: Highest acknowledged packet number
- * \return          XGL_OK, XGL_ERR_NOT_FOUND at end, or a validation error
+ * \details         Exhaustion returns XGL_ERR_NOT_FOUND. Malformed ranges
+ *                  return a validation error.
  */
 static xgl_error_t ack_ranges_next(ack_ranges_t* cursor, uint32_t* low,
                                    uint32_t* high) {
@@ -80,10 +81,8 @@ static xgl_error_t ack_ranges_next(ack_ranges_t* cursor, uint32_t* low,
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Complete one actually transmitted packet in its owning peer
- * \param[in,out]   ctx: Transport layer context
- * \param[in,out]   peer: Owning peer
- * \param[in]       packet: Live record already found in the owning queue
- * \param[in]       now_ms: Current transport clock
+ * \details         The live record must already belong to the selected peer
+ *                  queue.
  */
 static void transport_acknowledge_packet(xgl_transport_ctx_t* ctx,
                                          xgl_transport_peer_state_t* peer,
@@ -177,7 +176,7 @@ static bool transport_sack_bit_is_set(const uint8_t* bitmap, size_t bit_index) {
 
 /**
  * \brief           Schedule a missing original packet before RTO recovery
- * \param[in,out]   packet: Outstanding packet, or NULL if already acknowledged
+ * \details         A missing record means it was already acknowledged.
  * \note            Maintenance submits the retry after the receive stack has
  *                  unwound. Duplicate feedback preserves a local retry delay.
  */
@@ -274,10 +273,6 @@ static void transport_apply_sack(xgl_transport_ctx_t* ctx,
 /**
  * \brief           Validate an entire acknowledgement before applying
  *                  completion
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet: Borrowed acknowledgement view
- * \return          XGL_OK or an acknowledgement validation error
  */
 xgl_error_t transport_process_ack_packet(xgl_transport_ctx_t* ctx,
                                          xgl_handle_t handle,

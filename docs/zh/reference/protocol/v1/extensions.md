@@ -1,3 +1,10 @@
+---
+id: reference/protocol/v1/extensions
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 扩展
 
 每个 TLV 的布局为 `type:u8 | value_length:u8 | value`。TLV 受 `header_len` 限定，不从载荷内容推断边界。类型 `0` 无效，结构合法的未知非关键类型可被跳过。重复的 DATA_TYPE、SESSION、SECURITY 单例扩展会被拒绝；transport 要求每个 ACK 恰好包含一个 ACK_RANGE 或 SACK。

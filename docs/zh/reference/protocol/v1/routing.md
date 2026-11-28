@@ -1,3 +1,10 @@
+---
+id: reference/protocol/v1/routing
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 路由
 
 一条路由把目标节点映射到 PHY 及其完整帧 MTU。路由属于协议配置，Network 层持有固定路由表与可选的私有索引。容量耗尽时返回错误。

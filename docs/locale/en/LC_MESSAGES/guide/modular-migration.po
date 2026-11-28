@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: cc9f2c864de73c238fd452a2f6e5fdb586f16625b5bc2984c7c3b9a604fafa9f\n"
+
+#: docs/zh/guide/modular-migration.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/guide/modular-migration.md:11
+msgid "请查阅[当前文档](../guides/migration.md)。"
+msgstr "See the [current documentation](../guides/migration.md)."

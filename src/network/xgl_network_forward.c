@@ -2,6 +2,9 @@
  * \file            xgl_network_forward.c
  * \brief           Routed frame forwarding through the datalink submission
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_allocator.h"
@@ -61,11 +64,7 @@ static xgl_error_t network_validate_forward_size(xgl_network_ctx_t* ctx,
 
 /**
  * \brief           Forward a frame using parser storage or bounded scratch
- * \param[in,out]   ctx: Network layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       metadata: Validated incoming frame view
- * \param[in,out]   mutable_frame: Parser-owned bytes, restored before return
- * \return          XGL_OK on success, error code otherwise
+ * \details         Restore any parser-owned bytes before returning.
  * \note            The selected PHY must finish reading before tx returns.
  */
 xgl_error_t xgl_network_forward_mutable(xgl_network_ctx_t* ctx,

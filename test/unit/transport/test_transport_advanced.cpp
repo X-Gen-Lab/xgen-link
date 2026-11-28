@@ -1,6 +1,10 @@
 /**
  * \file            test_transport_advanced.cpp
  * \brief           Optional scoped runtime, deadlines and bounded maintenance
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -58,7 +62,7 @@ class XglTransportAdvancedTest : public ::testing::Test {
     }
 
     void Init(uint32_t lifetime = 0U, uint8_t window = 1U) {
-        lower = {this, Submit};
+        lower = {this, Submit, nullptr, nullptr};
         xgl_transport_config_t config = {};
         config.local_id = 1U;
         config.max_retry_count = 3U;
@@ -112,7 +116,8 @@ class XglTransportAdvancedTest : public ::testing::Test {
                                                       &range, 1U, &value_len);
         if (error != XGL_OK)
             return XGL_ERR_INVALID_FRAME;
-        uint8_t type = selective ? XGL_WIRE_EXT_SACK : XGL_WIRE_EXT_ACK_RANGE;
+        const auto type = static_cast<uint8_t>(
+            selective ? XGL_WIRE_EXT_SACK : XGL_WIRE_EXT_ACK_RANGE);
         if (xgl_wire_encode_ext(ext.data(), ext.size(), type, value.data(),
                                 value_len, &ext_len) != XGL_OK)
             return XGL_ERR_INVALID_FRAME;
@@ -129,7 +134,7 @@ class XglTransportAdvancedTest : public ::testing::Test {
         return xgl_transport_receive(&ctx, nullptr, &packet);
     }
 };
-}  // namespace
+} /* namespace */
 
 TEST_F(XglTransportAdvancedTest, BusyPeriodExpiresEvenWithZeroTransmitBudget) {
     Init(250U);

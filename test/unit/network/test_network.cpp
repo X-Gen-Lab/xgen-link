@@ -1,9 +1,13 @@
-#include "test_host_allocator.h"
 /**
  * \file            test_network.cpp
  * \brief           Unit tests for network layer
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
+
+#include "test_host_allocator.h"
 
 #include <datalink/xgl_datalink.h>
 #include <network/xgl_network.h>
@@ -62,19 +66,19 @@ struct NetworkForwardAllocatorState {
     size_t free_count = 0;
 };
 
-static NetworkForwardAllocatorState* g_network_forward_allocator_state =
+static NetworkForwardAllocatorState* s_network_forward_allocator_state =
     nullptr;
 
 static void* network_forward_test_malloc(void*, size_t size) {
-    if (g_network_forward_allocator_state != nullptr) {
-        g_network_forward_allocator_state->alloc_count++;
+    if (s_network_forward_allocator_state != nullptr) {
+        s_network_forward_allocator_state->alloc_count++;
     }
     return std::malloc(size);
 }
 
 static void network_forward_test_free(void*, void* ptr) {
-    if (g_network_forward_allocator_state != nullptr) {
-        g_network_forward_allocator_state->free_count++;
+    if (s_network_forward_allocator_state != nullptr) {
+        s_network_forward_allocator_state->free_count++;
     }
     std::free(ptr);
 }
@@ -228,7 +232,8 @@ class XglNetworkTest : public ::testing::Test {
             return {};
         }
 
-        // Replace the unknown TLV with a second DATA_TYPE and repair the CRC.
+        /* Replace the unknown TLV with a second DATA_TYPE and repair the CRC.
+         */
         bytes[XGL_WIRE_BASE_HEADER_SIZE + XGL_DATA_TYPE_EXT_SIZE] =
             XGL_WIRE_EXT_DATA_TYPE;
         const size_t crc_offset = written - XGL_CRC16_SIZE;
@@ -282,8 +287,9 @@ TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
                            0U,
                            1U,
                            0U};
-    for (uint8_t type :
-         {XGL_PACKET_TYPE_DATA, XGL_PACKET_TYPE_ACK, XGL_PACKET_TYPE_CONTROL}) {
+    const uint8_t packet_types[] = {XGL_PACKET_TYPE_DATA, XGL_PACKET_TYPE_ACK,
+                                    XGL_PACKET_TYPE_CONTROL};
+    for (uint8_t type : packet_types) {
         xgl_packet_data_t data = {};
         if (type == XGL_PACKET_TYPE_DATA) {
             data.data_len = sizeof(payload);
@@ -663,7 +669,7 @@ TEST_F(XglNetworkTest, FrameMetadataRejectsEveryTruncatedHeaderExtension) {
 TEST_F(XglNetworkTest, InitializeNetworkContext) {
     xgl_network_ctx_t ctx;
     xgl_route_table_t table;
-    xgl_layer_stats_t test_stats = {0};
+    xgl_layer_stats_t test_stats = {};
 
     xgl_route_table_init(&table, 4, xgl_test_host_allocator());
 
@@ -850,19 +856,19 @@ TEST_F(XglNetworkTest, SendPacketEncodesApplicationTypeAsHeaderExtension) {
     lower_layer.send = [](void* ctx, xgl_handle_t handle,
                           const xgl_frame_tx_message_t* data) -> xgl_error_t {
         (void)handle;
-        auto* capture = static_cast<CapturedFrameMessage*>(ctx);
+        auto* captured = static_cast<CapturedFrameMessage*>(ctx);
         auto* message = static_cast<const xgl_frame_tx_message_t*>(data);
-        if (capture == nullptr || message == nullptr ||
+        if (captured == nullptr || message == nullptr ||
             message->frame == nullptr) {
             return XGL_ERR_NULL_POINTER;
         }
-        capture->frame = *message->frame;
+        captured->frame = *message->frame;
         if (message->frame->extensions != nullptr &&
             message->frame->extensions_len > 0U) {
-            capture->extensions.assign(message->frame->extensions,
-                                       message->frame->extensions +
-                                           message->frame->extensions_len);
-            capture->frame.extensions = capture->extensions.data();
+            captured->extensions.assign(message->frame->extensions,
+                                        message->frame->extensions +
+                                            message->frame->extensions_len);
+            captured->frame.extensions = captured->extensions.data();
         }
         return XGL_OK;
     };
@@ -1011,16 +1017,16 @@ TEST_F(XglNetworkTest, ReceivePacketForForwarding) {
     xgl_error_t err = xgl_network_receive(&network_ctx, nullptr,
                                           frame_buf.data(), frame_buf.size());
     EXPECT_EQ(err, XGL_OK);
-    EXPECT_EQ(phy_tx_count, initial_tx_count + 1);  // Should forward
+    EXPECT_EQ(phy_tx_count, initial_tx_count + 1); /* Should forward */
 }
 
 TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
     ASSERT_EQ(
         xgl_route_table_add(&route_table, FORWARD_ID, &phy_ops, 256, 100, 1),
         XGL_OK);
-    xgl_layer_stats_t datalink_stats = {};
+    xgl_layer_stats_t forwarded_stats = {};
     xgl_datalink_config_t config = {};
-    config.stats = &datalink_stats;
+    config.stats = &forwarded_stats;
     xgl_datalink_ctx_t datalink = {};
     ASSERT_EQ(xgl_datalink_init(&datalink, &config), XGL_OK);
     xgl_frame_tx_endpoint_t lower = {};
@@ -1032,8 +1038,8 @@ TEST_F(XglNetworkTest, ForwardingUsesDatalinkSubmissionAndCountsWireBytes) {
         xgl_network_receive(&network_ctx, nullptr, frame.data(), frame.size()),
         XGL_OK);
     EXPECT_EQ(phy_tx_count, 1);
-    EXPECT_EQ(datalink_stats.tx_packets, 1U);
-    EXPECT_EQ(datalink_stats.tx_bytes, frame.size());
+    EXPECT_EQ(forwarded_stats.tx_packets, 1U);
+    EXPECT_EQ(forwarded_stats.tx_bytes, frame.size());
 }
 
 TEST_F(XglNetworkTest, ForwardingRejectsMissingPhyTransmitOperation) {
@@ -1123,7 +1129,7 @@ TEST_F(XglNetworkTest, ForwardingRejectsRouteMtuOverflow) {
 
 TEST_F(XglNetworkTest, ForwardingAllocatesWholeFrameFromNetworkResource) {
     NetworkForwardAllocatorState allocator_state;
-    g_network_forward_allocator_state = &allocator_state;
+    s_network_forward_allocator_state = &allocator_state;
     xgl_allocator_t allocator = {};
     allocator.ctx = nullptr;
     allocator.alloc = network_forward_test_malloc;
@@ -1173,13 +1179,13 @@ TEST_F(XglNetworkTest, ForwardingAllocatesWholeFrameFromNetworkResource) {
     EXPECT_EQ(allocator_state.alloc_count, 1U);
     EXPECT_EQ(allocator_state.free_count, 1U);
 
-    g_network_forward_allocator_state = nullptr;
+    s_network_forward_allocator_state = nullptr;
 }
 
 TEST_F(XglNetworkTest,
        SmallForwardReleasesAllocatorBufferAfterSuccessAndFailure) {
     NetworkForwardAllocatorState allocator_state;
-    g_network_forward_allocator_state = &allocator_state;
+    s_network_forward_allocator_state = &allocator_state;
     xgl_allocator_t allocator = {};
     allocator.ctx = nullptr;
     allocator.alloc = network_forward_test_malloc;
@@ -1207,7 +1213,7 @@ TEST_F(XglNetworkTest,
         XGL_ERR_TX_FAILED);
     EXPECT_EQ(allocator_state.alloc_count, 2U);
     EXPECT_EQ(allocator_state.free_count, 2U);
-    g_network_forward_allocator_state = nullptr;
+    s_network_forward_allocator_state = nullptr;
 }
 
 TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
@@ -1262,9 +1268,9 @@ TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
               XGL_OK);
     const size_t original_tag_offset =
         (size_t)original.header_len + (size_t)original.payload_len;
-    std::vector<uint8_t> original_tag(encoded.begin() + original_tag_offset,
-                                      encoded.begin() + original_tag_offset +
-                                          provider.tag_len);
+    const uint8_t* original_tag_start = encoded.data() + original_tag_offset;
+    const std::vector<uint8_t> original_tag(
+        original_tag_start, original_tag_start + provider.tag_len);
 
     ASSERT_EQ(xgl_network_receive(&network_ctx, nullptr, encoded.data(),
                                   encoded.size()),
@@ -1281,9 +1287,10 @@ TEST_F(XglNetworkTest, ForwardingPreservesEndToEndAuthTagAfterTtlDecrement) {
         (size_t)forwarded.header_len + (size_t)forwarded.payload_len;
     ASSERT_LE(forwarded_tag_offset + provider.tag_len,
               capture.bytes.size() - XGL_CRC16_SIZE);
-    EXPECT_EQ(std::vector<uint8_t>(capture.bytes.begin() + forwarded_tag_offset,
-                                   capture.bytes.begin() +
-                                       forwarded_tag_offset + provider.tag_len),
+    const uint8_t* forwarded_tag_start =
+        capture.bytes.data() + forwarded_tag_offset;
+    EXPECT_EQ(std::vector<uint8_t>(forwarded_tag_start,
+                                   forwarded_tag_start + provider.tag_len),
               original_tag);
 
     xgl_security_ctx_t receiver = {};
@@ -1312,7 +1319,7 @@ TEST_F(XglNetworkTest, ReceivePacketNoRouteForForwarding) {
 }
 
 TEST_F(XglNetworkTest, ReceiveInvalidFrame) {
-    uint8_t frame_buf[5] = {0};  // Too short
+    uint8_t frame_buf[5] = {0}; /* Too short */
 
     xgl_error_t err = xgl_network_receive(&network_ctx, nullptr, frame_buf, 5);
     EXPECT_EQ(err, XGL_ERR_INVALID_FRAME);
@@ -1377,13 +1384,13 @@ TEST_F(XglNetworkTest, ReceiveLocalPacketPropagatesSessionExtensionEpoch) {
     upper_layer.receive = [](void* ctx, xgl_handle_t handle,
                              const xgl_packet_t* data) -> xgl_error_t {
         (void)handle;
-        auto* capture = static_cast<CapturedPacket*>(ctx);
+        auto* captured = static_cast<CapturedPacket*>(ctx);
         auto* packet = static_cast<const xgl_packet_t*>(data);
-        if (capture == nullptr || packet == nullptr) {
+        if (captured == nullptr || packet == nullptr) {
             return XGL_ERR_NULL_POINTER;
         }
-        capture->called = true;
-        capture->packet = *packet;
+        captured->called = true;
+        captured->packet = *packet;
         return XGL_OK;
     };
     network_ctx.upper_layer = &upper_layer;
@@ -1426,13 +1433,13 @@ TEST_F(XglNetworkTest, DataBuilderNormalizesTheControlFlag) {
     upper_layer.receive = [](void* ctx, xgl_handle_t handle,
                              const xgl_packet_t* data) -> xgl_error_t {
         (void)handle;
-        auto* capture = static_cast<CapturedPacket*>(ctx);
+        auto* captured = static_cast<CapturedPacket*>(ctx);
         auto* packet = static_cast<const xgl_packet_t*>(data);
-        if (capture == nullptr || packet == nullptr) {
+        if (captured == nullptr || packet == nullptr) {
             return XGL_ERR_NULL_POINTER;
         }
-        capture->called = true;
-        capture->packet = *packet;
+        captured->called = true;
+        captured->packet = *packet;
         return XGL_OK;
     };
     network_ctx.upper_layer = &upper_layer;
@@ -1534,12 +1541,9 @@ TEST_F(XglNetworkTest, FrameMetadataRejectsDuplicateDataTypeExtensions) {
 
 TEST_F(XglNetworkTest, ErrorCallbackInvoked) {
     bool callback_invoked = false;
-    xgl_error_t callback_error = XGL_OK;
 
-    auto error_cb = [](xgl_handle_t handle, xgl_error_t error,
-                       const char* message, void* user_data) {
-        (void)handle;
-        (void)message;
+    auto error_cb = [](xgl_handle_t, xgl_error_t, const char*,
+                       void* user_data) {
         bool* invoked = (bool*)user_data;
         *invoked = true;
     };
@@ -1554,7 +1558,7 @@ TEST_F(XglNetworkTest, ErrorCallbackInvoked) {
     xgl_packet_t packet = {};
     packet.source_id = LOCAL_ID;
     packet.target_id = 99;
-    // No route
+    /* No route */
     packet.data_type = 1;
     packet.reliable = 1;
     packet.priority = 0;

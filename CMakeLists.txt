@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.24)
 include(cmake/XglVersion.cmake)
-project(xgl VERSION "${XGL_VERSION}" DESCRIPTION "xgen-link Protocol Stack" LANGUAGES C)
+project(
+    xgl
+    VERSION "${XGL_VERSION}"
+    DESCRIPTION "xgen-link Protocol Stack"
+    LANGUAGES C
+)
 
 include(GNUInstallDirs)
 
@@ -8,26 +13,45 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-option(XGL_BUILD_TESTS "Build regression tests matching the selected profile" OFF)
+option(
+    XGL_BUILD_TESTS
+    "Build regression tests matching the selected profile"
+    OFF
+)
 option(XGL_BUILD_EXAMPLES "Build examples" OFF)
 option(XGL_BUILD_DOCS "Build documentation" OFF)
 option(XGL_ENABLE_COVERAGE "Enable code coverage" OFF)
 option(XGL_BUILD_FOOTPRINT_REPORT "Build footprint report target" OFF)
-option(XGL_BUILD_SDK_CONSUMER_SMOKE "Build install-package consumer smoke test target" OFF)
-option(XGL_BUILD_RELEASE_VALIDATION_TARGET "Build release validation helper target" OFF)
+option(
+    XGL_BUILD_SDK_CONSUMER_SMOKE
+    "Build install-package consumer smoke test target"
+    OFF
+)
+option(
+    XGL_BUILD_RELEASE_VALIDATION_TARGET
+    "Build release validation helper target"
+    OFF
+)
 option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" OFF)
 
-if(CMAKE_CROSSCOMPILING AND
-   (XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE OR XGL_BUILD_SDK_CONSUMER_SMOKE))
-    message(FATAL_ERROR
-        "XGL_BUILD_TESTS, XGL_BUILD_NOHEAP_SMOKE and XGL_BUILD_SDK_CONSUMER_SMOKE require a separate native host build")
+if(
+    CMAKE_CROSSCOMPILING
+    AND (XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE OR XGL_BUILD_SDK_CONSUMER_SMOKE)
+)
+    message(
+        FATAL_ERROR
+        "XGL_BUILD_TESTS, XGL_BUILD_NOHEAP_SMOKE and XGL_BUILD_SDK_CONSUMER_SMOKE require a separate native host build"
+    )
 endif()
 
 include(cmake/XglProfiles.cmake)
 include(cmake/XglLibrary.cmake)
 xgl_add_library(xgl "${XGL_ALLOW_FALLBACK_MALLOC}" "${CMAKE_CURRENT_BINARY_DIR}/generated")
 add_library(xgl::xgl ALIAS xgl)
-target_include_directories(xgl PUBLIC "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+target_include_directories(
+    xgl
+    PUBLIC "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
 get_target_property(XGL_BUILD_CONFIG_ID xgl XGL_BUILD_CONFIG_ID)
 get_target_property(XGL_RESOURCE_CONFIG_ID xgl XGL_RESOURCE_CONFIG_ID)
 
@@ -36,7 +60,10 @@ if(XGL_ENABLE_COVERAGE)
         target_compile_options(xgl PRIVATE --coverage -O0 -g)
         target_link_options(xgl PUBLIC --coverage)
     else()
-        message(FATAL_ERROR "XGL_ENABLE_COVERAGE requires a native GNU compiler and gcov")
+        message(
+            FATAL_ERROR
+            "XGL_ENABLE_COVERAGE requires a native GNU compiler and gcov"
+        )
     endif()
 endif()
 

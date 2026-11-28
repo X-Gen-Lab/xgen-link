@@ -1,3 +1,10 @@
+---
+id: reference/glossary
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 术语表
 
 | 术语 | 含义 |

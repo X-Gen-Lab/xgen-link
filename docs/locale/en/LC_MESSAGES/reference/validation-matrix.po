@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: b9c2109cbb74ad61ed1d221b75f3086e734cd297f3bb2aba9d0cac55ffcb4462\n"
+
+#: docs/zh/reference/validation-matrix.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/reference/validation-matrix.md:11
+msgid "请查阅[当前文档](../development/validation.md)。"
+msgstr "See the [current documentation](../development/validation.md)."

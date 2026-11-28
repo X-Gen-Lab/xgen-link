@@ -1,7 +1,10 @@
 /**
  * \file            xgl_version.c
- * \brief           Protocol version API implementation
+ * \brief           SDK version queries
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-16
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <xgl/xgl.h>
@@ -11,14 +14,14 @@
 /*---------------------------------------------------------------------------*/
 
 /**
- * \brief           Get protocol version string at runtime
+ * \brief           Get the linked SDK version string
  */
 const char* xgl_version_string(void) {
     return XGL_VERSION_STRING;
 }
 
 /**
- * \brief           Get protocol version as integer at runtime
+ * \brief           Get the linked SDK version as an integer
  */
 uint32_t xgl_version_int(void) {
     return XGL_VERSION_INT;

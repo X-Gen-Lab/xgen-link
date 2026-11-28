@@ -1,3 +1,10 @@
+---
+id: explanation/datalink
+type: explanation
+audience: user
+source_language: zh_CN
+---
+
 # 数据链路
 
 Datalink 隔离 PHY 字节 I/O 与协议包，不持有可靠性、peer 身份或可信会话状态。

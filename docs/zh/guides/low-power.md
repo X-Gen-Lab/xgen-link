@@ -1,3 +1,10 @@
+---
+id: guides/low-power
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 低功耗运行时
 
 应用显式驱动协议工作。协议不内置时钟 provider、定时器线程或 sleep 实现。

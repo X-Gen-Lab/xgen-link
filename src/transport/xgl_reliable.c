@@ -1,6 +1,10 @@
 /**
  * \file            xgl_reliable.c
  * \brief           Owned reliable records, index and retry backoff
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_allocator.h"
@@ -260,9 +264,8 @@ void xgl_reliable_clear(xgl_reliable_queue_t* queue) {
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Calculate exponential backoff without signed overflow
- * \param[in]       initial_timeout_ms: Initial timeout; nonpositive means zero
- * \param[in]       retry_count: Retry exponent, limited to ten
- * \return          Timeout saturated to the inclusive range 0 to 30000 ms
+ * \details         A nonpositive initial delay becomes zero. Limit the retry
+ *                  exponent to ten and saturate at 30000 ms.
  */
 int32_t xgl_reliable_calc_backoff(int32_t initial_timeout_ms,
                                   uint8_t retry_count) {

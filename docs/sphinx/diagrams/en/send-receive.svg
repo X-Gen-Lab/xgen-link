@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 320" role="img" aria-label="Synchronous transmit path">
+<title>Synchronous transmit path</title>
+<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#41677d"/></marker></defs>
+<style>text{font:18px system-ui,sans-serif;fill:#15334a}.box{fill:#edf4f7;stroke:#41677d;stroke-width:1.5}.arrow{stroke:#41677d;stroke-width:1.5;marker-end:url(#a)}</style>
+<rect class="box" x="125" y="8" rx="7" width="370" height="34"/>
+<text x="310.0" y="31" text-anchor="middle">Application</text>
+<rect class="box" x="125" y="62" rx="7" width="370" height="34"/>
+<text x="310.0" y="85" text-anchor="middle">Transport</text>
+<line class="arrow" x1="310" y1="44" x2="310" y2="60"/>
+<rect class="box" x="125" y="116" rx="7" width="370" height="34"/>
+<text x="310.0" y="139" text-anchor="middle">Network</text>
+<line class="arrow" x1="310" y1="98" x2="310" y2="114"/>
+<rect class="box" x="125" y="170" rx="7" width="370" height="34"/>
+<text x="310.0" y="193" text-anchor="middle">Frame composition and authentication</text>
+<line class="arrow" x1="310" y1="152" x2="310" y2="168"/>
+<rect class="box" x="125" y="224" rx="7" width="370" height="34"/>
+<text x="310.0" y="247" text-anchor="middle">Datalink</text>
+<line class="arrow" x1="310" y1="206" x2="310" y2="222"/>
+<rect class="box" x="125" y="278" rx="7" width="370" height="34"/>
+<text x="310.0" y="301" text-anchor="middle">Synchronous PHY</text>
+<line class="arrow" x1="310" y1="260" x2="310" y2="276"/>
+</svg>

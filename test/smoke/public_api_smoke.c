@@ -2,6 +2,9 @@
  * \file            public_api_smoke.c
  * \brief           Installed C11 creation, deadlines and optional runtime APIs
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <xgl/xgl.h>

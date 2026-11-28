@@ -1,3 +1,10 @@
+---
+id: explanation/implementation-map
+type: explanation
+audience: user
+source_language: zh_CN
+---
+
 # 实现映射
 
 本页标明协议状态的所有者。公开应用包含 `<xgl/xgl.h>`；内部头文件用于实现边界，不作为已删除通用工具的兼容别名。
@@ -12,6 +19,7 @@
 | ACK 原子校验与应用 | `src/transport/xgl_transport_ack.c` |
 | 期限汇总与周期处理 | `src/transport/xgl_transport_runtime.c` |
 | 生产重传路径 | `src/transport/xgl_transport_runtime.c` |
+| 单帧发送规划、接纳与提交 | `src/transport/xgl_transport_tx.c` |
 | 接收排序与保留投递 | `src/transport/xgl_transport_rx.c`、`xgl_transport_rx_delivery.c` |
 | 路由查找、本地投递与转发 | `src/network/` |
 | 规范帧布局与 TLV | `src/wire/` |

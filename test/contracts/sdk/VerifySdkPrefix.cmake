@@ -4,7 +4,10 @@ function(xgl_verify_sdk_prefix expected_prefix)
     file(REAL_PATH "${xgl_DIR}/xglConfig.cmake" config_path)
     cmake_path(IS_PREFIX prefix "${config_path}" NORMALIZE config_inside_prefix)
     if(NOT config_inside_prefix OR NOT EXISTS "${config_path}")
-        message(FATAL_ERROR "Selected SDK config is outside the expected prefix: ${config_path}")
+        message(
+            FATAL_ERROR
+            "Selected SDK config is outside the expected prefix: ${config_path}"
+        )
     endif()
 
     get_target_property(include_dirs xgl::xgl INTERFACE_INCLUDE_DIRECTORIES)
@@ -13,29 +16,59 @@ function(xgl_verify_sdk_prefix expected_prefix)
     endif()
     foreach(directory IN LISTS include_dirs)
         file(REAL_PATH "${directory}" absolute_directory)
-        cmake_path(IS_PREFIX prefix "${absolute_directory}" NORMALIZE include_inside_prefix)
+        cmake_path(
+            IS_PREFIX
+            prefix
+            "${absolute_directory}"
+            NORMALIZE
+            include_inside_prefix
+        )
         if(NOT include_inside_prefix)
-            message(FATAL_ERROR "Selected SDK include is outside the expected prefix: ${absolute_directory}")
+            message(
+                FATAL_ERROR
+                "Selected SDK include is outside the expected prefix: ${absolute_directory}"
+            )
         endif()
         foreach(header IN ITEMS xgl.h xgl_build_config.h)
             file(REAL_PATH "${directory}/xgl/${header}" header_path)
-            cmake_path(IS_PREFIX prefix "${header_path}" NORMALIZE header_inside_prefix)
+            cmake_path(
+                IS_PREFIX
+                prefix
+                "${header_path}"
+                NORMALIZE
+                header_inside_prefix
+            )
             if(NOT header_inside_prefix OR NOT EXISTS "${header_path}")
-                message(FATAL_ERROR "Selected SDK public header is missing or outside the expected prefix: ${header_path}")
+                message(
+                    FATAL_ERROR
+                    "Selected SDK public header is missing or outside the expected prefix: ${header_path}"
+                )
             endif()
         endforeach()
     endforeach()
 
     get_target_property(configs xgl::xgl IMPORTED_CONFIGURATIONS)
     if(NOT configs)
-        message(FATAL_ERROR "Selected SDK does not export an archive configuration")
+        message(
+            FATAL_ERROR
+            "Selected SDK does not export an archive configuration"
+        )
     endif()
     foreach(config IN LISTS configs)
         get_target_property(archive xgl::xgl "IMPORTED_LOCATION_${config}")
         file(REAL_PATH "${archive}" archive_path)
-        cmake_path(IS_PREFIX prefix "${archive_path}" NORMALIZE archive_inside_prefix)
+        cmake_path(
+            IS_PREFIX
+            prefix
+            "${archive_path}"
+            NORMALIZE
+            archive_inside_prefix
+        )
         if(NOT archive_inside_prefix OR NOT EXISTS "${archive_path}")
-            message(FATAL_ERROR "Selected SDK archive is missing or outside the expected prefix: ${archive_path}")
+            message(
+                FATAL_ERROR
+                "Selected SDK archive is missing or outside the expected prefix: ${archive_path}"
+            )
         endif()
     endforeach()
     message(STATUS "Verified installed xgl SDK under ${prefix}")

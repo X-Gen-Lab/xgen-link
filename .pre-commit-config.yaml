@@ -1,0 +1,39 @@
+minimum_pre_commit_version: '4.3.0'
+fail_fast: true
+default_install_hook_types: [pre-commit, commit-msg]
+repos:
+  - repo: local
+    hooks:
+      - id: xgl-style
+        name: XGL format and comment checks
+        entry: python scripts/ci/style_gate.py --staged --report build/quality/style-staged.json
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: xgl-commit-message
+        name: XGL conventional commit message
+        entry: python scripts/ci/check_commit_message.py
+        language: system
+        stages: [commit-msg]
+      - id: xgl-docs
+        name: XGL offline staged documentation checks
+        entry: python tools/documentation/cli.py check --staged --report build/quality/docs-staged.json
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: xgl-workflow-lint
+        name: XGL offline GitHub Actions checks
+        entry: python scripts/ci/lint_workflows.py --staged
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: xgl-tdd-gate
+        name: XGL staged build and strict CTest
+        entry: python tools/dev/dev.py check --staged
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

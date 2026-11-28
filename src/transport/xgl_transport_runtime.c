@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_runtime.c
  * \brief           Bounded retransmission, maintenance and deadlines
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-17
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "xgl_transport_internal.h"
@@ -39,12 +43,8 @@ transport_next_work_peer(const xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Retry an owned packet or fail its peer at the retry limit
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in,out]   peer: Owning peer
- * \param[in,out]   rel_packet: Packet retained until ACK or peer failure
- * \param[in]       current_time_ms: Current transport clock
- * \return          Send result or XGL_ERR_ACK_TIMEOUT at the retry limit
+ * \details         Retain the packet until ACK or peer failure. Reaching the
+ *                  retry limit reports XGL_ERR_ACK_TIMEOUT.
  */
 static xgl_error_t transport_retransmit_reliable_packet(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle,
@@ -118,11 +118,8 @@ static xgl_error_t transport_retransmit_reliable_packet(
 
 /**
  * \brief           Retry due packets of one peer
- * \param[in,out]   ctx: Transport layer context
- * \param[in,out]   peer: Owning peer
- * \param[in]       handle: Protocol instance handle
- * \param[in]       current_time_ms: Current transport clock
- * \return          First terminal retry error; retained backpressure is normal
+ * \details         Return the first terminal error. Temporarily refused
+ *                  packets remain owned for retry.
  */
 static xgl_error_t transport_process_retransmission_queue(
     xgl_transport_ctx_t* ctx, xgl_transport_peer_state_t* peer,
@@ -169,10 +166,8 @@ static xgl_error_t transport_process_retransmission_queue(
 
 /**
  * \brief           Process each peer-owned retransmission queue
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       current_time_ms: Current transport clock
- * \return          First terminal error while continuing other peer queues
+ * \details         Keep servicing peers after a failure and return the first
+ *                  terminal error.
  */
 static xgl_error_t transport_process_retransmissions(xgl_transport_ctx_t* ctx,
                                                      xgl_handle_t handle,
@@ -275,11 +270,7 @@ xgl_error_t xgl_transport_run(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Merge a timer into the earliest remaining delay
- * \param[in]       now_ms: Current time
- * \param[in]       start_ms: Timer start
- * \param[in]       interval_ms: Timer duration
- * \param[in,out]   active: Whether any timer has been collected
- * \param[in,out]   timeout_ms: Earliest remaining delay
+ * \details         Merge an active timer into the earliest remaining delay.
  */
 static void transport_take_timeout(uint32_t now_ms, uint32_t start_ms,
                                    uint32_t interval_ms, bool* active,
@@ -295,10 +286,7 @@ static void transport_take_timeout(uint32_t now_ms, uint32_t start_ms,
 
 /**
  * \brief           Collect reliable transmission and peer-idle deadlines
- * \param[in]       ctx: Transport layer context
- * \param[in]       now_ms: Current time
- * \param[out]      timeout_ms: Remaining delay; zero means due now
- * \return          true if a timer is active
+ * \details         A returned delay of zero means work is already due.
  */
 bool xgl_transport_next_timeout(const xgl_transport_ctx_t* ctx, uint32_t now_ms,
                                 uint32_t* timeout_ms) {

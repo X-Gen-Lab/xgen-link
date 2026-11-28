@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 6106d5befa2d60baf44d9830a8dbd762b349eab2416359d65e609b8b0c629075\n"
+
+#: docs/zh/reference/protocol/v3/index.md:9
+msgid "协议概览"
+msgstr "Protocol Overview"
+
+#: docs/zh/reference/protocol/v3/index.md:11
+msgid "请查阅 [Wire v1 文档](../v1/index.md)。"
+msgstr "See the [Wire v1 documentation](../v1/index.md)."

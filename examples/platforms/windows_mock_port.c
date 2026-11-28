@@ -1,6 +1,10 @@
 /**
  * \file            windows_mock_port.c
  * \brief           Windows mock PHY for host-side SDK tests
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-06
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <string.h>
@@ -16,11 +20,8 @@ typedef struct {
 
 /**
  * \brief           Copy a frame without overwriting unread bytes
- * \param[in]       data: Borrowed frame bytes
- * \param[in]       len: Frame length
- * \param[in,out]   user_data: Persistent bounded mock state
- * \return          XGL_OK after copying, error code on invalid input or
- * overflow
+ * \details         A successful call copies the entire borrowed frame into
+ *                  bounded mock storage.
  */
 static xgl_error_t windows_mock_tx(const uint8_t* data, size_t len,
                                    void* user_data) {
@@ -40,10 +41,8 @@ static xgl_error_t windows_mock_tx(const uint8_t* data, size_t len,
 
 /**
  * \brief           Copy a bounded prefix and preserve remaining RX bytes
- * \param[out]      buffer: Caller RX buffer
- * \param[in,out]   len: Capacity on entry, produced length on return
- * \param[in,out]   user_data: Persistent bounded mock state
- * \return          XGL_OK after reading, error code on invalid input
+ * \details         The incoming length bounds the copy and is replaced by the
+ *                  bytes delivered.
  */
 static xgl_error_t windows_mock_rx(uint8_t* buffer, size_t* len,
                                    void* user_data) {

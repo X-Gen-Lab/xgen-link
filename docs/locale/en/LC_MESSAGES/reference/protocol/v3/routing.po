@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: d33e276b47d6acb03ff9ce46f275a3f04b5e88abfb473acc776a9a1317851a56\n"
+
+#: docs/zh/reference/protocol/v3/routing.md:9
+msgid "路由"
+msgstr "Routing"
+
+#: docs/zh/reference/protocol/v3/routing.md:11
+msgid "请查阅 [Wire v1 文档](../v1/routing.md)。"
+msgstr "See the [Wire v1 documentation](../v1/routing.md)."

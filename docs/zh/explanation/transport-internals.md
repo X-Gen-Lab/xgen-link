@@ -1,3 +1,10 @@
+---
+id: explanation/transport-internals
+type: explanation
+audience: user
+source_language: zh_CN
+---
+
 # Transport 内部结构
 
 Transport 唯一负责可靠状态转换。辅助模块按状态所有者及借用/自有数据契约划分，而不按可替换的通用算法划分。

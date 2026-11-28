@@ -2,6 +2,9 @@
  * \file            test_types.cpp
  * \brief           Unit tests for core data types and structures
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <cstring>

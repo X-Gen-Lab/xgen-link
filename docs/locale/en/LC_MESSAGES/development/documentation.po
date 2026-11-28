@@ -1,0 +1,97 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 5605d00e494f31421fcbccfc39228089cc53af13fe14b8c87304122f477107a3\n"
+
+#: docs/zh/development/documentation.md:8
+msgid "文档维护"
+msgstr "Maintain documentation"
+
+#: docs/zh/development/documentation.md:10
+msgid "根据读者任务选择文档类型。教程提供一条可运行路径，指南说明条件、步骤和失败恢复，解释页阐明取舍，参考页维护可检查的合同。标明适用版本、档位和验证范围。"
+msgstr ""
+"Choose the document type according to the reader's task. A tutorial provides one runnable path, a guide "
+"explains prerequisites, steps and recovery, an explanation describes trade-offs, and a reference "
+"specifies verifiable contracts. State the applicable version, profile and validation scope."
+
+#: docs/zh/development/documentation.md:12
+msgid "内容与翻译"
+msgstr "Content and translation"
+
+#: docs/zh/development/documentation.md:14
+msgid ""
+"中文规范正文位于 `docs/zh/`。每页用 `id`、`type`、`audience` 和 `source_language` 声明用途。英文译文位于 "
+"`docs/locale/en/LC_MESSAGES/<id>.po`。检查状态、API 名称、失败语义、数值和单位一致。字段与布局规则归 Wire v1 参考，声明与调用上下文归公开头 Doxygen "
+"注释。"
+msgstr ""
+"The canonical Chinese source is under `docs/zh/`. Each page declares `id`, `type`, `audience` and "
+"`source_language`. The English translation is stored at `docs/locale/en/LC_MESSAGES/<id>.po`. Keep "
+"states, API names, failure semantics, values and units consistent. Wire v1 references own the layout and"
+" field rules. Public-header Doxygen comments own declarations and calling context."
+
+#: docs/zh/development/documentation.md:16
+msgid ""
+"完整示例取自维护的可执行示例和测试。片段说明省略的初始化、配置和退出处理。MyST 构建只渲染内容。图示使用 `docs/sphinx/diagrams/` 下的双语本地 "
+"SVG。核对旧页面指路入口、两种语言和历史标题锚点。历史验证和失败证据关联各自的固定提交。"
+msgstr ""
+"Use maintained runnable examples and tests as the source for complete examples. Identify initialization,"
+" configuration and cleanup omitted from a snippet. MyST builds render the content. Use the bilingual "
+"local SVGs in `docs/sphinx/diagrams/`. Check historical routes, both languages and previous heading "
+"anchors. Associate historical verification and failure evidence with the relevant fixed commit."
+
+#: docs/zh/development/documentation.md:18
+msgid "构建与验证"
+msgstr "Build and verify"
+
+#: docs/zh/development/documentation.md:20
+msgid "正式工具环境使用 Linux x86_64 和 CPython 3.12。先在仓库根目录显式准备哈希锁定工具，再使用已准备的前缀离线验证。"
+msgstr ""
+"Use Linux x86_64 and CPython 3.12 for the locked tool environment. Explicitly prepare the hash-locked "
+"tools from the repository root, then use the prepared prefix for offline verification."
+
+#: docs/zh/development/documentation.md:22
+msgid ""
+"Windows 和 WSL 共用检出时，为两个系统分别准备虚拟环境和构建目录。Windows 可用 `.\\.venv\\Scripts\\python.exe` 做离线源检查。WSL 使用自己的 "
+"`python3.12` 准备正式文档工具，示例前缀可换为 `build/docs-tools-wsl`，输出可换为 `build/documentation-wsl`。Windows 本地预览可用已准备的 "
+"Windows 原生 Sphinx、MyST、Breathe、polib 与 Doxygen，运行对应 Python 的 `docs build --mode preview --output "
+"build/documentation-windows`。正式 CI 使用锁定的 Linux 前缀。"
+msgstr ""
+"When Windows and WSL share a checkout, prepare a virtual environment and build directory for each "
+"system. On Windows, `.\\.venv\\Scripts\\python.exe` can run the offline source check. In WSL, use its "
+"own `python3.12` to prepare the locked tools. The example prefix and output can be `build/docs-tools-"
+"wsl` and `build/documentation-wsl`. For a Windows preview, use native Windows installations of Sphinx, "
+"MyST, Breathe, polib and Doxygen, and run `docs build --mode preview --output build/documentation-"
+"windows` using that Python environment. CI uses the locked Linux prefix."
+
+#: docs/zh/development/documentation.md:30
+msgid ""
+"可用 `cmake -S docs -B build/docs -DXGL_DOCS_TOOL_PREFIX=build/docs-tools` 配置独立入口，再执行 `cmake --build "
+"build/docs --target xgl_docs`。在干净检出或源码归档上验证 `site/zh/`、`site/en/`、双语 Breathe C API 与 "
+"`/api/doxygen/html/` 兼容参考。`documentation-build.json` 记录实际源、工具、退出结果与执行目录。文档构建与 Pages 发布分别记录。"
+msgstr ""
+"The standalone CMake entry uses `cmake -S docs -B build/docs -DXGL_DOCS_TOOL_PREFIX=build/docs-tools` "
+"followed by `cmake --build build/docs --target xgl_docs`. In a clean checkout or source archive, check "
+"`site/zh/`, `site/en/`, both Breathe C API views and the compatibility reference at "
+"`/api/doxygen/html/`. `documentation-build.json` records the source, tools, status and attempt "
+"directory. Record documentation verification and Pages publication separately."
+
+#: docs/zh/development/documentation.md:32
+msgid ""
+"预览使用 `--mode preview` 和独立输出目录。在本次 `attempt-*/gettext/` 下查看提取的 POT，按实际 `msgid` 更新英文 PO，移除退役消息和 `fuzzy` "
+"标记。语义审查后将当前中文文件的 SHA-256 写到 `X-XGL-Source-SHA256`，并标记 `X-XGL-Reviewed: true`。验证会核对完整消息。使用 `docs serve "
+"--build <输出目录>` 本地浏览。预览中的缺译会回退中文，并记录到报告。提交时 `docs check --staged` 读取暂存版本并执行离线检查。参阅[开发工作流](workflow.md)。"
+msgstr ""
+"For preview, use `--mode preview` and a separate output directory. Read the current extraction under "
+"`attempt-*/gettext/`, update the English PO using the actual `msgid` values, and remove retired messages"
+" and `fuzzy` flags. After reviewing the translation, set `X-XGL-Source-SHA256` to the SHA-256 digest of "
+"the current Chinese file and set `X-XGL-Reviewed: true`. Verification checks the full set of messages. "
+"Use `docs serve --build <output>` for local browsing. The preview can fall back to Chinese for "
+"incomplete catalogs and lists those pages in the report. At commit time, `docs check --staged` checks "
+"the indexed version offline. See the [development workflow](workflow.md)."

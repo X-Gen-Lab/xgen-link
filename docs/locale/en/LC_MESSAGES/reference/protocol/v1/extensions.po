@@ -1,0 +1,166 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 17463acb8cf56bc43df340474b2283dc35aa1cc678ae14f94c30faeb0e672e8f\n"
+
+#: docs/zh/reference/protocol/v1/extensions.md:8
+msgid "扩展"
+msgstr "Extensions"
+
+#: docs/zh/reference/protocol/v1/extensions.md:10
+msgid ""
+"每个 TLV 的布局为 `type:u8 | value_length:u8 | value`。TLV 受 `header_len` 限定，不从载荷内容推断边界。类型 `0` "
+"无效，结构合法的未知非关键类型可被跳过。重复的 DATA_TYPE、SESSION、SECURITY 单例扩展会被拒绝；transport 要求每个 ACK 恰好包含一个 ACK_RANGE 或 SACK。"
+msgstr ""
+"Each TLV is `type:u8 | value_length:u8 | value`. TLVs are bounded by `header_len`, not by payload "
+"contents. Type `0` is invalid. Structurally valid unknown noncritical types are skipped. Duplicate "
+"DATA_TYPE, SESSION or SECURITY singleton extensions are rejected; transport accepts exactly one "
+"ACK_RANGE or SACK extension per ACK packet."
+
+#: docs/zh/reference/protocol/v1/extensions.md:12
+msgid "已定义的值"
+msgstr "Defined Values"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "类型"
+msgstr "Type"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "值长度"
+msgstr "Value bytes"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "含义"
+msgstr "Meaning"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "SESSION = 1"
+msgstr "SESSION = 1"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "12"
+msgstr "12"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "`epoch:u32`、`incarnation_id:u64`"
+msgstr "`epoch:u32`, `incarnation_id:u64`"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "ACK_RANGE = 2"
+msgstr "ACK_RANGE = 2"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "`9 + 4*n`"
+msgstr "`9 + 4*n`"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "`largest_ack:u32`、`ack_delay_us:u32`、`count:u8`，后接 `gap:u16,length:u16`"
+msgstr "`largest_ack:u32`, `ack_delay_us:u32`, `count:u8`, then `gap:u16,length:u16`"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "SACK = 3"
+msgstr "SACK = 3"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "`5 + n`"
+msgstr "`5 + n`"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "`base:u32`、`bitmap_length:u8`、位图"
+msgstr "`base:u32`, `bitmap_length:u8`, bitmap bytes"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "SECURITY = 4"
+msgstr "SECURITY = 4"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "13"
+msgstr "13"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "`key_id:u32`、`security_seq:u64`、`tag_length:u8`"
+msgstr "`key_id:u32`, `security_seq:u64`, `tag_length:u8`"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "DATA_TYPE = 5"
+msgstr "DATA_TYPE = 5"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "1"
+msgstr "1"
+
+#: docs/zh/reference/protocol/v1/extensions.md:0
+msgid "应用类型或 CONTROL 操作"
+msgstr "Application type or CONTROL operation"
+
+#: docs/zh/reference/protocol/v1/extensions.md:22
+msgid ""
+"值中的整数使用小端序。SESSION 增加 14 字节，SECURITY 增加 15 字节。未携带 SESSION 表示 epoch 为零。`incarnation_id` "
+"是传输的元数据，其存在不会安装信任，也不会替代 peer key。"
+msgstr ""
+"Values use little-endian integers. SESSION adds 14 frame bytes. SECURITY adds 15. Missing SESSION "
+"denotes epoch zero. `incarnation_id` is carried metadata; its presence does not install trust or replace"
+" the peer key."
+
+#: docs/zh/reference/protocol/v1/extensions.md:24
+msgid "ACK 语义"
+msgstr "ACK Semantics"
+
+#: docs/zh/reference/protocol/v1/extensions.md:26
+msgid ""
+"第一个 ACK 区间的 gap 必须为零，从 `largest_ack` 开始；length 为正的包数。后续区间跳过 gap 与区间边界，再描述较低包号。非法区间、下溢、未来包号使整个 ACK "
+"被拒绝，在此之前不修改队列、窗口或 RTT。"
+msgstr ""
+"The first ACK range has gap zero and begins at `largest_ack`; length is a positive packet count. Later "
+"ranges skip their gap plus the interval boundary before describing lower numbers. Invalid ranges, "
+"underflow and future numbers reject the entire ACK before queue, window or RTT mutation."
+
+#: docs/zh/reference/protocol/v1/extensions.md:28
+msgid ""
+"SACK 第 `i` 位描述 `base + i`。置位确认接收方持有对应字节，低于 `base` 的记录继续等待显式确认。有效范围内的缺失位可触发快重传。全零位图只提示 `base` "
+"对应记录的快重传。当前发送端最多生成八个字节的位图。Boot 即使裁剪了乱序缓存，仍可处理 transport 支持的 ACK 形式。"
+msgstr ""
+"SACK bit `i` describes `base + i`. A set bit confirms that the receiver owns those bytes. Records below "
+"`base` await explicit acknowledgement. Gaps within the reported range can trigger fast retransmission. "
+"An all-zero bitmap only hints at fast retransmission of `base`. The current sender emits at most eight "
+"bitmap bytes. Boot can consume ACK forms supported by the transport even when out-of-order buffering is "
+"compiled out."
+
+#: docs/zh/reference/protocol/v1/extensions.md:30
+msgid "组合"
+msgstr "Composition"
+
+#: docs/zh/reference/protocol/v1/extensions.md:32
+msgid ""
+"Network 组合或校验 DATA_TYPE 与非零 SESSION epoch 扩展。重传保留可靠 DATA 编号并重新构造帧。认证层每次尝试都从已安装的方向关联填充 SECURITY；保留 DATA "
+"包不等于保留已经签名的帧。"
+msgstr ""
+"Network composes or validates DATA_TYPE and nonzero SESSION epoch extensions. Retransmission keeps the "
+"DATA packet number and payload and recomposes the frame. Authentication fills SECURITY from the "
+"installed directional association for each attempt; callers must not treat a retained DATA packet as a "
+"retained signed frame."
+
+#: docs/zh/reference/protocol/v1/extensions.md:34
+msgid "验证依据：`test/unit/wire/test_wire.cpp`。"
+msgstr "Verification: `test/unit/wire/test_wire.cpp`."
+
+#: docs/zh/reference/protocol/v1/extensions.md:36
+msgid "保留的数据变换"
+msgstr "Reserved payload transforms"
+
+#: docs/zh/reference/protocol/v1/extensions.md:38
+msgid ""
+"压缩和载荷加密为保留能力。配置启用任意一项时返回 `XGL_ERR_INVALID_PARAM`，发送请求指定非零 `compression_id` 时返回 "
+"`XGL_ERR_UNSUPPORTED`。认证标签保护完整性，其语义见[安全](security.md)。应用自行变换消息时，双方需在业务格式中约定，并在提交前检查编码后长度。"
+msgstr ""
+"Compression and payload encryption are reserved capabilities. Enabling either in the configuration "
+"returns `XGL_ERR_INVALID_PARAM`. A send with nonzero `compression_id` returns `XGL_ERR_UNSUPPORTED`. For"
+" the authentication tag, see [Security](security.md). Applications that transform messages agree on a "
+"business payload format and check the encoded length before submission."

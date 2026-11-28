@@ -2,6 +2,9 @@
  * \file            test_transport_tx_contracts.cpp
  * \brief           Transactional first-send admission across build profiles
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -326,4 +329,4 @@ TEST_F(XglTransportTxContractTest, HelloLeasePreservesFailedScopeIdentity) {
     EXPECT_EQ(Transport().peers, failed);
 }
 
-}  // namespace
+} /* namespace */

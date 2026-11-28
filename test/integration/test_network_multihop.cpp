@@ -2,6 +2,9 @@
  * \file            test_network_multihop.cpp
  * \brief           Real-instance routing, endpoint trust and failure recovery
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -101,9 +104,8 @@ struct AuthenticationLedger {
         }
         *valid = false;
         if (length != self.provider.tag_len || length < 4U ||
-            !std::all_of(
-                tag + 4U, tag + length,
-                [](uint8_t byte) { return byte == 0U; })) {
+            !std::all_of(tag + 4U, tag + length,
+                         [](uint8_t byte) { return byte == 0U; })) {
             return XGL_OK;
         }
         const uint32_t id = xgl_deserialize_u32_le(tag);
@@ -619,7 +621,7 @@ TEST_F(XglNetworkMultihopTest,
     request.session_epoch = 9U;
     Bytes storage(protected_layout.frame_size);
     std::copy(payload.begin(), payload.end(),
-              storage.begin() + protected_layout.payload_offset);
+              storage.data() + protected_layout.payload_offset);
     request.data.buffer = storage.data();
     request.data.buffer_size = storage.size();
     request.data.data_offset = protected_layout.payload_offset;
@@ -722,4 +724,4 @@ TEST_F(XglNetworkMultihopTest, InstalledScopeProtectsResetAndSelectiveAck) {
 }
 #endif
 
-}  // namespace
+} /* namespace */

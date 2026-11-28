@@ -2,6 +2,9 @@
  * \file            test_instance_properties.cpp
  * \brief           Instance management property tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-03-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"

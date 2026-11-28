@@ -1,0 +1,312 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: bd77e59d019bf378c7b699fc8e375860fc618fc6224381e8211fa2eb4c02f706\n"
+
+#: docs/zh/development/validation.md:8
+msgid "验证"
+msgstr "Validation"
+
+#: docs/zh/development/validation.md:10
+msgid "协议覆盖"
+msgstr "Protocol coverage"
+
+#: docs/zh/development/validation.md:0
+msgid "范围"
+msgstr "Area"
+
+#: docs/zh/development/validation.md:0
+msgid "依据"
+msgstr "Evidence"
+
+#: docs/zh/development/validation.md:0
+msgid "Wire v1、TLV、CRC、未对齐字节跨度"
+msgstr "Wire v1, version rejection, TLV, CRC, unaligned spans"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/wire/test_wire.cpp`、`test/unit/datalink/test_parser.cpp`、frame 性质测试"
+msgstr "`test/unit/wire/test_wire.cpp`, `test/unit/datalink/test_parser.cpp`, frame properties"
+
+#: docs/zh/development/validation.md:0
+msgid "长度回绕、借用 SACK、失败视图清零及 raw/stream 一致"
+msgstr "Length overflow, borrowed SACK, failure-view clearing, and raw/stream agreement"
+
+#: docs/zh/development/validation.md:0
+msgid ""
+"`test/unit/wire/test_frame.cpp`、`test_wire_sack_view.cpp`、`test_wire_rx_contracts.cpp`、`test/unit/transport/test_transport_sack_view.cpp`"
+msgstr ""
+"`test/unit/wire/test_frame.cpp`, `test_wire_sack_view.cpp`, `test_wire_rx_contracts.cpp`, "
+"`test/unit/transport/test_transport_sack_view.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "固定路由及认证帧转发"
+msgstr "Fixed routes and authenticated forwarding"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/network/test_route.cpp`、`test/unit/network/test_network.cpp`"
+msgstr "`test/unit/network/test_route.cpp`, `test/unit/network/test_network.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "本地反馈出口、反向 MTU 与 PHY 背压"
+msgstr "Local feedback egress, reverse MTU and PHY backpressure"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/integration/test_network_multihop.cpp`"
+msgstr "`test/integration/test_network_multihop.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "精确 scope、原子 ACK、RX 保留、重传、RESET 与关闭"
+msgstr "Exact scope, atomic ACK, RX retention, retry, RESET and close"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/transport/test_transport.cpp`、transport 性质测试"
+msgstr "`test/unit/transport/test_transport.cpp`, transport properties"
+
+#: docs/zh/development/validation.md:0
+msgid "RX/TX 无副作用拒绝、延迟快重传、终止错误与唯一存储归属"
+msgstr ""
+"Side-effect-free RX/TX rejection, deferred fast retry, terminal errors and unique storage ownership"
+
+#: docs/zh/development/validation.md:0
+msgid ""
+"`test_transport_rx_contracts.cpp`、`test_transport_tx_contracts.cpp`、`test_transport_runtime_contracts.cpp`、`test_transport_storage.cpp`（均位于"
+" `test/unit/transport/`）"
+msgstr ""
+"`test_transport_rx_contracts.cpp`, `test_transport_tx_contracts.cpp`, "
+"`test_transport_runtime_contracts.cpp`, `test_transport_storage.cpp` (all under `test/unit/transport/`)"
+
+#: docs/zh/development/validation.md:0
+msgid "显式可信会话、nonce/AAD、防重放、关闭槽"
+msgstr "Explicit trusted sessions, nonce/AAD, replay, closed slots"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/security/test_security.cpp`"
+msgstr "`test/unit/security/test_security.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "静态认证丢 ACK 恢复、应用只交付一次"
+msgstr "Static authenticated lost-ACK recovery and exactly-once delivery"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/api/test_send.cpp`"
+msgstr "`test/unit/api/test_send.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "静态工作区、背压、回绕、存储复用"
+msgstr "Static workspace, backpressure, wraparound, storage reuse"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/smoke/static_workspace_smoke.c`"
+msgstr "`test/smoke/static_workspace_smoke.c`"
+
+#: docs/zh/development/validation.md:0
+msgid "一次后端预留、运行期不调用后端分配"
+msgstr "One backend reservation and no runtime backend allocations"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/api/test_footprint.cpp`、memory 性质测试"
+msgstr "`test/unit/api/test_footprint.cpp`, memory properties"
+
+#: docs/zh/development/validation.md:0
+msgid "公开安装包 C 消费者、ABI/profile 拒绝"
+msgstr "Public installed C consumer, ABI/profile rejection"
+
+#: docs/zh/development/validation.md:0
+msgid "SDK 消费者 CTest 及 instance 测试"
+msgstr "SDK consumer CTest and instance tests"
+
+#: docs/zh/development/validation.md:0
+msgid "精确创建错误、纯预算期限查询与时间回绕"
+msgstr "Exact creation errors, pure work-budget deadlines and clock wraparound"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/api/test_api_contracts.cpp`"
+msgstr "`test/unit/api/test_api_contracts.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "认证配置预检、基本 ACK 容量及较小转发路由"
+msgstr "Authentication preflight, base ACK capacity and smaller transit routes"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/api/test_config_consistency.cpp`"
+msgstr "`test/unit/api/test_config_consistency.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "所有发送入口的单帧大小上限、终止 scope 拒绝及布局无副作用"
+msgstr "Single-frame capacity, terminal scope rejection and pure layout across send APIs"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/api/test_send_policy.cpp`"
+msgstr "`test/unit/api/test_send_policy.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "ACK 长度溢出、初始化失败释放、PHY 错误与恢复"
+msgstr "ACK size overflow, failed-init release, PHY failure and recovery"
+
+#: docs/zh/development/validation.md:0
+msgid ""
+"`test/unit/wire/test_coverage_wire.cpp`、`test/unit/api/test_coverage_api.cpp`、`test/integration/test_coverage_delivery.cpp`"
+msgstr ""
+"`test/unit/wire/test_coverage_wire.cpp`, `test/unit/api/test_coverage_api.cpp`, "
+"`test/integration/test_coverage_delivery.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "RTT 观察、workspace 预留量、流式 CRC 分类"
+msgstr "RTT observations, workspace reservations and streaming CRC classification"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/api/test_stats.cpp`、`test/unit/datalink/test_datalink.cpp`"
+msgstr "`test/unit/api/test_stats.cpp`, `test/unit/datalink/test_datalink.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "Boot 关闭统计和详细诊断时保留错误契约"
+msgstr "Boot error contracts with statistics and detailed diagnostics disabled"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/smoke/static_workspace_smoke.c` 的条件分支"
+msgstr "Conditional checks in `test/smoke/static_workspace_smoke.c`"
+
+#: docs/zh/development/validation.md:0
+msgid "Boot/Lite 可靠交付、容量拒绝与 parser"
+msgstr "Boot/Lite reliable delivery, capacity rejection and parsing"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/api/test_bounded_profile.cpp` 的按能力测试"
+msgstr "Capability-selected cases in `test/unit/api/test_bounded_profile.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "Boot 生成的 TX 扩展与 raw wire 的完整帧边界"
+msgstr "Boot generated TX extensions and the complete raw Wire frame boundary"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/unit/network/test_boot_network.cpp`"
+msgstr "`test/unit/network/test_boot_network.cpp`"
+
+#: docs/zh/development/validation.md:0
+msgid "多配置发布与安装、导出能力"
+msgstr "Multi-configuration publication and installation, exported capabilities"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/contracts/build/test_profile_builds.py`"
+msgstr "`test/contracts/build/test_profile_builds.py`"
+
+#: docs/zh/development/validation.md:0
+msgid "四组资源配置 API、固定 RTO 安装测试及标签完整性"
+msgstr "Four resource-configured API sets, installed fixed-RTO tests and complete labels"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/contracts/build/test_transport_resource_config.py`"
+msgstr "`test/contracts/build/test_transport_resource_config.py`"
+
+#: docs/zh/development/validation.md:0
+msgid "公开/私有头文件独立 C11/C++17 编译、逐例发现、种子回放"
+msgstr "Independent C11/C++17 public/private header compilation, discovery and seed replay"
+
+#: docs/zh/development/validation.md:0
+msgid "`test/cmake/HeaderContracts.cmake`、分类与 runner 契约测试"
+msgstr "`test/cmake/HeaderContracts.cmake`, classification and runner contracts"
+
+#: docs/zh/development/validation.md:37
+msgid "构建和安装"
+msgstr "Build and installation"
+
+#: docs/zh/development/validation.md:39
+msgid ""
+"在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库和源码子目录。独立安装消费实际编译、链接并运行公开 C11 和 C++17 程序，覆盖 "
+"ABI、profile、必需能力、资源身份和前缀冲突。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。"
+msgstr ""
+"Use a clean build with only the C11 toolchain to validate the default production library, Boot "
+"production library and source subdirectory. Compile, link and run isolated C11 and C++17 consumers "
+"against the installed SDK. Exercise rejected ABI, profile, required capability, resource identity and "
+"prefix combinations. Follow the [development workflow](workflow.md) for host tests. Keep missing test "
+"inventories, missing reports and failing exit statuses visible."
+
+#: docs/zh/development/validation.md:41
+msgid "`ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。多配置构建逐配置保存结果。"
+msgstr ""
+"The `ci` preset selects Full with advanced runtime and GCC coverage instrumentation. `run_ctest.py` "
+"records the inventory and JUnit report and rejects skipped tests. Save results for each configuration "
+"when using a multi-config generator."
+
+#: docs/zh/development/validation.md:49
+msgid ""
+"本地使用 CMake 时，运行 `cmake --build --preset ci --target xgl_release_validation` 构建并执行已注册的 CTest 用例，包含 SDK "
+"搬移消费和无堆检查。如启用了本机构建的 `xgl_footprint` 目标，可用它报告静态库文件大小。"
+msgstr ""
+"For a local CMake check, `cmake --build --preset ci --target xgl_release_validation` builds and runs the"
+" registered CTest cases, including the relocated SDK and no-heap smoke tests. When enabled, the native "
+"`xgl_footprint` target reports the static archive size."
+
+#: docs/zh/development/validation.md:51
+msgid ""
+"使用 `boot-small-host-test` 的配置、构建和测试 preset 验证单窗口槽与固定 RTO。`asan` preset 会让 AddressSanitizer 和 "
+"UndefinedBehaviorSanitizer 的诊断使测试失败。SDK 冒烟测试也会将两个独立消费者链接到经过插桩的库并运行。记录实际执行的 profile、编译器和 "
+"sanitizer。GoogleTest 依赖见 `test/CMakeLists.txt`。"
+msgstr ""
+"Use the `boot-small-host-test` configure, build and test presets for one window slot with fixed RTO. The"
+" `asan` preset makes AddressSanitizer and UndefinedBehaviorSanitizer findings fail the tests. The SDK "
+"smoke test also links and runs both independent consumers against the instrumented library. Record the "
+"profiles, compiler and sanitizer runs that executed. See `test/CMakeLists.txt` for the GoogleTest "
+"dependency."
+
+#: docs/zh/development/validation.md:53
+msgid ""
+"同时保留每个配置的 `compile_commands.json`。静态分析使用当前生产翻译单元、生成头与编译标志。Windows、macOS、GCC 覆盖率、Native Release 和 TSan "
+"的执行范围按 CI 对应任务核对。资源变更使用真实 ARM 编译链接及目标 map 复核，见下节。"
+msgstr ""
+"Also retain `compile_commands.json` for each configuration. Static analysis uses the production "
+"translation units, generated headers and actual compile flags. See the corresponding CI jobs for "
+"Windows, macOS, GCC coverage, Native Release and TSan. Verify resource changes with real ARM "
+"compilation, linking and a target map as described below."
+
+#: docs/zh/development/validation.md:55
+msgid "资源和产品验收"
+msgstr "Resources and product qualification"
+
+#: docs/zh/development/validation.md:57
+msgid ""
+"用产品目标工具链、最终链接 map 和实际应用配置测量固件。比较时保持档位、帧与接收缓冲大小和优化选项一致。记录 Flash、workspace、静态 RAM 和栈空间，再在板上核对驱动缓冲、ISR "
+"嵌套及栈峰值。"
+msgstr ""
+"Measure the product firmware with its target toolchain, linker map and actual application settings. "
+"Compare builds with the same profile, frame and RX sizes, and optimization settings. Record Flash, "
+"workspace, static RAM and stack, then validate driver buffers, ISR nesting and peak stack on the board."
+
+#: docs/zh/development/validation.md:59
+msgid "真实板卡、Flash 断电、DMA 借用、生产认证和重启后 nonce 新鲜性由产品验收。模拟与软件检查、ARM 链接、远端 CI、发布和硬件执行各自关联实际提交与产物。"
+msgstr ""
+"Product qualification covers the actual board, Flash power interruption, DMA borrows, production "
+"authentication and nonce freshness after restart. Bind simulation and software checks, ARM linkage, "
+"remote CI, release and hardware execution to their actual inputs and artifacts."
+
+#: docs/zh/development/validation.md:61
+msgid "历史证据"
+msgstr "Historical evidence"
+
+#: docs/zh/development/validation.md:63
+msgid ""
+"开发分支的[实施记录](https://github.com/X-Gen-Lab/xgen-"
+"link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_STATUS.md)、[重构计划](https://github.com/X-Gen-"
+"Lab/xgen-"
+"link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_PLAN.md)、[架构决策](https://github.com/X-Gen-"
+"Lab/xgen-link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/adr)和[验证证据](https://github.com/X-Gen-"
+"Lab/xgen-"
+"link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/validation)保存在固定提交。阅读历史数据时同时核对报告中实际受测的源码身份和构建配置。"
+msgstr ""
+"The development branch's [implementation record](https://github.com/X-Gen-Lab/xgen-"
+"link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_STATUS.md), [refactoring "
+"plan](https://github.com/X-Gen-Lab/xgen-"
+"link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_PLAN.md), [architecture "
+"decisions](https://github.com/X-Gen-Lab/xgen-"
+"link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/adr) and [validation "
+"records](https://github.com/X-Gen-Lab/xgen-"
+"link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/validation) remain available at the pinned "
+"revision. Consult the actual tested source identity and build configuration when reading historical "
+"results."

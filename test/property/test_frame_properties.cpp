@@ -2,6 +2,9 @@
  * \file            test_frame_properties.cpp
  * \brief           Frame handling property tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>
@@ -276,8 +279,9 @@ TEST(XglFrameProperties, FieldValidation) {
         uint16_t target_id =
             static_cast<uint16_t>((gen.random_uint32() % 0xFFFEU) + 1U);
         uint8_t data_type = XGL_PACKET_TYPE_DATA;
-        uint32_t packet_number = gen.random_uint32();
-        uint8_t ack_range = gen.random_uint8();
+        /* Keep the historical draw sequence for fixed-seed replay. */
+        (void)gen.random_uint32();
+        (void)gen.random_uint8();
         bool reliable = (gen.random_uint8() & 1) != 0;
         uint8_t priority = gen.random_uint8() & 0x07; /* Valid: 3 bits (0-7) */
 

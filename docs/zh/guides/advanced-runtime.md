@@ -1,6 +1,13 @@
+---
+id: guides/advanced-runtime
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 扩展运行选项
 
-构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile 默认关闭；关闭时扩展入口返回 `XGL_ERR_UNSUPPORTED`。选项改变私有布局与构建身份，库和消费者必须使用同一生成配置头。SDK 5 使用版本 2 的 options 描述符。
+构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile 默认关闭；关闭时扩展入口返回 `XGL_ERR_UNSUPPORTED`。选项改变私有布局与构建身份，库和消费者必须使用同一生成配置头。高级运行时选项描述符的版本为 `2`。
 
 ## 创建与生命周期
 

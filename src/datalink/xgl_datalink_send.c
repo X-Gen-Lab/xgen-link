@@ -1,6 +1,10 @@
 /**
  * \file            xgl_datalink_send.c
  * \brief           Data link TX path implementation
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-16
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_datalink.h>
@@ -31,11 +35,8 @@ static void datalink_report_tx_error(xgl_datalink_ctx_t* ctx, xgl_error_t err,
 
 /**
  * \brief           Validate the configured TX authentication tag size
- * \param[in]       ctx: Datalink authentication configuration
- * \param[in]       frame: Frame authentication flag
- * \param[out]      auth_tag_len: Trailer length, or zero for an unauthenticated
- *                  TX
- * \return          XGL_OK on success, error code otherwise
+ * \details         An unauthenticated frame has a zero-length authentication
+ *                  trailer.
  */
 static xgl_error_t datalink_auth_tag_len(const xgl_datalink_ctx_t* ctx,
                                          const xgl_frame_t* frame,
@@ -58,14 +59,9 @@ static xgl_error_t datalink_auth_tag_len(const xgl_datalink_ctx_t* ctx,
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Serialize and synchronously transmit using a borrowed buffer
- * \param[in,out]   ctx: Datalink context owning the frame allocator
- * \param[in]       phy: Physical layer operations
- * \param[in]       frame: Frame to serialize
- * \param[in]       layout: Validated network layout or NULL to measure
- * \param[in,out]   buffer: Borrowed storage, or NULL to allocate scratch
- * \param[in]       capacity: Total borrowed storage size in bytes
- * \param[in]       payload_offset: Existing payload offset in borrowed storage
- * \return          XGL_OK on success, error code otherwise
+ * \details         A supplied layout has already been validated. With no
+ *                  layout, measure it here. With no caller buffer, use bounded
+ *                  scratch. The payload offset refers to the supplied buffer.
  * \note            The PHY must finish reading the frame before tx returns.
  */
 static xgl_error_t datalink_encode_submit(xgl_datalink_ctx_t* ctx,

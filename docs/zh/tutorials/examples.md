@@ -1,3 +1,10 @@
+---
+id: tutorials/examples
+type: tutorial
+audience: user
+source_language: zh_CN
+---
+
 # 示例
 
 ## 程序

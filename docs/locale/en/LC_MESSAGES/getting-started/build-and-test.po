@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: bba2c8d93a517ee9754300c7f0e59d05d1afc7fa345c4456999886f03c62d26f\n"
+
+#: docs/zh/getting-started/build-and-test.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/getting-started/build-and-test.md:11
+msgid "请查阅[当前文档](../guides/build-and-consume.md)。"
+msgstr "See the [current documentation](../guides/build-and-consume.md)."

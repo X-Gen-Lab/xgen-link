@@ -1,6 +1,10 @@
 /**
  * \file            test_coverage_wire.cpp
  * \brief           Wire codec rejection boundaries and extension contracts
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>
@@ -33,7 +37,7 @@ void refresh_header_crc(uint8_t* bytes) {
                          xgl_crc16_modbus(bytes, XGL_WIRE_BASE_HEADER_SIZE));
 }
 
-}  // namespace
+} /* namespace */
 
 TEST(XglCoverageWire, HeaderRejectsEachInvalidSemanticFieldAndNullArgument) {
     uint8_t bytes[XGL_WIRE_BASE_HEADER_SIZE] = {};
@@ -166,8 +170,9 @@ TEST(XglCoverageWire, SingletonMetadataRejectsMalformedAndDuplicateExtensions) {
               XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_wire_decode_ext_metadata(nullptr, 1, false, &metadata),
               XGL_ERR_NULL_POINTER);
-    for (uint8_t type : {XGL_WIRE_EXT_DATA_TYPE, XGL_WIRE_EXT_SESSION,
-                         XGL_WIRE_EXT_SECURITY}) {
+    const uint8_t extension_types[] = {
+        XGL_WIRE_EXT_DATA_TYPE, XGL_WIRE_EXT_SESSION, XGL_WIRE_EXT_SECURITY};
+    for (uint8_t type : extension_types) {
         SCOPED_TRACE(type);
         const uint8_t wrong[] = {type, 0};
         EXPECT_EQ(xgl_wire_decode_ext_metadata(wrong, sizeof(wrong),

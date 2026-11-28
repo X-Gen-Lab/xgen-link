@@ -1,0 +1,80 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 70c3217b58307d09d935999a5b46453760c53d610382a27a061d4a5b9476590a\n"
+
+#: docs/zh/guides/boot.md:8
+msgid "Boot 接入"
+msgstr "Integrate Boot"
+
+#: docs/zh/guides/boot.md:10
+msgid "Boot 编译档位保留静态 workspace、单 peer、最多一条路由和包窗口 1。它支持可靠单播，应用自行分块。认证、转发、乱序、统计和详细诊断文字由其他档位提供。"
+msgstr ""
+"The Boot profile retains static workspaces, a single peer, at most one route and one packet per window. "
+"It supports reliable unicast with application-defined blocks. Other profiles provide authentication, "
+"forwarding, out-of-order buffering, statistics and detailed diagnostics."
+
+#: docs/zh/guides/boot.md:12
+msgid "选择资源"
+msgstr "Select resources"
+
+#: docs/zh/guides/boot.md:14
+msgid ""
+"用 [编译档位](../reference/profiles.md) 选择构建，再用 `xgl_config_get_preset_boot()` 设置运行配置。设置路由、节点、MTU、RX "
+"缓冲和时间预算，通过 `xgl_memory_requirements()` 获取真实大小和对齐。将存储配置为静态并以 `xgl_init_static()` 初始化。包载荷预算按真实头、TLV 和 CRC "
+"扣除后计算。"
+msgstr ""
+"Choose a [build profile](../reference/profiles.md) and use `xgl_config_get_preset_boot()` to set the "
+"runtime configuration. Set the route, nodes, MTU, RX buffer and time budget. Query target size and "
+"alignment through `xgl_memory_requirements()`, provide static storage and initialize with "
+"`xgl_init_static()`. Derive payload limits by subtracting the actual header, TLVs and CRC."
+
+#: docs/zh/guides/boot.md:16
+msgid "测量目标固件并记录外部 PHY 所需的缓冲、时序及实际调用栈。运行窗口 1 与独立的编译窗口上限分别选择。资源证据参见[验证](../development/validation.md)。"
+msgstr ""
+"Measure the target firmware and account for external PHY buffers, timing and call-chain stack. Set the "
+"runtime window and compiled window capacity separately. See [Validation](../development/validation.md) "
+"for resource evidence."
+
+#: docs/zh/guides/boot.md:18
+msgid "接收和提交"
+msgstr "Receive and commit"
+
+#: docs/zh/guides/boot.md:20
+msgid ""
+"从[可运行示例](../tutorials/examples.md)查看主机 `boot_update`。应用接纳回调在当前块无法写入暂存槽时返回 `XGL_ERR_BUSY`。接纳时复制数据到自己的槽，由 "
+"owner 在回调退出后推进 Flash 操作并发送提交回执。发送端应等这一回执后推进镜像偏移。复位或错误之后，排空旧流量并按新的 scope 恢复。"
+msgstr ""
+"See host `boot_update` in [Runnable examples](../tutorials/examples.md). The application admission "
+"callback returns `XGL_ERR_BUSY` while the staging slot is unavailable. On acceptance it copies the block"
+" to application storage. The owner drives Flash work and sends a commit receipt after the callback "
+"returns. The sender advances its image offset after that receipt. After reset or failure, drain the old "
+"flow and resume under a new scope."
+
+#: docs/zh/guides/boot.md:22
+msgid ""
+"将驱动接纳、可靠 ACK、持久化提交和镜像启用分开记录。真实产品提供 Flash 分区、已签名镜像验证、版本策略、断电恢复与启动交接。应用共享一个 PHY 时保持单一执行者和显式借用边界。静态协议 "
+"workspace 之外还需核算 BSP、暂存区与安全组件。"
+msgstr ""
+"Observe driver admission, reliable ACK, durable commit and image activation separately. The product owns"
+" Flash partitions, signed-image verification, version policy, power-loss recovery and boot handoff. Keep"
+" one owner and an explicit borrow boundary for shared PHYs. Include the BSP, staging area and security "
+"components in budgets outside the protocol workspace."
+
+#: docs/zh/guides/boot.md:24
+msgid "验收"
+msgstr "Qualification"
+
+#: docs/zh/guides/boot.md:26
+msgid "验证背压、丢 ACK、字节流中断、时钟回绕、资源耗尽和停止。主机模拟覆盖传输和接纳。板级 Flash、DMA 与安全验收另按产品要求执行。"
+msgstr ""
+"Exercise backpressure, lost ACKs, broken byte streams, clock wraparound, resource exhaustion and "
+"shutdown. The host model validates transfer and admission. Hardware Flash, DMA and security "
+"qualification follow the product requirements."

@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 32dfe92904fea3dae0d77c326139e4521e194ffc105d4cc291df8060f8109fb3\n"
+
+#: docs/zh/reference/datalink-optimization.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/reference/datalink-optimization.md:11
+msgid "请查阅[当前文档](../explanation/datalink.md)。"
+msgstr "See the [current documentation](../explanation/datalink.md)."

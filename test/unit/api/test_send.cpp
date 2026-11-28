@@ -2,6 +2,9 @@
  * \file            test_send.cpp
  * \brief           Unit tests for send API
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -27,26 +30,26 @@ class SendTestPhy {
     MOCK_METHOD(xgl_error_t, tx,
                 (const uint8_t* data, size_t len, void* user_data));
     MOCK_METHOD(xgl_error_t, rx,
-                (uint8_t* buffer, size_t* len, void* user_data));
+                (uint8_t * buffer, size_t* len, void* user_data));
 };
 
 /* Global mock instance for C callbacks */
-static SendTestPhy* g_mock_phy = nullptr;
-static constexpr size_t kZeroCopyAppHeaderLen =
+static SendTestPhy* s_mock_phy = nullptr;
+static constexpr size_t XGL_TEST_ZERO_COPY_APP_HEADER_LEN =
     XGL_FRAME_HEADER_SIZE + XGL_WIRE_EXT_HEADER_SIZE + 1U;
 
 /* C callback wrappers */
 static xgl_error_t mock_phy_tx(const uint8_t* data, size_t len,
                                void* user_data) {
-    if (g_mock_phy) {
-        return g_mock_phy->tx(data, len, user_data);
+    if (s_mock_phy) {
+        return s_mock_phy->tx(data, len, user_data);
     }
     return XGL_OK;
 }
 
 static xgl_error_t mock_phy_rx(uint8_t* buffer, size_t* len, void* user_data) {
-    if (g_mock_phy) {
-        return g_mock_phy->rx(buffer, len, user_data);
+    if (s_mock_phy) {
+        return s_mock_phy->rx(buffer, len, user_data);
     }
     return XGL_OK;
 }
@@ -112,7 +115,7 @@ class XglSendTest : public ::testing::Test {
     void SetUp() override {
         /* Create mock PHY */
         mock_phy = new SendTestPhy();
-        g_mock_phy = mock_phy;
+        s_mock_phy = mock_phy;
 
         /* Setup PHY operations */
         phy_ops.tx = mock_phy_tx;
@@ -148,7 +151,7 @@ class XglSendTest : public ::testing::Test {
             handle = nullptr;
         }
 
-        g_mock_phy = nullptr;
+        s_mock_phy = nullptr;
         delete mock_phy;
         mock_phy = nullptr;
     }
@@ -267,13 +270,13 @@ TEST_F(XglSendTest, BasicSendSuccess) {
     /* Expect PHY TX to be called */
     EXPECT_CALL(*mock_phy, tx(testing::_, testing::_, testing::_))
         .Times(1)
-        .WillOnce(testing::Invoke([](const uint8_t* bytes, size_t len, void*) {
+        .WillOnce([](const uint8_t* bytes, size_t len, void*) {
             if (len < XGL_FRAME_HEADER_SIZE) {
                 return XGL_ERR_INVALID_FRAME;
             }
             EXPECT_EQ(bytes[2], 1U);
             return XGL_OK;
-        }));
+        });
 
     xgl_error_t err = xgl_send_at(handle, &tx_data, 0U);
 
@@ -282,8 +285,8 @@ TEST_F(XglSendTest, BasicSendSuccess) {
 
 TEST_F(XglSendTest, OrdinaryRejectsPayloadAboveRouteMtu) {
     ASSERT_LT(route.max_frame_size, config.protocol.max_frame_size);
-    const size_t capacity =
-        route.max_frame_size - kZeroCopyAppHeaderLen - XGL_CRC16_SIZE;
+    const size_t capacity = route.max_frame_size -
+                            XGL_TEST_ZERO_COPY_APP_HEADER_LEN - XGL_CRC16_SIZE;
     std::vector<uint8_t> data(capacity + 1U, 0x5A);
     xgl_tx_data_t tx_data = {};
     tx_data.target_id = 2;
@@ -383,9 +386,8 @@ TEST_F(XglSendTest, ScopedAuthenticatedCopyAndZeroCopyHonorExactRouteMtu) {
     };
     testing::InSequence sequence;
     EXPECT_CALL(*mock_phy, tx(testing::_, mtu, testing::_))
-        .WillOnce(testing::Invoke(check_frame));
-    EXPECT_CALL(*mock_phy, tx(frame, mtu, testing::_))
-        .WillOnce(testing::Invoke(check_frame));
+        .WillOnce(check_frame);
+    EXPECT_CALL(*mock_phy, tx(frame, mtu, testing::_)).WillOnce(check_frame);
     EXPECT_EQ(xgl_send_at(handle, &copy, 1U), XGL_OK);
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &zero_copy, 2U), XGL_OK);
 }
@@ -491,12 +493,13 @@ TEST_F(XglSendTest, ZeroCopySendWithBufferTooSmall) {
 TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     uint8_t buffer[64] = {};
     const char payload[] = "zcopy";
-    memcpy(buffer + kZeroCopyAppHeaderLen, payload, sizeof(payload) - 1U);
+    memcpy(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
+           sizeof(payload) - 1U);
 
     xgl_tx_data_zerocopy_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
-    tx_data.data_offset = kZeroCopyAppHeaderLen;
+    tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = sizeof(payload) - 1U;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
@@ -504,17 +507,17 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
     tx_data.priority = 0;
     tx_data.timeout_ms = 0;
 
-    EXPECT_CALL(*mock_phy,
-                tx(buffer,
-                   kZeroCopyAppHeaderLen + tx_data.data_len + XGL_CRC16_SIZE,
-                   testing::_))
+    EXPECT_CALL(*mock_phy, tx(buffer,
+                              XGL_TEST_ZERO_COPY_APP_HEADER_LEN +
+                                  tx_data.data_len + XGL_CRC16_SIZE,
+                              testing::_))
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
 
     EXPECT_EQ(xgl_send_zerocopy_at(handle, &tx_data, 0U), XGL_OK);
     EXPECT_EQ(buffer[0], XGL_WIRE_MAGIC_0);
     EXPECT_EQ(buffer[1], XGL_WIRE_MAGIC_1);
-    EXPECT_EQ(std::memcmp(buffer + kZeroCopyAppHeaderLen, payload,
+    EXPECT_EQ(std::memcmp(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
                           sizeof(payload) - 1U),
               0);
 }
@@ -522,12 +525,13 @@ TEST_F(XglSendTest, ZeroCopyUnreliableUsesCallerFrameBuffer) {
 TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
     uint8_t buffer[64] = {};
     const char payload[] = "stats";
-    memcpy(buffer + kZeroCopyAppHeaderLen, payload, sizeof(payload) - 1U);
+    memcpy(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
+           sizeof(payload) - 1U);
 
     xgl_tx_data_zerocopy_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
-    tx_data.data_offset = kZeroCopyAppHeaderLen;
+    tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = sizeof(payload) - 1U;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
@@ -536,7 +540,7 @@ TEST_F(XglSendTest, ZeroCopyBypassStillUpdatesLayerStats) {
     tx_data.timeout_ms = 0;
 
     const size_t expected_frame_len =
-        kZeroCopyAppHeaderLen + tx_data.data_len + XGL_CRC16_SIZE;
+        XGL_TEST_ZERO_COPY_APP_HEADER_LEN + tx_data.data_len + XGL_CRC16_SIZE;
     EXPECT_CALL(*mock_phy, tx(buffer, expected_frame_len, testing::_))
         .Times(1)
         .WillOnce(testing::Return(XGL_OK));
@@ -668,11 +672,11 @@ TEST_F(XglSendTest, ZeroCopyUnreliableRejectsPayloadExceedingRouteMtu) {
     ASSERT_EQ(xgl_init(handle), XGL_OK);
 
     uint8_t buffer[128] = {};
-    memset(buffer + kZeroCopyAppHeaderLen, 0xAB, 60);
+    memset(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, 0xAB, 60);
     xgl_tx_data_zerocopy_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
-    tx_data.data_offset = kZeroCopyAppHeaderLen;
+    tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = 60;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
@@ -688,12 +692,13 @@ TEST_F(XglSendTest, ZeroCopyUnreliableRejectsPayloadExceedingRouteMtu) {
 TEST_F(XglSendTest, ZeroCopyUnreliableWritesDefaultTtlAndEmptySession) {
     uint8_t buffer[64] = {};
     const char payload[] = "zcopy";
-    memcpy(buffer + kZeroCopyAppHeaderLen, payload, sizeof(payload) - 1U);
+    memcpy(buffer + XGL_TEST_ZERO_COPY_APP_HEADER_LEN, payload,
+           sizeof(payload) - 1U);
 
     xgl_tx_data_zerocopy_t tx_data = {};
     tx_data.buffer = buffer;
     tx_data.buffer_size = sizeof(buffer);
-    tx_data.data_offset = kZeroCopyAppHeaderLen;
+    tx_data.data_offset = XGL_TEST_ZERO_COPY_APP_HEADER_LEN;
     tx_data.data_len = sizeof(payload) - 1U;
     tx_data.target_id = 2;
     tx_data.data_type = 1;
@@ -796,7 +801,7 @@ static xgl_error_t static_auth_accept(xgl_handle_t, uint16_t, uint8_t,
     static_cast<StaticAuthEndpoint*>(context)->deliveries++;
     return XGL_OK;
 }
-}  // namespace
+} /* namespace */
 
 TEST(XglStaticAuthenticatedSendTest,
      LostAckRetransmitsWithFreshNonceAndExactlyOnceDelivery) {

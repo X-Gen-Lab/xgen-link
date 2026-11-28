@@ -1,6 +1,10 @@
 /**
  * \file            xgl_size_class_allocator.c
  * \brief           Fixed pool selection for instance initialization
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-11-26
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_size_class_allocator.h"

@@ -1,6 +1,10 @@
 /**
  * \file            xgl_network_receive.c
  * \brief           Network receive and forwarding path implementation
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-16
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "network/xgl_route.h"
@@ -10,10 +14,8 @@
 
 /**
  * \brief           Deliver connection identity and borrowed payload upstream
- * \param[in,out]   ctx: Network layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       metadata: Validated frame view
- * \return          Upper layer acceptance result, or XGL_OK without a receiver
+ * \details         Pass the upper layer acceptance result back to the caller.
+ *                  With no receiver, this endpoint succeeds.
  */
 static xgl_error_t
 network_deliver_local(xgl_network_ctx_t* ctx, xgl_handle_t handle,
@@ -53,11 +55,7 @@ network_deliver_local(xgl_network_ctx_t* ctx, xgl_handle_t handle,
 
 /**
  * \brief           Decode a complete frame before local delivery or forwarding
- * \param[in,out]   ctx: Network layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       frame_buf: Complete frame bytes
- * \param[in]       frame_len: Available bytes including the final CRC
- * \return          XGL_OK on success, error code otherwise
+ * \details         The input covers the complete frame through its CRC.
  */
 xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                                 const uint8_t* frame_buf, size_t frame_len) {
@@ -85,10 +83,7 @@ xgl_error_t xgl_network_receive(xgl_network_ctx_t* ctx, xgl_handle_t handle,
 /**
  * \brief           Route a previously validated frame view without decoding
  *                  again
- * \param[in,out]   ctx: Network layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       metadata: Borrowed view from the trusted internal RX path
- * \return          XGL_OK on success, error code otherwise
+ * \details         The decoder has already validated this borrowed view.
  */
 xgl_error_t
 xgl_network_receive_mutable_view(xgl_network_ctx_t* ctx, xgl_handle_t handle,

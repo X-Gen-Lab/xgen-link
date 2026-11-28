@@ -2,6 +2,9 @@
  * \file            xgl_datalink.c
  * \brief           Data link layer implementation
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_datalink.h>
@@ -75,9 +78,6 @@ static xgl_error_t datalink_send_impl(void* ctx, xgl_handle_t handle,
 /**
  * \brief           Get datalink layer interface
  * \details         Returns the layer interface for this datalink instance
- * \param[in]       ctx: Datalink layer context
- * \param[out]      iface: Layer interface structure to initialize
- * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_datalink_get_tx_endpoint(xgl_datalink_ctx_t* ctx,
                                          xgl_frame_tx_endpoint_t* iface) {

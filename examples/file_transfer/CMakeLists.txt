@@ -2,5 +2,8 @@ add_executable(file_transfer main.c)
 target_link_libraries(file_transfer PRIVATE xgl::xgl)
 if(XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE)
     add_test(NAME xgl_file_transfer_example COMMAND file_transfer)
-    set_tests_properties(xgl_file_transfer_example PROPERTIES LABELS integration TIMEOUT 10)
+    set_tests_properties(
+        xgl_file_transfer_example
+        PROPERTIES LABELS integration TIMEOUT 10
+    )
 endif()

@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 965d0bef2099a44c6957603626a1bff452ad157d18868e45b427155aba1b5638\n"
+
+#: docs/zh/reference/c-api.md:8
+msgid "C API 参考"
+msgstr "C API reference"
+
+#: docs/zh/reference/c-api.md:10
+msgid "公开声明由当前 SDK 头文件生成。"
+msgstr "Public declarations are generated from the current SDK headers."

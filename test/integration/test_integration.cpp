@@ -2,6 +2,9 @@
  * \file            test_integration.cpp
  * \brief           Integration tests for end-to-end functionality
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  * \note            Validates: Requirements 19.2
  */
 
@@ -395,7 +398,7 @@ static void e2e_rx_callback(xgl_handle_t handle, uint16_t source_id,
     }
 }
 
-}  // namespace
+} /* namespace */
 
 /**
  * \brief           End-to-end unreliable single-hop test

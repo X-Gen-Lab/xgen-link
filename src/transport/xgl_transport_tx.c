@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_tx.c
  * \brief           Transport transmit planning, admission and submission
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "wire/xgl_frame.h"
@@ -159,11 +163,9 @@ transport_send_packet_view(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 
 /**
  * \brief           Check scope state and reserve reliable submission ownership
- * \param[in,out]   ctx: Transport context
- * \param[in]       tx_data: Borrowed application request
- * \param[out]      peer: Exact owner on success; NULL for unreliable traffic
- * \param[out]      created: Whether this request reserved the peer
- * \return          XGL_OK or admission error
+ * \details         Return the exact owning peer on success and indicate
+ *                  whether the request created it. Unreliable traffic has no
+ *                  owner here.
  */
 static xgl_error_t transport_prepare_reliable_send(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle, const xgl_tx_data_t* tx_data,
@@ -222,10 +224,7 @@ static xgl_error_t transport_announce_peer(const xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Return a new scope that never accepted reliable data
- * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       peer: Scope considered for rollback
- * \param[in]       created: Whether the current request reserved this scope
+ * \details         Only roll back a scope created by the current request.
  */
 static void transport_rollback_new_peer(xgl_transport_ctx_t* ctx,
                                         xgl_handle_t handle,

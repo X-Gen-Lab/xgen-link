@@ -2,6 +2,9 @@
  * \file            xgl_send_zerocopy.c
  * \brief           Synchronous caller-buffer send API
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "xgl_instance_internal.h"

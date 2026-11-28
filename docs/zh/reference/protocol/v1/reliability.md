@@ -1,3 +1,10 @@
+---
+id: reference/protocol/v1/reliability
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 可靠传输
 
 每个 peer 独占一个 TX 窗口、可靠队列和 RX 排序状态；启用自适应 RTO 时还拥有 RTT 估计器。唯一键为 `(remote_id, connection_id, session_epoch)`，没有实例级回退窗口，也没有独立的 PHY 直接重传通道。

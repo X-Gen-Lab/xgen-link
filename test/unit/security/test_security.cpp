@@ -1,3 +1,12 @@
+/**
+ * \file            test_security.cpp
+ * \brief           Exercise session ownership and replay protection
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-07
+ * \copyright       Copyright (c) 2026 X-Gen Lab
+ */
+
 #include <security/xgl_security.h>
 
 #include <gtest/gtest.h>
@@ -205,7 +214,7 @@ class XglSecuritySessionTest : public ::testing::Test {
                              xgl_crc16_modbus(bytes, length - 2));
     }
 };
-}  // namespace
+} /* namespace */
 
 TEST_F(XglSecuritySessionTest, RefusesUninstalledSendAndReceiveSessions) {
     EXPECT_EQ(Sign(), XGL_ERR_NOT_FOUND);
@@ -441,16 +450,16 @@ TEST_F(XglSecuritySessionTest, BroadcastAssociationDoesNotReserveTrustedState) {
 }
 
 TEST_F(XglSecuritySessionTest, AuthenticatedBroadcastIsRejectedBeforeSigning) {
-    const uint8_t payload = 0x61U;
+    const uint8_t broadcast_payload = 0x61U;
     xgl_frame_params_t params = {};
     params.source_id = 1U;
     params.target_id = UINT16_MAX;
-    params.payload = &payload;
+    params.payload = &broadcast_payload;
     params.payload_len = 1U;
-    xgl_frame_t frame = {};
-    ASSERT_EQ(xgl_frame_build(&frame, &params), XGL_OK);
+    xgl_frame_t broadcast = {};
+    ASSERT_EQ(xgl_frame_build(&broadcast, &params), XGL_OK);
     size_t written = 19U;
-    EXPECT_EQ(xgl_security_serialize_frame(bytes, sizeof(bytes), &frame,
+    EXPECT_EQ(xgl_security_serialize_frame(bytes, sizeof(bytes), &broadcast,
                                            &sender, &written),
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(written, 0U);

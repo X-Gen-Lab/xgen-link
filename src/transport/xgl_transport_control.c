@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_control.c
  * \brief           Transport control packet helpers
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-15
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "wire/xgl_wire.h"
@@ -9,13 +13,8 @@
 /**
  * \brief           Send a control request without consuming a reliable DATA
  * number
- * \param[in]       ctx: Transport context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       target_id: Remote endpoint
- * \param[in]       control_type: HELLO or RESET operation
- * \param[in]       connection_id: Exact connection identity
- * \param[in]       session_epoch: Exact session epoch
- * \return          Lower layer send result
+ * \details         Return the lower layer result for a HELLO or RESET within
+ *                  the exact peer scope.
  */
 xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
                                    xgl_handle_t handle, uint16_t target_id,
@@ -54,10 +53,6 @@ xgl_error_t transport_send_control(const xgl_transport_ctx_t* ctx,
 /**
  * \brief           Ensure HELLO ownership or terminally cancel an exact RESET
  * scope
- * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet: Borrowed control request
- * \return          XGL_OK, or validation/capacity/unknown-scope error
  * \note            Repeated HELLO and RESET are idempotent. RESET never reopens
  *                  a failed epoch and never creates a previously unknown peer.
  */

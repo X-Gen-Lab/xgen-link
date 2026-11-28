@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_rx_buffer.c
  * \brief           Owned out-of-order packet storage
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-15
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_allocator.h"
@@ -11,8 +15,7 @@
 /**
  * \brief           Release a buffered receive packet through its resource
  * services
- * \param[in]       ctx: Transport context
- * \param[in,out]   buffered: Owned packet storage, or NULL
+ * \details         The owned packet may be NULL.
  */
 void transport_free_rx_buffered_packet(
     const xgl_transport_ctx_t* ctx,

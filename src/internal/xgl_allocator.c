@@ -1,6 +1,10 @@
 /**
  * \file            xgl_allocator.c
  * \brief           Dispatch through an explicit XGL allocation service
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-11-26
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_allocator.h"

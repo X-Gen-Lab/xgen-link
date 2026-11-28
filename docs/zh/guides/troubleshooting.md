@@ -1,3 +1,10 @@
+---
+id: guides/troubleshooting
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 诊断和调试
 
 先检查返回错误、编译 profile，以及配置对应的精确 workspace 需求。协议不安装内部日志或平台诊断 backend。

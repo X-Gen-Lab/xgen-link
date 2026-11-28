@@ -1,0 +1,90 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: ea9c066c62c9826529a63042ed55bd114e5b28c2fb4dd1d0c0317a61d7516d1a\n"
+
+#: docs/zh/reference/protocol/v1/interoperability.md:8
+msgid "互操作"
+msgstr "Interoperability"
+
+#: docs/zh/reference/protocol/v1/interoperability.md:10
+msgid ""
+"端点及中继使用这里定义的 Wire v1 编码。升级时应同步替换使用早期 Wire v1 编码的端点和中继。版本字段同为 `1`，帧标志位和 TLV 编号仍须一致。每个端点使用自身构建中的配套头文件和库。"
+msgstr ""
+"Endpoints and relays on a path must use the Wire v1 encoding specified here. Replace endpoints and "
+"relays that use the earlier Wire v1 encoding together during deployment. The version byte is `1` in both"
+" revisions, so ensure all devices use the same flags and TLV assignments. Each build uses its matching "
+"headers and library."
+
+#: docs/zh/reference/protocol/v1/interoperability.md:12
+msgid "必须一致的约定"
+msgstr "Required agreements"
+
+#: docs/zh/reference/protocol/v1/interoperability.md:14
+msgid ""
+"对端须约定 MTU、扩展语义、认证 tag 长度、可信 connection/epoch 和方向性安全参数。只有可靠 DATA 消耗可靠包序号。认证使用独立的 64 位安全序号及 provider "
+"定义的算法。"
+msgstr ""
+"Peers must agree on the path MTU, extension semantics and authentication policy. With authentication, "
+"also agree on the tag length, trusted connection/epoch and directional security parameters. Only "
+"reliable DATA consumes a reliable packet number. Authentication uses an independent 64-bit sequence and "
+"a provider-defined algorithm."
+
+#: docs/zh/reference/protocol/v1/interoperability.md:16
+msgid "复现 v1 端点互通"
+msgstr "Reproduce the endpoint test"
+
+#: docs/zh/reference/protocol/v1/interoperability.md:18
+msgid ""
+"`test/interop/interop_peer.c` 是两个端点使用的公开 API 夹具。`test/interop/test_wire_interop.py` 启动两个独立进程，通过标准流交换实际帧。"
+msgstr ""
+"`test/interop/interop_peer.c` provides the public API fixture for both endpoints. "
+"`test/interop/test_wire_interop.py` starts two independent processes and exchanges actual frames through"
+" their standard streams."
+
+#: docs/zh/reference/protocol/v1/interoperability.md:20
+msgid "从仓库根目录执行。独立夹具由 C11 工具链构建。分别用 `boot` 和 `full` 运行下列命令。"
+msgstr ""
+"Run from the repository root. The independent fixture builds with C11. Repeat the commands below with "
+"`boot` and `full`."
+
+#: docs/zh/reference/protocol/v1/interoperability.md:35
+msgid ""
+"可在新的端点构建目录使用安装包，传入 `-DXGL_INTEROP_SDK_PREFIX=/path/to/sdk` 和 `-DXGL_INTEROP_SDK_VERSION=0.0.1`。端点要求该前缀中的"
+" SDK 版本和 profile 匹配。"
+msgstr ""
+"To use an installed SDK in fresh endpoint build directories, pass "
+"`-DXGL_INTEROP_SDK_PREFIX=/path/to/sdk` and `-DXGL_INTEROP_SDK_VERSION=0.0.1`. The SDK at that prefix "
+"must match the requested version and profile."
+
+#: docs/zh/reference/protocol/v1/interoperability.md:37
+msgid ""
+"Boot 场景检查双向丢 ACK 后重传、应用只交付一次，以及重复 RESET 后拒绝同 epoch 发送。Full 场景交换带测试认证的 DATA，调换两个独立 DATA 帧的到达顺序，检查 SACK "
+"和按序交付。脚本在错误、漏交付、重复交付或指定恢复分支未执行时返回失败。"
+msgstr ""
+"Boot drops the first ACK in each direction and checks retransmission and single delivery. Repeated RESET"
+" also checks rejection of sends for the same epoch. Full reorders two authenticated DATA frames and "
+"checks SACK and ordered delivery. The script fails on an error, missing or duplicate delivery, or "
+"failure to exercise the selected recovery branch."
+
+#: docs/zh/reference/protocol/v1/interoperability.md:39
+msgid "证据"
+msgstr "Evidence"
+
+#: docs/zh/reference/protocol/v1/interoperability.md:41
+msgid ""
+"`test/unit/wire/test_wire.cpp`、`test/unit/security/test_security.cpp` 和 "
+"`test/unit/network/test_network.cpp` 检查编码、认证输入、规范化转发 AAD 及路由交付。确定性签名 provider "
+"用于检查测试范围内的认证输入绑定。产品负责验证实际密码 provider 和板级 PHY。"
+msgstr ""
+"`test/unit/wire/test_wire.cpp`, `test/unit/security/test_security.cpp` and "
+"`test/unit/network/test_network.cpp` separately check encoding, authentication inputs, canonical "
+"forwarded AAD and routing. The deterministic test signing provider checks authentication input binding. "
+"Products qualify their actual cryptographic provider and board PHY."

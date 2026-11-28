@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_rx.c
  * \brief           Receive classification, ordering and contiguous delivery
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "xgl/xgl_config.h"
@@ -11,12 +15,9 @@
 /**
  * \brief           Deliver contiguous owned packets without discarding busy
  *                  data
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in,out]   peer: Owning receive peer
- * \param[out]      retained_backpressure: Optional flag; true only when the
- *                  returned error is temporary delivery refusal of owned data
- * \return          First hard error, otherwise the first temporary error
+ * \details         Return the first hard error, otherwise the first temporary
+ *                  error. The optional flag marks temporary delivery refusal
+ *                  of data the transport still owns.
  */
 xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
                                         xgl_handle_t handle,
@@ -92,12 +93,8 @@ static bool transport_has_rx_handler(const xgl_transport_ctx_t* ctx) {
 /**
  * \brief           Classify duplicates and retain supported out-of-order
  *                  packets
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet: Borrowed reliable packet view
- * \param[in,out]   peer: Receive peer, created on first reliable packet
- * \param[out]      decision: Whether the caller must attempt payload delivery
- * \return          XGL_OK or a receive admission error
+ * \details         The receive peer is created on first reliable admission.
+ *                  The decision tells the caller whether to attempt delivery.
  */
 static xgl_error_t transport_process_reliable_rx_order(
     xgl_transport_ctx_t* ctx, xgl_handle_t handle, const xgl_packet_t* packet,
@@ -149,10 +146,7 @@ static xgl_error_t transport_process_reliable_rx_order(
 
 /**
  * \brief           Roll back a new scope when no reliable history was admitted
- * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet: Rejected packet identifying the tentative scope
- * \param[in]       scope_was_absent: Whether this receive created the scope
+ * \details         Only roll back a scope created by this receive.
  * \note            Existing, failed or data-owning scopes are never reclaimed.
  */
 static void transport_release_rejected_scope(xgl_transport_ctx_t* ctx,
@@ -172,10 +166,6 @@ static void transport_release_rejected_scope(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Dispatch peer traffic and acknowledge only admitted payloads
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet: Borrowed packet view
- * \return          XGL_OK or a validation, admission or session error
  */
 xgl_error_t xgl_transport_receive(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                                   const xgl_packet_t* packet) {

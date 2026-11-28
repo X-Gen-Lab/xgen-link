@@ -36,7 +36,7 @@ extern "C" {
  * \return          1 if current version >= specified version, 0 otherwise
  */
 #define XGL_VERSION_CHECK(major, minor, patch)                                 \
-    (XGL_VERSION_INT >= ((major) * 10000 + (minor) * 100 + (patch)))
+    (XGL_VERSION_INT >= ((major)*10000 + (minor)*100 + (patch)))
 
 /**
  * \brief           Reserve a workspace after checking consumer ABI constants

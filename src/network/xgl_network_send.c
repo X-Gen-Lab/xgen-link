@@ -1,6 +1,10 @@
 /**
  * \file            xgl_network_send.c
  * \brief           Network send path implementation
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-16
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <internal/xgl_diagnostics.h>
@@ -60,11 +64,8 @@ static xgl_error_t network_append_data_type_ext(uint8_t* extensions,
 
 /**
  * \brief           Compose packet extensions while preserving session identity
- * \param[out]      extensions: Destination extension buffer
- * \param[in]       extensions_capacity: Destination capacity in bytes
- * \param[out]      extensions_len: Composed extension length
- * \param[in]       packet: Packet metadata and optional existing extensions
- * \return          XGL_OK on success, error code otherwise
+ * \details         Compose into the caller buffer and report the resulting
+ *                  byte count within its capacity.
  */
 static xgl_error_t network_copy_packet_extensions(uint8_t* extensions,
                                                   size_t extensions_capacity,
@@ -144,12 +145,8 @@ static uint8_t network_reliability_class(const xgl_packet_t* packet) {
 /**
  * \brief           Build a frame using composed extensions and wire scope
  *                  fields
- * \param[in,out]   ctx: Network statistics context
- * \param[in]       packet: Packet to transmit
- * \param[out]      extensions: Caller-owned extension workspace
- * \param[in]       extensions_capacity: Extension workspace capacity in bytes
- * \param[out]      frame: Built frame borrowing payload and extension storage
- * \return          XGL_OK on success, error code otherwise
+ * \details         The result borrows the payload and caller-owned extension
+ *                  storage.
  */
 static xgl_error_t network_build_tx_frame(xgl_network_ctx_t* ctx,
                                           const xgl_packet_t* packet,
@@ -425,8 +422,6 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet) {
 
 /**
  * \brief           Validate zero-copy transmission data
- * \param[in]       tx_data: Borrowed caller buffer and send parameters
- * \return          XGL_OK when lengths and offsets are valid
  */
 xgl_error_t
 xgl_network_validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {

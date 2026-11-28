@@ -1,3 +1,10 @@
+---
+id: reference/protocol/v1/interoperability
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 互操作
 
 端点及中继使用这里定义的 Wire v1 编码。升级时应同步替换使用早期 Wire v1 编码的端点和中继。版本字段同为 `1`，帧标志位和 TLV 编号仍须一致。每个端点使用自身构建中的配套头文件和库。
@@ -25,7 +32,7 @@ python3 test/interop/test_wire_interop.py \
   "$work/$profile-b/xgl_interop_peer" --profile "$profile"
 ```
 
-可在新的端点构建目录使用安装包，传入 `-DXGL_INTEROP_SDK_PREFIX=/path/to/sdk` 和 `-DXGL_INTEROP_SDK_VERSION=5.0.0`。端点要求该前缀中的 SDK 版本和 profile 匹配。
+可在新的端点构建目录使用安装包，传入 `-DXGL_INTEROP_SDK_PREFIX=/path/to/sdk` 和 `-DXGL_INTEROP_SDK_VERSION=0.0.1`。端点要求该前缀中的 SDK 版本和 profile 匹配。
 
 Boot 场景检查双向丢 ACK 后重传、应用只交付一次，以及重复 RESET 后拒绝同 epoch 发送。Full 场景交换带测试认证的 DATA，调换两个独立 DATA 帧的到达顺序，检查 SACK 和按序交付。脚本在错误、漏交付、重复交付或指定恢复分支未执行时返回失败。
 

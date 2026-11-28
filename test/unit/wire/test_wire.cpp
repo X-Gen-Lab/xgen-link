@@ -1,3 +1,12 @@
+/**
+ * \file            test_wire.cpp
+ * \brief           Exercise the Wire v1 encoding and decoding contract
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-07
+ * \copyright       Copyright (c) 2026 X-Gen Lab
+ */
+
 #include <wire/xgl_wire.h>
 
 #include <array>

@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 0efdbfa0326ec4e9faf28a1bb4b9e951f4f9d08c7d651dc41cb22824a11e184a\n"
+
+#: docs/zh/reference/protocol/v3/reliability.md:9
+msgid "可靠传输"
+msgstr "Reliability"
+
+#: docs/zh/reference/protocol/v3/reliability.md:11
+msgid "请查阅 [Wire v1 文档](../v1/reliability.md)。"
+msgstr "See the [Wire v1 documentation](../v1/reliability.md)."

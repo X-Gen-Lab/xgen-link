@@ -1,19 +1,17 @@
+---
+id: explanation/state-machines
+type: explanation
+audience: user
+source_language: zh_CN
+---
+
 # 状态机
 
 状态转换属于精确 scope。应用意图、可靠 DATA 编号与认证重放状态具有各自独立的生命周期。
 
 ## Peer 生命周期
 
-```mermaid
-stateDiagram-v2
-    [*] --> Absent
-    Absent --> Active: 接纳精确 scope 或 HELLO
-    Active --> Active: DATA 或有效 ACK
-    Active --> Failed: RESET / 重试耗尽 / 硬错误
-    Failed --> Failed: 重复 RESET 或 HELLO
-    Active --> Absent: 显式 close
-    Failed --> Absent: 显式 close
-```
+![Peer 状态转换](../diagrams/peer-lifecycle.svg)
 
 失败 epoch 是终态。Close 释放 transport 容量，新的连接尝试必须使用新 epoch。关闭仍有已接纳工作的 scope 时报告一次取消。RESET 只查找已存在的精确 scope，不创建或重新开放它。HELLO 幂等，不重置计数器。
 
@@ -21,16 +19,7 @@ stateDiagram-v2
 
 ## 可靠包生命周期
 
-```mermaid
-stateDiagram-v2
-    [*] --> Reserved: 复制并预留容量
-    Reserved --> WaitingACK: 首次同步发送成功
-    Reserved --> [*]: 首次提交失败
-    WaitingACK --> WaitingACK: 超时或 SACK 重试
-    WaitingACK --> [*]: 有效 ACK 释放所有权
-    WaitingACK --> Failed: scope 终止
-    Failed --> [*]: 释放保留存储
-```
+![可靠包状态转换](../diagrams/reliable-packet.svg)
 
 发送窗口耗尽时，应用可以等 ACK 释放槽后重新提交新包。接收方已持有的乱序包在应用 BUSY 时继续保留。
 

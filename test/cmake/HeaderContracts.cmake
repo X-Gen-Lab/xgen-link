@@ -1,34 +1,58 @@
 # Compile every public and private header first in separate C11/C++17 units.
 # Framework or neighboring headers must not hide missing includes or linkage.
-file(GLOB public_header_inputs CONFIGURE_DEPENDS
+file(
+    GLOB public_header_inputs
+    CONFIGURE_DEPENDS
     RELATIVE "${PROJECT_SOURCE_DIR}/include"
-    "${PROJECT_SOURCE_DIR}/include/xgl/*.h")
-file(GLOB_RECURSE private_header_inputs CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/include/xgl/*.h"
+)
+file(
+    GLOB_RECURSE private_header_inputs
+    CONFIGURE_DEPENDS
     RELATIVE "${PROJECT_SOURCE_DIR}/src"
-    "${PROJECT_SOURCE_DIR}/src/*.h")
+    "${PROJECT_SOURCE_DIR}/src/*.h"
+)
 list(APPEND public_header_inputs xgl/xgl_build_config.h)
 set(header_contract_sources)
 foreach(header IN LISTS public_header_inputs private_header_inputs)
     string(REPLACE "/" "_" unit_name "${header}")
     foreach(language c cpp)
-        set(unit "${CMAKE_CURRENT_BINARY_DIR}/header-contracts/${unit_name}.${language}")
+        set(unit
+            "${CMAKE_CURRENT_BINARY_DIR}/header-contracts/${unit_name}.${language}"
+        )
         set(header_usage "")
         if(header STREQUAL "xgl/xgl_types.h")
-            set(header_usage "xgl_instance_options_t xgl_header_options_contract(void) {\n    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;\n    return options;\n}\n")
+            set(header_usage
+                "xgl_instance_options_t xgl_header_options_contract(void);\n\nxgl_instance_options_t xgl_header_options_contract(void) {\n    xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;\n    return options;\n}\n"
+            )
         endif()
         # Macro-only configuration headers otherwise form an empty C unit.
-        file(GENERATE OUTPUT "${unit}" CONTENT
-            "#include <${header}>\n\ntypedef int xgl_header_contract_translation_unit;\n${header_usage}")
+        file(
+            GENERATE OUTPUT "${unit}"
+            CONTENT
+                "#include <${header}>\n\ntypedef int xgl_header_contract_translation_unit;\n${header_usage}"
+        )
         list(APPEND header_contract_sources "${unit}")
     endforeach()
 endforeach()
 add_library(xgl_header_contracts OBJECT ${header_contract_sources})
+xgl_target_owned_warnings(xgl_header_contracts)
 target_link_libraries(xgl_header_contracts PRIVATE xgl)
-target_include_directories(xgl_header_contracts PRIVATE "${PROJECT_SOURCE_DIR}/src")
+target_include_directories(
+    xgl_header_contracts
+    PRIVATE "${PROJECT_SOURCE_DIR}/src"
+)
 target_compile_features(xgl_header_contracts PRIVATE c_std_11 cxx_std_17)
-set_target_properties(xgl_header_contracts PROPERTIES
-    C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF
-    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+set_target_properties(
+    xgl_header_contracts
+    PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS OFF
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+)
 if(MSVC)
     target_compile_options(xgl_header_contracts PRIVATE /permissive-)
 else()

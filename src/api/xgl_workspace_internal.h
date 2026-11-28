@@ -1,6 +1,7 @@
 /**
  * \file            xgl_workspace_internal.h
  * \brief           Private workspace layout shared with target ABI diagnostics
+ * \author          X-Gen Lab
  */
 #ifndef XGL_WORKSPACE_INTERNAL_H
 #define XGL_WORKSPACE_INTERNAL_H

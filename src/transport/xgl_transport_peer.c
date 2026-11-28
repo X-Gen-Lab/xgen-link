@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_peer.c
  * \brief           Exact peer identity, lifecycle and bounded reclamation
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-15
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "xgl_transport_internal.h"
@@ -10,8 +14,6 @@
 
 /**
  * \brief           Check for buffered DATA that prevents peer reclamation
- * \param[in]       peer: Peer state
- * \return          true if the transport still owns buffered DATA
  */
 static bool
 transport_peer_has_buffered_data(const xgl_transport_peer_state_t* peer) {
@@ -63,11 +65,8 @@ static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Find an exact node, connection and epoch owner
- * \param[in]       ctx: Transport context; lookup does not change ownership
- * \param[in]       peer_id: Remote endpoint
- * \param[in]       connection_id: Connection identity, including zero
- * \param[in]       session_epoch: Session epoch, including zero
- * \return          Matching owner, or NULL
+ * \details         Connection and epoch zero are exact identities. Lookup
+ *                  leaves ownership intact.
  */
 xgl_transport_peer_state_t*
 transport_find_peer_scope(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
@@ -90,11 +89,7 @@ transport_find_peer_scope(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
 
 /**
  * \brief           Find a peer or allocate one within the configured peer limit
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       peer_id: Remote node ID
- * \param[in]       connection_id: Connection identity
- * \param[in]       session_epoch: Session identity
- * \return          Owned peer state, or NULL when capacity is unavailable
+ * \details         When no peer capacity is available, return NULL.
  */
 xgl_transport_peer_state_t*
 transport_get_or_create_peer_scope(xgl_transport_ctx_t* ctx, uint16_t peer_id,
@@ -170,9 +165,7 @@ void transport_destroy_peers(xgl_transport_ctx_t* ctx) {
 /**
  * \brief           Reclaim peer states that have been idle beyond the
  *                  configured timeout, or whose unused HELLO lease expired
- * \param[in,out]   ctx: Transport context
- * \param[in]       current_time_ms: Explicit current time
- * \return          Number of peers reclaimed.
+ * \details         Return the number of reclaimed peers at the supplied time.
  */
 uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
                                       uint32_t current_time_ms) {
@@ -217,9 +210,7 @@ uint32_t transport_reclaim_idle_peers(xgl_transport_ctx_t* ctx,
 /**
  * \brief           Release all data owned by one scope without reusing its
  * numbers
- * \param[in,out]   ctx: Transport context
- * \param[in,out]   peer: Exact owner whose identity and failure state are
- * retained
+ * \details         Retain the peer identity and terminal state.
  */
 static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
                                       xgl_transport_peer_state_t* peer) {
@@ -237,10 +228,8 @@ static void transport_clear_peer_data(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Fail a peer and release all transport-owned outstanding data
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in,out]   peer: Peer that requires a new epoch before further traffic
- * \param[in]       error: Failure reported once to the application
+ * \details         Report the failure once. Further traffic requires a new
+ *                  epoch.
  */
 void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
                          xgl_transport_peer_state_t* peer, xgl_error_t error) {
@@ -266,12 +255,6 @@ void transport_fail_peer(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
 /**
  * \brief           Close one exact scope and return its peer storage
  * reservation
- * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle for cancellation reporting
- * \param[in]       remote_id: Remote endpoint
- * \param[in]       connection_id: Connection identity
- * \param[in]       session_epoch: Session epoch being retired
- * \return          XGL_OK, XGL_ERR_NOT_FOUND, or XGL_ERR_NULL_POINTER
  * \note            The caller closes authentication first, or drains
  * unauthenticated old traffic and changes epoch before reusing this
  * reservation.
@@ -328,9 +311,6 @@ xgl_error_t xgl_transport_close_scope(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Find the exact peer identified by received metadata
- * \param[in,out]   ctx: Transport context
- * \param[in]       packet: Received packet metadata
- * \return          Matching peer, or NULL
  */
 xgl_transport_peer_state_t* transport_find_rx_peer(xgl_transport_ctx_t* ctx,
                                                    const xgl_packet_t* packet) {
@@ -340,9 +320,7 @@ xgl_transport_peer_state_t* transport_find_rx_peer(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Admit the exact peer identified by received metadata
- * \param[in,out]   ctx: Transport context
- * \param[in]       packet: Received packet metadata
- * \return          Matching peer, or NULL when capacity is unavailable
+ * \details         Return NULL when capacity is unavailable.
  */
 xgl_transport_peer_state_t*
 transport_get_or_create_rx_peer(xgl_transport_ctx_t* ctx,
@@ -353,11 +331,6 @@ transport_get_or_create_rx_peer(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Query capacity for an exact peer and session scope
- * \param[in]       ctx: Transport layer context
- * \param[in]       peer_id: Remote node ID
- * \param[in]       connection_id: Connection scope ID
- * \param[in]       session_epoch: Session epoch
- * \return          true if a reliable packet can be accepted
  */
 bool xgl_transport_can_send_to(const xgl_transport_ctx_t* ctx, uint16_t peer_id,
                                uint32_t connection_id, uint32_t session_epoch) {

@@ -1,6 +1,10 @@
 /**
  * \file            xgl_pool.c
  * \brief           Fixed slots in an instance-owned storage partition
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-11-26
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_pool.h"

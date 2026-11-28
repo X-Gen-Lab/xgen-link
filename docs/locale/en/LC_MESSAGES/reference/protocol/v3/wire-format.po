@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: a4ff84f3cfabc9603e46ccc5291138ff959de75b45de17735913f9fc7db75e7a\n"
+
+#: docs/zh/reference/protocol/v3/wire-format.md:9
+msgid "线格式"
+msgstr "Wire Format"
+
+#: docs/zh/reference/protocol/v3/wire-format.md:11
+msgid "请查阅 [Wire v1 文档](../v1/wire-format.md)。"
+msgstr "See the [Wire v1 documentation](../v1/wire-format.md)."

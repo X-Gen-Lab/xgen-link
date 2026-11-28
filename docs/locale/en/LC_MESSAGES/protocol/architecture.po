@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 679bddd9a9f458262f2b07ef24098e7f57b8f5bc30c7bd51c43dc44090a6658f\n"
+
+#: docs/zh/protocol/architecture.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/protocol/architecture.md:11
+msgid "请查阅[当前文档](../explanation/architecture.md)。"
+msgstr "See the [current documentation](../explanation/architecture.md)."

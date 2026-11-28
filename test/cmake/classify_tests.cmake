@@ -15,7 +15,11 @@ foreach(test_name IN LISTS xgl_discovered_tests)
     set(labels xgl unit)
     if(test_name MATCHES "^(${xgl_integration_pattern})[.]")
         set(labels xgl integration)
-    elseif(test_name MATCHES "Properties[.]|^(PropertyGeneratorTest|PropertySeedTest)[.]")
+    elseif(
+        test_name
+            MATCHES
+            "Properties[.]|^(PropertyGeneratorTest|PropertySeedTest)[.]"
+    )
         list(APPEND labels property)
     endif()
     set_tests_properties("${test_name}" PROPERTIES LABELS "${labels}")
@@ -29,7 +33,8 @@ else()
         XglBoundedProfileTest.RejectsUnsupportedAuthentication
         XglBoundedProfileTest.CapacityShortagePreservesCallerStorage
         XglBoundedProfileTest.RejectsOversizedSingleFrameWithoutTransmit
-        XglBoundedProfileTest.ParserRequiresCompleteValidatedFrame)
+        XglBoundedProfileTest.ParserRequiresCompleteValidatedFrame
+    )
 endif()
 foreach(test_name IN LISTS baseline_tests)
     list(FIND xgl_discovered_tests "${test_name}" baseline_index)

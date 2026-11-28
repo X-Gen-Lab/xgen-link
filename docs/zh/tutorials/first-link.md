@@ -1,3 +1,10 @@
+---
+id: tutorials/first-link
+type: tutorial
+audience: user
+source_language: zh_CN
+---
+
 # 跑通首次收发
 
 ## 构建并运行

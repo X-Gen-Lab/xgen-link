@@ -2,6 +2,10 @@
  * \file            test_coverage_delivery.cpp
  * \brief           Receive admission, PHY failures and parser recovery
  * contracts
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_datalink.h>
@@ -10,6 +14,7 @@
 #include <wire/xgl_wire.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <vector>
 
@@ -55,7 +60,8 @@ class XglCoverageDelivery : public ::testing::Test {
             if (*length != 0U) {
                 std::memcpy(bytes, self.input.data(), *length);
                 self.input.erase(self.input.begin(),
-                                 self.input.begin() + *length);
+                                 self.input.begin() +
+                                     static_cast<std::ptrdiff_t>(*length));
             }
             return XGL_OK;
         };
@@ -332,4 +338,4 @@ TEST_F(XglCoverageDelivery, NetworkRejectsMissingOrInvalidFrameViews) {
               XGL_ERR_INVALID_FRAME);
 }
 
-}  // namespace
+} /* namespace */

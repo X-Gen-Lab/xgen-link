@@ -1,3 +1,10 @@
+---
+id: explanation/runtime
+type: explanation
+audience: user
+source_language: zh_CN
+---
+
 # 接收与运行时工作预算
 
 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 启用可续跑的接收校验和

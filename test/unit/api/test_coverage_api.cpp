@@ -1,6 +1,10 @@
 /**
  * \file            test_coverage_api.cpp
  * \brief           Public lifecycle and bounded workspace edge contracts
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -118,7 +122,7 @@ struct AllocationObserver {
     }
 };
 
-}  // namespace
+} /* namespace */
 
 TEST(XglCoverageApi,
      ConfigPresetsAcceptNullAndRejectIncompleteResourceBudgets) {
@@ -258,7 +262,8 @@ TEST(XglCoverageApi,
     zero.target_id = 123;
     EXPECT_EQ(xgl_send_zerocopy_at(handle, &zero, 0), XGL_ERR_ROUTE_NOT_FOUND);
     xgl_destroy(handle);
-    EXPECT_NE(xgl_error_string(static_cast<xgl_error_t>(0x7FFF)), nullptr);
+    /* Value 99 is unassigned and fits the public enum's range. */
+    EXPECT_NE(xgl_error_string(static_cast<xgl_error_t>(99)), nullptr);
 }
 
 TEST(XglCoverageApi, RuntimeUsesFastestSharedPhyAndPreservesFirstReceiveError) {

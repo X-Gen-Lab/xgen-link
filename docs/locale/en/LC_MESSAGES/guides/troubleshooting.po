@@ -1,0 +1,161 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: ea13d69cc615f391eba2437ce55a2ca3e89ccf16a303f1e5cd41779151dd85e0\n"
+
+#: docs/zh/guides/troubleshooting.md:8
+msgid "诊断和调试"
+msgstr "Troubleshooting"
+
+#: docs/zh/guides/troubleshooting.md:10
+msgid "先检查返回错误、编译 profile，以及配置对应的精确 workspace 需求。协议不安装内部日志或平台诊断 backend。"
+msgstr ""
+"Start with the returned error, the compiled profile, and the exact configuration/workspace requirements."
+" The protocol does not install an internal logging or platform diagnostics backend."
+
+#: docs/zh/guides/troubleshooting.md:12
+msgid "初始化"
+msgstr "Initialization"
+
+#: docs/zh/guides/troubleshooting.md:14
+msgid ""
+"检查生成头文件与库的 ABI 是否一致，节点/peer/TX 容量是否有效，路由回调是否齐全，RX 容量是否覆盖完整帧上限。Workspace 地址和大小必须满足 "
+"`xgl_memory_requirements()`。"
+msgstr ""
+"Check the generated header/library ABI pair, nonzero node/peer/TX capacity, route callbacks, and RX "
+"capacity relative to the full frame limit. The workspace address and size must satisfy "
+"`xgl_memory_requirements()`."
+
+#: docs/zh/guides/troubleshooting.md:16
+msgid ""
+"保证配置及引用对象持续有效。`xgl_create()` 只预留存储，还要调用 `xgl_init()`；`xgl_init_static()` 本身包含初始化。无 heap "
+"的动态创建必须提供有效的显式上下文分配器。"
+msgstr ""
+"Keep the configuration and referenced objects alive. `xgl_create()` reserves storage but still needs "
+"`xgl_init()`; `xgl_init_static()` performs initialization itself. For no-heap dynamic creation, supply a"
+" valid explicit context allocator."
+
+#: docs/zh/guides/troubleshooting.md:18
+msgid "发送和接收"
+msgstr "Send and Receive"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "现象或状态"
+msgstr "Symptom/status"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "检查项"
+msgstr "Check"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_WINDOW_FULL`"
+msgstr "`XGL_ERR_WINDOW_FULL`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "Peer 在途窗口；继续 step 接收 ACK"
+msgstr "Peer in-flight window; keep stepping to receive ACKs"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_NO_MEMORY`"
+msgstr "`XGL_ERR_NO_MEMORY`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "Peer、全局 TX 和乱序 RX 的容量及接纳预算"
+msgstr "Peer and packet pool capacity"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_BUSY`"
+msgstr "`XGL_ERR_BUSY`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "PHY、应用接纳，或 peer 已有待推进消息"
+msgstr "PHY, application admission, or an already pending peer message"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_ROUTE_NOT_FOUND`"
+msgstr "`XGL_ERR_ROUTE_NOT_FOUND`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "目标与固定路由配置"
+msgstr "Target and fixed route configuration"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_BUFFER_TOO_SMALL`"
+msgstr "`XGL_ERR_BUFFER_TOO_SMALL`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "Workspace、RX cache、完整帧开销或消息上限"
+msgstr "Workspace, RX cache, full frame overhead, or message limit"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_UNSUPPORTED`"
+msgstr "`XGL_ERR_UNSUPPORTED`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "编译 profile 与请求功能"
+msgstr "Compiled profile and requested feature"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_INVALID_VERSION`"
+msgstr "`XGL_ERR_INVALID_VERSION`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "消费者 ABI/build 标识或接收 wire 版本"
+msgstr "Consumer ABI/build identifier or received wire version"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "`XGL_ERR_ACK_TIMEOUT`"
+msgstr "`XGL_ERR_ACK_TIMEOUT`"
+
+#: docs/zh/guides/troubleshooting.md:0
+msgid "链路丢失、step 未推进或可靠 scope 已失败"
+msgstr "Lost traffic, blocked stepping, or a failed reliable scope"
+
+#: docs/zh/guides/troubleshooting.md:31
+msgid "确认 PHY RX 无数据时返回零字节，不越过缓冲容量，也不无限阻塞。完整序列化帧须满足两端限制。本地发送成功不是交付回执。"
+msgstr ""
+"Verify that PHY RX returns zero bytes when empty, never exceeds its buffer capacity, and does not block "
+"indefinitely. Ensure serialized frame length fits both endpoint limits. A local send success is not a "
+"delivery receipt."
+
+#: docs/zh/guides/troubleshooting.md:33
+msgid "诊断和回调"
+msgstr "Diagnostics and Callbacks"
+
+#: docs/zh/guides/troubleshooting.md:35
+msgid "在相同的实例串行化策略下使用 `xgl_stats_get()`、`xgl_stats_reset()` 和应用 `error_callback`。Boot 诊断文本裁剪后可记录数值状态。"
+msgstr ""
+"Use `xgl_stats_get()`, `xgl_stats_reset()`, and an application `error_callback` under the same "
+"serialized instance policy. Record numeric statuses when Boot diagnostics are reduced."
+
+#: docs/zh/guides/troubleshooting.md:37
+msgid "回调不能重入或销毁实例，应将恢复动作推迟到返回后。应用 BUSY 不能通过丢弃已被协议接纳到自有存储的数据来“解决”。"
+msgstr ""
+"Callbacks cannot reenter or destroy the instance. Queue recovery for after return. Application BUSY must"
+" not be “fixed” by discarding a pointer whose data was already accepted into owned protocol storage."
+
+#: docs/zh/guides/troubleshooting.md:39
+msgid "恢复"
+msgstr "Recovery"
+
+#: docs/zh/guides/troubleshooting.md:41
+msgid ""
+"可靠 scope 失败后须显式退役并使用新 epoch。未认证 peer 协调排空旧流量后使用 `xgl_close_peer()`；认证会话通过 `xgl_close_security_session()`"
+" 关闭，并安装新的可信参数。"
+msgstr ""
+"A failed reliable scope requires explicit retirement and a new epoch. Close unauthenticated peers with "
+"`xgl_close_peer()` after coordinating stale-traffic draining. Close authenticated sessions through "
+"`xgl_close_security_session()` and install fresh trusted parameters."
+
+#: docs/zh/guides/troubleshooting.md:43
+msgid "只有上板失败时，检查最终链接 map、调用链栈深、驱动半帧发送、DMA 生命周期、中断并发和时间源。"
+msgstr ""
+"If failures appear only on hardware, compare the final linker map, call-stack depth, driver partial-send"
+" behavior, DMA lifetime, interrupt concurrency, and clock source."

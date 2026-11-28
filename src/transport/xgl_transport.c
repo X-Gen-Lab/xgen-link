@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport.c
  * \brief           Transport lifecycle and layer entry points
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_allocator.h"
@@ -15,9 +19,7 @@
 
 /**
  * \brief           Initialize transport with explicit bounded resource services
- * \param[out]      ctx: Transport context
- * \param[in]       config: Borrowed configuration and allocator descriptors
- * \return          XGL_OK or configuration validation error
+ * \details         Borrow the configuration and allocator descriptors.
  */
 xgl_error_t xgl_transport_init(xgl_transport_ctx_t* ctx,
                                const xgl_transport_config_t* config) {
@@ -125,10 +127,6 @@ void xgl_transport_destroy(xgl_transport_ctx_t* ctx) {
 
 /**
  * \brief           Deliver a borrowed network packet to transport
- * \param[in,out]   ctx: Transport context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet: Borrowed received packet
- * \return          Transport receive result
  */
 static xgl_error_t transport_receive_impl(void* ctx, xgl_handle_t handle,
                                           const xgl_packet_t* packet) {
@@ -137,9 +135,8 @@ static xgl_error_t transport_receive_impl(void* ctx, xgl_handle_t handle,
 
 /**
  * \brief           Initialize the typed transport receive boundary
- * \param[in,out]   ctx: Transport context
- * \param[out]      iface: Packet interface initialized with receive only
- * \return          XGL_OK or invalid argument error
+ * \details         Initialize only the receive operation of the typed
+ *                  endpoint.
  */
 xgl_error_t xgl_transport_get_rx_endpoint(xgl_transport_ctx_t* ctx,
                                           xgl_packet_rx_endpoint_t* iface) {
@@ -152,7 +149,6 @@ xgl_error_t xgl_transport_get_rx_endpoint(xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Record a transport send failure
- * \param[in,out]   ctx: Transport layer context
  */
 void transport_count_send_error(xgl_transport_ctx_t* ctx) {
 #if XGL_FEATURE_STATISTICS

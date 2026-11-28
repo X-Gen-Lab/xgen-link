@@ -2,6 +2,9 @@
  * \file            xgl_runtime.c
  * \brief           Instance scheduling with module-owned deadlines and state
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-16
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <xgl/xgl.h>
 #include <xgl/xgl_config.h>

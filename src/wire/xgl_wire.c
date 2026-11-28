@@ -2,7 +2,7 @@
  * \file            xgl_wire.c
  * \brief           Production wire-format encoding primitives
  * \author          X-Gen Lab
- * \version         5.0.0
+ * \version         0.0.1
  * \date            2026-11-28
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */

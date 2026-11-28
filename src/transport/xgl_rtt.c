@@ -23,8 +23,6 @@
 
 /**
  * \brief           Calculate absolute value of integer
- * \param[in]       value: Input value
- * \return          Absolute value
  */
 static inline int32_t abs_int32(int32_t value) {
     return (value < 0) ? -value : value;
@@ -32,10 +30,6 @@ static inline int32_t abs_int32(int32_t value) {
 
 /**
  * \brief           Clamp value to range [min, max]
- * \param[in]       value: Input value
- * \param[in]       min: Minimum value
- * \param[in]       max: Maximum value
- * \return          Clamped value
  */
 static inline int32_t clamp_rto(int64_t value, int32_t min, int32_t max) {
     if (value < min) {

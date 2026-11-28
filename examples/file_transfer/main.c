@@ -2,6 +2,9 @@
  * \file            main.c
  * \brief           Reliable fixed-block transfer using bounded host storage
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <stdio.h>
 
@@ -21,13 +24,8 @@ typedef struct {
 
 /**
  * \brief           Accept each ordered block into bounded application storage
- * \param[in]       handle: Callback instance, unused
- * \param[in]       source: Sender identity
- * \param[in]       type: Application type
- * \param[in]       data: Borrowed block
- * \param[in]       length: Block length
- * \param[in,out]   context: Receiver storage
- * \return          XGL_OK when copied, INVALID_PARAM on overflow
+ * \details         Accept after copying the borrowed block. Reject a block
+ *                  that exceeds application capacity.
  */
 static xgl_error_t file_accept(xgl_handle_t handle, uint16_t source,
                                uint8_t type, const uint8_t* data, size_t length,

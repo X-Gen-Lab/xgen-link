@@ -2,6 +2,9 @@
  * \file            test_parser_resync.cpp
  * \brief           Buffered CRC recovery and frame-consumption contracts
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>
@@ -509,4 +512,4 @@ TEST_F(XglParserResyncTest,
                           {XGL_WIRE_DECODE_FRAME_CRC}));
 }
 
-}  // namespace
+} /* namespace */

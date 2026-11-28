@@ -38,7 +38,7 @@ xgl_list_node_t* xgl_list_remove_head(xgl_list_t* list);
 
 /* Recover the owning record from its actual embedded node. */
 #define XGL_LIST_ENTRY(ptr, type, member)                                      \
-    ((type*)(void*)((char*)(ptr) - offsetof(type, member)))
+    ((type*)(void*)((char*)(ptr)-offsetof(type, member)))
 
 #define XGL_LIST_FOR_EACH(list, node)                                          \
     for ((node) = (list)->head; (node) != NULL; (node) = (node)->next)

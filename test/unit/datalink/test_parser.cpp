@@ -2,6 +2,9 @@
  * \file            test_parser.cpp
  * \brief           Frame parser unit tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>
@@ -88,7 +91,7 @@ class XglParserTest : public ::testing::Test {
         EXPECT_EQ(err, XGL_OK);
 
         /* Copy to result */
-        frame.assign(buffer.begin(), buffer.begin() + bytes_written);
+        frame.assign(buffer.data(), buffer.data() + bytes_written);
         return frame;
     }
 

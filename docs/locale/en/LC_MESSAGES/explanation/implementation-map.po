@@ -1,0 +1,182 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: d3913872f7b0ca98856003ede5d29cfb90042a84937b1803cbeec4d8ace1f7fa\n"
+
+#: docs/zh/explanation/implementation-map.md:8
+msgid "实现映射"
+msgstr "Implementation Map"
+
+#: docs/zh/explanation/implementation-map.md:10
+msgid "本页标明协议状态的所有者。公开应用包含 `<xgl/xgl.h>`；内部头文件用于实现边界，不作为已删除通用工具的兼容别名。"
+msgstr ""
+"This map identifies protocol owners. Public applications include `<xgl/xgl.h>`; internal headers are "
+"implementation boundaries, not compatibility aliases for removed utilities."
+
+#: docs/zh/explanation/implementation-map.md:12
+msgid "源码所有权"
+msgstr "Source Ownership"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "契约"
+msgstr "Contract"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "主要源码"
+msgstr "Main source"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "ABI 校验、生命周期、公开 step"
+msgstr "ABI validation, lifecycle, public stepping"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/api/`"
+msgstr "`src/api/`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "静态工作区规划与资源服务"
+msgstr "Static workspace planning and resource services"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/api/xgl_workspace.c`"
+msgstr "`src/api/xgl_workspace.c`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "精确 peer 生命周期与 close"
+msgstr "Exact peer lifecycle and close"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/transport/xgl_transport_peer.c`"
+msgstr "`src/transport/xgl_transport_peer.c`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "ACK 原子校验与应用"
+msgstr "Atomic ACK validation and application"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/transport/xgl_transport_ack.c`"
+msgstr "`src/transport/xgl_transport_ack.c`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "期限汇总与周期处理"
+msgstr "Deadline collection and periodic work"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/transport/xgl_transport_runtime.c`"
+msgstr "`src/transport/xgl_transport_runtime.c`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "生产重传路径"
+msgstr "Production retransmission"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "单帧发送规划、接纳与提交"
+msgstr "Single-frame send planning, admission and submission"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/transport/xgl_transport_tx.c`"
+msgstr "`src/transport/xgl_transport_tx.c`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "接收排序与保留投递"
+msgstr "Receive ordering and retained delivery"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/transport/xgl_transport_rx.c`、`xgl_transport_rx_delivery.c`"
+msgstr "`src/transport/xgl_transport_rx.c`, `xgl_transport_rx_delivery.c`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "路由查找、本地投递与转发"
+msgstr "Route lookup and local/forward delivery"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/network/`"
+msgstr "`src/network/`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "规范帧布局与 TLV"
+msgstr "Canonical frame layout and TLVs"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/wire/`"
+msgstr "`src/wire/`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "方向性会话状态与认证"
+msgstr "Directional session state and authentication"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/security/`"
+msgstr "`src/security/`"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "增量组帧与同步 PHY"
+msgstr "Incremental framing and synchronous PHY"
+
+#: docs/zh/explanation/implementation-map.md:0
+msgid "`src/datalink/`"
+msgstr "`src/datalink/`"
+
+#: docs/zh/explanation/implementation-map.md:29
+msgid "内部接口"
+msgstr "Internal Interfaces"
+
+#: docs/zh/explanation/implementation-map.md:31
+msgid ""
+"`xgl_protocol_io.h` 分别定义 packet TX/RX 和 frame TX/RX 四种单向端点。Transport 提供 packet RX，Network 提供 packet TX 与"
+" frame RX，Datalink 提供 frame TX。实例静态绑定端点，packet TX 还提供对反向反馈出口的只读预检。各层通过有类型的端口交换同步借用数据。"
+msgstr ""
+"`xgl_protocol_io.h` defines four directional endpoints for packet and frame TX/RX. Transport provides "
+"packet RX, Network provides packet TX and frame RX, and Datalink provides frame TX. The instance binds "
+"them statically. Packet TX also provides a read-only check of the feedback egress. The typed endpoints "
+"pass borrowed data synchronously."
+
+#: docs/zh/explanation/implementation-map.md:33
+msgid ""
+"`xgl_packet.h` 包含借用的协议视图。`xgl_protocol_memory.h` "
+"描述资源类别服务，不实现分配器；peer、等待确认记录、载荷与临时编码空间仍保持各自的容量和生命周期。不能仅因使用相同 allocator 接口就合并预算或引入共享堆回退。"
+msgstr ""
+"`xgl_packet.h` contains borrowed protocol views. `xgl_protocol_memory.h` describes resource-class "
+"services without implementing an allocator. Peers, pending acknowledgements, payloads and encoding "
+"scratch retain separate capacities and lifetimes. Sharing an allocator interface does not justify "
+"merging their budgets or adding an implicit shared heap fallback."
+
+#: docs/zh/explanation/implementation-map.md:35
+msgid ""
+"Datalink 源码按入口、发送、接收和 parser 划分。接收文件集中处理 span 消费、同步交付与 wire 错误分类；parser 只持有每 PHY 的增量状态。完整 wire view "
+"位于同步调用栈，不为每条链路增加常驻 view。"
+msgstr ""
+"Datalink source separates initialization, transmit, receive and parser responsibilities. Receive owns "
+"span consumption, synchronous delivery and wire error classification. The parser retains only per-PHY "
+"incremental state. A complete wire view lives on the synchronous call stack, not persistently in every "
+"link."
+
+#: docs/zh/explanation/implementation-map.md:37
+msgid "可靠队列保存并索引记录，不独立确认 scope，也不直接向 PHY 重发原始帧。由 peer 所有者 transport 经当前 network/security 路径执行这些状态转换。"
+msgstr ""
+"The reliable queue stores records and indexes them. It does not acknowledge scopes independently or "
+"retransmit raw PHY frames. Peer-owned transport code performs these state transitions through the "
+"current network/security path."
+
+#: docs/zh/explanation/implementation-map.md:39
+msgid "验证边界"
+msgstr "Verification Boundaries"
+
+#: docs/zh/explanation/implementation-map.md:41
+msgid ""
+"单元测试覆盖 ACK 校验、scope 隔离、取消、自有载荷生命周期与容量拒绝。Transport "
+"属性测试经过生产重传路径。静态工作区属性测试在有界资源服务上验证容量边界和接收背压。Wire/security 测试断言字节布局、nonce/AAD 构造与重放行为。SDK/profile "
+"冒烟构建独立于内部单元夹具，检查安装后的公开 API。"
+msgstr ""
+"Unit tests cover ACK validation, scope isolation, cancellation, owned payload lifetime and capacity "
+"rejection. Transport properties exercise the production retry path. Static workspace properties use "
+"bounded services across reliable delivery and receiver backpressure. Wire/security tests assert byte "
+"layouts, nonce/AAD construction and replay behavior. SDK/profile smoke builds check the installed public"
+" API separately from internal unit fixtures."

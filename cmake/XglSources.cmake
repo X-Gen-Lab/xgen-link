@@ -11,13 +11,11 @@ set(XGL_SOURCES
     src/api/xgl_security_session.c
     src/api/xgl_stats.c
     src/api/xgl_version.c
-
     # Private storage primitives
     src/internal/xgl_allocator.c
     src/internal/xgl_list.c
     src/internal/xgl_pool.c
     src/internal/xgl_size_class_allocator.c
-
     # Wire format and serialization
     src/wire/xgl_crc16.c
     src/wire/xgl_wire_ack_ext.c
@@ -27,22 +25,22 @@ set(XGL_SOURCES
 )
 
 if(XGL_FEATURE_AUTH)
-    list(APPEND XGL_SOURCES
+    list(
+        APPEND XGL_SOURCES
         src/security/xgl_security_frame.c
         src/security/xgl_security.c
     )
 endif()
 
-list(APPEND XGL_SOURCES
+list(
+    APPEND XGL_SOURCES
     # Protocol error domain
     src/api/xgl_error.c
-
     # Data Link Layer
     src/datalink/xgl_parser.c
     src/datalink/xgl_datalink_send.c
     src/datalink/xgl_datalink_receive.c
     src/datalink/xgl_datalink.c
-
     # Network Layer
     src/network/xgl_route.c
     src/network/xgl_network_send.c
@@ -51,7 +49,8 @@ list(APPEND XGL_SOURCES
     src/network/xgl_network.c
 )
 
-list(APPEND XGL_SOURCES
+list(
+    APPEND XGL_SOURCES
     # Transport Layer
     src/transport/xgl_reliable.c
     src/transport/xgl_rtt.c
@@ -68,7 +67,8 @@ if(XGL_FEATURE_OUT_OF_ORDER)
     list(APPEND XGL_SOURCES src/transport/xgl_transport_rx_buffer.c)
 endif()
 
-list(APPEND XGL_SOURCES
+list(
+    APPEND XGL_SOURCES
     src/transport/xgl_transport_rx_delivery.c
     src/transport/xgl_transport_tx.c
 )

@@ -1,0 +1,79 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 816da6a53e7a321d6a67d34e76d4ecea9880ea27d21d4f8b52b453b1d19262c7\n"
+
+#: docs/zh/tutorials/examples.md:8
+msgid "示例"
+msgstr "Examples"
+
+#: docs/zh/tutorials/examples.md:10
+msgid "程序"
+msgstr "Programs"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "Target"
+msgstr "Target"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "演示"
+msgstr "Demonstration"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "`echo_server`"
+msgstr "`echo_server`"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "接收回调排队，下次应用步进发送响应"
+msgstr "Queue in RX callback, respond from the next application step"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "`file_transfer`"
+msgstr "`file_transfer`"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "可靠应用块及 payload 校验"
+msgstr "Reliable application chunks and payload verification"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "`multi_node`"
+msgstr "`multi_node`"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "经中间节点路由，需要转发能力"
+msgstr "Routing through an intermediate node; requires forwarding"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "`boot_update`"
+msgstr "`boot_update`"
+
+#: docs/zh/tutorials/examples.md:0
+msgid "有界块、慢 Flash BUSY 及丢 ACK 恢复"
+msgstr "Bounded blocks, slow Flash BUSY and lost-ACK recovery"
+
+#: docs/zh/tutorials/examples.md:19
+msgid "示例通过 `xgl::xgl` 使用协议，并提供显式时间和固定应用存储。`boot_update` 另用内部字节和 CRC 辅助函数。公共同步主机 PHY 把帧复制到有界字节队列。"
+msgstr ""
+"The examples link `xgl::xgl` and provide explicit time and fixed application storage. `boot_update` also"
+" uses private byte and CRC helpers. The common synchronous host PHY copies frames into bounded byte "
+"queues."
+
+#: docs/zh/tutorials/examples.md:21
+msgid "运行"
+msgstr "Run"
+
+#: docs/zh/tutorials/examples.md:23
+msgid ""
+"显式开启 `XGL_BUILD_EXAMPLES=ON`。运行 CTest 示例还需开启 `XGL_BUILD_TESTS` 或 `XGL_BUILD_NOHEAP_SMOKE`。Boot "
+"不构建转发示例。按[首次收发](first-link.md)运行 echo，其他可执行文件和边界见 `examples/*/README.md`。"
+msgstr ""
+"Enable `XGL_BUILD_EXAMPLES=ON`. Set `XGL_BUILD_TESTS` or `XGL_BUILD_NOHEAP_SMOKE` to register the "
+"examples with CTest. Boot excludes the forwarding example. [Run your first link](first-link.md) gives "
+"the echo commands. See `examples/*/README.md` for the other executables and their limits."

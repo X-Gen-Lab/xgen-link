@@ -2,6 +2,9 @@
  * \file            test_transport_fixed_rto.cpp
  * \brief           Fixed retransmission timeout selection and backoff
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -30,7 +33,7 @@ class XglTransportFixedRtoTest : public ::testing::Test {
     }
 
     void SetUp() override {
-        lower = {this, SendPacket};
+        lower = {this, SendPacket, nullptr, nullptr};
         xgl_transport_config_t config = {};
         config.allocator = xgl_test_host_allocator();
         config.local_id = 1U;
@@ -131,5 +134,5 @@ TEST_F(XglTransportFixedRtoTest, SuccessfulRetryRetainsExponentialBackoff) {
     ExpectDeadline(2200U, 2800U);
 }
 
-}  // namespace
+} /* namespace */
 #endif

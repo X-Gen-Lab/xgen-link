@@ -1,0 +1,222 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: a9c8e81558227acd8ee587aa3460ffb8cb3bdce0577e564f30efb766aa508843\n"
+
+#: docs/zh/explanation/architecture.md:8
+msgid "架构"
+msgstr "Architecture"
+
+#: docs/zh/explanation/architecture.md:10
+msgid "XGen Link 是独立 C11 协议库，负责线上编码、链路处理与可靠状态。协议所需的固定池、队列、位图、字节编码及 CRC 随生产库构建。应用负责时钟、执行上下文、PHY 驱动与可信密钥建立。"
+msgstr ""
+"XGen Link is a standalone C11 protocol library. It owns wire encoding, link processing and reliable "
+"state. The production library builds its own protocol storage, queues, bitsets, byte encoding and CRC. "
+"The application owns the clock, execution context, PHY driver and trusted key establishment."
+
+#: docs/zh/explanation/architecture.md:12
+msgid "模块边界"
+msgstr "Module Boundaries"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "模块"
+msgstr "Module"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "职责"
+msgstr "Responsibility"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "边界"
+msgstr "Boundary"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "API"
+msgstr "API"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "校验 ABI/profile/容量；构造实例；驱动执行"
+msgstr "Validate ABI/profile/capacities; construct instances; drive work"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "公开配置与显式时间戳"
+msgstr "Public configuration and explicit timestamps"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "Transport"
+msgstr "Transport"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "精确 peer 所有权；可靠 DATA；ACK；重传；可选乱序缓存"
+msgstr "Exact peer ownership; reliable DATA; ACK; retry; optional out-of-order receive buffering"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "有类型的逻辑包视图"
+msgstr "Typed logical packet views"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "Network"
+msgstr "Network"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "路由查找、TLV 组合、本地认证、转发"
+msgstr "Route lookup, TLV composition, local authentication, forwarding"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "上层逻辑包，下层完整帧"
+msgstr "Logical packets above, complete frames below"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "Security"
+msgstr "Security"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "安装方向性 nonce 域、签名与重放状态"
+msgstr "Installed directional nonce domains, signing and replay state"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "带版本的认证输入"
+msgstr "Versioned authentication input"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "Datalink"
+msgstr "Datalink"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "增量流组帧与同步 PHY 提交"
+msgstr "Incremental stream framing and synchronous PHY submission"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "借用字节区间"
+msgstr "Borrowed byte spans"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "Wire"
+msgstr "Wire"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "唯一规范帧解析器、序列化器与扩展编码"
+msgstr "One canonical frame parser, serializer and extension encoding"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "有界输入输出区间"
+msgstr "Bounded input and output spans"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "协议内存"
+msgstr "Protocol memory"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "按协议生命周期预留资源"
+msgstr "Reserve resources by their protocol lifetime"
+
+#: docs/zh/explanation/architecture.md:0
+msgid "私有固定资源与可选公开分配回调"
+msgstr "Private storage and optional public allocator callbacks"
+
+#: docs/zh/explanation/architecture.md:24
+msgid "发送与接收流程"
+msgstr "Send and Receive Flow"
+
+#: docs/zh/explanation/architecture.md:26
+msgid "![同步发送路径](../diagrams/send-receive.svg)"
+msgstr "![Synchronous transmit path](../diagrams/send-receive.svg)"
+
+#: docs/zh/explanation/architecture.md:26
+msgid "同步发送路径"
+msgstr "Synchronous transmit path"
+
+#: docs/zh/explanation/architecture.md:28
+msgid ""
+"接收按相反方向经过这些边界：每 PHY 的 parser 调用 wire 验证完整帧并生成借用视图，datalink 和 network 传递该视图；network 完成本地认证后，transport 才修改"
+" peer 状态。完整帧 CRC 只计算一次。直接提交原始帧的内部入口仍先验证输入，不能冒充已验证视图。"
+msgstr ""
+"Receive reverses the boundary direction: each PHY parser calls wire to validate a complete frame and "
+"produce a borrowed view. Datalink and network pass that view through; network verifies local "
+"authentication before transport changes peer state. The complete-frame CRC is computed once. Internal "
+"raw-frame entry points still validate their inputs before delivery."
+
+#: docs/zh/explanation/architecture.md:30
+msgid ""
+"普通、认证和原地发送共用帧长度规划与编码规则，统一由 datalink 提交 PHY。转发不创建本地 transport 状态，但也经过该 PHY 出口。可靠重传从持有的逻辑包重新组合帧，保留 DATA "
+"编号并取得新的安全序号。"
+msgstr ""
+"Copied, authenticated and in-place sends share frame measurement and encoding rules, with datalink as "
+"the single PHY submission owner. Forwarding creates no local transport state but uses that same PHY "
+"exit. Reliable retransmission starts from an owned logical packet and traverses frame composition again,"
+" retaining its DATA number while obtaining a fresh security sequence."
+
+#: docs/zh/explanation/architecture.md:32
+msgid "所有权与执行"
+msgstr "Ownership and Execution"
+
+#: docs/zh/explanation/architecture.md:34
+msgid ""
+"一个 peer 唯一持有 `(remote_id, connection_id, session_epoch)` 对应的窗口、等待 ACK 记录、RTT "
+"和接收顺序。借用的包/帧视图不得超出同步调用；需要保留的载荷由明确资源类别持有。安全状态独立于 peer 生命周期，不随 transport RESET 清除。"
+msgstr ""
+"One peer owns one exact `(remote_id, connection_id, session_epoch)` scope, including its window, wait-"
+"ACK records, RTT and receive order. Borrowed packet/frame views never outlive a synchronous call; "
+"retained payloads have a resource-class owner. Security state is separate from peer lifetime and "
+"survives transport RESET."
+
+#: docs/zh/explanation/architecture.md:36
+msgid ""
+"实例持有唯一 security context，各层借用它；每个唯一 PHY 描述符对应一个 parser 和 RX cache，共用 PHY 的多条路由不会重复预留。已缓存的乱序包在应用 BUSY "
+"时继续占用接收槽，直到交付或所属 scope 关闭或失败。"
+msgstr ""
+"The instance owns one security context, borrowed by the layers. Each unique PHY descriptor owns one "
+"parser and RX cache; multiple routes sharing that descriptor do not reserve duplicates. A retained out-"
+"of-order frame keeps its storage while the application reports BUSY."
+
+#: docs/zh/explanation/architecture.md:38
+msgid ""
+"同一实例由调用方串行访问。回调不得重入或销毁该实例。时钟和实例调度由应用提供。工作区固定，运行阶段只消耗已预留资源。参见[内存](resource-"
+"model.md)与[平台](../guides/porting.md)。"
+msgstr ""
+"Calls on one instance are serialized by the caller. Callbacks cannot reenter or destroy that instance. "
+"The application provides the clock and schedules protocol work. Runtime operations use the fixed "
+"workspace reservations. See [Memory](resource-model.md) and [Platform](../guides/porting.md)."
+
+#: docs/zh/explanation/architecture.md:40
+msgid "源码与构建边界"
+msgstr "Source and Build Boundaries"
+
+#: docs/zh/explanation/architecture.md:42
+msgid ""
+"`include/xgl/` 仅保留公开 SDK。私有头与实现同放 "
+"`src/api`、`wire`、`datalink`、`network`、`transport`、`security`；跨层数据与资源契约放 `src/internal`。私有目录不安装、不导出给消费者。"
+msgstr ""
+"`include/xgl/` contains only the public SDK. Private headers live with their implementations under "
+"`src/api`, `wire`, `datalink`, `network`, `transport` and `security`. Cross-layer data and resource "
+"contracts live under `src/internal`. Private directories are neither installed nor exported to "
+"consumers."
+
+#: docs/zh/explanation/architecture.md:44
+msgid ""
+"生产导出一个 `xgl::xgl` target。`cmake/XglVersion.cmake` 为库与独立文档提供版本，`XglProfiles.cmake` "
+"解析档位与资源身份，`XglSources.cmake` 按能力列出生产编译单元，`XglLibrary.cmake` 组装带匹配配置头的库。`XglInstall.cmake` 导出 "
+"SDK，`XglDevelopment.cmake` 接入按需启用的开发检查。"
+msgstr ""
+"Production exports one `xgl::xgl` target. `cmake/XglVersion.cmake` supplies the version to the library "
+"and standalone docs. `XglProfiles.cmake` resolves the profile and resource identity, `XglSources.cmake` "
+"selects the production translation units by capability, and `XglLibrary.cmake` assembles the library "
+"with its matching configuration header. `XglInstall.cmake` exports the SDK and `XglDevelopment.cmake` "
+"registers the selected development checks."
+
+#: docs/zh/explanation/architecture.md:46
+msgid ""
+"协议回归位于 `test/unit/<layer>`、`test/integration` 和 `test/property`。`test/smoke` 保存 C11 夹具，`test/interop` 保存"
+" Wire v1 双端点夹具，`test/contracts` 按构建、安装与 CTest 区分验证对象。历史用例和回放种子由现有发现入口维护。"
+msgstr ""
+"Protocol regression suites live under `test/unit/<layer>`, `test/integration`, and `test/property`. "
+"`test/smoke` contains the C11 fixtures, `test/interop` contains Wire v1 peer fixtures, and "
+"`test/contracts` groups build, SDK and CTest checks. Test discovery preserves historical names and "
+"replay seeds."

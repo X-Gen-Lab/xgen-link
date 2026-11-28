@@ -1,6 +1,10 @@
 /**
  * \file            test_transport_runtime_contracts.cpp
  * \brief           Deferred transport work and observable maintenance failures
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -67,7 +71,7 @@ class XglTransportRuntimeTest : public ::testing::Test {
     }
 
     void Init() {
-        lower = {this, SendPacket};
+        lower = {this, SendPacket, nullptr, nullptr};
         xgl_transport_config_t config = {};
         config.local_id = 1U;
         config.max_retry_count = 2U;
@@ -114,10 +118,11 @@ class XglTransportRuntimeTest : public ::testing::Test {
         if (error != XGL_OK) {
             return error;
         }
-        error = xgl_wire_encode_ext(
-            extensions.data(), extensions.size(),
-            sack ? XGL_WIRE_EXT_SACK : XGL_WIRE_EXT_ACK_RANGE, value.data(),
-            value_length, &extensions_length);
+        const auto type = static_cast<uint8_t>(sack ? XGL_WIRE_EXT_SACK
+                                                    : XGL_WIRE_EXT_ACK_RANGE);
+        error =
+            xgl_wire_encode_ext(extensions.data(), extensions.size(), type,
+                                value.data(), value_length, &extensions_length);
         if (error != XGL_OK) {
             return error;
         }
@@ -409,4 +414,4 @@ TEST(XglTransportPublicRuntimeTest, StepReturnsHardRetryAndExhaustionErrors) {
     }
 }
 
-}  // namespace
+} /* namespace */

@@ -1,6 +1,7 @@
 /**
  * \file            xgl_size_class_allocator.h
  * \brief           Fixed pool selection for instance initialization
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_SIZE_CLASS_ALLOCATOR_H

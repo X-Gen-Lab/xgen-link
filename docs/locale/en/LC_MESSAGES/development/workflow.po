@@ -1,0 +1,81 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: cb654bbbcc899d5ba94020245326bea6cc4c59545d0854d5e4853d925ca96723\n"
+
+#: docs/zh/development/workflow.md:8
+msgid "开发工作流"
+msgstr "Development workflow"
+
+#: docs/zh/development/workflow.md:10
+msgid ""
+"使用 C11 生产构建和严格 C++17 主机测试。配置前准备 CMake、所选编译器和测试依赖。启用共享的 `pre-commit` 和 `commit-msg`，提交信息采用 Conventional "
+"Commits。"
+msgstr ""
+"Use a C11 production build and strict C++17 host tests. Prepare CMake, the selected compiler and the "
+"test dependencies before configuring the build. Enable the shared `pre-commit` and `commit-msg` hooks "
+"and use Conventional Commits."
+
+#: docs/zh/development/workflow.md:12
+msgid "行为与回归"
+msgstr "Behavior and regressions"
+
+#: docs/zh/development/workflow.md:14
+msgid ""
+"新增或修复行为时，先运行能触发问题的生产路径测试，记录实际失败，再修复并复跑。优先替换外部 PHY、时钟或 allocator 以控制输入。迁移等价行为时保留历史用例、标签、性质测试种子与差分记录。"
+msgstr ""
+"When changing behavior or fixing a defect, run a test through the affected production path, record its "
+"actual failure, then implement and rerun the test. Prefer substituting the external PHY, clock or "
+"allocator to control inputs. When moving equivalent behavior, preserve historical cases, labels, "
+"property seeds and comparison records."
+
+#: docs/zh/development/workflow.md:16
+msgid "从仓库根目录按[构建与消费](../guides/build-and-consume.md)准备 GoogleTest，再依次配置、构建并执行严格 CTest。"
+msgstr ""
+"From the repository root, prepare GoogleTest as described in [Build and consume](../guides/build-and-"
+"consume.md), then configure, build and run strict CTest in sequence."
+
+#: docs/zh/development/workflow.md:24
+msgid ""
+"CI 主机任务用 `python test/cmake/run_ctest.py --build-dir build/native-debug --config Debug` 保存并核对测试清单与 JUnit"
+" 结果。失败时保留首次错误和可复现命令。性质测试支持 `XGL_PROPERTY_SEED` 固定随机输入。"
+msgstr ""
+"CI host jobs record and verify the test inventory and JUnit results with `python test/cmake/run_ctest.py"
+" --build-dir build/native-debug --config Debug`. Retain the original error and reproduction command on "
+"failure. Use `XGL_PROPERTY_SEED` to set property-test inputs."
+
+#: docs/zh/development/workflow.md:26
+msgid "CI 的 `status` 任务汇总主机、裁剪档位、SDK、Wire、静态分析与 ARM 软件验收。文档工作流独立构建经验证的 Pages 部署产物。"
+msgstr ""
+"The CI `status` job summarizes host, bounded profile, SDK, Wire, static analysis and ARM software "
+"verification. The documentation workflow independently builds the validated Pages artifact."
+
+#: docs/zh/development/workflow.md:28
+msgid "文档"
+msgstr "Documentation"
+
+#: docs/zh/development/workflow.md:30
+msgid "提交前离线检查暂存文档，再按[文档维护](documentation.md)执行 Sphinx/MyST 双语严格构建并验证生成的公开 API 参考。"
+msgstr ""
+"Check indexed documentation offline before committing, then run the strict bilingual Sphinx/MyST build "
+"and verify the generated public API reference as described in [Maintain "
+"documentation](documentation.md)."
+
+#: docs/zh/development/workflow.md:32
+msgid "完成条件"
+msgstr "Completion"
+
+#: docs/zh/development/workflow.md:34
+msgid ""
+"记录基线、工具链、profile、命令、退出结果及实际产物。按改动涉及的生命周期、wire 或资源边界选择[验证范围](validation.md)。先运行有针对性的检查，再运行交付所需的完整矩阵。"
+msgstr ""
+"Record the source baseline, toolchain, profile, commands, exit status and actual artifacts. Choose "
+"[validation scope](validation.md) based on the lifecycle, wire or resource boundaries affected by the "
+"change. Run focused checks first and the complete required matrix before delivery."

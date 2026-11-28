@@ -1,6 +1,10 @@
 /**
  * \file            xgl_transport_ack_send.c
  * \brief           ACK and selective acknowledgement emission
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-17
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "wire/xgl_wire.h"
@@ -29,14 +33,8 @@ xgl_error_t transport_check_feedback(const xgl_transport_ctx_t* ctx,
 
 /**
  * \brief           Submit a borrowed ACK extension with a shared packet header
- * \param[in]       ctx: Transport context
- * \param[in]       handle: Protocol instance
- * \param[in]       source_id: Remote endpoint being acknowledged
- * \param[in]       connection_id: Exact connection identity
- * \param[in]       session_epoch: Exact session epoch
- * \param[in]       extension: Borrowed encoded acknowledgement
- * \param[in]       extension_len: Encoded extension size
- * \return          Synchronous lower-layer submission result
+ * \details         Use the exact peer scope. The encoded extension remains
+ *                  borrowed until synchronous lower-layer submission returns.
  */
 /* Parameter order follows the exact peer identity and byte-span contract. */
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
@@ -70,11 +68,6 @@ static xgl_error_t transport_emit_ack(const xgl_transport_ctx_t* ctx,
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Send ACK packet for received data
- * \param[in]       ctx: Transport context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet_number: Packet number to acknowledge
- * \param[in]       source_id: Source node ID
- * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t transport_send_ack(const xgl_transport_ctx_t* ctx,
                                xgl_handle_t handle, uint32_t packet_number,

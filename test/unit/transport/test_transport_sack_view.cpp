@@ -2,6 +2,9 @@
  * \file            test_transport_sack_view.cpp
  * \brief           Bounded SACK admission without partial peer mutations
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -129,7 +132,7 @@ class XglTransportSackViewTest : public ::testing::Test {
     }
 };
 
-}  // namespace
+} /* namespace */
 
 #if XGL_BUILD_WINDOW_CAPACITY >= 4
 TEST_F(XglTransportSackViewTest, AcceptsTheExisting64ByteBitmapLimit) {

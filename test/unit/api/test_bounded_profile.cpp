@@ -2,6 +2,9 @@
  * \file            test_bounded_profile.cpp
  * \brief           Capability-selected protocol contracts for bounded profiles
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>

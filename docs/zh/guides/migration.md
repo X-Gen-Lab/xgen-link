@@ -1,10 +1,17 @@
-# SDK 5 迁移
+---
+id: guides/migration
+type: how-to
+audience: user
+source_language: zh_CN
+---
 
-SDK 5 使用配置 ABI 5 和 Wire v1。清理旧构建缓存和安装前缀，按[构建与消费](build-and-consume.md)重新构建产品，使用同一档位、资源组合的库与生成头，继续链接 `xgl::xgl`。
+# 迁移既有集成
+
+将此前开发快照中的集成迁移到 SDK 0.0.1 时，使用新的构建目录和安装前缀。配置 ABI 为 `5`，线上协议为 Wire v1。按[构建与消费](build-and-consume.md)重新构建产品，配套使用同一档位和资源组合的库与生成头，继续链接 `xgl::xgl`。
 
 ## 线上协议与应用
 
-- **将链路上的端点和中继切换到 Wire v1。** 版本字段为 `1`。已经部署早期 Wire v1 的产品也应同步替换端点和中继，因为本版重新分配了标志位和 TLV 编号。基本帧头布局及 CRC 算法见[线格式](../reference/protocol/v1/wire-format.md)。
+- **核对链路上端点和中继的 Wire v1 编码。** 版本字段为 `1`。迁移使用早期 Wire v1 编码的产品时，同步替换端点和中继，使帧标志位和 TLV 编号一致。基本帧头布局及 CRC 算法见[线格式](../reference/protocol/v1/wire-format.md)。
 - **移除旧 `XGL_TRAFFIC_ENCRYPTION_*` 常量的引用。** 流量类别只携带优先级和可靠性。
 - **每次发送提交一个完整 DATA 帧。** 超出完整帧上限返回 `XGL_ERR_BUFFER_TOO_SMALL`。大数据改用[应用分块](send.md)，可参考文件传输与固件更新示例。接收 DATA 的实例需要配置接纳回调；纯发送端可使用空回调处理 ACK 和 CONTROL。
 - **核对可靠通信的[双向 MTU](../reference/protocol/v1/routing.md)。** 分别检查 DATA 路径和 ACK 回程。缺失本地反向路由或反馈预算不足时，接收端在接纳前报错。
@@ -17,4 +24,4 @@ SDK 5 使用配置 ABI 5 和 Wire v1。清理旧构建缓存和安装前缀，�
 
 定制编译帧长时，配置库的 `XGL_DATALINK_MAX_FRAME_SIZE`，然后重新安装生成头和库。发布检查见[互操作](../reference/protocol/v1/interoperability.md)与[验证](../development/validation.md)。
 
-旧 SDK 4 的[迁移记录](https://github.com/X-Gen-Lab/xgen-link/blob/d775c8a2fbc2dabcfc2406034e5cdc43808954bd/docs/zh/guides/migration.md)和 SDK 3 的[历史装配指南](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/docs/zh/guide/modular-migration.md)保存在固定提交。
+开发时期的[迁移记录](https://github.com/X-Gen-Lab/xgen-link/blob/d775c8a2fbc2dabcfc2406034e5cdc43808954bd/docs/zh/guides/migration.md)和[装配指南](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/docs/zh/guide/modular-migration.md)保存在各自的固定提交。

@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: b0cc7cb62971e83d28231e4be10bd51c8d824030771c8e2840def346844db023\n"
+
+#: docs/zh/protocol/extensions.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/protocol/extensions.md:11
+msgid "请查阅[当前文档](../reference/protocol/v1/extensions.md)。"
+msgstr "See the [current documentation](../reference/protocol/v1/extensions.md)."

@@ -13,7 +13,7 @@
 #include <gtest/gtest.h>
 #include <system_error>
 
-inline uint32_t property_base_seed = 0x58474CU;
+inline uint32_t g_property_base_seed = 0x58474CU;
 
 /**
  * \brief           Read an unsigned decimal seed without truncation
@@ -40,7 +40,7 @@ inline bool property_parse_seed(const char* text, uint32_t& seed) {
  * \return          Base seed mixed with the currently running test name
  */
 inline uint32_t property_test_seed() {
-    uint32_t seed = property_base_seed;
+    uint32_t seed = g_property_base_seed;
     const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
     if (info != nullptr) {
         for (const char* name : {info->test_suite_name(), info->name()}) {

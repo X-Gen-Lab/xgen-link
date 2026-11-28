@@ -1,6 +1,13 @@
+---
+id: reference/api
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 公开 API
 
-[生成的 C API 参考](../../api/index.md)。
+[生成的 C API 参考](c-api.md)。
 
 使用 `<xgl/xgl.h>`。安装头文件包含生成的 profile 和 ABI 常量；`internal/` 头文件不安装。
 

@@ -2,6 +2,9 @@
  * \file            xgl_datalink_receive.c
  * \brief           Data link layer receive path
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_datalink.h>
@@ -23,25 +26,23 @@ static void datalink_report_decode_error(xgl_datalink_ctx_t* ctx,
         ctx->stats->rx_errors++;
     }
 #endif
-    const char* message = NULL;
-    if (status == XGL_WIRE_DECODE_HEADER_CRC) {
-#if XGL_FEATURE_STATISTICS
-        if (ctx->rx_header_crc_errors != NULL) {
-            (*ctx->rx_header_crc_errors)++;
-        }
-#endif
-        message = XGL_ERROR_MESSAGE("Header CRC16 validation failed");
-    } else if (status == XGL_WIRE_DECODE_FRAME_CRC) {
-#if XGL_FEATURE_STATISTICS
-        if (ctx->rx_crc16_errors != NULL) {
-            (*ctx->rx_crc16_errors)++;
-        }
-#endif
-        message = XGL_ERROR_MESSAGE("Frame CRC16 validation failed");
+    const bool header_crc = status == XGL_WIRE_DECODE_HEADER_CRC;
+    if (!header_crc && status != XGL_WIRE_DECODE_FRAME_CRC) {
+        return;
     }
-    if (message != NULL && ctx->error_callback != NULL) {
-        ctx->error_callback(ctx->owner_handle, XGL_ERR_CRC_FAILED, message,
-                            ctx->callback_user_data);
+#if XGL_FEATURE_STATISTICS
+    uint64_t* crc_errors =
+        header_crc ? ctx->rx_header_crc_errors : ctx->rx_crc16_errors;
+    if (crc_errors != NULL) {
+        (*crc_errors)++;
+    }
+#endif
+    if (ctx->error_callback != NULL) {
+        ctx->error_callback(
+            ctx->owner_handle, XGL_ERR_CRC_FAILED,
+            XGL_ERROR_MESSAGE(header_crc ? "Header CRC16 validation failed"
+                                         : "Frame CRC16 validation failed"),
+            ctx->callback_user_data);
     }
 }
 
@@ -274,13 +275,7 @@ xgl_error_t xgl_datalink_consume_span(xgl_datalink_ctx_t* ctx,
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Receive a bounded byte chunk with the selected link parser
- * \param[in,out]   ctx: Shared datalink policy and delivery context
- * \param[in,out]   parser: Parser owned by this PHY
- * \param[in]       phy: Physical layer operations
- * \param[in]       current_time_ms: Current time in milliseconds
- * \param[in]       timeout_ms: Parser timeout in milliseconds
- * \param[in]       byte_budget: Maximum bytes to read in this call
- * \return          XGL_OK on success, error code otherwise
+ * \details         Select the parser owned by the PHY being polled.
  */
 xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
                                      xgl_parser_t* parser, xgl_phy_ops_t* phy,
@@ -330,10 +325,8 @@ xgl_error_t xgl_datalink_poll_parser(xgl_datalink_ctx_t* ctx,
 
 /**
  * \brief           Validate frame policy and deliver a borrowed view upstream
- * \param[in,out]   ctx: Shared security, statistics and delivery context
- * \param[in]       frame_buffer: Complete frame bytes
- * \param[in]       frame_len: Available bytes including the final CRC
- * \return          XGL_OK on success, error code otherwise
+ * \details         The input span covers the complete frame, including its
+ *                  CRC.
  */
 xgl_error_t xgl_datalink_process_frame(xgl_datalink_ctx_t* ctx,
                                        const uint8_t* frame_buffer,

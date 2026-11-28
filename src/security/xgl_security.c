@@ -1,6 +1,10 @@
 /**
  * \file            xgl_security.c
  * \brief           Security helpers for authenticated production transport
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-07
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <security/xgl_security.h>
@@ -12,12 +16,8 @@
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Initialize a bounded replay window for one trusted scope
- * \param[out]      window: Replay state
- * \param[in]       source_id: Remote endpoint identifier
- * \param[in]       connection_id: Connection identity
- * \param[in]       session_epoch: Trusted epoch
- * \param[in]       window_size: Accepted reordering distance, from 1 to 64
- * \return          XGL_OK on success, error code otherwise
+ * \details         The accepted reordering distance ranges from one to 64
+ *                  positions.
  */
 xgl_error_t xgl_replay_window_init(xgl_replay_window_t* window,
                                    uint16_t source_id, uint32_t connection_id,
@@ -45,12 +45,9 @@ xgl_error_t xgl_replay_window_init(xgl_replay_window_t* window,
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Classify and commit a security sequence in one replay window
- * \param[in,out]   window: Replay state or a tentative copy before verification
- * \param[in]       source_id: Remote endpoint identifier
- * \param[in]       connection_id: Connection identity
- * \param[in]       session_epoch: Trusted epoch
- * \param[in]       packet_number: Independent 64-bit security sequence
- * \return          New sequence, duplicate, or rejected scope/window position
+ * \details         The replay state may be a tentative copy until
+ *                  authentication succeeds. The sequence is an independent
+ *                  64-bit security value.
  */
 xgl_replay_result_t xgl_replay_window_check(xgl_replay_window_t* window,
                                             uint16_t source_id,
@@ -103,12 +100,8 @@ xgl_replay_result_t xgl_replay_window_check(xgl_replay_window_t* window,
 
 /**
  * \brief           Commit a previously unseen security sequence
- * \param[in,out]   window: Replay state
- * \param[in]       source_id: Remote endpoint identifier
- * \param[in]       connection_id: Connection identity
- * \param[in]       session_epoch: Trusted epoch
- * \param[in]       packet_number: Independent 64-bit security sequence
- * \return          True only for a previously unseen in-window sequence
+ * \details         Commit only a previously unseen sequence within the replay
+ *                  window.
  */
 bool xgl_replay_window_accept(xgl_replay_window_t* window, uint16_t source_id,
                               uint32_t connection_id, uint32_t session_epoch,
@@ -122,11 +115,8 @@ bool xgl_replay_window_accept(xgl_replay_window_t* window, uint16_t source_id,
 /**
  * \brief           Find an explicitly installed association, including
  * tombstones
- * \param[in]       ctx: Security context
- * \param[in]       remote_id: Remote endpoint
- * \param[in]       connection_id: Connection identity
- * \param[in]       epoch: Trusted epoch
- * \return          Matching index or XGL_SECURITY_SESSION_CAPACITY
+ * \details         Use the session-capacity sentinel when no exact scope
+ *                  matches.
  */
 static size_t security_find_index(const xgl_security_ctx_t* ctx,
                                   uint16_t remote_id, uint32_t connection_id,
@@ -206,11 +196,7 @@ xgl_error_t xgl_security_check_tx_scope(const xgl_security_ctx_t* ctx,
 
 /**
  * \brief           Initialize an empty security context
- * \param[out]      ctx: Security context
- * \param[in]       local_id: Local endpoint identifier
- * \param[in]       auth_required: Require authentication on local delivery
- * \param[in]       provider: Borrowed provider
- * \return          XGL_OK on success, error code otherwise
+ * \details         Borrow the provider for the lifetime of this context.
  */
 xgl_error_t xgl_security_init(xgl_security_ctx_t* ctx, uint16_t local_id,
                               bool auth_required,
@@ -234,9 +220,6 @@ xgl_error_t xgl_security_init(xgl_security_ctx_t* ctx, uint16_t local_id,
 
 /**
  * \brief           Check whether two associations reuse a key and nonce prefix
- * \param[in]       a: Existing association
- * \param[in]       b: Proposed association
- * \return          True if any directional nonce domain overlaps
  */
 static bool security_domain_overlap(const xgl_security_session_config_t* a,
                                     const xgl_security_session_config_t* b) {
@@ -252,9 +235,6 @@ static bool security_domain_overlap(const xgl_security_session_config_t* a,
 
 /**
  * \brief           Install trusted state without replacing old nonce domains
- * \param[in,out]   ctx: Security context
- * \param[in]       config: Association copied into context
- * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t
 xgl_security_session_install(xgl_security_ctx_t* ctx,
@@ -305,11 +285,6 @@ xgl_security_session_install(xgl_security_ctx_t* ctx,
 /**
  * \brief           Close trusted state while retaining its nonce-domain
  * reservation
- * \param[in,out]   ctx: Security context
- * \param[in]       remote_id: Remote endpoint
- * \param[in]       connection_id: Connection identity
- * \param[in]       session_epoch: Trusted epoch
- * \return          XGL_OK on success, error code otherwise
  */
 xgl_error_t xgl_security_session_close(xgl_security_ctx_t* ctx,
                                        uint16_t remote_id,
@@ -334,14 +309,9 @@ xgl_error_t xgl_security_session_close(xgl_security_ctx_t* ctx,
 /* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
 /**
  * \brief           Construct strict nonce and canonical AAD for a provider call
- * \param[in,out]   ctx: Context owning canonical AAD scratch
- * \param[out]      input: Versioned borrowed provider input
- * \param[in]       header: Validated or constructed wire header
- * \param[in]       buffer: Actual frame bytes
- * \param[in]       epoch: Trusted epoch
- * \param[in]       key_id: Directional key identifier
- * \param[in]       prefix: Directional nonce prefix
- * \param[in]       sequence: Independent security sequence
+ * \details         The context owns canonical AAD scratch. The versioned
+ *                  provider input is borrowed for this call and uses the
+ *                  trusted epoch, directional key and nonce prefix.
  */
 static void security_prepare_input(xgl_security_ctx_t* ctx,
                                    xgl_auth_input_t* input,
@@ -439,13 +409,8 @@ xgl_error_t xgl_security_sign_measured(xgl_security_ctx_t* ctx, uint8_t* buffer,
 /**
  * \brief           Consume a unique sequence and authenticate prepared frame
  * bytes
- * \param[in,out]   ctx: Security context
- * \param[in,out]   buffer: Encoded header, extensions and payload
- * \param[in]       capacity: Capacity excluding final CRC
- * \param[in]       aad_len: Encoded header length
- * \param[in]       payload_len: Encoded payload length
- * \param[out]      frame_len: Produced length excluding final CRC
- * \return          XGL_OK on success, error code otherwise
+ * \details         The encoded body and reported lengths exclude the final
+ *                  CRC.
  */
 xgl_error_t xgl_security_sign_frame(xgl_security_ctx_t* ctx, uint8_t* buffer,
                                     size_t capacity, size_t aad_len,
@@ -494,9 +459,8 @@ xgl_error_t xgl_security_sign_frame(xgl_security_ctx_t* ctx, uint8_t* buffer,
 
 /**
  * \brief           Verify local authentication before committing replay state
- * \param[in,out]   ctx: Security context
- * \param[in]       view: Wire-validated immutable frame view
- * \return          XGL_OK on acceptance, error code otherwise
+ * \details         The wire decoder has already validated the immutable frame
+ *                  view.
  */
 xgl_error_t xgl_security_verify_frame(xgl_security_ctx_t* ctx,
                                       const xgl_wire_frame_view_t* view) {

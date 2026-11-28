@@ -2,6 +2,9 @@
  * \file            xgl_route_index.c
  * \brief           Optional fixed-bucket index for network routes
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-11-26
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <network/xgl_route_index.h>
@@ -18,7 +21,7 @@ bool xgl_route_index_init(xgl_route_index_t* index,
                           size_t capacity) {
     if (index == NULL || buckets == NULL || bucket_count == 0U ||
         (bucket_count & (bucket_count - 1U)) != 0U || capacity == 0U ||
-        bucket_count > SIZE_MAX / sizeof(*buckets)) {
+        bucket_count > SIZE_MAX / sizeof(xgl_route_index_node_t*)) {
         return false;
     }
 

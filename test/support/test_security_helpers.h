@@ -1,6 +1,7 @@
 /**
  * \file            test_security_helpers.h
  * \brief           Explicit trusted fixtures for wire and frame tests
+ * \author          X-Gen Lab
  */
 #ifndef TEST_SECURITY_HELPERS_H
 #define TEST_SECURITY_HELPERS_H

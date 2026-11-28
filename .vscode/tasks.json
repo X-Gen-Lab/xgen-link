@@ -1,0 +1,31 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "XGL Configure Native Debug",
+            "type": "process",
+            "command": "python",
+            "args": ["tools/dev/dev.py", "configure", "--preset", "native-debug"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "problemMatcher": []
+        },
+        {
+            "label": "XGL Build Native Debug",
+            "type": "process",
+            "command": "python",
+            "args": ["tools/dev/dev.py", "build", "--preset", "native-debug"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "group": "build",
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "XGL Test Native Debug",
+            "type": "process",
+            "command": "python",
+            "args": ["tools/dev/dev.py", "test", "--preset", "native-debug"],
+            "options": {"cwd": "${workspaceFolder}"},
+            "group": "test",
+            "problemMatcher": []
+        }
+    ]
+}

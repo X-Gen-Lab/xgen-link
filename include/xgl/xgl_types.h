@@ -477,16 +477,11 @@ typedef struct {
 
 /** \brief           Compatible C11/C++17 initializer for optional policy. */
 #define XGL_INSTANCE_OPTIONS_INIT                                              \
-    {sizeof(xgl_instance_options_t),                                           \
-     XGL_INSTANCE_OPTIONS_VERSION,                                             \
-     sizeof(xgl_config_t),                                                     \
-     XGL_CONFIG_ABI_VERSION,                                                   \
-     XGL_BUILD_CONFIG_ID,                                                      \
-     0U,                                                                       \
-     false,                                                                    \
-     NULL,                                                                     \
-     NULL,                                                                     \
-     NULL}
+    {                                                                          \
+        sizeof(xgl_instance_options_t), XGL_INSTANCE_OPTIONS_VERSION,          \
+            sizeof(xgl_config_t), XGL_CONFIG_ABI_VERSION, XGL_BUILD_CONFIG_ID, \
+            0U, false, NULL, NULL, NULL                                        \
+    }
 
 /** \brief           Additional limits for one bounded step; zero stops that
  * work. */
@@ -645,34 +640,29 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_TINY                                                 \
     {                                                                          \
-        /* name */ "tiny",                                                     \
-        /* source_id */ 1, /* memory */                                        \
-        {                                                                      \
-            /* rx_buffer_size */ 160,                                          \
-            /* allocator */ NULL,                                              \
-        }, /* protocol */                                                      \
-        {                                                                      \
-            /* ack_timeout_ms */ 1000,                                         \
-            /* max_retry_count */ 3,                                           \
-            /* window_size */ 2,                                               \
-            /* max_frame_size */ 128,                                          \
-        }, /* features */                                                      \
-        {                                                                      \
-            /* enable_compression */ false,                                    \
-            /* enable_encryption */ false,                                     \
-            /* max_tx_packets */ 2,                                            \
-            /* max_rx_buffered_packets */ 2,                                   \
-            /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_peers */ 1,                                                 \
-        },                                                                     \
-        /* auth_required */ false,                                             \
-        /* auth_provider */ NULL,                                              \
-        /* route_table */ NULL,                                                \
-        /* route_table_len */ 0,                                               \
-        /* rx_callback */ NULL,                                                \
-        /* rx_accept_callback */ NULL,                                         \
-        /* error_callback */ NULL,                                             \
-        /* callback_user_data */ NULL,                                         \
+        /* name */ "tiny", /* source_id */ 1, /* memory */                     \
+            {                                                                  \
+                /* rx_buffer_size */ 160,                                      \
+                /* allocator */ NULL,                                          \
+            }, /* protocol */                                                  \
+            {                                                                  \
+                /* ack_timeout_ms */ 1000,                                     \
+                /* max_retry_count */ 3,                                       \
+                /* window_size */ 2,                                           \
+                /* max_frame_size */ 128,                                      \
+            }, /* features */                                                  \
+            {                                                                  \
+                /* enable_compression */ false,                                \
+                /* enable_encryption */ false,                                 \
+                /* max_tx_packets */ 2,                                        \
+                /* max_rx_buffered_packets */ 2,                               \
+                /* peer_idle_timeout_ms */ 60000,                              \
+                /* max_peers */ 1,                                             \
+            },                                                                 \
+            /* auth_required */ false, /* auth_provider */ NULL,               \
+            /* route_table */ NULL, /* route_table_len */ 0,                   \
+            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
+            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
     }
 
 /**
@@ -680,34 +670,29 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_SMALL                                                \
     {                                                                          \
-        /* name */ "small",                                                    \
-        /* source_id */ 1, /* memory */                                        \
-        {                                                                      \
-            /* rx_buffer_size */ 288,                                          \
-            /* allocator */ NULL,                                              \
-        }, /* protocol */                                                      \
-        {                                                                      \
-            /* ack_timeout_ms */ 1000,                                         \
-            /* max_retry_count */ 5,                                           \
-            /* window_size */ 4,                                               \
-            /* max_frame_size */ 256,                                          \
-        }, /* features */                                                      \
-        {                                                                      \
-            /* enable_compression */ false,                                    \
-            /* enable_encryption */ false,                                     \
-            /* max_tx_packets */ 4,                                            \
-            /* max_rx_buffered_packets */ 4,                                   \
-            /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_peers */ 2,                                                 \
-        },                                                                     \
-        /* auth_required */ false,                                             \
-        /* auth_provider */ NULL,                                              \
-        /* route_table */ NULL,                                                \
-        /* route_table_len */ 0,                                               \
-        /* rx_callback */ NULL,                                                \
-        /* rx_accept_callback */ NULL,                                         \
-        /* error_callback */ NULL,                                             \
-        /* callback_user_data */ NULL,                                         \
+        /* name */ "small", /* source_id */ 1, /* memory */                    \
+            {                                                                  \
+                /* rx_buffer_size */ 288,                                      \
+                /* allocator */ NULL,                                          \
+            }, /* protocol */                                                  \
+            {                                                                  \
+                /* ack_timeout_ms */ 1000,                                     \
+                /* max_retry_count */ 5,                                       \
+                /* window_size */ 4,                                           \
+                /* max_frame_size */ 256,                                      \
+            }, /* features */                                                  \
+            {                                                                  \
+                /* enable_compression */ false,                                \
+                /* enable_encryption */ false,                                 \
+                /* max_tx_packets */ 4,                                        \
+                /* max_rx_buffered_packets */ 4,                               \
+                /* peer_idle_timeout_ms */ 60000,                              \
+                /* max_peers */ 2,                                             \
+            },                                                                 \
+            /* auth_required */ false, /* auth_provider */ NULL,               \
+            /* route_table */ NULL, /* route_table_len */ 0,                   \
+            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
+            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
     }
 
 /**
@@ -715,34 +700,29 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_MEDIUM                                               \
     {                                                                          \
-        /* name */ "medium",                                                   \
-        /* source_id */ 1, /* memory */                                        \
-        {                                                                      \
-            /* rx_buffer_size */ 544,                                          \
-            /* allocator */ NULL,                                              \
-        }, /* protocol */                                                      \
-        {                                                                      \
-            /* ack_timeout_ms */ 1000,                                         \
-            /* max_retry_count */ 5,                                           \
-            /* window_size */ 8,                                               \
-            /* max_frame_size */ 512,                                          \
-        }, /* features */                                                      \
-        {                                                                      \
-            /* enable_compression */ false,                                    \
-            /* enable_encryption */ false,                                     \
-            /* max_tx_packets */ 16,                                           \
-            /* max_rx_buffered_packets */ 16,                                  \
-            /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_peers */ 8,                                                 \
-        },                                                                     \
-        /* auth_required */ false,                                             \
-        /* auth_provider */ NULL,                                              \
-        /* route_table */ NULL,                                                \
-        /* route_table_len */ 0,                                               \
-        /* rx_callback */ NULL,                                                \
-        /* rx_accept_callback */ NULL,                                         \
-        /* error_callback */ NULL,                                             \
-        /* callback_user_data */ NULL,                                         \
+        /* name */ "medium", /* source_id */ 1, /* memory */                   \
+            {                                                                  \
+                /* rx_buffer_size */ 544,                                      \
+                /* allocator */ NULL,                                          \
+            }, /* protocol */                                                  \
+            {                                                                  \
+                /* ack_timeout_ms */ 1000,                                     \
+                /* max_retry_count */ 5,                                       \
+                /* window_size */ 8,                                           \
+                /* max_frame_size */ 512,                                      \
+            }, /* features */                                                  \
+            {                                                                  \
+                /* enable_compression */ false,                                \
+                /* enable_encryption */ false,                                 \
+                /* max_tx_packets */ 16,                                       \
+                /* max_rx_buffered_packets */ 16,                              \
+                /* peer_idle_timeout_ms */ 60000,                              \
+                /* max_peers */ 8,                                             \
+            },                                                                 \
+            /* auth_required */ false, /* auth_provider */ NULL,               \
+            /* route_table */ NULL, /* route_table_len */ 0,                   \
+            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
+            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
     }
 
 /**
@@ -750,34 +730,29 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_LARGE                                                \
     {                                                                          \
-        /* name */ "large",                                                    \
-        /* source_id */ 1, /* memory */                                        \
-        {                                                                      \
-            /* rx_buffer_size */ 1056,                                         \
-            /* allocator */ NULL,                                              \
-        }, /* protocol */                                                      \
-        {                                                                      \
-            /* ack_timeout_ms */ 1000,                                         \
-            /* max_retry_count */ 7,                                           \
-            /* window_size */ 16,                                              \
-            /* max_frame_size */ 1024,                                         \
-        }, /* features */                                                      \
-        {                                                                      \
-            /* enable_compression */ false,                                    \
-            /* enable_encryption */ false,                                     \
-            /* max_tx_packets */ 64,                                           \
-            /* max_rx_buffered_packets */ 64,                                  \
-            /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_peers */ 16,                                                \
-        },                                                                     \
-        /* auth_required */ false,                                             \
-        /* auth_provider */ NULL,                                              \
-        /* route_table */ NULL,                                                \
-        /* route_table_len */ 0,                                               \
-        /* rx_callback */ NULL,                                                \
-        /* rx_accept_callback */ NULL,                                         \
-        /* error_callback */ NULL,                                             \
-        /* callback_user_data */ NULL,                                         \
+        /* name */ "large", /* source_id */ 1, /* memory */                    \
+            {                                                                  \
+                /* rx_buffer_size */ 1056,                                     \
+                /* allocator */ NULL,                                          \
+            }, /* protocol */                                                  \
+            {                                                                  \
+                /* ack_timeout_ms */ 1000,                                     \
+                /* max_retry_count */ 7,                                       \
+                /* window_size */ 16,                                          \
+                /* max_frame_size */ 1024,                                     \
+            }, /* features */                                                  \
+            {                                                                  \
+                /* enable_compression */ false,                                \
+                /* enable_encryption */ false,                                 \
+                /* max_tx_packets */ 64,                                       \
+                /* max_rx_buffered_packets */ 64,                              \
+                /* peer_idle_timeout_ms */ 60000,                              \
+                /* max_peers */ 16,                                            \
+            },                                                                 \
+            /* auth_required */ false, /* auth_provider */ NULL,               \
+            /* route_table */ NULL, /* route_table_len */ 0,                   \
+            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
+            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
     }
 
 /**
@@ -788,34 +763,29 @@ typedef struct {
  */
 #define XGL_CONFIG_PRESET_PRODUCTION                                           \
     {                                                                          \
-        /* name */ "production",                                               \
-        /* source_id */ 1, /* memory */                                        \
-        {                                                                      \
-            /* rx_buffer_size */ 1056,                                         \
-            /* allocator */ NULL,                                              \
-        }, /* protocol */                                                      \
-        {                                                                      \
-            /* ack_timeout_ms */ 1000,                                         \
-            /* max_retry_count */ 7,                                           \
-            /* window_size */ 16,                                              \
-            /* max_frame_size */ 1024,                                         \
-        }, /* features */                                                      \
-        {                                                                      \
-            /* enable_compression */ false,                                    \
-            /* enable_encryption */ false,                                     \
-            /* max_tx_packets */ 64,                                           \
-            /* max_rx_buffered_packets */ 64,                                  \
-            /* peer_idle_timeout_ms */ 60000,                                  \
-            /* max_peers */ 16,                                                \
-        },                                                                     \
-        /* auth_required */ true,                                              \
-        /* auth_provider */ NULL,                                              \
-        /* route_table */ NULL,                                                \
-        /* route_table_len */ 0,                                               \
-        /* rx_callback */ NULL,                                                \
-        /* rx_accept_callback */ NULL,                                         \
-        /* error_callback */ NULL,                                             \
-        /* callback_user_data */ NULL,                                         \
+        /* name */ "production", /* source_id */ 1, /* memory */               \
+            {                                                                  \
+                /* rx_buffer_size */ 1056,                                     \
+                /* allocator */ NULL,                                          \
+            }, /* protocol */                                                  \
+            {                                                                  \
+                /* ack_timeout_ms */ 1000,                                     \
+                /* max_retry_count */ 7,                                       \
+                /* window_size */ 16,                                          \
+                /* max_frame_size */ 1024,                                     \
+            }, /* features */                                                  \
+            {                                                                  \
+                /* enable_compression */ false,                                \
+                /* enable_encryption */ false,                                 \
+                /* max_tx_packets */ 64,                                       \
+                /* max_rx_buffered_packets */ 64,                              \
+                /* peer_idle_timeout_ms */ 60000,                              \
+                /* max_peers */ 16,                                            \
+            },                                                                 \
+            /* auth_required */ true, /* auth_provider */ NULL,                \
+            /* route_table */ NULL, /* route_table_len */ 0,                   \
+            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
+            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
     }
 
 #ifdef __cplusplus

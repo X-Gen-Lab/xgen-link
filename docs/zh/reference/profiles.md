@@ -1,3 +1,10 @@
+---
+id: reference/profiles
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 配置预设
 
 profile 定义编译能力上限，preset 在上限内提供显式运行容量。不支持的能力由配置校验拒绝。

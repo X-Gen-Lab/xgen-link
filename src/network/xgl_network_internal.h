@@ -1,6 +1,7 @@
 /**
  * \file            xgl_network_internal.h
  * \brief           Internal network helpers shared across network modules
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_NETWORK_INTERNAL_H

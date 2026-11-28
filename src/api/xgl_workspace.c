@@ -2,6 +2,9 @@
  * \file            xgl_workspace.c
  * \brief           Exact protocol resource partitions over bounded memory pools
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <internal/xgl_allocator.h>
@@ -425,13 +428,9 @@ xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
 
 /**
  * \brief           Prepare bounded pools and an uninitialized protocol instance
- * \param[in]       config: Immutable configuration borrowed until destruction
- * \param[in,out]   storage: Aligned storage covering the measured layout
- * \param[in]       storage_size: Available storage bytes
- * \param[in]       storage_allocator: Owning backend, or NULL for caller
- * storage
- * \param[out]      handle: Prepared instance, or NULL on failure
- * \return          XGL_OK or a configuration, alignment or capacity error
+ * \details         The aligned storage must cover the measured layout. A
+ *                  backend owns dynamically reserved storage. Caller-owned
+ *                  storage has no backend. Clear the handle on failure.
  */
 xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
                                   size_t storage_size,

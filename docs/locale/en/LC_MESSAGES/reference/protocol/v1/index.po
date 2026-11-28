@@ -1,0 +1,111 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: ab76917f584e5628e36b9359ad8d2932f60d9c61359c2e30e2618fac47d065d6\n"
+
+#: docs/zh/reference/protocol/v1/index.md:8
+msgid "协议概览"
+msgstr "Protocol Overview"
+
+#: docs/zh/reference/protocol/v1/index.md:10
+msgid "XGen Link 实现面向有界、同步嵌入式通信的 Wire v1。各 profile 使用相同的帧头和扩展编码。收发与转发只接受版本字段为 1 的帧。"
+msgstr ""
+"XGen Link implements Wire v1 for bounded, synchronous embedded communication. All profiles use the same "
+"header and extension encoding. Endpoints and relays only accept frames with version 1."
+
+#: docs/zh/reference/protocol/v1/index.md:0 docs/zh/reference/protocol/v1/index.md:12
+msgid "职责"
+msgstr "Responsibilities"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "组件"
+msgstr "Component"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "API"
+msgstr "API"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "实例生命周期、显式时间、配置与工作区检查"
+msgstr "Instance lifecycle, explicit time, configuration and workspace checks"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "Transport"
+msgstr "Transport"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "peer 所有权、可靠 DATA、ACK/SACK、重传与可选乱序缓存"
+msgstr "Peer ownership, reliable DATA, ACK/SACK, retries and optional out-of-order buffering"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "Network"
+msgstr "Network"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "目标查找、扩展组合与可选转发"
+msgstr "Destination lookup, extension composition and optional forwarding"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "Security"
+msgstr "Security"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "显式可信会话、独立认证序号与重放检查"
+msgstr "Explicit trusted sessions, fresh authentication sequences and replay"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "Datalink / Wire"
+msgstr "Datalink / Wire"
+
+#: docs/zh/reference/protocol/v1/index.md:0
+msgid "同步帧提交、有界解析、布局与 CRC"
+msgstr "Synchronous frame submission, bounded parsing, layout and CRC"
+
+#: docs/zh/reference/protocol/v1/index.md:22
+msgid "核心契约"
+msgstr "Core Contracts"
+
+#: docs/zh/reference/protocol/v1/index.md:24
+msgid ""
+"peer 严格由 `(remote_id, connection_id, session_epoch)` 标识。connection 和 epoch 的零值是普通取值，不存在短 session 回退。只有可靠"
+" DATA 消耗连续的 32 位 DATA 序号；ACK、CONTROL、非可靠 DATA 的该帧头字段为零。每次签名尝试使用独立的 64 位认证序号。"
+msgstr ""
+"A peer is exactly `(remote_id, connection_id, session_epoch)`. Zero connection and epoch are ordinary "
+"values. There is no short-session fallback. Only reliable DATA consumes the contiguous 32-bit DATA "
+"sequence. ACK, CONTROL and unreliable DATA carry zero in that header field. Authentication uses a "
+"separate 64-bit sequence for every signing attempt."
+
+#: docs/zh/reference/protocol/v1/index.md:26
+msgid ""
+"可靠发送成功表示本地已接纳并持有数据。ACK 表示 transport 或应用已接纳，不代表写 flash 或其他业务操作已经提交。失败对该 epoch 是终态。RESET 不会将其重新开放；显式 close"
+" 释放容量后，才能建立新 epoch。"
+msgstr ""
+"Successful reliable submission means local acceptance into owned storage. An ACK means transport or "
+"application acceptance; it does not prove that flash programming or another business operation has "
+"committed. Failure is terminal for an epoch. RESET cannot reopen it; explicit close releases capacity "
+"before a new epoch is established."
+
+#: docs/zh/reference/protocol/v1/index.md:28
+msgid "阅读顺序"
+msgstr "Reading Order"
+
+#: docs/zh/reference/protocol/v1/index.md:30
+msgid ""
+"先阅读[架构](../../../explanation/architecture.md)、[线格式](wire-"
+"format.md)、[扩展](extensions.md)、[可靠传输](reliability.md)和[安全](security.md)。[内存](../../../explanation/resource-"
+"model.md)、[平台](../../../guides/porting.md)与[实现映射](../../../explanation/implementation-"
+"map.md)说明容量、执行及源码所有权。Boot profile 使用单 peer、单包窗口；文件与固件由应用协议[分块](../../../guides/send.md)，每块单独发送。"
+msgstr ""
+"Read [Architecture](../../../explanation/architecture.md), [Wire Format](wire-format.md), "
+"[Extensions](extensions.md), [Reliability](reliability.md) and [Security](security.md) for the principal"
+" contracts. [Memory](../../../explanation/resource-model.md), [Platform](../../../guides/porting.md) and"
+" [Implementation Map](../../../explanation/implementation-map.md) describe capacity, execution and "
+"source ownership. The Boot profile uses one peer and a one-packet window; for files and firmware, the "
+"application protocol [splits objects](../../../guides/send.md) and submits each chunk separately."

@@ -1,0 +1,85 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 5d306fb7b4f4910172920ca10149b5534b90db55a3ab6caae8221a67a1dc7c9f\n"
+
+#: docs/zh/index.md:8
+msgid "XGen Link SDK"
+msgstr "XGen Link SDK"
+
+#: docs/zh/index.md:10
+msgid "XGen Link 为嵌入式系统提供 C11 通信协议、显式有界存储与可靠传输。产品提供 PHY、时间和执行者。"
+msgstr ""
+"XGen Link provides a C11 communication protocol for embedded systems, with explicit bounded storage and "
+"reliable delivery. The product supplies the PHY, clock and execution context."
+
+#: docs/zh/index.md:0
+msgid "任务"
+msgstr "Task"
+
+#: docs/zh/index.md:0
+msgid "入口"
+msgstr "Start here"
+
+#: docs/zh/index.md:0
+msgid "第一次运行"
+msgstr "Run your first program"
+
+#: docs/zh/index.md:0
+msgid "[跑通收发](tutorials/first-link.md)"
+msgstr "[Run your first link](tutorials/first-link.md)"
+
+#: docs/zh/index.md:0
+msgid "构建、安装和接入工程"
+msgstr "Build, install and consume"
+
+#: docs/zh/index.md:0
+msgid "[构建与消费](guides/build-and-consume.md)"
+msgstr "[Build and consume](guides/build-and-consume.md)"
+
+#: docs/zh/index.md:0
+msgid "配置容量和硬件接口"
+msgstr "Set budgets and hardware interfaces"
+
+#: docs/zh/index.md:0
+msgid "[配置](guides/configuration.md)、[移植](guides/porting.md)"
+msgstr "[Configuration](guides/configuration.md), [Porting](guides/porting.md)"
+
+#: docs/zh/index.md:0
+msgid "接入 Boot 传输"
+msgstr "Integrate Boot transfer"
+
+#: docs/zh/index.md:0
+msgid "[Boot 接入](guides/boot.md)"
+msgstr "[Integrate Boot](guides/boot.md)"
+
+#: docs/zh/index.md:0
+msgid "了解架构及资源"
+msgstr "Understand architecture and resources"
+
+#: docs/zh/index.md:0
+msgid "[架构](explanation/architecture.md)、[资源模型](explanation/resource-model.md)"
+msgstr "[Architecture](explanation/architecture.md), [Resource model](explanation/resource-model.md)"
+
+#: docs/zh/index.md:0
+msgid "查 API 与协议"
+msgstr "Look up API and protocol contracts"
+
+#: docs/zh/index.md:0
+msgid "[公开 API](reference/api.md)、[Wire v1](reference/protocol/v1/index.md)"
+msgstr "[Public API](reference/api.md), [Wire v1](reference/protocol/v1/index.md)"
+
+#: docs/zh/index.md:0
+msgid "开发和验证"
+msgstr "Develop and verify"
+
+#: docs/zh/index.md:0
+msgid "[开发工作流](development/workflow.md)、[验证](development/validation.md)"
+msgstr "[Development workflow](development/workflow.md), [Validation](development/validation.md)"

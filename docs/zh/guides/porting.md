@@ -1,3 +1,10 @@
+---
+id: guides/porting
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 移植
 
 协议核心使用 C11。产品提供 PHY、单调时钟、静态存储或显式分配回调，并负责串行执行。

@@ -3,6 +3,9 @@
  * \brief           Static workspace requirement and reported host memory
  * accounting
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-07-10
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <cstdio>
 #include <vector>
@@ -12,9 +15,8 @@
 /**
  * \brief           Query exact static workspace and exercise the selected host
  * preset
- * \param[in]       name: CSV preset label
- * \param[in]       config: Preset copied into persistent nodes
- * \return          True if initialization and all deliveries succeed
+ * \details         Copy the selected preset into persistent nodes. A
+ *                  successful run completes every delivery.
  */
 static bool run_memory_benchmark(const char* name, const xgl_config_t& config) {
     BenchmarkPair pair;

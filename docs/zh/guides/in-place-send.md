@@ -1,3 +1,10 @@
+---
+id: guides/in-place-send
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 零拷贝
 
 零拷贝发送 API 在调用者提供的可写存储中构造单帧非可靠消息，不引入异步缓冲所有权。

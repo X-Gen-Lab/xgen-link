@@ -1,6 +1,10 @@
 /**
  * \file            interop_peer.c
  * \brief           Standalone host process for exercising Wire v1 exchanges.
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-11-26
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <stdio.h>
 #include <stdlib.h>

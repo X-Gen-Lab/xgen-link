@@ -1,0 +1,606 @@
+{
+  "zh_CN": {
+    "development/documentation": [
+      "_1",
+      "_2",
+      "_3"
+    ],
+    "development/validation": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5"
+    ],
+    "development/workflow": [
+      "_1",
+      "_2",
+      "_3",
+      "_4"
+    ],
+    "explanation/architecture": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5"
+    ],
+    "explanation/datalink": [
+      "_1",
+      "_2",
+      "_3",
+      "_4"
+    ],
+    "explanation/implementation-map": [
+      "_1",
+      "_2",
+      "_3",
+      "_4"
+    ],
+    "explanation/resource-model": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "heap",
+      "_5"
+    ],
+    "explanation/runtime": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5",
+      "dma-owner-task",
+      "_6"
+    ],
+    "explanation/state-machines": [
+      "_1",
+      "peer",
+      "_2",
+      "_3"
+    ],
+    "explanation/transport-internals": [
+      "transport",
+      "peer",
+      "_1",
+      "_2"
+    ],
+    "getting-started/build-and-test": [
+      "_1"
+    ],
+    "getting-started/quick-start": [
+      "_1"
+    ],
+    "guide/kconfig": [
+      "_1"
+    ],
+    "guide/modular-migration": [
+      "_1"
+    ],
+    "guide/porting": [
+      "_1"
+    ],
+    "guide/thread-safety": [
+      "_1"
+    ],
+    "guides/advanced-runtime": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "scope",
+      "_5"
+    ],
+    "guides/boot": [
+      "boot",
+      "_1",
+      "_2",
+      "_3"
+    ],
+    "guides/build-and-consume": [
+      "_1",
+      "cmake",
+      "_2",
+      "_3"
+    ],
+    "guides/configuration": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5",
+      "profile"
+    ],
+    "guides/in-place-send": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5",
+      "_6"
+    ],
+    "guides/low-power": [
+      "_1",
+      "api",
+      "_2",
+      "rtos",
+      "_3"
+    ],
+    "guides/migration": [
+      "sdk-5",
+      "_1",
+      "_2"
+    ],
+    "guides/porting": [
+      "_1",
+      "phy",
+      "_2",
+      "_3",
+      "isr-rtos",
+      "_4",
+      "_5"
+    ],
+    "guides/send": [
+      "api",
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5",
+      "scope",
+      "data-type"
+    ],
+    "guides/troubleshooting": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5"
+    ],
+    "index": [
+      "xgen-link-sdk"
+    ],
+    "protocol/architecture": [
+      "_1"
+    ],
+    "protocol/codec": [
+      "_1"
+    ],
+    "protocol/extensions": [
+      "_1"
+    ],
+    "protocol/reliability": [
+      "_1"
+    ],
+    "protocol/security": [
+      "_1"
+    ],
+    "protocol/wire-format": [
+      "_1"
+    ],
+    "reference/api": [
+      "api",
+      "_1",
+      "_2",
+      "_3"
+    ],
+    "reference/datalink-optimization": [
+      "_1"
+    ],
+    "reference/errors": [
+      "_1",
+      "_2"
+    ],
+    "reference/glossary": [
+      "_1"
+    ],
+    "reference/profiles": [
+      "_1",
+      "_2",
+      "_3",
+      "_4"
+    ],
+    "reference/protocol/v1/extensions": [
+      "_1",
+      "_2",
+      "ack",
+      "_3",
+      "_4"
+    ],
+    "reference/protocol/v1/index": [
+      "_1",
+      "_2",
+      "_3",
+      "_4"
+    ],
+    "reference/protocol/v1/interoperability": [
+      "_1",
+      "_2",
+      "v1",
+      "_3"
+    ],
+    "reference/protocol/v1/reliability": [
+      "_1",
+      "_2",
+      "_3",
+      "_4"
+    ],
+    "reference/protocol/v1/routing": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5"
+    ],
+    "reference/protocol/v1/security": [
+      "_1",
+      "_2",
+      "_3",
+      "_4"
+    ],
+    "reference/protocol/v1/wire-format": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5"
+    ],
+    "reference/protocol/v3/extensions": [
+      "_1"
+    ],
+    "reference/protocol/v3/fragmentation": [
+      "_1"
+    ],
+    "reference/protocol/v3/index": [
+      "_1"
+    ],
+    "reference/protocol/v3/interoperability": [
+      "_1"
+    ],
+    "reference/protocol/v3/reliability": [
+      "_1"
+    ],
+    "reference/protocol/v3/routing": [
+      "_1"
+    ],
+    "reference/protocol/v3/security": [
+      "_1"
+    ],
+    "reference/protocol/v3/wire-format": [
+      "_1"
+    ],
+    "reference/public-api": [
+      "_1"
+    ],
+    "reference/statistics": [
+      "_1",
+      "_2",
+      "_3",
+      "network",
+      "_4",
+      "_5",
+      "rtt"
+    ],
+    "reference/validation-matrix": [
+      "_1"
+    ],
+    "reference/wire-optimization": [
+      "_1"
+    ],
+    "tutorials/examples": [
+      "_1",
+      "_2",
+      "_3"
+    ],
+    "tutorials/first-link": [
+      "_1",
+      "_2",
+      "_3",
+      "_4",
+      "_5"
+    ]
+  },
+  "en": {
+    "development/documentation": [
+      "maintain-documentation",
+      "content-and-translation",
+      "build-and-verify"
+    ],
+    "development/validation": [
+      "validation",
+      "protocol-coverage",
+      "build-and-installation",
+      "resources-and-product-qualification",
+      "historical-evidence"
+    ],
+    "development/workflow": [
+      "development-workflow",
+      "behavior-and-regressions",
+      "documentation",
+      "completion"
+    ],
+    "explanation/architecture": [
+      "architecture",
+      "module-boundaries",
+      "send-and-receive-flow",
+      "ownership-and-execution",
+      "source-and-build-boundaries"
+    ],
+    "explanation/datalink": [
+      "datalink",
+      "receive-framing",
+      "synchronous-transmit-contract",
+      "limits-and-scheduling"
+    ],
+    "explanation/implementation-map": [
+      "implementation-map",
+      "source-ownership",
+      "internal-interfaces",
+      "verification-boundaries"
+    ],
+    "explanation/resource-model": [
+      "resource-model",
+      "allocation-phases",
+      "independent-resource-pools",
+      "capacity-and-failure",
+      "no-heap-builds",
+      "measurement"
+    ],
+    "explanation/runtime": [
+      "bounded-receive-and-runtime-work",
+      "what-the-limits-count",
+      "continuation-and-input-ownership",
+      "recovery-and-time",
+      "polling-and-throughput",
+      "dma-and-owner-task-integration",
+      "validation-scope"
+    ],
+    "explanation/state-machines": [
+      "state-machines",
+      "peer-lifecycle",
+      "reliable-packet-lifecycle",
+      "security-lifecycle"
+    ],
+    "explanation/transport-internals": [
+      "transport-internals",
+      "peer-state-and-helpers",
+      "ownership-across-calls",
+      "scheduling-and-observability"
+    ],
+    "getting-started/build-and-test": [
+      "page-moved"
+    ],
+    "getting-started/quick-start": [
+      "page-moved"
+    ],
+    "guide/kconfig": [
+      "page-moved"
+    ],
+    "guide/modular-migration": [
+      "page-moved"
+    ],
+    "guide/porting": [
+      "page-moved"
+    ],
+    "guide/thread-safety": [
+      "page-moved"
+    ],
+    "guides/advanced-runtime": [
+      "advanced-runtime-options",
+      "creation-and-lifetime",
+      "deadlines-and-observation",
+      "resource-snapshots",
+      "security-scope-policy",
+      "scheduling-and-validation"
+    ],
+    "guides/boot": [
+      "integrate-boot",
+      "select-resources",
+      "receive-and-commit",
+      "qualification"
+    ],
+    "guides/build-and-consume": [
+      "build-and-consume",
+      "cmake-consumption",
+      "compiled-resource-options",
+      "host-validation"
+    ],
+    "guides/configuration": [
+      "configuration",
+      "lifetime-and-identity",
+      "routes-and-frames",
+      "explicit-capacities",
+      "authentication",
+      "validation-and-build-profiles"
+    ],
+    "guides/in-place-send": [
+      "zero-copy",
+      "supported-scope",
+      "buffer-layout",
+      "plan-and-send",
+      "ownership",
+      "failure-handling"
+    ],
+    "guides/low-power": [
+      "low-power-runtime",
+      "relative-timeout-api",
+      "main-loop-integration",
+      "rtos-integration",
+      "time-and-recovery"
+    ],
+    "guides/migration": [
+      "migrate-to-sdk-5",
+      "protocol-and-application-changes",
+      "configuration-and-storage"
+    ],
+    "guides/porting": [
+      "porting",
+      "phy-contract",
+      "time-and-scheduling",
+      "storage-and-lifetime",
+      "isr-and-rtos-integration",
+      "shutdown-and-platform-adaptation",
+      "verification"
+    ],
+    "guides/send": [
+      "send-api",
+      "data-ownership",
+      "caller-owned-frame-storage",
+      "reliable-and-unreliable",
+      "application-blocks",
+      "receive-admission-and-callbacks",
+      "failure-and-scope-recovery",
+      "application-data-type"
+    ],
+    "guides/troubleshooting": [
+      "troubleshooting",
+      "initialization",
+      "send-and-receive",
+      "diagnostics-and-callbacks",
+      "recovery"
+    ],
+    "index": [
+      "xgen-link-sdk"
+    ],
+    "protocol/architecture": [
+      "page-moved"
+    ],
+    "protocol/codec": [
+      "page-moved"
+    ],
+    "protocol/extensions": [
+      "page-moved"
+    ],
+    "protocol/reliability": [
+      "page-moved"
+    ],
+    "protocol/security": [
+      "page-moved"
+    ],
+    "protocol/wire-format": [
+      "page-moved"
+    ],
+    "reference/api": [
+      "public-api",
+      "lifecycle-and-ownership",
+      "send-and-scheduling",
+      "sessions-and-diagnostics"
+    ],
+    "reference/datalink-optimization": [
+      "page-moved"
+    ],
+    "reference/errors": [
+      "errors",
+      "handling"
+    ],
+    "reference/glossary": [
+      "glossary"
+    ],
+    "reference/profiles": [
+      "configuration-presets",
+      "profiles",
+      "compiled-resource-identity",
+      "runtime-limits"
+    ],
+    "reference/protocol/v1/extensions": [
+      "extensions",
+      "defined-values",
+      "ack-semantics",
+      "composition",
+      "reserved-payload-transforms"
+    ],
+    "reference/protocol/v1/index": [
+      "protocol-overview",
+      "responsibilities",
+      "core-contracts",
+      "reading-order"
+    ],
+    "reference/protocol/v1/interoperability": [
+      "interoperability",
+      "required-agreements",
+      "reproduce-the-endpoint-test",
+      "evidence"
+    ],
+    "reference/protocol/v1/reliability": [
+      "reliability",
+      "transmit-lifecycle",
+      "receive-and-acknowledgement",
+      "failure-and-recovery"
+    ],
+    "reference/protocol/v1/routing": [
+      "routing",
+      "lookup-and-capacity",
+      "link-assembly-and-lifetime",
+      "forwarding",
+      "broadcast-and-reliability"
+    ],
+    "reference/protocol/v1/security": [
+      "security",
+      "trusted-associations",
+      "authentication-attempt",
+      "receive-and-forwarding"
+    ],
+    "reference/protocol/v1/wire-format": [
+      "wire-format",
+      "base-header",
+      "flags-and-traffic-class",
+      "validation-and-numbering",
+      "size-budget"
+    ],
+    "reference/protocol/v3/extensions": [
+      "extensions"
+    ],
+    "reference/protocol/v3/fragmentation": [
+      "fragmentation"
+    ],
+    "reference/protocol/v3/index": [
+      "protocol-overview"
+    ],
+    "reference/protocol/v3/interoperability": [
+      "interoperability"
+    ],
+    "reference/protocol/v3/reliability": [
+      "reliability"
+    ],
+    "reference/protocol/v3/routing": [
+      "routing"
+    ],
+    "reference/protocol/v3/security": [
+      "security"
+    ],
+    "reference/protocol/v3/wire-format": [
+      "wire-format"
+    ],
+    "reference/public-api": [
+      "page-moved"
+    ],
+    "reference/statistics": [
+      "statistics",
+      "interpretation",
+      "send-admission",
+      "network-counters",
+      "access",
+      "build-profiles",
+      "rtt-and-memory"
+    ],
+    "reference/validation-matrix": [
+      "page-moved"
+    ],
+    "reference/wire-optimization": [
+      "page-moved"
+    ],
+    "tutorials/examples": [
+      "examples",
+      "programs",
+      "run"
+    ],
+    "tutorials/first-link": [
+      "run-your-first-link",
+      "build-and-run",
+      "storage-and-lifetime",
+      "main-loop",
+      "runnable-programs"
+    ]
+  }
+}

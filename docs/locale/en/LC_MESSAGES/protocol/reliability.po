@@ -1,0 +1,19 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 0f479f6b6b597a3124ef3fb90a64a9f9afcc11572f3066ab4930d21c01f66ea6\n"
+
+#: docs/zh/protocol/reliability.md:9
+msgid "页面已迁移"
+msgstr "Page moved"
+
+#: docs/zh/protocol/reliability.md:11
+msgid "请查阅[当前文档](../reference/protocol/v1/reliability.md)。"
+msgstr "See the [current documentation](../reference/protocol/v1/reliability.md)."

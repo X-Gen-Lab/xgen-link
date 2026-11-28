@@ -3,6 +3,9 @@
  * \brief           Static fixed-block update with slow Flash admission and lost
  * ACK recovery
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include <wire/xgl_crc16.h>
 #include <wire/xgl_wire_bytes.h>
@@ -49,13 +52,9 @@ typedef struct {
 /**
  * \brief           Admit one copied block; Flash writes happen outside this
  * callback
- * \param[in]       handle: Callback instance, unused
- * \param[in]       source: Host identifier
- * \param[in]       type: Block message type
- * \param[in]       data: Little-endian offset followed by one image block
- * \param[in]       length: Fixed block message length
- * \param[in,out]   context: Bounded Flash staging slot
- * \return          BUSY until the slot is available, OK after copying ownership
+ * \details         Each message carries a little-endian offset and one fixed-
+ *                  size block. Return BUSY while the staging slot is occupied
+ *                  and accept only after copying the block.
  */
 static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
                                 uint8_t type, const uint8_t* data,
@@ -88,13 +87,9 @@ static xgl_error_t flash_accept(xgl_handle_t handle, uint16_t source,
 /**
  * \brief           Accept a durable-commit progress notification without
  * reentering
- * \param[in]       handle: Callback instance, unused
- * \param[in]       source: Device identifier
- * \param[in]       type: Commit message type
- * \param[in]       data: Little-endian committed byte count
- * \param[in]       length: Must be four
- * \param[in,out]   context: Host progress state
- * \return          XGL_OK for monotonic block-aligned progress
+ * \details         A progress message contains a four-byte little-endian
+ *                  committed byte count. Accept only monotonic, block-aligned
+ *                  progress.
  */
 static xgl_error_t host_accept(xgl_handle_t handle, uint16_t source,
                                uint8_t type, const uint8_t* data, size_t length,
@@ -115,10 +110,7 @@ static xgl_error_t host_accept(xgl_handle_t handle, uint16_t source,
 
 /**
  * \brief           Record a host error without reentering the instance
- * \param[in]       handle: Callback instance, unused
- * \param[in]       error: Reported protocol failure
- * \param[in]       message: Borrowed diagnostic text
- * \param[in,out]   context: Host application state
+ * \details         Diagnostic text is borrowed for the callback.
  */
 static void host_error(xgl_handle_t handle, xgl_error_t error,
                        const char* message, void* context) {
@@ -130,10 +122,7 @@ static void host_error(xgl_handle_t handle, xgl_error_t error,
 
 /**
  * \brief           Record a device error without reentering the instance
- * \param[in]       handle: Callback instance, unused
- * \param[in]       error: Reported protocol failure
- * \param[in]       message: Borrowed diagnostic text
- * \param[in,out]   context: Flash application state
+ * \details         Diagnostic text is borrowed for the callback.
  */
 static void flash_error(xgl_handle_t handle, xgl_error_t error,
                         const char* message, void* context) {
@@ -146,7 +135,6 @@ static void flash_error(xgl_handle_t handle, xgl_error_t error,
 /**
  * \brief           Simulate a Flash completion and queue its application
  * notification
- * \param[in,out]   app: Flash staging state
  */
 static void flash_complete(flash_app_t* app) {
     if (app->staging && (int32_t)(app->now - app->ready_at) >= 0) {

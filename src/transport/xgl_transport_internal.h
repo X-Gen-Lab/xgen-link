@@ -1,6 +1,7 @@
 /**
  * \file            xgl_transport_internal.h
  * \brief           Internal transport helpers shared across transport modules
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_TRANSPORT_INTERNAL_H

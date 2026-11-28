@@ -2,6 +2,9 @@
  * \file            xgl_route.c
  * \brief           Fixed-capacity protocol routes with an optional index
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <network/xgl_route.h>
@@ -37,7 +40,8 @@ xgl_error_t xgl_route_table_init(xgl_route_table_t* table, size_t capacity,
     }
     table->nodes = xgl_alloc(allocator, capacity * sizeof(*table->nodes));
     xgl_route_index_node_t** buckets = (xgl_route_index_node_t**)xgl_alloc(
-        allocator, XGL_ROUTE_TABLE_DEFAULT_SIZE * sizeof(*buckets));
+        allocator,
+        XGL_ROUTE_TABLE_DEFAULT_SIZE * sizeof(xgl_route_index_node_t*));
     if (table->nodes == NULL || buckets == NULL) {
         xgl_free(allocator, (void*)buckets);
         xgl_route_table_destroy(table);

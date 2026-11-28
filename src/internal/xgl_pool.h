@@ -1,6 +1,7 @@
 /**
  * \file            xgl_pool.h
  * \brief           Fixed slots in an instance-owned storage partition
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_POOL_H

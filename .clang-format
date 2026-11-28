@@ -1,6 +1,6 @@
 ---
 # X-Gen C/C++ Formatting Configuration
-# Validated with clang-format 19.1.5
+# Use the locked clang-format 14.0.6.
 
 Language: Cpp
 BasedOnStyle: LLVM
@@ -78,17 +78,16 @@ BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
 Cpp11BracedListStyle: true
 DerivePointerAlignment: false
-FixNamespaceComments: true
+# Namespace closing comments use the same block form as other comments.
+FixNamespaceComments: false
 IncludeBlocks: Preserve
-KeepEmptyLines:
-  AtStartOfFile: false
-  AtStartOfBlock: false
-  AtEndOfFile: false
-LineEnding: LF
+DeriveLineEnding: false
+KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
 ReflowComments: true
 SeparateDefinitionBlocks: Always
 SortIncludes: CaseSensitive
 SortUsingDeclarations: true
 Standard: c++17
+UseCRLF: false
 ...

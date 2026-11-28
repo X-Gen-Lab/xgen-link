@@ -2,6 +2,9 @@
  * \file            xgl_list.c
  * \brief           Non-owning list operations shared by protocol queues
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-11-26
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <internal/xgl_list.h>

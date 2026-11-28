@@ -1,0 +1,12 @@
+{
+  "source": "X-Gen-Lab/Nexus@acbc46e1ba9d4c442ccc879830a0971a809c0c48/dependencies/docs-tools.lock.json",
+  "host": "Linux x86_64 with CPython 3.12",
+  "doxygen": {
+    "version": "1.14.0",
+    "filename": "doxygen-1.14.0.linux.bin.tar.gz",
+    "archive_root": "doxygen-1.14.0",
+    "url": "https://github.com/doxygen/doxygen/releases/download/Release_1_14_0/doxygen-1.14.0.linux.bin.tar.gz",
+    "sha256": "e5d6ae24d0bf3f0cdc4d8f146726b89ca323922f19441af99b1872d503665ad6",
+    "size": 77914826
+  }
+}

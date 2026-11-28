@@ -132,10 +132,54 @@
       }
     },
     {
+      "name": "native-debug",
+      "displayName": "Native Debug",
+      "inherits": "debug"
+    },
+    {
+      "name": "native-release",
+      "displayName": "Native Release",
+      "inherits": "host-validation",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "native-asan",
+      "displayName": "Native ASan and UBSan",
+      "inherits": "asan"
+    },
+    {
+      "name": "native-tsan",
+      "displayName": "Native TSan",
+      "inherits": "gcc-validation",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread"
+      }
+    },
+    {
       "name": "boot",
       "inherits": "bounded",
       "cacheVariables": {
         "XGL_PROFILE": "boot"
+      }
+    },
+    {
+      "name": "boot-small",
+      "displayName": "Boot Small",
+      "description": "Boot with one window slot and fixed RTO",
+      "inherits": "boot",
+      "cacheVariables": {
+        "XGL_RELIABLE_INDEX_BUCKETS": "1",
+        "XGL_TRANSPORT_WINDOW_CAPACITY": "1",
+        "XGL_ENABLE_ADAPTIVE_RTO": "OFF"
       }
     },
     {
@@ -165,12 +209,10 @@
       "name": "boot-small-host-test",
       "displayName": "Boot Small host regression",
       "description": "Native GoogleTest regression with one window slot and fixed RTO",
-      "inherits": "boot-host-test",
-      "cacheVariables": {
-        "XGL_RELIABLE_INDEX_BUCKETS": "1",
-        "XGL_TRANSPORT_WINDOW_CAPACITY": "1",
-        "XGL_ENABLE_ADAPTIVE_RTO": "OFF"
-      }
+      "inherits": [
+        "bounded-host-validation",
+        "boot-small"
+      ]
     },
     {
       "name": "embedded-lite-host-test",
@@ -235,8 +277,33 @@
       "description": "Build with AddressSanitizer"
     },
     {
+      "name": "native-debug",
+      "configurePreset": "native-debug"
+    },
+    {
+      "name": "native-release",
+      "configurePreset": "native-release"
+    },
+    {
+      "name": "native-asan",
+      "configurePreset": "native-asan"
+    },
+    {
+      "name": "native-tsan",
+      "configurePreset": "native-tsan",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
       "name": "boot",
       "configurePreset": "boot"
+    },
+    {
+      "name": "boot-small",
+      "configurePreset": "boot-small"
     },
     {
       "name": "embedded-lite",
@@ -314,6 +381,31 @@
       "displayName": "Run ASan Tests",
       "description": "Run tests with AddressSanitizer",
       "inherits": "test-results"
+    },
+    {
+      "name": "native-debug",
+      "configurePreset": "native-debug",
+      "inherits": "test-results"
+    },
+    {
+      "name": "native-release",
+      "configurePreset": "native-release",
+      "inherits": "test-results"
+    },
+    {
+      "name": "native-asan",
+      "configurePreset": "native-asan",
+      "inherits": "test-results"
+    },
+    {
+      "name": "native-tsan",
+      "configurePreset": "native-tsan",
+      "inherits": "test-results",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     },
     {
       "name": "boot-host-test",

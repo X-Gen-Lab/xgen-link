@@ -1,3 +1,10 @@
+---
+id: explanation/architecture
+type: explanation
+audience: user
+source_language: zh_CN
+---
+
 # 架构
 
 XGen Link 是独立 C11 协议库，负责线上编码、链路处理与可靠状态。协议所需的固定池、队列、位图、字节编码及 CRC 随生产库构建。应用负责时钟、执行上下文、PHY 驱动与可信密钥建立。
@@ -16,14 +23,7 @@ XGen Link 是独立 C11 协议库，负责线上编码、链路处理与可靠�
 
 ## 发送与接收流程
 
-```mermaid
-flowchart LR
-    A[应用] --> T[Transport]
-    T --> N[Network]
-    N --> W[帧组合与认证]
-    W --> D[Datalink]
-    D --> P[同步 PHY]
-```
+![同步发送路径](../diagrams/send-receive.svg)
 
 接收按相反方向经过这些边界：每 PHY 的 parser 调用 wire 验证完整帧并生成借用视图，datalink 和 network 传递该视图；network 完成本地认证后，transport 才修改 peer 状态。完整帧 CRC 只计算一次。直接提交原始帧的内部入口仍先验证输入，不能冒充已验证视图。
 

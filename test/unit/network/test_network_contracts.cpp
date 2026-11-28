@@ -2,6 +2,9 @@
  * \file            test_network_contracts.cpp
  * \brief           Validated receive boundaries across protocol profiles
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <gtest/gtest.h>
@@ -93,4 +96,4 @@ TEST_F(XglNetworkContracts, ViewDeliveryReturnsUpperAcceptanceUnchanged) {
     EXPECT_EQ(xgl_network_receive_view(&network, nullptr, &view), XGL_OK);
 }
 
-}  // namespace
+} /* namespace */

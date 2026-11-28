@@ -1,0 +1,200 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: eb69f228ef937a2feb17c3fdda3ce8e60f7b82191876f57b542a272264037f24\n"
+
+#: docs/zh/guides/in-place-send.md:8
+msgid "零拷贝"
+msgstr "Zero-Copy"
+
+#: docs/zh/guides/in-place-send.md:10
+msgid "零拷贝发送 API 在调用者提供的可写存储中构造单帧非可靠消息，不引入异步缓冲所有权。"
+msgstr ""
+"The zero-copy send APIs build a single unreliable frame in caller-owned writable storage. They do not "
+"introduce asynchronous buffer ownership."
+
+#: docs/zh/guides/in-place-send.md:12
+msgid "支持范围"
+msgstr "Supported Scope"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "API"
+msgstr "API"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "作用域与用途"
+msgstr "Scope and purpose"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "`xgl_send_zerocopy_at()`"
+msgstr "`xgl_send_zerocopy_at()`"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "保留原有描述符；connection ID 与 session epoch 均为零"
+msgstr "Legacy descriptor; connection ID and session epoch are both zero"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "`xgl_send_zerocopy_scoped_at()`"
+msgstr "`xgl_send_zerocopy_scoped_at()`"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "通过 `xgl_tx_zerocopy_request_t` 指定 connection ID 与 session epoch"
+msgstr "`xgl_tx_zerocopy_request_t` selects an explicit connection ID and session epoch"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "`xgl_send_zerocopy_layout()`"
+msgstr "`xgl_send_zerocopy_layout()`"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "查询指定作用域请求的精确载荷偏移与完整帧大小"
+msgstr "Queries the exact payload offset and complete frame size for the scoped request"
+
+#: docs/zh/guides/in-place-send.md:20
+msgid ""
+"两个发送 API 均只支持单帧非可靠发送。`reliable=true` 返回 `XGL_ERR_INVALID_PARAM`，`timeout_ms` 不参与处理。可靠发送使用 "
+"`xgl_send_at()`。认证发送要求已为选定的目标、connection ID 与 session epoch 安装可信会话。"
+msgstr ""
+"Both send APIs support only single-frame, unreliable transmission. `reliable=true` is rejected with "
+"`XGL_ERR_INVALID_PARAM`, and `timeout_ms` is ignored. Use `xgl_send_at()` for reliable DATA. "
+"Authenticated sending requires a trusted session installed for the selected target, connection ID and "
+"session epoch."
+
+#: docs/zh/guides/in-place-send.md:22
+msgid "缓冲布局"
+msgstr "Buffer Layout"
+
+#: docs/zh/guides/in-place-send.md:24
+msgid "载荷前预留精确头部空间，载荷后预留尾部空间："
+msgstr "Reserve exact headroom before the payload and trailer capacity after it:"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "部分"
+msgstr "Part"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "字节数"
+msgstr "Bytes"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "基础头"
+msgstr "Base header"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "`XGL_FRAME_HEADER_SIZE`（24）"
+msgstr "`XGL_FRAME_HEADER_SIZE` (24)"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "非零 data type"
+msgstr "Nonzero data type"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "`XGL_DATA_TYPE_EXT_SIZE`（3）"
+msgstr "`XGL_DATA_TYPE_EXT_SIZE` (3)"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "非零 session epoch"
+msgstr "Nonzero session epoch"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "`XGL_SESSION_EXT_SIZE`（14）"
+msgstr "`XGL_SESSION_EXT_SIZE` (14)"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "启用认证时的 security extension"
+msgstr "Authentication security extension, if enabled"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "15"
+msgstr "15"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "启用认证时的 tag"
+msgstr "Authentication tag, if enabled"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "Provider tag 长度"
+msgstr "Provider tag length"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "末尾 CRC"
+msgstr "Final CRC"
+
+#: docs/zh/guides/in-place-send.md:0
+msgid "`XGL_CRC16_SIZE`（2）"
+msgstr "`XGL_CRC16_SIZE` (2)"
+
+#: docs/zh/guides/in-place-send.md:35
+msgid ""
+"Connection ID 位于基础头中，不增加扩展字节。应用通过 `xgl_send_zerocopy_layout()` 获取布局，避免自行重复计算。`data_offset` 必须等于 "
+"`layout.payload_offset`，`buffer_size` 必须覆盖 `layout.frame_size`。完整帧同时满足路由 MTU 和实例帧长限制。协议写入头部与尾部，载荷地址保持不变。"
+msgstr ""
+"The connection ID is carried in the base header and adds no extension bytes. Obtain the layout from "
+"`xgl_send_zerocopy_layout()` instead of duplicating these calculations in application code. "
+"`data_offset` must equal `layout.payload_offset`, and `buffer_size` must cover `layout.frame_size`. The "
+"complete frame must fit both the route MTU and the instance frame limit. The stack writes the header and"
+" trailer; the payload remains at its original address."
+
+#: docs/zh/guides/in-place-send.md:37
+msgid "规划并发送"
+msgstr "Plan and Send"
+
+#: docs/zh/guides/in-place-send.md:39
+msgid "下面的 C11 示例要求实例已初始化并配置到节点 2 的路由。如果要求认证，应先安装对应的可信会话，再查询布局。"
+msgstr ""
+"The following C11 example assumes an initialized instance with a route to node 2. If authentication is "
+"required, install the corresponding trusted session before querying the layout."
+
+#: docs/zh/guides/in-place-send.md:72
+msgid ""
+"查询忽略 `buffer`、`buffer_size` 和 `data_offset`，但 `data_len` 必须非零。失败时输出布局清零。查询不分配内存、不调用安全 provider 或 "
+"PHY、不更新发送统计，也不消耗安全序号。查询成功不预留资源，实际发送仍会重新检查当前路由、容量与安全状态。"
+msgstr ""
+"The query ignores `buffer`, `buffer_size` and `data_offset`; `data_len` must be nonzero. It clears the "
+"output layout on failure. It does not allocate, call the security provider or PHY, update transmission "
+"statistics, or consume a security sequence. A successful query reserves no resources. The eventual send "
+"revalidates the current route, limits and security state."
+
+#: docs/zh/guides/in-place-send.md:74
+msgid "所有权"
+msgstr "Ownership"
+
+#: docs/zh/guides/in-place-send.md:76
+msgid ""
+"任一发送 API 返回后，调用者即可复用存储。所有回调均同步借用缓冲区；即使使用 DMA，PHY TX 返回前也必须完成读取或复制。此接口减少组帧复制，驱动仍可能需要复制到自有 DMA "
+"缓冲。不得保存借用指针，也不得传入只读存储。"
+msgstr ""
+"The caller may reuse storage after either send API returns. All callbacks borrow it synchronously. PHY "
+"TX must finish reading or copying it before returning, even when backed by DMA. This interface reduces "
+"frame assembly copies; a driver's private DMA copy may still be necessary. Do not retain borrowed "
+"pointers or pass immutable storage."
+
+#: docs/zh/guides/in-place-send.md:78
+msgid "失败处理"
+msgstr "Failure Handling"
+
+#: docs/zh/guides/in-place-send.md:80
+msgid ""
+"检查返回值。本地成功不能证明远端交付，失败也可能已经修改头部与尾部。认证发送一旦预留安全序号，后续 provider 或 PHY 失败不会回退该序号；重试应再次调用 "
+"API，不能重放之前序列化的帧。详见[安全机制](../reference/protocol/v1/security.md)。"
+msgstr ""
+"Check the returned status. A local success is not evidence of remote delivery. A failure can leave the "
+"header and trailer modified. Once an authenticated send reserves a security sequence, later provider or "
+"PHY failure does not roll it back; retry through the API instead of replaying the previously serialized "
+"bytes. See [Security](../reference/protocol/v1/security.md)."
+
+#: docs/zh/guides/in-place-send.md:82
+msgid ""
+"调用、查询与重试均遵循实例串行化规则。布局查询和基础描述符校验阶段的拒绝不构成发送尝试；进入统一 network "
+"发送路径后的错误按[统计契约](../reference/statistics.md)计数，不能只凭返回错误码判断失败阶段。"
+msgstr ""
+"Calls, queries and retries must follow the instance's serialization rules. A layout query or rejection "
+"during basic descriptor validation is not a transmission attempt. Errors after entering the common "
+"network send path are counted according to the [statistics contract](../reference/statistics.md); the "
+"returned error code alone does not identify which validation stage failed."

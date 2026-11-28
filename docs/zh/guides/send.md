@@ -1,3 +1,10 @@
+---
+id: guides/send
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 发送 API
 
 使用 `xgl_send_at(handle, &tx, now_ms)`，时间源与 `xgl_step()` 的单调毫秒时间一致。返回成功表示本地接纳，不代表远端应用已完成处理。

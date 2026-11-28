@@ -9,15 +9,29 @@ list(LENGTH sdk_includes sdk_include_count)
 if(NOT sdk_include_count EQUAL 1)
     message(FATAL_ERROR "Expected exactly one public include directory")
 endif()
-file(GLOB installed_headers RELATIVE "${sdk_includes}/xgl" "${sdk_includes}/xgl/*")
+file(
+    GLOB installed_headers
+    RELATIVE "${sdk_includes}/xgl"
+    "${sdk_includes}/xgl/*"
+)
 list(SORT installed_headers)
-if(NOT installed_headers STREQUAL "xgl.h;xgl_build_config.h;xgl_config.h;xgl_error.h;xgl_types.h")
-    message(FATAL_ERROR "Unexpected installed SDK header set: ${installed_headers}")
+if(
+    NOT installed_headers
+        STREQUAL
+        "xgl.h;xgl_build_config.h;xgl_config.h;xgl_error.h;xgl_types.h"
+)
+    message(
+        FATAL_ERROR
+        "Unexpected installed SDK header set: ${installed_headers}"
+    )
 endif()
 
 add_executable(xgl_consumer main.c)
 target_link_libraries(xgl_consumer PRIVATE xgl::xgl)
 add_executable(xgl_public_api_consumer public_api.c)
 target_link_libraries(xgl_public_api_consumer PRIVATE xgl::xgl)
-set_target_properties(xgl_consumer xgl_public_api_consumer PROPERTIES
-    C_STANDARD 11 C_STANDARD_REQUIRED YES C_EXTENSIONS NO)
+set_target_properties(
+    xgl_consumer
+    xgl_public_api_consumer
+    PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED YES C_EXTENSIONS NO
+)

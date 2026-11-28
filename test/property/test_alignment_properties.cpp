@@ -2,6 +2,9 @@
  * \file            test_alignment_properties.cpp
  * \brief           Protocol frame roundtrips from unaligned byte spans
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-03-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <wire/xgl_frame.h>

@@ -2,6 +2,9 @@
  * \file            test_wire_sack_view.cpp
  * \brief           Checked borrowed SACK values
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <wire/xgl_wire.h>

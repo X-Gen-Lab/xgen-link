@@ -1,4 +1,5 @@
-set(XGL_CONFIG_ABI_VERSION ${PROJECT_VERSION_MAJOR})
+# Configuration layout compatibility is independent of the SDK release number.
+set(XGL_CONFIG_ABI_VERSION 5)
 set(XGL_PROFILES boot embedded-lite embedded full)
 set(XGL_PROFILE "full" CACHE STRING "Compiled protocol profile")
 set_property(CACHE XGL_PROFILE PROPERTY STRINGS ${XGL_PROFILES})
@@ -50,14 +51,38 @@ else()
 endif()
 
 # These sequences are also the digit order in the SDK resource ID.
-set(XGL_BUCKET_COUNTS 1 2 4 8 16 32)
-set(XGL_WINDOW_CAPACITIES 1 8 16 32 64 128)
+set(XGL_BUCKET_COUNTS
+    1
+    2
+    4
+    8
+    16
+    32
+)
+set(XGL_WINDOW_CAPACITIES
+    1
+    8
+    16
+    32
+    64
+    128
+)
 set(XGL_RX_CHUNK_SIZES 16 32 64 128)
 
-function(xgl_resolve_capacity option_name resolved_name default_value allowed_values description)
+function(
+    xgl_resolve_capacity
+    option_name
+    resolved_name
+    default_value
+    allowed_values
+    description
+)
     string(JOIN ", " choices AUTO ${${allowed_values}})
     set(${option_name} "AUTO" CACHE STRING "${description} (${choices})")
-    set_property(CACHE ${option_name} PROPERTY STRINGS AUTO ${${allowed_values}})
+    set_property(
+        CACHE ${option_name}
+        PROPERTY STRINGS AUTO ${${allowed_values}}
+    )
     set(selected "${${option_name}}")
     if(selected STREQUAL "AUTO")
         set(selected "${default_value}")
@@ -68,19 +93,29 @@ function(xgl_resolve_capacity option_name resolved_name default_value allowed_va
 endfunction()
 
 xgl_resolve_capacity(XGL_DATALINK_RX_CHUNK_SIZE XGL_BUILD_RX_CHUNK_SIZE
-    "${XGL_DEFAULT_RX_CHUNK_SIZE}" XGL_RX_CHUNK_SIZES "Temporary PHY read buffer bytes")
+    "${XGL_DEFAULT_RX_CHUNK_SIZE}" XGL_RX_CHUNK_SIZES "Temporary PHY read buffer bytes"
+)
 xgl_resolve_capacity(XGL_RELIABLE_INDEX_BUCKETS XGL_RELIABLE_BUCKET_COUNT
-    "${XGL_DEFAULT_BUCKET_COUNT}" XGL_BUCKET_COUNTS "Reliable index buckets per peer")
+    "${XGL_DEFAULT_BUCKET_COUNT}" XGL_BUCKET_COUNTS "Reliable index buckets per peer"
+)
 xgl_resolve_capacity(XGL_TRANSPORT_WINDOW_CAPACITY XGL_BUILD_WINDOW_CAPACITY
-    "${XGL_DEFAULT_WINDOW_CAPACITY}" XGL_WINDOW_CAPACITIES "Compiled private window capacity")
+    "${XGL_DEFAULT_WINDOW_CAPACITY}" XGL_WINDOW_CAPACITIES "Compiled private window capacity"
+)
 
-set(XGL_DATALINK_MAX_FRAME_SIZE "${XGL_DEFAULT_MAX_FRAME_SIZE}" CACHE STRING
-    "Maximum complete serialized frame size in bytes")
-if(NOT XGL_DATALINK_MAX_FRAME_SIZE MATCHES "^[1-9][0-9]*$" OR
-   XGL_DATALINK_MAX_FRAME_SIZE LESS 64 OR
-   XGL_DATALINK_MAX_FRAME_SIZE GREATER XGL_DEFAULT_MAX_FRAME_SIZE)
-    message(FATAL_ERROR
-        "XGL_DATALINK_MAX_FRAME_SIZE must be a decimal integer from 64 to ${XGL_DEFAULT_MAX_FRAME_SIZE}")
+set(XGL_DATALINK_MAX_FRAME_SIZE
+    "${XGL_DEFAULT_MAX_FRAME_SIZE}"
+    CACHE STRING
+    "Maximum complete serialized frame size in bytes"
+)
+if(
+    NOT XGL_DATALINK_MAX_FRAME_SIZE MATCHES "^[1-9][0-9]*$"
+    OR XGL_DATALINK_MAX_FRAME_SIZE LESS 64
+    OR XGL_DATALINK_MAX_FRAME_SIZE GREATER XGL_DEFAULT_MAX_FRAME_SIZE
+)
+    message(
+        FATAL_ERROR
+        "XGL_DATALINK_MAX_FRAME_SIZE must be a decimal integer from 64 to ${XGL_DEFAULT_MAX_FRAME_SIZE}"
+    )
 endif()
 
 function(xgl_resolve_switch option_name resolved_name default_value description)
@@ -96,21 +131,36 @@ function(xgl_resolve_switch option_name resolved_name default_value description)
 endfunction()
 
 xgl_resolve_switch(XGL_ENABLE_ADAPTIVE_RTO XGL_FEATURE_ADAPTIVE_RTO
-    "${XGL_DEFAULT_ADAPTIVE_RTO}" "Include per-peer RTT estimator state and sampling")
+    "${XGL_DEFAULT_ADAPTIVE_RTO}" "Include per-peer RTT estimator state and sampling"
+)
 xgl_resolve_switch(XGL_ENABLE_ADVANCED_RUNTIME XGL_FEATURE_ADVANCED_RUNTIME
-    "${XGL_DEFAULT_ADVANCED_RUNTIME}" "Enable explicit runtime limits, scoped callbacks and resource observation")
+    "${XGL_DEFAULT_ADVANCED_RUNTIME}" "Enable explicit runtime limits, scoped callbacks and resource observation"
+)
 
-option(XGL_ALLOW_FALLBACK_MALLOC "Allow instance creation to select the explicit libc allocator backend"
-    "${XGL_DEFAULT_FALLBACK_MALLOC}")
+option(
+    XGL_ALLOW_FALLBACK_MALLOC
+    "Allow instance creation to select the explicit libc allocator backend"
+    "${XGL_DEFAULT_FALLBACK_MALLOC}"
+)
 if(XGL_PROFILE STREQUAL "boot" AND XGL_ALLOW_FALLBACK_MALLOC)
-    message(FATAL_ERROR "The boot profile requires XGL_ALLOW_FALLBACK_MALLOC=OFF")
+    message(
+        FATAL_ERROR
+        "The boot profile requires XGL_ALLOW_FALLBACK_MALLOC=OFF"
+    )
 endif()
 
 set(XGL_CAPABILITIES wire reliable)
 if(XGL_FEATURE_AUTH)
     list(APPEND XGL_CAPABILITIES authentication)
 endif()
-foreach(capability FORWARDING OUT_OF_ORDER STATISTICS DIAGNOSTICS ADVANCED_RUNTIME)
+foreach(
+    capability
+    FORWARDING
+    OUT_OF_ORDER
+    STATISTICS
+    DIAGNOSTICS
+    ADVANCED_RUNTIME
+)
     if(XGL_FEATURE_${capability})
         string(TOLOWER "${capability}" capability_name)
         list(APPEND XGL_CAPABILITIES "${capability_name}")
@@ -129,24 +179,37 @@ function(xgl_finalize_build_config generated_dir)
         set(heap_code 0)
     endif()
     math(EXPR profile_code "${XGL_PROFILE_CONFIG_ID} - 300")
-    math(EXPR XGL_RESOURCE_CONFIG_ID
-        "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * (${heap_code} + 2 * ${XGL_FEATURE_ADVANCED_RUNTIME})))))")
+    math(
+        EXPR
+        XGL_RESOURCE_CONFIG_ID
+        "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * (${heap_code} + 2 * ${XGL_FEATURE_ADVANCED_RUNTIME})))))"
+    )
     # Preserve the existing low 14 bits and all identities at the default ceiling.
-    math(EXPR XGL_RESOURCE_CONFIG_ID
-        "${XGL_RESOURCE_CONFIG_ID} + 16384 * (${XGL_DEFAULT_MAX_FRAME_SIZE} - ${XGL_DATALINK_MAX_FRAME_SIZE})")
+    math(
+        EXPR
+        XGL_RESOURCE_CONFIG_ID
+        "${XGL_RESOURCE_CONFIG_ID} + 16384 * (${XGL_DEFAULT_MAX_FRAME_SIZE} - ${XGL_DATALINK_MAX_FRAME_SIZE})"
+    )
 
     set(XGL_BUILD_CONFIG_ID "${XGL_PROFILE_CONFIG_ID}")
-    if(NOT (XGL_RELIABLE_BUCKET_COUNT EQUAL XGL_DEFAULT_BUCKET_COUNT AND
-            XGL_BUILD_WINDOW_CAPACITY EQUAL XGL_DEFAULT_WINDOW_CAPACITY AND
-            XGL_FEATURE_ADAPTIVE_RTO EQUAL XGL_DEFAULT_ADAPTIVE_RTO AND
-            XGL_BUILD_RX_CHUNK_SIZE EQUAL XGL_DEFAULT_RX_CHUNK_SIZE AND
-            heap_code EQUAL XGL_DEFAULT_FALLBACK_MALLOC AND
-            XGL_FEATURE_ADVANCED_RUNTIME EQUAL XGL_DEFAULT_ADVANCED_RUNTIME AND
-            XGL_DATALINK_MAX_FRAME_SIZE EQUAL XGL_DEFAULT_MAX_FRAME_SIZE))
+    if(
+        NOT (
+            XGL_RELIABLE_BUCKET_COUNT EQUAL XGL_DEFAULT_BUCKET_COUNT
+            AND XGL_BUILD_WINDOW_CAPACITY EQUAL XGL_DEFAULT_WINDOW_CAPACITY
+            AND XGL_FEATURE_ADAPTIVE_RTO EQUAL XGL_DEFAULT_ADAPTIVE_RTO
+            AND XGL_BUILD_RX_CHUNK_SIZE EQUAL XGL_DEFAULT_RX_CHUNK_SIZE
+            AND heap_code EQUAL XGL_DEFAULT_FALLBACK_MALLOC
+            AND XGL_FEATURE_ADVANCED_RUNTIME EQUAL XGL_DEFAULT_ADVANCED_RUNTIME
+            AND XGL_DATALINK_MAX_FRAME_SIZE EQUAL XGL_DEFAULT_MAX_FRAME_SIZE
+        )
+    )
         math(EXPR XGL_BUILD_CONFIG_ID "65536 + ${XGL_RESOURCE_CONFIG_ID}")
     endif()
-    configure_file("${CMAKE_CURRENT_FUNCTION_LIST_DIR}/templates/xgl_build_config.h.in"
-        "${generated_dir}/xgl/xgl_build_config.h" @ONLY)
+    configure_file(
+        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/templates/xgl_build_config.h.in"
+        "${generated_dir}/xgl/xgl_build_config.h"
+        @ONLY
+    )
     set(XGL_RESOURCE_CONFIG_ID "${XGL_RESOURCE_CONFIG_ID}" PARENT_SCOPE)
     set(XGL_BUILD_CONFIG_ID "${XGL_BUILD_CONFIG_ID}" PARENT_SCOPE)
 endfunction()

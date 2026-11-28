@@ -1,7 +1,8 @@
 # Export only the public protocol SDK; private headers stay with their owners.
 include(CMakePackageConfigHelpers)
 
-install(TARGETS xgl
+install(
+    TARGETS xgl
     EXPORT xglTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -15,13 +16,14 @@ set(XGL_PUBLIC_HEADERS
     include/xgl/xgl_types.h
 )
 
-install(FILES ${XGL_PUBLIC_HEADERS}
+install(FILES ${XGL_PUBLIC_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xgl)
+install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/xgl/xgl_build_config.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xgl
 )
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/xgl/xgl_build_config.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xgl)
 
-install(EXPORT xglTargets
+install(
+    EXPORT xglTargets
     FILE xglTargets.cmake
     NAMESPACE xgl::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/xgl
@@ -39,8 +41,9 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/xglConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/xglConfigVersion.cmake
+install(
+    FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/xglConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/xglConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/xgl
 )

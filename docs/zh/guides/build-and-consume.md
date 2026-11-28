@@ -1,3 +1,10 @@
+---
+id: guides/build-and-consume
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 构建与消费
 
 生产库由 C11 编译器和 CMake 3.24 或以上构建。从 xgen-link 仓库根目录执行下列命令。默认构建只生成静态库和匹配的配置头。
@@ -15,7 +22,7 @@ cmake --install build/production --prefix "$PWD/build/sdk"
 从源代码装配时，父工程先确定工具链和所需的 [编译档位](../reference/profiles.md)，再调用 `add_subdirectory(path/to/xgen-link)`。安装消费使用以下入口。两种入口均提供 `xgl::xgl`。
 
 ```cmake
-find_package(xgl 5 CONFIG REQUIRED COMPONENTS wire reliable)
+find_package(xgl 0.0.1 CONFIG REQUIRED COMPONENTS wire reliable)
 target_link_libraries(my_application PRIVATE xgl::xgl)
 ```
 
@@ -38,12 +45,13 @@ cmake --build build/boot-small
 
 ## 主机验证
 
-显式准备包含 GoogleMock 的 GoogleTest 1.16.0，并使用新的原生构建目录。配置阶段使用已有工具和安装包。
+显式准备包含 GoogleMock 的 GoogleTest 1.16.0。`prepare` 输出与当前编译器相符的 `GTest_DIR` 路径，配置消费已安装包。也可提供同版本、同工具链的独立安装。
 
 ```sh
-cmake --preset gcc-test -DGTest_DIR=/path/to/gtest/lib/cmake/GTest
-cmake --build --preset gcc-test
-ctest --preset gcc-test --no-tests=error
+python tools/dev/dev.py prepare --scope host --allow-network
+python tools/dev/dev.py configure --preset native-debug --gtest-dir /path/to/lib/cmake/GTest
+python tools/dev/dev.py build --preset native-debug
+python tools/dev/dev.py test --preset native-debug
 ```
 
 使用 `boot-host-test`、`embedded-lite-host-test` 或 `embedded-host-test` 验证对应能力。C11 示例、无堆检查、文档及发布验证各自显式开启。完整验证流程见[开发工作流](../development/workflow.md)。

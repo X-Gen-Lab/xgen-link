@@ -2,9 +2,14 @@
  * \file            mock_phy.cpp
  * \brief           Physical layer mock implementation
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "mock_phy.h"
+
+#include <cstddef>
 
 /* Thread-local storage for current mock instance */
 thread_local MockPhy* MockPhy::current_instance_ = nullptr;
@@ -49,7 +54,8 @@ xgl_error_t MockPhy::rx_wrapper(uint8_t* buffer, size_t* len, void* user_data) {
         size_t copy_len = std::min(*len, instance->rx_queue_.size());
         std::memcpy(buffer, instance->rx_queue_.data(), copy_len);
         instance->rx_queue_.erase(instance->rx_queue_.begin(),
-                                  instance->rx_queue_.begin() + copy_len);
+                                  instance->rx_queue_.begin() +
+                                      static_cast<std::ptrdiff_t>(copy_len));
         *len = copy_len;
         return XGL_OK;
     }

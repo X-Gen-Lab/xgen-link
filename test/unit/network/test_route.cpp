@@ -2,6 +2,9 @@
  * \file            test_route.cpp
  * \brief           Route table unit tests
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -167,7 +170,7 @@ TEST_F(XglRouteTest, AddDuplicateRouteUpdates) {
         xgl_route_table_add(&route_table, TARGET_ID_1, &phy_ops, 512, 200, 2);
 
     EXPECT_EQ(err, XGL_OK);
-    EXPECT_EQ(route_table.route_count, 1);  // Should not increase
+    EXPECT_EQ(route_table.route_count, 1); /* Should not increase */
 
     /* Verify updated values */
     xgl_route_item_t* route = xgl_route_table_lookup(&route_table, TARGET_ID_1);

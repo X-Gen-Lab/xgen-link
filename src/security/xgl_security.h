@@ -1,6 +1,7 @@
 /**
  * \file            xgl_security.h
  * \brief           Security helpers for authenticated production transport
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_SECURITY_H

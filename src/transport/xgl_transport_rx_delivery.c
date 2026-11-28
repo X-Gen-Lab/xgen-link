@@ -1,19 +1,18 @@
 /**
  * \file            xgl_transport_rx_delivery.c
  * \brief           Application admission for received DATA
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-17
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "xgl_transport_rx_internal.h"
 
 /**
  * \brief           Offer borrowed payload bytes to the application
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       source_id: Remote node ID
- * \param[in]       data_type: Application message type
- * \param[in]       data: Borrowed payload bytes
- * \param[in]       len: Payload size
- * \return          Application admission result
+ * \details         Return the application admission result before changing
+ *                  receive state.
  */
 static xgl_error_t transport_accept_payload(
 #if XGL_FEATURE_ADVANCED_RUNTIME
@@ -54,12 +53,6 @@ static xgl_error_t transport_accept_payload(
 
 /**
  * \brief           Offer packet payload to the application
- * \param[in,out]   ctx: Transport layer context
- * \param[in]       handle: Protocol instance handle
- * \param[in]       packet: Packet metadata
- * \param[in]       data: Borrowed payload bytes
- * \param[in]       data_len: Payload size
- * \return          XGL_OK after application admission
  */
 xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,

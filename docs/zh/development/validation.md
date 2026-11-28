@@ -1,3 +1,10 @@
+---
+id: development/validation
+type: how-to
+audience: maintainer
+source_language: zh_CN
+---
+
 # 验证
 
 ## 协议覆盖
@@ -43,6 +50,8 @@ python test/cmake/run_ctest.py --build-dir build/ci --config Debug
 
 使用 `boot-small-host-test` 的配置、构建和测试 preset 验证单窗口槽与固定 RTO。`asan` preset 会让 AddressSanitizer 和 UndefinedBehaviorSanitizer 的诊断使测试失败。SDK 冒烟测试也会将两个独立消费者链接到经过插桩的库并运行。记录实际执行的 profile、编译器和 sanitizer。GoogleTest 依赖见 `test/CMakeLists.txt`。
 
+同时保留每个配置的 `compile_commands.json`。静态分析使用当前生产翻译单元、生成头与编译标志。Windows、macOS、GCC 覆盖率、Native Release 和 TSan 的执行范围按 CI 对应任务核对。资源变更使用真实 ARM 编译链接及目标 map 复核，见下节。
+
 ## 资源和产品验收
 
 用产品目标工具链、最终链接 map 和实际应用配置测量固件。比较时保持档位、帧与接收缓冲大小和优化选项一致。记录 Flash、workspace、静态 RAM 和栈空间，再在板上核对驱动缓冲、ISR 嵌套及栈峰值。
@@ -51,4 +60,4 @@ python test/cmake/run_ctest.py --build-dir build/ci --config Debug
 
 ## 历史证据
 
-SDK 3 分支的[实施记录](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_STATUS.md)、[重构计划](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_PLAN.md)、[架构决策](https://github.com/X-Gen-Lab/xgen-link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/adr)和[验证证据](https://github.com/X-Gen-Lab/xgen-link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/validation)保存在固定提交。阅读历史数据时同时核对报告中实际受测的源码身份和构建配置。
+开发分支的[实施记录](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_STATUS.md)、[重构计划](https://github.com/X-Gen-Lab/xgen-link/blob/f09efca25abe84c344ce8c41d5645006c7b61df9/REFACTORING_PLAN.md)、[架构决策](https://github.com/X-Gen-Lab/xgen-link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/adr)和[验证证据](https://github.com/X-Gen-Lab/xgen-link/tree/f09efca25abe84c344ce8c41d5645006c7b61df9/design/validation)保存在固定提交。阅读历史数据时同时核对报告中实际受测的源码身份和构建配置。

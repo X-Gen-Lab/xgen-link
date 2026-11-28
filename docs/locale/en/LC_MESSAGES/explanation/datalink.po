@@ -1,0 +1,155 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 10b6d69b5646b2809d842019bfc3c76ae5d06fab580fda791ac4e34202c90dd0\n"
+
+#: docs/zh/explanation/datalink.md:8
+msgid "数据链路"
+msgstr "Datalink"
+
+#: docs/zh/explanation/datalink.md:10
+msgid "Datalink 隔离 PHY 字节 I/O 与协议包，不持有可靠性、peer 身份或可信会话状态。"
+msgstr ""
+"Datalink separates PHY byte I/O from protocol packets. It does not own reliability, peer identity or "
+"trusted sessions."
+
+#: docs/zh/explanation/datalink.md:12
+msgid "接收组帧"
+msgstr "Receive Framing"
+
+#: docs/zh/explanation/datalink.md:14
+msgid ""
+"PHY 收到的字节可能截断在帧头或帧内，也可能包含多个帧。增量解析器保留有界的半帧状态，识别 magic/帧头布局，并向上提交完整帧。半帧仅在配置的接收缓冲区与帧超时限制内保留。错误长度、帧头 CRC "
+"和最终帧 CRC 在本地 transport 处理前拒绝。"
+msgstr ""
+"PHY receive bytes may end in the middle of a header or frame, or contain several frames. The incremental"
+" parser preserves bounded partial-frame state, detects the magic/header layout and submits complete "
+"frames upward. Truncated input is retained only within the configured receive buffer and frame timeout. "
+"Malformed lengths, header CRC and final frame CRC are rejected before local transport processing."
+
+#: docs/zh/explanation/datalink.md:16
+msgid ""
+"逐步流解析和完整帧解码共用规范 Wire 校验，对同一组帧头、扩展、长度与 CRC 规则给出一致判定。CRC 用于检测传输错误；本地 network 投递执行认证策略与验签。解码得到 AUTH "
+"标志不代表已经验签。"
+msgstr ""
+"Incremental stream parsing and complete-frame decoding share the canonical Wire checks for headers, "
+"extensions, lengths and CRCs. CRC detects transmission errors; authentication policy and verification "
+"are enforced at local network delivery. A decoded AUTH flag is not proof of verification."
+
+#: docs/zh/explanation/datalink.md:18
+msgid ""
+"固定头校验成功后，立即检查头、载荷及 CRC 的最小总长度是否能装入 parser cache；解析 SECURITY 扩展后，再检查认证标签所需的空间。超容量、格式或 CRC "
+"错误拒绝当前候选，并在保留的缓存中重新寻找 magic；末尾单个 `A5` 也会保留。恢复优先选择最早的完整有效帧，否则保留最早的可能半帧。正常接收不会因为载荷内出现 magic 而切换候选。"
+msgstr ""
+"Once the fixed header validates, the parser immediately checks that the header, payload and CRC minimum "
+"fits its cache. After decoding SECURITY, it checks the authentication trailer too. Capacity, format or "
+"CRC errors reject the current candidate and search retained bytes for magic, including a final single "
+"`A5`. Recovery prefers the earliest complete valid frame, otherwise retaining the earliest possible "
+"partial candidate. Magic inside a normally received payload does not preempt that frame."
+
+#: docs/zh/explanation/datalink.md:20
+msgid ""
+"私有 `xgl_datalink_consume_span()` 同步消费一段稳定的字节，支持任意帧边界和一段多帧。完整帧借用 parser cache "
+"向上交付，交付后仅消费该帧，并继续排空缓存中的后帧，无需等待新的 PHY 字节；末尾半帧留待后续输入。上层 BUSY 或认证拒绝不会触发载荷重新同步，也不延长借用指针的生命周期；返回值保留第一次交付错误。输入"
+" span 不得与 cache 重叠，不得在调用期间被 DMA 改写；函数不保存输入指针，也不自行读取 PHY 或检查超时。"
+msgstr ""
+"The private `xgl_datalink_consume_span()` synchronously consumes stable bytes across arbitrary frame "
+"boundaries, including several frames in one span. Completed views borrow the parser cache until delivery"
+" returns. Only that frame is consumed; subsequent cached frames drain without waiting for new PHY bytes,"
+" while a partial suffix remains buffered. Upper-layer BUSY or authentication rejection does not rescan "
+"the payload or extend the borrowed pointer lifetime; the function returns the first delivery error. "
+"Input must not overlap the cache or be modified by DMA during consumption. The function retains no input"
+" pointer, reads no PHY and does not check expiry itself."
+
+#: docs/zh/explanation/datalink.md:22
+msgid ""
+"私有 parser 调用方在 feed 返回 ERROR 后记录诊断、COMPLETE 后同步消费，然后调用 `xgl_parser_advance_view()` 直到 "
+"INCOMPLETE。`get_frame` 只返回当前帧的长度；reset 明确丢弃整个缓存。恢复扫描中的假候选不重复计入 CRC 错误。"
+msgstr ""
+"Private parser callers record an ERROR or synchronously consume a COMPLETE from feed, then call "
+"`xgl_parser_advance_view()` until INCOMPLETE. `get_frame` reports only the current frame length; reset "
+"explicitly discards the entire cache. False candidates found during recovery do not increment CRC "
+"diagnostics again."
+
+#: docs/zh/explanation/datalink.md:24
+msgid ""
+"`A5 A5 5A` 中第二个 `A5` 成为新候选起点，并记录它的实际接收时间。头和载荷的正常推进不会延长期限；从缓存恢复的后缀保守继承原期限，可能提前过期。恢复复用既有缓存且不分配内存，但候选 CRC "
+"校验和多帧压缩最坏可有二次工作量；读取字节预算不代表严格的 CPU 周期预算。"
+msgstr ""
+"In `A5 A5 5A`, the second `A5` starts a new candidate with its actual receive timestamp. Normal header "
+"and payload progress never extends the deadline. Recovered suffixes conservatively inherit the original "
+"deadline and may expire early. Recovery reuses the existing cache without allocation, but candidate CRC "
+"checks and multiple frame compactions can require quadratic work in the worst case; a receive-byte "
+"budget is not a strict CPU-cycle budget."
+
+#: docs/zh/explanation/datalink.md:26
+msgid ""
+"`poll_parser` 负责超时和一次 PHY 读取，再交给同一个 span 入口。直接提交完整原始帧的入口调用 wire 解码器取得 view 与 CRC 状态，没有额外 metadata "
+"包装。这些均为私有实现接口；公开应用仍通过 `xgl_step` 驱动，不因此获得 ISR、异步 DMA 或零拷贝接收保证。"
+msgstr ""
+"`poll_parser` owns expiry and one PHY read before calling the same span entry. Direct complete-frame "
+"input obtains its view and CRC status from wire without an extra metadata wrapper. These are private "
+"implementation interfaces. Applications still drive `xgl_step`; this does not introduce an ISR API, "
+"asynchronous DMA ownership or a zero-copy receive guarantee."
+
+#: docs/zh/explanation/datalink.md:28
+msgid "同步发送契约"
+msgstr "Synchronous Transmit Contract"
+
+#: docs/zh/explanation/datalink.md:30
+msgid "PHY 发送回调返回前必须停止读取借用缓冲区。成功表示同步提交完成，失败返回协议调用方。Datalink 不为 DMA 完成事件保留指针，也不提供异步所有权 token。"
+msgstr ""
+"The PHY transmit callback must stop reading its borrowed buffer before returning. Success means the "
+"synchronous submission completed, and a failure is returned to the protocol caller. Datalink does not "
+"retain a pointer for DMA completion and does not provide an asynchronous ownership token."
+
+#: docs/zh/explanation/datalink.md:32
+msgid "DMA 驱动必须先复制到驱动自有存储再返回，或等待发送完成。协议 scratch 随后可以立即释放，用于 ACK/控制帧或下一帧。回调执行不得重入实例。"
+msgstr ""
+"A DMA driver must copy into driver-owned storage before return, or wait for completion. Protocol scratch"
+" can then be released immediately and is reusable for ACK/control or another frame. Callback execution "
+"cannot reenter the instance."
+
+#: docs/zh/explanation/datalink.md:34
+msgid "限制与调度"
+msgstr "Limits and Scheduling"
+
+#: docs/zh/explanation/datalink.md:36
+msgid ""
+"编译期帧长上限和配置的链路 MTU 都约束完整序列化帧，包括扩展、标签和 CRC。`xgl_step` 接收显式时间与接收工作预算。`xgl_next_timeout` 汇总链路轮询、parser 和 "
+"transport 期限；零 RX 预算或链路尚未到轮询时间时，仍检查半帧过期。存在且为零的延迟表示工作已到期。驱动通过就绪通知或轮询发现新接收字节。"
+msgstr ""
+"The compiled frame-size bound and configured link MTU both apply to the full serialized frame, including"
+" extensions, tag and CRC. `xgl_step` receives explicit time and a receive-work budget. "
+"`xgl_next_timeout` combines link polling, parser and transport deadlines. Partial-frame expiry is "
+"maintained even with zero RX budget or before the next PHY poll. An active zero delay means work is due "
+"now. Drivers supply readiness notifications or polling for newly arrived bytes."
+
+#: docs/zh/explanation/datalink.md:38
+msgid ""
+"构建选项 `XGL_DATALINK_RX_CHUNK_SIZE` 接受 `AUTO`、`16`、`32`、`64`、`128`；默认 `AUTO` 在 Boot 选择 32 字节，其余 profile 选择"
+" 128 字节。实际值写入安装的配置头，消费方不能通过不同的 `-D` 值改变已编译库。每次到期轮询最多读取 `min(rx_bytes, chunk)` 字节，仍只调用 PHY "
+"一次；减小运行期预算不会缩小编译期栈数组，减小 chunk 也不会改变 MTU 或持久 cache。"
+msgstr ""
+"The build option `XGL_DATALINK_RX_CHUNK_SIZE` accepts `AUTO`, `16`, `32`, `64` and `128`. The default "
+"`AUTO` selects 32 bytes for Boot and 128 for other profiles. The installed configuration header records "
+"the resolved value; consumer `-D` overrides cannot change an already compiled library. Each due poll "
+"reads at most `min(rx_bytes, chunk)` bytes in one PHY call. Reducing the runtime budget does not shrink "
+"the compiled stack array; reducing the chunk changes neither MTU nor persistent cache capacity."
+
+#: docs/zh/explanation/datalink.md:40
+msgid ""
+"产品应同时验证读取频率、驱动缓冲容量和整帧超时。例如每毫秒读取 32 字节的理想持续上限为 32,000 B/s，实际需留出调度与突发余量；更高吞吐可显式选择 64 或 128。资源数据和验收限制见 "
+"[Datalink 优化](datalink.md)。"
+msgstr ""
+"Products must validate polling rate, driver buffer capacity and total frame timeout together. Reading 32"
+" bytes every millisecond has an ideal continuous ceiling of 32,000 B/s, before scheduling and burst "
+"margin. Select 64 or 128 explicitly when needed. See [Datalink Optimization](datalink.md) for measured "
+"resources and validation limits."

@@ -2,6 +2,9 @@
  * \file            test_parser_recovery.cpp
  * \brief           Parser deadlines, bounded admission and view contracts
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <datalink/xgl_parser.h>
@@ -229,4 +232,4 @@ TEST_F(XglParserRecoveryTest, LegacyByteFeedKeepsValidationAndFrameAccess) {
     EXPECT_TRUE(std::equal(valid.begin(), valid.end(), bytes));
 }
 
-}  // namespace
+} /* namespace */

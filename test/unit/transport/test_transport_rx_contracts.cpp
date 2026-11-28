@@ -2,6 +2,9 @@
  * \file            test_transport_rx_contracts.cpp
  * \brief           Receive admission and acknowledgement failure contracts
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -48,7 +51,7 @@ class XglTransportRxContract : public ::testing::Test {
     }
 
     void SetUp() override {
-        lower = {this, Send};
+        lower = {this, Send, nullptr, nullptr};
         xgl_transport_config_t config = {};
         config.allocator = xgl_test_host_allocator();
         config.max_peers = 1U;
@@ -164,8 +167,7 @@ std::vector<uint8_t> MakeFrame(uint8_t type, bool reliable = false,
     parameters.source_id = 2U;
     parameters.target_id = target;
     parameters.packet_type = type;
-    parameters.reliable =
-        reliable ? XGL_RELIABILITY_ACK_ELICITING : XGL_RELIABILITY_NONE;
+    parameters.reliable = reliable;
     parameters.extensions = extensions.empty() ? nullptr : extensions.data();
     parameters.extensions_len = extensions.size();
     parameters.payload = payload.data();
@@ -194,7 +196,7 @@ void RefreshFrameCrc(std::vector<uint8_t>& encoded) {
                          xgl_crc16_modbus(encoded.data(), frame_crc));
 }
 
-}  // namespace
+} /* namespace */
 
 TEST(XglTransportRxWireContract, AcceptsVersionOneAndRejectsVersionThree) {
     PublicReceiver receiver;

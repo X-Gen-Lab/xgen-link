@@ -1,6 +1,7 @@
 /**
  * \file            xgl_allocator.h
  * \brief           Dispatch through an explicit XGL allocation service
+ * \author          X-Gen Lab
  */
 
 #ifndef XGL_ALLOCATOR_H

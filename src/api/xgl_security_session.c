@@ -2,6 +2,9 @@
  * \file            xgl_security_session.c
  * \brief           Explicit trusted security session lifecycle
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include <xgl/xgl.h>

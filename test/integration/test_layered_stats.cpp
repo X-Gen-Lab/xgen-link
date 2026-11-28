@@ -2,6 +2,9 @@
  * \file            test_layered_stats.cpp
  * \brief           Unit tests for layered statistics architecture
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-03-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -315,12 +318,12 @@ TEST_F(XglLayeredStatsTest, ErrorRatePerLayer) {
     stats.transport.tx_errors = 2;
 
     /* Calculate error rates */
-    double dl_error_rate =
-        (double)stats.datalink.tx_errors / stats.datalink.tx_packets;
-    double net_error_rate =
-        (double)stats.network.tx_errors / stats.network.tx_packets;
-    double trans_error_rate =
-        (double)stats.transport.tx_errors / stats.transport.tx_packets;
+    double dl_error_rate = static_cast<double>(stats.datalink.tx_errors) /
+                           static_cast<double>(stats.datalink.tx_packets);
+    double net_error_rate = static_cast<double>(stats.network.tx_errors) /
+                            static_cast<double>(stats.network.tx_packets);
+    double trans_error_rate = static_cast<double>(stats.transport.tx_errors) /
+                              static_cast<double>(stats.transport.tx_packets);
 
     EXPECT_NEAR(dl_error_rate, 0.05, 0.001);      /* 5% */
     EXPECT_NEAR(net_error_rate, 0.0316, 0.001);   /* ~3.16% */

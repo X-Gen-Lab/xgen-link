@@ -2,6 +2,9 @@
  * \file            xgl_window.c
  * \brief           Sliding Window Implementation
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-02-28
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "transport/xgl_window.h"

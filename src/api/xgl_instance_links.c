@@ -2,6 +2,9 @@
  * \file            xgl_instance_links.c
  * \brief           Per-PHY receive parser ownership and route polling intervals
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-01
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "internal/xgl_allocator.h"

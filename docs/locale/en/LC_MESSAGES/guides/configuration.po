@@ -1,0 +1,397 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 17aa1c0870d74e2288c20c7110528a5996dcf9664632c7aee1770906293e04aa\n"
+
+#: docs/zh/guides/configuration.md:8
+msgid "配置"
+msgstr "Configuration"
+
+#: docs/zh/guides/configuration.md:10
+msgid ""
+"先选择与编译 profile 匹配的预设，补充应用参数，再调用 `xgl_config_validate()` 和 "
+"`xgl_memory_requirements()`，最后准备存储。预设只是初始容量组合，不代表已测量的 MCU RAM 占用。"
+msgstr ""
+"Start with a preset compatible with the compiled profile, fill in application details, then call "
+"`xgl_config_validate()` and `xgl_memory_requirements()` before allocating storage. Presets are starting "
+"capacities, not measured MCU RAM guarantees."
+
+#: docs/zh/guides/configuration.md:12
+msgid ""
+"`xgl_config_get_default()` 在 Boot 档使用 Boot 预设；其余 profile 使用 Medium 模板，并将 `protocol.window_size` "
+"限制为已编译的窗口容量。具名预设和 `XGL_CONFIG_PRESET_*` 宏保留各自的固定模板，不会自动缩小窗口或其他容量。例如，窗口容量为一的构建可以使用默认配置，但 Tiny "
+"的窗口模板仍为二，需要显式调整后再校验。"
+msgstr ""
+"`xgl_config_get_default()` uses the Boot preset in a Boot build. Other profiles use the Medium template "
+"and limit `protocol.window_size` to the compiled window capacity. Named presets and "
+"`XGL_CONFIG_PRESET_*` macros retain their fixed templates without automatically reducing windows or "
+"other capacities. For example, a build with window capacity one can use the default configuration, while"
+" Tiny still has a window template of two and needs explicit adjustment before validation."
+
+#: docs/zh/guides/configuration.md:14
+msgid "生命周期和身份"
+msgstr "Lifetime and Identity"
+
+#: docs/zh/guides/configuration.md:16
+msgid ""
+"实例借用不可变的 `xgl_config_t`，直到 `xgl_destroy()`。其路由数组、PHY 描述符、分配器服务、认证 "
+"provider、名称和回调上下文也必须持续有效。创建后不得修改配置，也不能让配置与 workspace 重叠。"
+msgstr ""
+"The instance borrows the immutable `xgl_config_t` until `xgl_destroy()`. Keep its route array, PHY "
+"descriptors, allocator service, authentication provider, name, and callback contexts alive as well. Do "
+"not change configuration after creation or overlap it with the workspace."
+
+#: docs/zh/guides/configuration.md:18
+msgid ""
+"`source_id` 必须非零且不同于 `XGL_BROADCAST_ID`。路由决定可达目标。接收应用数据需要接收处理函数；`rx_accept_callback` 优先于返回 void 的旧式 "
+"`rx_callback`。"
+msgstr ""
+"Set a nonzero `source_id` other than `XGL_BROADCAST_ID`. Routes determine reachable destinations. A "
+"receive handler is needed to consume application data; `rx_accept_callback` takes precedence over the "
+"legacy void `rx_callback`."
+
+#: docs/zh/guides/configuration.md:20
+msgid "路由和帧"
+msgstr "Routes and Frames"
+
+#: docs/zh/guides/configuration.md:0
+msgid "字段"
+msgstr "Field"
+
+#: docs/zh/guides/configuration.md:0
+msgid "含义"
+msgstr "Meaning"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`target_id`"
+msgstr "`target_id`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "目标节点"
+msgstr "Destination node"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`phy`"
+msgstr "`phy`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "借用的同步 TX、非阻塞 RX 回调"
+msgstr "Borrowed synchronous TX and nonblocking RX callbacks"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`max_frame_size`"
+msgstr "`max_frame_size`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "此路由允许的完整序列化帧上限"
+msgstr "Complete serialized frame limit for this route"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`read_freq_hz`"
+msgstr "`read_freq_hz`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "owner 调度时的读取频率提示，不创建定时器或任务"
+msgstr "Owner-driven read frequency hint; creates no timer or task"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`metric`"
+msgstr "`metric`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "保留的度量字段，当前不参与路径选择"
+msgstr "Reserved metric; not currently used for path selection"
+
+#: docs/zh/guides/configuration.md:30
+msgid "路由容量在初始化时固定。共享同一 PHY 描述符的路由共享 parser/link；不同 PHY 描述符拥有独立 RX 状态。"
+msgstr ""
+"Routes have fixed capacity established at initialization. Routes sharing the same PHY descriptor share a"
+" parser/link; distinct PHY descriptors have independent RX state."
+
+#: docs/zh/guides/configuration.md:32
+msgid "实际轮询还受 step 调用频率、字节预算及回调时长约束。同一 PHY 使用共享路由中的最高频率提示；协议不能保证调度器未提供的吞吐量。"
+msgstr ""
+"Actual polling also depends on step frequency, byte limits and callback duration. A shared PHY uses the "
+"highest frequency hint among its routes; the protocol cannot guarantee throughput that the scheduler "
+"does not provide."
+
+#: docs/zh/guides/configuration.md:34
+msgid ""
+"临时 PHY 读取块通过 CMake 的 `XGL_DATALINK_RX_CHUNK_SIZE` 选择：AUTO 默认 Boot 为 32，其余为 128，也支持显式 16/32/64/128，例如 "
+"`-DXGL_DATALINK_RX_CHUNK_SIZE=64`。它限制每次读取的栈缓冲，不改变 MTU 或持久 RX 空间。实际值写入生成的配置头；不得给已安装库的消费方注入冲突宏。吞吐与超时的配合见 "
+"[Datalink](../explanation/datalink.md)。"
+msgstr ""
+"Select the temporary PHY read chunk through CMake `XGL_DATALINK_RX_CHUNK_SIZE`: AUTO defaults to 32 for "
+"Boot and 128 elsewhere, with explicit 16/32/64/128 also supported, for example "
+"`-DXGL_DATALINK_RX_CHUNK_SIZE=64`. It bounds the per-read stack buffer without changing MTU or "
+"persistent RX storage. The generated header records the actual value; consumers of an installed library "
+"cannot inject a conflicting macro. See [Datalink](../explanation/datalink.md) for throughput and timeout"
+" considerations."
+
+#: docs/zh/guides/configuration.md:36
+msgid ""
+"实际帧必须同时满足协议上限和路由 MTU，包括 24 字节基础头、扩展、payload、启用认证时的 tag 和 2 字节 CRC。`memory.rx_buffer_size` 至少为 "
+"`protocol.max_frame_size`。"
+msgstr ""
+"The effective frame must fit the configured protocol limit and route MTU, including the 24-byte base "
+"header, extensions, payload, authentication tag if enabled, and 2-byte CRC. `memory.rx_buffer_size` must"
+" be at least `protocol.max_frame_size`."
+
+#: docs/zh/guides/configuration.md:38
+msgid ""
+"生产 SDK 的 `XGL_DATALINK_MAX_FRAME_SIZE` 默认 2048 字节，可在构建库时通过同名 CMake 选项在 64–2048 字节之间选择。实例 MTU 必须处于 64 "
+"字节与所选上限之间。单条路由可以声明更大的物理 MTU，发送时两项限制同时生效。`xgl_config_get_default()` 会约束默认 MTU，使用具名 preset 时应检查并调整 "
+"`protocol.max_frame_size`。接收存储设为同一 MTU 可避免额外预留。涉及可靠通信时同时检查[反向反馈预算](../reference/protocol/v1/routing.md)。"
+msgstr ""
+"The producer CMake option `XGL_DATALINK_MAX_FRAME_SIZE` selects a ceiling of 64–2048 bytes, defaulting "
+"to 2048. The instance MTU must be between 64 bytes and that ceiling. A route may declare a larger "
+"physical MTU. Both limits apply on send. `xgl_config_get_default()` fits its default MTU to the ceiling."
+" After choosing a named preset, check and adjust `protocol.max_frame_size` for the build. Setting the RX"
+" storage to the same MTU avoids extra reservation. For reliable traffic, also check the [reverse "
+"feedback budget](../reference/protocol/v1/routing.md)."
+
+#: docs/zh/guides/configuration.md:40
+msgid "显式容量"
+msgstr "Explicit Capacities"
+
+#: docs/zh/guides/configuration.md:0
+msgid "配置字段"
+msgstr "Configuration field"
+
+#: docs/zh/guides/configuration.md:0
+msgid "上限"
+msgstr "Bound"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`features.max_peers`"
+msgstr "`features.max_peers`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "同时存在的 connection/epoch scope 数"
+msgstr "Simultaneous connection/epoch scopes"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`protocol.window_size`"
+msgstr "`protocol.window_size`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "每个 peer 的可靠在途包，1–32，且不超过编译窗口容量"
+msgstr "Outstanding reliable packets per peer, 1–32, within compiled window capacity"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`features.max_tx_packets`"
+msgstr "`features.max_tx_packets`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "整个实例的可靠在途包"
+msgstr "Outstanding reliable packets across the instance"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`features.max_rx_buffered_packets`"
+msgstr "`features.max_rx_buffered_packets`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "整个实例的乱序包"
+msgstr "Out-of-order packets across the instance"
+
+#: docs/zh/guides/configuration.md:49
+msgid ""
+"启用的容量必须显式给出；零不表示无限制。peer 和 TX 包容量必须非零。窗口大于一时，乱序容量必须非零。关闭的可选资源可以为零。全局 TX 预算可以小于 `max_peers * "
+"window_size`，此时更早出现背压。"
+msgstr ""
+"Enabled capacities are explicit; zero does not mean unlimited. Peer and TX packet capacities must be "
+"nonzero. Window sizes above one require nonzero out-of-order capacity. Disabled optional resources can "
+"remain zero. A smaller global TX budget than `max_peers * window_size` is valid and causes earlier "
+"backpressure."
+
+#: docs/zh/guides/configuration.md:51
+msgid ""
+"workspace 为各类包预留固定大小的槽位。需要减少预留 RAM 时，重新核算完整帧上限和各资源的槽位数量。参见[资源模型](../explanation/resource-model.md)。"
+msgstr ""
+"The workspace reserves fixed-size packet and payload slots according to these capacities and the "
+"configured MTU. See [Resource Model](../explanation/resource-model.md)."
+
+#: docs/zh/guides/configuration.md:53
+msgid ""
+"显式编译 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 后，可通过独立版本化描述符限制可靠发送的忙期并接收带 scope 的回调，见[扩展运行选项](advanced-"
+"runtime.md)。该能力默认关闭。安装消费可要求 `advanced_runtime` 能力。"
+msgstr ""
+"With explicit `XGL_ENABLE_ADVANCED_RUNTIME=ON`, a separate versioned descriptor enables reliable TX "
+"lifetime limits and scoped receive callbacks; see [advanced runtime options](advanced-runtime.md). "
+"Default OFF retains the existing configuration ABI. Installed consumers can require the "
+"`advanced_runtime` capability."
+
+#: docs/zh/guides/configuration.md:55
+msgid "认证"
+msgstr "Authentication"
+
+#: docs/zh/guides/configuration.md:57
+msgid ""
+"启用认证能力的 profile 要求所有非空 `auth_provider` 都包含同步 sign/verify 回调以及 `1..XGL_AUTH_TAG_MAX_LEN` 的 tag 长度，即使 "
+"`auth_required` 为 false。`auth_required` 为 true 时还要求 provider 非空。无效 provider "
+"在配置校验和工作区测量阶段被拒绝，创建不会先分配工作区。发送认证流量前，用 `xgl_install_security_session()` 安装可信的双向参数。"
+msgstr ""
+"An authentication-capable profile requires every nonnull `auth_provider` to supply synchronous "
+"sign/verify callbacks and a tag length in `1..XGL_AUTH_TAG_MAX_LEN`, even when `auth_required` is false."
+" When `auth_required` is true, the provider must also be nonnull. Configuration validation and workspace"
+" measurement reject invalid providers, so creation does not allocate a workspace first. Install trusted "
+"directional parameters with `xgl_install_security_session()` before sending authenticated traffic."
+
+#: docs/zh/guides/configuration.md:59
+msgid ""
+"`auth_required` 为 true 时，`protocol.max_frame_size` 必须支持本机基本认证收发能力。校验复用 wire 编码与帧测量，检查一个普通 `ACK_RANGE` "
+"的完整认证帧；它覆盖零 epoch 的基本 HELLO 和最小 DATA 所需空间。32 字节 tag 对应的当前基础门槛为 88 字节，64 字节协议上限会被前置拒绝。"
+msgstr ""
+"When `auth_required` is true, `protocol.max_frame_size` must support basic authenticated communication "
+"by the local endpoint. Validation uses the wire encoder and frame measurement to check one complete "
+"authenticated ordinary `ACK_RANGE` frame, which also covers the base HELLO and minimum DATA at epoch "
+"zero. The current base threshold for a 32-byte tag is 88 bytes; a 64-byte protocol limit is rejected "
+"before allocation."
+
+#: docs/zh/guides/configuration.md:61
+msgid ""
+"此门槛不包含可选的 `SESSION` 和应用 `DATA_TYPE` 扩展，也不保证任意元数据组合都能发送。单条路由可以具有更小的 "
+"MTU，用于转发或其他能容纳的帧；本机发送和转发仍逐帧检查真实长度。例如，协议上限为 128、路由 MTU 为 64、tag 为 32 的配置可以初始化并转发短帧，但不能通过该路由发送本机认证 "
+"DATA。`auth_required` 控制本机认证收发，不为非本地转发帧增加端点认证。"
+msgstr ""
+"This threshold excludes optional `SESSION` and application `DATA_TYPE` extensions and does not guarantee"
+" that every metadata combination can be sent. An individual route can have a smaller MTU for forwarding "
+"or other frames that fit; local transmission and forwarding still check the actual length of each frame."
+" For example, a protocol limit of 128, route MTU of 64, and tag length of 32 permits initialization and "
+"short-frame forwarding, but cannot send local authenticated DATA over that route. `auth_required` "
+"controls local authenticated communication and does not add endpoint authentication to nonlocal "
+"forwarded frames."
+
+#: docs/zh/guides/configuration.md:63
+msgid "认证不要求 libc 分配器，静态 workspace 同样支持。密钥、前缀、epoch 和重启后的新鲜性由应用负责。普通报文不能建立可信会话。关闭会话后保留 nonce 域的占用记录。"
+msgstr ""
+"Authentication does not require a libc allocator: static workspaces support it. Session keys, prefixes, "
+"epochs, and restart freshness are application responsibilities. Ordinary packets cannot create trusted "
+"sessions. Closing a session preserves a nonce-domain tombstone."
+
+#: docs/zh/guides/configuration.md:65
+msgid "校验和编译 Profile"
+msgstr "Validation and Build Profiles"
+
+#: docs/zh/guides/configuration.md:67
+msgid "只支持以下明确的能力组合，不提供任意 feature flag 的排列。实际启用项及容量仍由运行时配置决定，运行时配置不能恢复编译时已裁剪的能力。"
+msgstr ""
+"Only these explicit capability combinations are supported, rather than arbitrary feature-flag "
+"permutations. Runtime configuration still selects enabled features and capacities, but cannot restore "
+"capabilities removed at build time."
+
+#: docs/zh/guides/configuration.md:0
+msgid "Profile"
+msgstr "Profile"
+
+#: docs/zh/guides/configuration.md:0
+msgid "默认配置 ID"
+msgstr "Default configuration ID"
+
+#: docs/zh/guides/configuration.md:0
+msgid "认证/转发"
+msgstr "Authentication/forwarding"
+
+#: docs/zh/guides/configuration.md:0
+msgid "乱序"
+msgstr "Out-of-order buffering"
+
+#: docs/zh/guides/configuration.md:0
+msgid "统计/诊断文字"
+msgstr "Statistics/diagnostic text"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`boot`"
+msgstr "`boot`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "301"
+msgstr "301"
+
+#: docs/zh/guides/configuration.md:0
+msgid "无"
+msgstr "No"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`embedded-lite`"
+msgstr "`embedded-lite`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "304"
+msgstr "304"
+
+#: docs/zh/guides/configuration.md:0
+msgid "有"
+msgstr "Yes"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`embedded`"
+msgstr "`embedded`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "302"
+msgstr "302"
+
+#: docs/zh/guides/configuration.md:0
+msgid "`full`"
+msgstr "`full`"
+
+#: docs/zh/guides/configuration.md:0
+msgid "303"
+msgstr "303"
+
+#: docs/zh/guides/configuration.md:76
+msgid ""
+"Boot 允许一个 peer、最多一条路由、窗口一。Embedded Lite 默认使用 8 个可靠索引桶，不保留安全会话存储；适用于需要乱序缓存的直接通信端点。其他容量上限由生成的 "
+"`xgl_build_config.h` 给出。"
+msgstr ""
+"Boot permits one peer, at most one route, and window one. Embedded Lite defaults to eight reliable-index"
+" buckets and retains no security-session storage. It serves endpoints that need out-of-order buffering "
+"and use plaintext endpoint traffic. The generated `xgl_build_config.h` declares the other capacity "
+"limits."
+
+#: docs/zh/guides/configuration.md:78
+msgid ""
+"可靠索引桶数、私有窗口容量和自适应 RTO 可以通过受控编译选项选择，默认私有窗口仍为 128 槽，自适应 RTO 默认开启。运行时配置不能扩大已编译容量。上表 ID 仅适用于全部实际资源与 profile "
+"默认值一致的构建；改变资源组合、PHY 读取块或 libc fallback 会获得不同的构建身份。选项、安装消费和冲突拒绝见[构建与测试](build-and-consume.md)。"
+msgstr ""
+"Reliable index buckets, private window capacity and adaptive RTO can be selected through controlled "
+"compiled options. Default private capacity remains 128 slots, and adaptive RTO defaults to enabled. "
+"Runtime settings cannot enlarge compiled capacity. The table's IDs apply only when all resolved "
+"resources match profile defaults; changing the resource combination, PHY read chunk or libc fallback "
+"produces a different build identity. See [build and test](build-and-consume.md#compiled-resource-"
+"options) for options, installed consumption and conflict rejection."
+
+#: docs/zh/guides/configuration.md:80
+msgid ""
+"安装包导出 `xgl_PROFILE`、`xgl_BUILD_CONFIG_ID`、`xgl_RESOURCE_CONFIG_ID`、`xgl_CAPABILITIES` 和实际资源选项，目标 "
+"`xgl::xgl` 同时具有对应的 profile、构建与资源身份、能力属性。消费者可用 `find_package(xgl CONFIG REQUIRED COMPONENTS reliable "
+"out_of_order)` 要求能力；不支持的必需能力在配置阶段拒绝。可请求名称为 "
+"`wire`、`reliable`、`authentication`、`forwarding`、`out_of_order`、`statistics`、`diagnostics` 和 "
+"`advanced_runtime`。"
+msgstr ""
+"Installed packages export `xgl_PROFILE`, `xgl_BUILD_CONFIG_ID`, `xgl_RESOURCE_CONFIG_ID`, "
+"`xgl_CAPABILITIES` and resolved resource options. Target `xgl::xgl` carries the corresponding profile, "
+"build identity, resource identity and capability properties. Consumers can require capabilities with "
+"`find_package(xgl CONFIG REQUIRED COMPONENTS reliable out_of_order)`; unsupported required capabilities "
+"fail configuration. Requestable names are `wire`, `reliable`, `authentication`, `forwarding`, "
+"`out_of_order`, `statistics`, `diagnostics`, and `advanced_runtime`."
+
+#: docs/zh/guides/configuration.md:82
+msgid ""
+"压缩和 payload 加密仍是保留项，启用会被拒绝；两个 feature flag 保持 false，`compression_id` 保持零。通过 `xgl_memory_requirements()` "
+"检查 workspace 算术溢出并查询依赖 ABI 的真实大小。库、CMake target 与消费者必须使用匹配的生成 profile 和资源头文件；公开 checked "
+"入口使用生成的构建身份，不能硬编码默认 profile ID。"
+msgstr ""
+"Compression and payload encryption remain reserved and rejected; keep both feature flags false and "
+"`compression_id` zero. Use `xgl_memory_requirements()` to detect workspace arithmetic overflow and query"
+" the actual ABI-dependent size. The library, CMake target and consumer must use matching generated "
+"profile and resource headers. Public checked entry points use the generated build identity rather than "
+"hardcoded default profile IDs."

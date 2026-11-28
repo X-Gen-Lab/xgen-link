@@ -1,0 +1,92 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: cbb7156920ab2b33d2eae794b434354efe66ddc9aae0b1a4069f1c88a0fe7e17\n"
+
+#: docs/zh/explanation/state-machines.md:8
+msgid "状态机"
+msgstr "State Machines"
+
+#: docs/zh/explanation/state-machines.md:10
+msgid "状态转换属于精确 scope。应用意图、可靠 DATA 编号与认证重放状态具有各自独立的生命周期。"
+msgstr ""
+"State transitions belong to exact scopes. Application intent, reliable DATA numbering and authentication"
+" replay state are separate lifecycles."
+
+#: docs/zh/explanation/state-machines.md:12
+msgid "Peer 生命周期"
+msgstr "Peer Lifecycle"
+
+#: docs/zh/explanation/state-machines.md:14
+msgid "![Peer 状态转换](../diagrams/peer-lifecycle.svg)"
+msgstr "![Peer state transitions](../diagrams/peer-lifecycle.svg)"
+
+#: docs/zh/explanation/state-machines.md:14
+msgid "Peer 状态转换"
+msgstr "Peer state transitions"
+
+#: docs/zh/explanation/state-machines.md:16
+msgid ""
+"失败 epoch 是终态。Close 释放 transport 容量，新的连接尝试必须使用新 epoch。关闭仍有已接纳工作的 scope 时报告一次取消。RESET 只查找已存在的精确 "
+"scope，不创建或重新开放它。HELLO 幂等，不重置计数器。"
+msgstr ""
+"A failed epoch is terminal. Closing releases transport capacity; a new connection attempt uses a new "
+"epoch. Closing pending accepted work reports cancellation once. RESET finds only an existing exact scope"
+" and never allocates or reopens it. HELLO is idempotent and does not reset counters."
+
+#: docs/zh/explanation/state-machines.md:18
+msgid ""
+"空闲回收仅适用于空 peer：它从未消耗 TX 可靠编号，也没有 RX 可靠编号状态。任一方向存在可靠历史后，空闲时间不能清除去重保护或重启编号。该 scope 保留至显式 "
+"close，超时查询也不再包含其空闲定时器。"
+msgstr ""
+"Idle reclamation is restricted to an empty peer that has never consumed TX reliable numbers and has no "
+"RX reliable-number state. Once either direction has reliable history, idle time cannot erase its "
+"duplicate protection or restart numbering. Such a scope remains until explicit close; its idle timer is "
+"excluded from timeout queries."
+
+#: docs/zh/explanation/state-machines.md:20
+msgid "可靠包生命周期"
+msgstr "Reliable Packet Lifecycle"
+
+#: docs/zh/explanation/state-machines.md:22
+msgid "![可靠包状态转换](../diagrams/reliable-packet.svg)"
+msgstr "![Reliable packet state transitions](../diagrams/reliable-packet.svg)"
+
+#: docs/zh/explanation/state-machines.md:22
+msgid "可靠包状态转换"
+msgstr "Reliable packet state transitions"
+
+#: docs/zh/explanation/state-machines.md:24
+msgid "发送窗口耗尽时，应用可以等 ACK 释放槽后重新提交新包。接收方已持有的乱序包在应用 BUSY 时继续保留。"
+msgstr ""
+"When the application reports BUSY, the protocol keeps any out-of-order packets it has already accepted "
+"into its receive buffer. ACKs release TX window capacity."
+
+#: docs/zh/explanation/state-machines.md:26
+msgid "安全生命周期"
+msgstr "Security Lifecycle"
+
+#: docs/zh/explanation/state-machines.md:28
+msgid "显式安装建立可信方向性关联。签名尝试即使 provider 失败也消耗预留的安全序号。验签成功才提交重放窗口更新，验签失败不提交。Transport RESET 不改变这些状态。"
+msgstr ""
+"Explicit installation creates a trusted directional association. A signing attempt burns its reserved "
+"sequence even on provider failure. Successful verification commits a replay-window update; failed "
+"verification commits none. Transport RESET does not change this state."
+
+#: docs/zh/explanation/state-machines.md:30
+msgid ""
+"Security close 停用关联并保留关闭标记。安装时立即预留方向性 `(key_id, nonce_prefix)` 域。同一上下文不能重新安装相同 scope，也不能复用已预留的域；应用负责防止不同"
+" ID 对应同一实际密钥的别名复用。因此安全会话槽也计入关闭标记。设备重启后必须重新建立信任或使用持久化新鲜性状态，RAM 清零不等于经过认证的新 epoch。"
+msgstr ""
+"Security close retires the association and retains a tombstone. Installation immediately reserves "
+"directional `(key_id, nonce_prefix)` domains. The same scope and reserved domains cannot be reinstalled "
+"in that context; the application is responsible for preventing actual-key aliases across different IDs. "
+"Session slots therefore count closed tombstones too. Fresh trust or persisted freshness is needed across"
+" a device restart; a RAM reset is not an authenticated new epoch."

@@ -1,0 +1,13 @@
+html { color-scheme: light; }
+body { font-family: system-ui, sans-serif; }
+div.body { min-width: 0; overflow-wrap: anywhere; }
+div.body table { border-collapse: collapse; }
+div.body td, div.body th { border: 1px solid #c4ccd3; }
+div.body img { max-width: 100%; height: auto; }
+.xgl-language { display: flex; flex-wrap: wrap; gap: .55rem; margin: 0 0 1rem; }
+.xgl-preview { border-left: .25rem solid #b47b25; padding-left: .6rem; }
+@media (max-width: 700px) {
+  div.sphinxsidebar { width: auto; margin: 0; background: transparent; }
+  div.sphinxsidebarwrapper { padding: 0 .9rem; }
+  div.sphinxsidebar .xgl-language a { color: #004d67; }
+}

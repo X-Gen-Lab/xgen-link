@@ -1,0 +1,64 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: XGen Link documentation\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-XGL-Reviewed: true\n"
+"X-XGL-Source-SHA256: 2463a066c93130c4839f898220ba5dddd613eff2b9e68373a7c1dd42b52c8fa5\n"
+
+#: docs/zh/reference/errors.md:8
+msgid "错误"
+msgstr "Errors"
+
+#: docs/zh/reference/errors.md:10
+msgid "`xgl_error_t` 定义公开协议错误。公共入口在出错时返回本表的状态；私有资源操作的失败由相应的协议边界转换。"
+msgstr ""
+"`xgl_error_t` defines the public protocol errors. Public entry points return the statuses in this "
+"reference. The owning protocol boundary maps failures from private resource operations."
+
+#: docs/zh/reference/errors.md:12
+msgid "处理"
+msgstr "Handling"
+
+#: docs/zh/reference/errors.md:14
+msgid "`WINDOW_FULL`、`QUEUE_FULL`、`BUSY`、`NO_MEMORY`：施加背压；发送失败后不能假定所有权已被接纳。"
+msgstr ""
+"`WINDOW_FULL`, `QUEUE_FULL`, `BUSY`, `NO_MEMORY`: apply backpressure; do not assume ownership was "
+"accepted after a failed send."
+
+#: docs/zh/reference/errors.md:15
+msgid "`INVALID_FRAME`、`CRC_FAILED`、`INVALID_VERSION`：拒绝该帧；认证失败作为无效帧报告。"
+msgstr ""
+"`INVALID_FRAME`, `CRC_FAILED`, `INVALID_VERSION`: reject the frame. Authentication failures are reported"
+" as invalid frames."
+
+#: docs/zh/reference/errors.md:16
+msgid "`ACK_TIMEOUT`：精确 peer scope 进入失败终态，重新连接必须使用新 epoch。"
+msgstr "`ACK_TIMEOUT`: the exact peer scope enters its terminal failed state. Reconnect with a new epoch."
+
+#: docs/zh/reference/errors.md:17
+msgid "`CANCELLED`：显式关闭或 RESET 终止了待发送操作。"
+msgstr "`CANCELLED`: explicit close or RESET ended pending transmission."
+
+#: docs/zh/reference/errors.md:18
+msgid "`UNSUPPORTED`：所选 profile 或 API 路径不提供该能力。"
+msgstr "`UNSUPPORTED`: the selected profile or API path does not provide the capability."
+
+#: docs/zh/reference/errors.md:20
+msgid ""
+"接收接纳回调在接受数据前返回 `BUSY`；transport 不确认无法保留或交付的数据。完成回调不得重入实例。参见 `test/property/test_error_properties.cpp`。"
+msgstr ""
+"The receive acceptance callback returns `BUSY` before accepting data; transport does not confirm data "
+"that it cannot retain or deliver. Completion callbacks may not reenter the instance. See "
+"`test/property/test_error_properties.cpp`."
+
+#: docs/zh/reference/errors.md:22
+msgid "错误回调的 `message` 始终非空指针。Boot 关闭 `XGL_FEATURE_DIAGNOSTICS` 时传入空字符串以裁掉详细诊断文本；错误码和回调时机保留，应用应按错误码决策。"
+msgstr ""
+"The error callback always receives a non-null `message`. Boot disables `XGL_FEATURE_DIAGNOSTICS` and "
+"supplies an empty string to remove detailed diagnostic text. Error codes and callback timing remain "
+"available; applications should make decisions from the error code."

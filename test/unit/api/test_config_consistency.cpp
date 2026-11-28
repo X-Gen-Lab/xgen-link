@@ -1,6 +1,10 @@
 /**
  * \file            test_config_consistency.cpp
  * \brief           Configuration admission agrees with workspace and lifecycle
+ * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-10-02
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -14,6 +18,7 @@
 #include "wire/xgl_wire.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <vector>
 
@@ -165,12 +170,13 @@ xgl_phy_ops_t connected_phy(ConnectedPhy* state) {
         *length = std::min(*length, port.incoming.size());
         std::copy_n(port.incoming.begin(), *length, bytes);
         port.incoming.erase(port.incoming.begin(),
-                            port.incoming.begin() + *length);
+                            port.incoming.begin() +
+                                static_cast<std::ptrdiff_t>(*length));
         return XGL_OK;
     };
     return phy;
 }
-}  // namespace
+} /* namespace */
 
 TEST(XglConfigConsistency, OptionalInvalidProviderIsRejectedBeforeAllocation) {
     for (unsigned invalid = 0U; invalid < 4U; ++invalid) {

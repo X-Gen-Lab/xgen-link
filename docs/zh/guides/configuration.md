@@ -1,3 +1,10 @@
+---
+id: guides/configuration
+type: how-to
+audience: user
+source_language: zh_CN
+---
+
 # 配置
 
 先选择与编译 profile 匹配的预设，补充应用参数，再调用 `xgl_config_validate()` 和 `xgl_memory_requirements()`，最后准备存储。预设只是初始容量组合，不代表已测量的 MCU RAM 占用。

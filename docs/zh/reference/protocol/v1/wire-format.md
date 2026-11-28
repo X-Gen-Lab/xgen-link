@@ -1,3 +1,10 @@
+---
+id: reference/protocol/v1/wire-format
+type: reference
+audience: user
+source_language: zh_CN
+---
+
 # 线格式
 
 Wire 版本为 `1`。除特别说明外，整数字段使用小端序。帧布局为 `基本帧头 | TLV | 载荷 | 可选认证标签 | 整帧 CRC16`。基本帧头为 24 字节；`header_len` 包含所有 TLV，最大为 255。

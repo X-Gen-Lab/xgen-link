@@ -36,21 +36,22 @@ jobs:
       - name: Prepare MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c # v1.13.0
+      - uses: ./.github/actions/setup-build
       - uses: ./.github/actions/setup-gtest
       - name: Native C++17 build and individual CTest execution
         run: |
           mkdir -p out/reports
-          cmake --preset debug -DXGL_ENABLE_ADVANCED_RUNTIME=${{ matrix.advanced }} 2>&1 | tee out/reports/configure.log
-          cmake --build --preset debug --parallel 2 2>&1 | tee out/reports/build.log
-          python test/cmake/run_ctest.py --build-dir build/debug --config Debug
+          cmake --preset native-debug -DXGL_ENABLE_ADVANCED_RUNTIME=${{ matrix.advanced }} 2>&1 | tee out/reports/configure.log
+          cmake --build --preset native-debug --parallel 2 2>&1 | tee out/reports/build.log
+          python test/cmake/run_ctest.py --build-dir build/native-debug --config Debug
       - name: Verify language, discovery and seed replay contracts
         run: |
-          binary=build/debug/test/xgl_tests
+          binary=build/native-debug/test/xgl_tests
           if [[ "$RUNNER_OS" == Windows ]]; then binary+=.exe; fi
-          python test/contracts/ctest/test_runner_contracts.py --build-dir build/debug --binary "$binary"
+          python test/contracts/ctest/test_runner_contracts.py --build-dir build/native-debug --binary "$binary"
       - name: Exercise the Full Wire v1 peer exchange
         run: |
-          peer=build/debug/test/xgl_interop_peer
+          peer=build/native-debug/test/xgl_interop_peer
           if [[ "$RUNNER_OS" == Windows ]]; then peer+=.exe; fi
           python test/interop/test_wire_interop.py "$peer" "$peer" --profile full \
             --transcript out/reports/wire-v1.log
@@ -61,10 +62,10 @@ jobs:
           name: host-${{ matrix.os }}-${{ matrix.advanced }}
           path: |
             out/reports/
-            build/debug/Testing/
-            build/debug/compile_commands.json
-            build/debug/ctest.xml
-            build/debug/ctest-inventory.json
+            build/native-debug/Testing/
+            build/native-debug/compile_commands.json
+            build/native-debug/ctest.xml
+            build/native-debug/ctest-inventory.json
           if-no-files-found: warn
 
   gcc-validation:
@@ -76,6 +77,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+      - uses: ./.github/actions/setup-build
       - uses: ./.github/actions/setup-gtest
       - name: Build instrumented real protocol
         run: |
@@ -108,22 +110,23 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+      - uses: ./.github/actions/setup-build
       - uses: ./.github/actions/setup-gtest
       - name: Build and check every selected executable
         run: |
           mkdir -p out/reports
-          cmake --preset asan -DXGL_ENABLE_ADVANCED_RUNTIME=ON 2>&1 | tee out/reports/configure.log
-          cmake --build --preset asan --parallel 2 2>&1 | tee out/reports/build.log
-          python test/cmake/run_ctest.py --build-dir build/asan --config Debug
+          cmake --preset native-asan -DXGL_ENABLE_ADVANCED_RUNTIME=ON 2>&1 | tee out/reports/configure.log
+          cmake --build --preset native-asan --parallel 2 2>&1 | tee out/reports/build.log
+          python test/cmake/run_ctest.py --build-dir build/native-asan --config Debug
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: sanitizers
           path: |
             out/reports/
-            build/asan/Testing/
-            build/asan/ctest.xml
-            build/asan/ctest-inventory.json
+            build/native-asan/Testing/
+            build/native-asan/ctest.xml
+            build/native-asan/ctest-inventory.json
           if-no-files-found: warn
 
   bounded-profiles:
@@ -143,6 +146,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+      - uses: ./.github/actions/setup-build
       - uses: ./.github/actions/setup-gtest
       - name: Build and test the bounded preset
         env:
@@ -179,6 +183,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+      - uses: ./.github/actions/setup-build
       - uses: ./.github/actions/setup-gtest
       - name: Check CTest discovery and delivery presets
         run: |
@@ -195,6 +200,7 @@ jobs:
         run: |
           python test/contracts/build/test_profile_builds.py \
             --link-source . \
+            --gtest-dir "$GTest_DIR" \
             --work-dir out/reports/profile-contracts
       - name: Validate bounded RX chunk selection and installed configuration
         run: |
@@ -233,6 +239,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
+      - uses: ./.github/actions/setup-build
       - name: Build and run two installed SDK consumers
         env:
           PROFILE: ${{ matrix.profile }}
@@ -265,9 +272,120 @@ jobs:
           path: out/reports/wire-interop/${{ matrix.profile }}/
           if-no-files-found: warn
 
+  native-configurations:
+    name: Native ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: native-release
+            configuration: Release
+          - preset: native-tsan
+            configuration: Debug
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/setup-build
+      - uses: ./.github/actions/setup-gtest
+        with:
+          configuration: ${{ matrix.configuration }}
+      - name: Execute the complete selected CTest plan
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: |
+          prefix=()
+          if [[ "$PRESET" == native-tsan ]]; then
+            # Keep ASLR changes local to the instrumented configure/build/test subprocesses.
+            prefix=(setarch "$(uname -m)" -R)
+            export TSAN_OPTIONS=halt_on_error=1
+          fi
+          "${prefix[@]}" python tools/dev/dev.py configure --preset "$PRESET" --gtest-dir "$GTest_DIR" -- -DXGL_ENABLE_ADVANCED_RUNTIME=ON
+          "${prefix[@]}" python tools/dev/dev.py build --preset "$PRESET" --parallel 2
+          "${prefix[@]}" python tools/dev/dev.py test --preset "$PRESET"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ${{ matrix.preset }}
+          path: |
+            build/${{ matrix.preset }}/developer-commands/
+            build/${{ matrix.preset }}/ctest.xml
+            build/${{ matrix.preset }}/ctest-inventory.json
+          if-no-files-found: warn
+
+  quality:
+    name: Required style and static analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Prepare locked maintenance and analysis tools
+        run: |
+          python -m pip install --only-binary=:all: --require-hashes -r dependencies/python-tools-linux-cp312.txt
+          python tools/dev/dev.py prepare --scope workflow --allow-network
+          sudo apt-get update
+          sudo apt-get install -y clang-14 clang-tidy-14 cppcheck
+      - name: Check full repository style and workflows
+        run: |
+          python scripts/ci/style_gate.py --all --report build/quality/style.json
+          python scripts/ci/lint_workflows.py
+          python -m unittest discover -s test/contracts/tooling
+      - name: Configure, build and analyze Full and Boot Small production targets
+        run: |
+          for profile in full boot; do
+            options=()
+            if [[ "$profile" == boot ]]; then
+              options+=(-DXGL_TRANSPORT_WINDOW_CAPACITY=1 -DXGL_RELIABLE_INDEX_BUCKETS=1 -DXGL_ENABLE_ADAPTIVE_RTO=OFF)
+            else
+              options+=(-DXGL_ENABLE_ADVANCED_RUNTIME=ON)
+            fi
+            dir=build/quality-$profile
+            cmake -S . -B "$dir" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+              "-DXGL_PROFILE=$profile" "${options[@]}"
+            cmake --build "$dir" --parallel 2
+            python scripts/ci/quality_tools.py tidy --build-dir "$dir" --report "build/quality/tidy-$profile.txt"
+            python scripts/ci/quality_tools.py cppcheck --build-dir "$dir" --report "build/quality/cppcheck-$profile.txt"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: quality
+          path: build/quality/
+          if-no-files-found: warn
+
+  arm-reference:
+    name: ARM Boot SDK reference
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/setup-build
+      - name: Prepare ARM tools and verify both relocated SDK consumers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-arm
+          arm=$(python tools/dev/dev.py prepare --scope arm --allow-network)
+          python test/integration/arm/run.py --toolchain-root "$arm" --work-dir build/arm-reference
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: arm-reference
+          path: build/arm-reference/
+          if-no-files-found: warn
+
   status:
     if: always()
-    needs: [host, gcc-validation, sanitizers, bounded-profiles, dependency-contracts, wire-compatibility]
+    needs: [host, gcc-validation, sanitizers, bounded-profiles, dependency-contracts, wire-compatibility,
+            native-configurations, quality, arm-reference]
     runs-on: ubuntu-24.04
     steps:
       - name: Require every selected job to succeed

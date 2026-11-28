@@ -2,6 +2,9 @@
  * \file            test_footprint.cpp
  * \brief           Workspace ownership and runtime allocation accounting
  * \author          X-Gen Lab
+ * \version         0.0.1
+ * \date            2026-06-06
+ * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
 #include "test_host_allocator.h"
@@ -56,7 +59,7 @@ xgl_error_t null_rx(uint8_t*, size_t* size, void*) {
     return XGL_OK;
 }
 
-}  // namespace
+} /* namespace */
 
 TEST(XglFootprintTest, CreateReservesExactlyTheMeasuredWorkspaceOnce) {
     CountingAllocator counter;

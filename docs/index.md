@@ -5,5 +5,6 @@
 Portable C11 communication for embedded systems, with bounded storage, reliable delivery and optional authentication.
 
 - [简体中文](zh/index.md)
-- [English](en/index.md)
+- [English](https://x-gen-lab.github.io/xgen-link/en/)
 - [Generated C API](api/index.md)
+- [工程约定](standards.md)

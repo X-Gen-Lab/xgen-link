@@ -1,8 +1,39 @@
 ---
-# X-Gen quality 0.1.0: focused C/C++ analysis.
-# Annex K is optional and unavailable on supported freestanding C11 targets.
-# Keep buffer bounds analysis; only omit suggestions to replace libc with *_s.
-Checks: '-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,bugprone-*,performance-*'
-WarningsAsErrors: '*'
+# Editor and manual analysis. CI selects its portable C profile explicitly.
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters
+WarningsAsErrors: ''
 HeaderFilterRegex: '.*[/\\](include[/\\]xgl|src[/\\](api|wire|datalink|network|transport|security|internal))[/\\].*'
 FormatStyle: file
+CheckOptions:
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.TypedefCase
+    value: lower_case
+  - key: readability-identifier-naming.TypedefSuffix
+    value: '_t'
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-function-size.LineThreshold
+    value: 100
+  - key: readability-function-cognitive-complexity.Threshold
+    value: 25
