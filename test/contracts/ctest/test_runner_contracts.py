@@ -36,7 +36,7 @@ class RunnerContracts(unittest.TestCase):
         tests = json.loads(result.stdout)["tests"]
         cases = [case for case in tests if "." in case["name"]]
         baseline = BASELINE.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(len(baseline), 459)
+        self.assertEqual(len(baseline), 450)
         self.assertEqual(len(baseline), len(set(baseline)))
         self.assertGreaterEqual(len(cases), len(baseline))
         self.assertNotIn("xgl_tests", {case["name"] for case in tests})

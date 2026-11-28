@@ -273,7 +273,8 @@ TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
         bytes->resize(written);
         return err;
     };
-    network_ctx.lower_layer = &lower;
+    auto ctx = network_ctx;
+    ctx.lower_layer = &lower;
     const uint8_t payload[] = {1};
     const uint8_t ack[] = {XGL_WIRE_EXT_ACK_RANGE,
                            13U,
@@ -313,7 +314,7 @@ TEST_F(XglNetworkTest, SendPreservesEpochForDataAckAndControl) {
         if (type == XGL_PACKET_TYPE_CONTROL) {
             packet.data_type = 0x0EU;
         }
-        ASSERT_EQ(xgl_network_send(&network_ctx, &packet), XGL_OK);
+        ASSERT_EQ(xgl_network_send(&ctx, &packet), XGL_OK);
         xgl_wire_frame_view_t metadata = {};
         ASSERT_EQ(xgl_wire_decode_frame(&metadata, captured.data(),
                                         captured.size(), nullptr),
