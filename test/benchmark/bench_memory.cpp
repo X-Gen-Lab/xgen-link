@@ -8,6 +8,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 #include "test_config.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <cstdio>
 #include <vector>
@@ -25,7 +26,6 @@ static bool run_memory_benchmark(const xgl_config_t& config) {
         return false;
     }
     xgl_config_t static_config = pair.config_a;
-    static_config.memory.allocator = nullptr;
     xgl_memory_requirements_t required = {};
     if (xgl_memory_requirements(&static_config, &required) != XGL_OK) {
         return false;

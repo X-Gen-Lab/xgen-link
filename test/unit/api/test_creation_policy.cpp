@@ -10,15 +10,18 @@
 #include "test_host_allocator.h"
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
 
 TEST(CreationPolicyTest, MissingAllocatorFollowsCompiledPolicy) {
     xgl_config_t config;
     config = xgl_test_two_packet_config();
-    ASSERT_EQ(config.memory.allocator, nullptr);
-    const xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = nullptr;
+    const xgl_error_t error = xgl_init_allocated(&config, nullptr, &handle);
 #if XGL_ALLOW_FALLBACK_MALLOC
+    EXPECT_EQ(error, XGL_OK);
     EXPECT_NE(handle, nullptr);
 #else
+    EXPECT_EQ(error, XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(handle, nullptr);
 #endif
     xgl_destroy(handle);
@@ -27,9 +30,11 @@ TEST(CreationPolicyTest, MissingAllocatorFollowsCompiledPolicy) {
 TEST(CreationPolicyTest, ExplicitAllocatorWorksWithoutHeapFallback) {
     xgl_config_t config;
     config = xgl_test_two_packet_config();
-    config.memory.allocator = xgl_test_host_allocator();
-    const xgl_handle_t handle = xgl_create(&config);
+    xgl_handle_t handle = nullptr;
+    ASSERT_EQ(xgl_init_allocated(&config, xgl_test_host_allocator(), &handle),
+              XGL_OK);
     ASSERT_NE(handle, nullptr);
-    EXPECT_EQ(xgl_init(handle), XGL_OK);
+    const xgl_work_budget_t budget = {};
+    EXPECT_EQ(xgl_step(handle, 0U, &budget), XGL_OK);
     xgl_destroy(handle);
 }

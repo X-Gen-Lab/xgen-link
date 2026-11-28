@@ -10,6 +10,7 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <xgl/xgl.h>
 
@@ -86,12 +87,10 @@ class XglIntegrationTest : public ::testing::Test {
  */
 TEST_F(XglIntegrationTest, BasicInstanceLifecycle) {
     /* Create instance */
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
 
     /* Initialize instance */
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
     /* Get statistics */
     xgl_statistics_t stats;
@@ -114,16 +113,12 @@ TEST_F(XglIntegrationTest, BasicInstanceLifecycle) {
  */
 TEST_F(XglIntegrationTest, MultipleIndependentInstances) {
     /* Create first instance */
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
     /* Create second instance */
-    xgl_test_use_host_allocator(&config2_);
-    handle2_ = xgl_create(&config2_);
+    handle2_ = xgl_test_init_allocated(&config2_);
     ASSERT_NE(handle2_, nullptr);
-    ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     /* Verify both instances have independent statistics */
     xgl_statistics_t stats1, stats2;
@@ -151,17 +146,17 @@ TEST_F(XglIntegrationTest, ConfigurationValidation) {
     /* Test valid configuration */
     config = xgl_test_config();
     config.source_id = 1;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_OK);
 
     /* Test invalid configuration - zero pool size */
     config.features.max_tx_packets = 0;
-    EXPECT_NE(xgl_config_validate(&config), XGL_OK);
+    EXPECT_NE(xgl_test_measure_config(&config), XGL_OK);
 
     /* Test invalid configuration - zero window size */
     config = xgl_test_config();
     config.source_id = 1;
     config.protocol.window_size = 0;
-    EXPECT_NE(xgl_config_validate(&config), XGL_OK);
+    EXPECT_NE(xgl_test_measure_config(&config), XGL_OK);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -174,10 +169,8 @@ TEST_F(XglIntegrationTest, ConfigurationValidation) {
  */
 TEST_F(XglIntegrationTest, RuntimeProcessing) {
     /* Create and initialize instance */
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
     /* Call xgl_step multiple times - should not crash */
     for (int i = 0; i < 10; ++i) {
@@ -195,15 +188,11 @@ TEST_F(XglIntegrationTest, RuntimeProcessing) {
  */
 TEST_F(XglIntegrationTest, MultiInstanceRuntimeProcessing) {
     /* Create two instances */
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
-    xgl_test_use_host_allocator(&config2_);
-    handle2_ = xgl_create(&config2_);
+    handle2_ = xgl_test_init_allocated(&config2_);
     ASSERT_NE(handle2_, nullptr);
-    ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     /* Process both instances */
     for (int i = 0; i < 10; ++i) {
@@ -244,14 +233,11 @@ TEST_F(XglIntegrationTest, NullHandleErrorHandling) {
  * \note            Validates: Requirements 19.2, 2.2, 8.3
  */
 TEST_F(XglIntegrationTest, InitializationErrors) {
-    /* Test double initialization */
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
-    ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
-
-    /* Second init should fail */
-    EXPECT_EQ(xgl_init(handle1_), XGL_ERR_ALREADY_INITIALIZED);
+    config1_.source_id = 0U;
+    EXPECT_EQ(
+        xgl_init_allocated(&config1_, xgl_test_host_allocator(), &handle1_),
+        XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(handle1_, nullptr);
 }
 
 /**
@@ -265,8 +251,7 @@ TEST_F(XglIntegrationTest, MemoryAllocationFailure) {
     xgl_memory_requirements_t requirements{};
     EXPECT_EQ(xgl_memory_requirements(&config, &requirements),
               XGL_ERR_INVALID_PARAM);
-    xgl_test_use_host_allocator(&config);
-    EXPECT_EQ(xgl_create(&config), nullptr);
+    EXPECT_EQ(xgl_test_init_allocated(&config), nullptr);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -278,11 +263,6 @@ TEST_F(XglIntegrationTest, MemoryAllocationFailure) {
  * \note            Validates: Requirements 19.2, 29.1
  */
 TEST_F(XglIntegrationTest, VersionInformation) {
-    /* Test version string */
-    const char* version_str = xgl_version_string();
-    ASSERT_NE(version_str, nullptr);
-    EXPECT_STREQ(version_str, XGL_VERSION_STRING);
-
     /* Test version integer */
     uint32_t version_int = xgl_version_int();
     EXPECT_EQ(version_int, XGL_VERSION_INT);
@@ -300,10 +280,8 @@ TEST_F(XglIntegrationTest, RapidInstanceLifecycle) {
     const int iterations = 100;
 
     for (int i = 0; i < iterations; ++i) {
-        xgl_test_use_host_allocator(&config1_);
-        xgl_handle_t handle = xgl_create(&config1_);
+        xgl_handle_t handle = xgl_test_init_allocated(&config1_);
         ASSERT_NE(handle, nullptr);
-        ASSERT_EQ(xgl_init(handle), XGL_OK);
         xgl_destroy(handle);
     }
 
@@ -315,10 +293,8 @@ TEST_F(XglIntegrationTest, RapidInstanceLifecycle) {
  * \note            Validates: Requirements 19.2, 11.1, 11.2, 11.3
  */
 TEST_F(XglIntegrationTest, StatisticsUnderLoad) {
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
     xgl_statistics_t stats;
 
@@ -348,9 +324,12 @@ struct E2eRxTracker {
     std::vector<E2eRxRecord> records;
 };
 
-static void e2e_rx_callback(xgl_handle_t handle, uint16_t source_id,
-                            uint8_t data_type, const uint8_t* data, size_t len,
-                            void* user_data) {
+static xgl_error_t e2e_rx_callback(xgl_handle_t handle,
+                                   const xgl_rx_info_t* info,
+                                   const uint8_t* data, size_t len,
+                                   void* user_data) {
+    const uint16_t source_id = info->source_id;
+    const uint8_t data_type = info->data_type;
     (void)handle;
     auto* tracker = static_cast<E2eRxTracker*>(user_data);
     if (tracker != nullptr && data != nullptr && len > 0) {
@@ -358,6 +337,7 @@ static void e2e_rx_callback(xgl_handle_t handle, uint16_t source_id,
         tracker->records.push_back(
             {source_id, data_type, std::vector<uint8_t>(data, data + len)});
     }
+    return XGL_OK;
 }
 
 } /* namespace */
@@ -378,13 +358,12 @@ TEST_F(XglIntegrationTest, UnreliableSingleHop) {
     route_a.phy = &phy_a;
     route_a.max_frame_size = 256;
     route_a.read_freq_hz = 100;
-    route_a.metric = 1;
+
     xgl_route_item_t route_b = {};
     route_b.target_id = 1;
     route_b.phy = &phy_b;
     route_b.max_frame_size = 256;
     route_b.read_freq_hz = 100;
-    route_b.metric = 1;
 
     config1_.route_table = &route_a;
     config1_.route_table_len = 1;
@@ -393,18 +372,14 @@ TEST_F(XglIntegrationTest, UnreliableSingleHop) {
 
     E2eRxTracker rx_tracker_b;
     config2_.rx_callback = e2e_rx_callback;
-    config2_.callback_user_data = &rx_tracker_b;
+    config2_.rx_user_data = &rx_tracker_b;
 
     /* Create and init both instances */
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
-    xgl_test_use_host_allocator(&config2_);
-    handle2_ = xgl_create(&config2_);
+    handle2_ = xgl_test_init_allocated(&config2_);
     ASSERT_NE(handle2_, nullptr);
-    ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     /* A sends unreliable data to B */
     const uint8_t payload[] = {'H', 'e', 'l', 'l', 'o'};
@@ -445,13 +420,12 @@ TEST_F(XglIntegrationTest, ReliableWithAck) {
     route_a.phy = &phy_a;
     route_a.max_frame_size = 256;
     route_a.read_freq_hz = 100;
-    route_a.metric = 1;
+
     xgl_route_item_t route_b = {};
     route_b.target_id = 1;
     route_b.phy = &phy_b;
     route_b.max_frame_size = 256;
     route_b.read_freq_hz = 100;
-    route_b.metric = 1;
 
     config1_.route_table = &route_a;
     config1_.route_table_len = 1;
@@ -460,17 +434,13 @@ TEST_F(XglIntegrationTest, ReliableWithAck) {
 
     E2eRxTracker rx_tracker_b;
     config2_.rx_callback = e2e_rx_callback;
-    config2_.callback_user_data = &rx_tracker_b;
+    config2_.rx_user_data = &rx_tracker_b;
 
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
-    xgl_test_use_host_allocator(&config2_);
-    handle2_ = xgl_create(&config2_);
+    handle2_ = xgl_test_init_allocated(&config2_);
     ASSERT_NE(handle2_, nullptr);
-    ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     /* A sends reliable data to B */
     const uint8_t payload[] = {'R', 'E', 'L'};
@@ -518,13 +488,12 @@ TEST_F(XglIntegrationTest, RejectsOversizedMessageAndDeliversFrameAtMtu) {
     route_a.phy = &phy_a;
     route_a.max_frame_size = 64;
     route_a.read_freq_hz = 100;
-    route_a.metric = 1;
+
     xgl_route_item_t route_b = {};
     route_b.target_id = 1;
     route_b.phy = &phy_b;
     route_b.max_frame_size = 64;
     route_b.read_freq_hz = 100;
-    route_b.metric = 1;
 
     config1_.route_table = &route_a;
     config1_.route_table_len = 1;
@@ -533,17 +502,13 @@ TEST_F(XglIntegrationTest, RejectsOversizedMessageAndDeliversFrameAtMtu) {
 
     E2eRxTracker rx_tracker_b;
     config2_.rx_callback = e2e_rx_callback;
-    config2_.callback_user_data = &rx_tracker_b;
+    config2_.rx_user_data = &rx_tracker_b;
 
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
-    xgl_test_use_host_allocator(&config2_);
-    handle2_ = xgl_create(&config2_);
+    handle2_ = xgl_test_init_allocated(&config2_);
     ASSERT_NE(handle2_, nullptr);
-    ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
     constexpr size_t payload_limit =
         64U - XGL_FRAME_HEADER_SIZE - XGL_CRC16_SIZE;
@@ -595,19 +560,16 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
     route_a.phy = &phy_a;
     route_a.max_frame_size = 256;
     route_a.read_freq_hz = 100;
-    route_a.metric = 1;
 
     /* B has routes: from A (rx) and to C (tx) */
     xgl_route_item_t routes_b[] = {{/* target_id */ 1,
                                     /* phy */ &phy_b_from_a,
                                     /* max_frame_size */ 256,
-                                    /* read_freq_hz */ 100,
-                                    /* metric */ 1},
+                                    /* read_freq_hz */ 100},
                                    {/* target_id */ 3,
                                     /* phy */ &phy_b_to_c,
                                     /* max_frame_size */ 256,
-                                    /* read_freq_hz */ 100,
-                                    /* metric */ 1}};
+                                    /* read_freq_hz */ 100}};
 
     /* C has route to B */
     xgl_route_item_t route_c = {};
@@ -615,7 +577,6 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
     route_c.phy = &phy_c;
     route_c.max_frame_size = 256;
     route_c.read_freq_hz = 100;
-    route_c.metric = 1;
 
     config1_.source_id = 1;
     config1_.route_table = &route_a;
@@ -643,22 +604,16 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
 
     E2eRxTracker rx_tracker_c;
     config_c.rx_callback = e2e_rx_callback;
-    config_c.callback_user_data = &rx_tracker_c;
+    config_c.rx_user_data = &rx_tracker_c;
 
-    xgl_test_use_host_allocator(&config1_);
-    handle1_ = xgl_create(&config1_);
+    handle1_ = xgl_test_init_allocated(&config1_);
     ASSERT_NE(handle1_, nullptr);
-    ASSERT_EQ(xgl_init(handle1_), XGL_OK);
 
-    xgl_test_use_host_allocator(&config_b);
-    handle2_ = xgl_create(&config_b);
+    handle2_ = xgl_test_init_allocated(&config_b);
     ASSERT_NE(handle2_, nullptr);
-    ASSERT_EQ(xgl_init(handle2_), XGL_OK);
 
-    xgl_test_use_host_allocator(&config_c);
-    xgl_handle_t handle3 = xgl_create(&config_c);
+    xgl_handle_t handle3 = xgl_test_init_allocated(&config_c);
     ASSERT_NE(handle3, nullptr);
-    ASSERT_EQ(xgl_init(handle3), XGL_OK);
 
     /* A sends unreliable data to C (target_id=3) */
     const uint8_t payload[] = {'M', 'H', 'o', 'p'};

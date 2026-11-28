@@ -11,6 +11,9 @@
 #include "test_host_allocator.h"
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_security.h>
 
 #if XGL_FEATURE_AUTH
 #include "test_security_helpers.h"
@@ -36,7 +39,6 @@ struct ScopedInstance {
 xgl_config_t bounded_config() {
     xgl_config_t config;
     config = xgl_test_single_packet_config();
-    config.memory.allocator = xgl_test_host_allocator();
     return config;
 }
 
@@ -58,8 +60,7 @@ struct CountingAllocator {
 
 void expect_rejected_before_allocation(xgl_config_t config) {
     CountingAllocator allocator;
-    config.memory.allocator = &allocator.service;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_test_measure_config(&config), XGL_ERR_INVALID_PARAM);
 
     xgl_memory_requirements_t requirements = {};
     requirements.size = 123U;
@@ -72,7 +73,8 @@ void expect_rejected_before_allocation(xgl_config_t config) {
     EXPECT_EQ(report.management_bytes, 456U);
 
     ScopedInstance instance;
-    instance.handle = xgl_create(&config);
+    EXPECT_EQ(xgl_init_allocated(&config, &allocator.service, &instance.handle),
+              XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(instance.handle, nullptr);
     EXPECT_EQ(allocator.attempts, 0U);
 }
@@ -207,14 +209,13 @@ TEST(XglConfigConsistency, OptionalProviderDoesNotImposeAuthenticationBudget) {
     config.memory.rx_buffer_size = 64U;
     ConnectedPhy port;
     auto phy = connected_phy(&port);
-    xgl_route_item_t route = {2U, &phy, 64U, 100U, 0U};
+    xgl_route_item_t route = {2U, &phy, 64U, 100U};
     config.route_table = &route;
     config.route_table_len = 1U;
-    ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
+    ASSERT_EQ(xgl_test_measure_config(&config), XGL_OK);
     ScopedInstance instance;
-    instance.handle = xgl_create(&config);
+    instance.handle = xgl_test_init_allocated(&config);
     ASSERT_NE(instance.handle, nullptr);
-    ASSERT_EQ(xgl_init(instance.handle), XGL_OK);
 
     const uint8_t byte = 0xA5U;
     xgl_tx_data_t tx = {};
@@ -236,7 +237,7 @@ TEST(XglConfigConsistency,
     config.memory.rx_buffer_size = 64U;
     ConnectedPhy port;
     auto phy = connected_phy(&port);
-    xgl_route_item_t route = {2U, &phy, 64U, 100U, 0U};
+    xgl_route_item_t route = {2U, &phy, 64U, 100U};
     config.route_table = &route;
     config.route_table_len = 1U;
     expect_rejected_before_allocation(config);
@@ -265,15 +266,13 @@ TEST(XglConfigConsistency, SmallRouteKeepsForwardingAndChecksActualSendBudget) {
     config.auth_provider = &provider;
     ConnectedPhy port;
     auto phy = connected_phy(&port);
-    xgl_route_item_t routes[] = {{2U, &phy, 64U, 100U, 0U},
-                                 {3U, &phy, 128U, 100U, 0U}};
+    xgl_route_item_t routes[] = {{2U, &phy, 64U, 100U}, {3U, &phy, 128U, 100U}};
     config.route_table = routes;
     config.route_table_len = 2U;
-    ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
+    ASSERT_EQ(xgl_test_measure_config(&config), XGL_OK);
     ScopedInstance instance;
-    instance.handle = xgl_create(&config);
+    instance.handle = xgl_test_init_allocated(&config);
     ASSERT_NE(instance.handle, nullptr);
-    ASSERT_EQ(xgl_init(instance.handle), XGL_OK);
     const auto session = test_session_config(2U);
     ASSERT_EQ(xgl_install_security_session(instance.handle, &session), XGL_OK);
 
@@ -321,8 +320,8 @@ TEST(XglConfigConsistency,
     receiver_port.remote = &sender_port;
     auto sender_phy = connected_phy(&sender_port);
     auto receiver_phy = connected_phy(&receiver_port);
-    xgl_route_item_t sender_route = {2U, &sender_phy, mtu, 100U, 0U};
-    xgl_route_item_t receiver_route = {1U, &receiver_phy, mtu, 100U, 0U};
+    xgl_route_item_t sender_route = {2U, &sender_phy, mtu, 100U};
+    xgl_route_item_t receiver_route = {1U, &receiver_phy, mtu, 100U};
     auto sender_config = bounded_config();
     sender_config.auth_required = true;
     sender_config.auth_provider = &provider;
@@ -332,21 +331,20 @@ TEST(XglConfigConsistency,
     auto receiver_config = sender_config;
     receiver_config.source_id = 2U;
     receiver_config.route_table = &receiver_route;
-    receiver_config.callback_user_data = &receiver_port;
-    receiver_config.rx_callback = [](xgl_handle_t, uint16_t, uint8_t,
+    receiver_config.rx_user_data = &receiver_port;
+    receiver_config.rx_callback = [](xgl_handle_t, const xgl_rx_info_t*,
                                      const uint8_t*, size_t, void* context) {
         ++static_cast<ConnectedPhy*>(context)->received_payloads;
+        return XGL_OK;
     };
-    ASSERT_EQ(xgl_config_validate(&sender_config), XGL_OK);
-    ASSERT_EQ(xgl_config_validate(&receiver_config), XGL_OK);
+    ASSERT_EQ(xgl_test_measure_config(&sender_config), XGL_OK);
+    ASSERT_EQ(xgl_test_measure_config(&receiver_config), XGL_OK);
     ScopedInstance sender;
     ScopedInstance receiver;
-    sender.handle = xgl_create(&sender_config);
-    receiver.handle = xgl_create(&receiver_config);
+    sender.handle = xgl_test_init_allocated(&sender_config);
+    receiver.handle = xgl_test_init_allocated(&receiver_config);
     ASSERT_NE(sender.handle, nullptr);
     ASSERT_NE(receiver.handle, nullptr);
-    ASSERT_EQ(xgl_init(sender.handle), XGL_OK);
-    ASSERT_EQ(xgl_init(receiver.handle), XGL_OK);
     const auto sender_session = test_session_config(2U);
     const auto receiver_session = test_session_config(1U, 0U, 0U, 7U, true);
     ASSERT_EQ(xgl_install_security_session(sender.handle, &sender_session),

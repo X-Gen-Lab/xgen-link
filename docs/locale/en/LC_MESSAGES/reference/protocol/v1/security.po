@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 0c0ae3664a662854691606fa831cb81737e9494c0a45541c32d909ac0cf78502\n"
+"X-XGL-Source-SHA256: 631381948d2abf54f8342a15fcf6e61397a4b60be32f992e9504ded5db31716c\n"
 
 #: docs/zh/reference/protocol/v1/security.md:8
 msgid "安全"
@@ -20,6 +20,14 @@ msgstr ""
 "Authentication is a compiled capability in embedded and full profiles. Boot and embedded-lite omit it. "
 "Authentication protects unicast traffic; this implementation does not provide payload encryption or a "
 "key-establishment protocol."
+
+#: docs/zh/reference/protocol/v1/security.md:12
+msgid ""
+"应用通过 `<xgl/xgl_security.h>` 提供同步认证 provider，并调用 `xgl_install_security_session()` 和 "
+"`xgl_close_security_session()` 管理可信关联。"
+msgstr ""
+"Supply a synchronous authentication provider through `<xgl/xgl_security.h>` and manage trusted "
+"associations with `xgl_install_security_session()` and `xgl_close_security_session()`."
 
 #: docs/zh/reference/protocol/v1/security.md:12
 msgid "可信关联"

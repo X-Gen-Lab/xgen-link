@@ -8,6 +8,7 @@
  */
 
 #include <transport/xgl_transport.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include "test_host_allocator.h"
 

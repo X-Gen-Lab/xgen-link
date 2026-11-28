@@ -9,6 +9,8 @@ source_language: zh_CN
 
 embedded、full profile 编译认证能力，Boot 和 embedded-lite 不包含认证。认证保护单播流量；本实现不提供载荷加密或密钥建立协议。
 
+应用通过 `<xgl/xgl_security.h>` 提供同步认证 provider，并调用 `xgl_install_security_session()` 和 `xgl_close_security_session()` 管理可信关联。
+
 ## 可信关联
 
 广播 ID `0xFFFF` 在安装关联及认证序列化、签名之前都会被拒绝。拒绝不占用安全槽、不消耗安全序号，也不调用 provider 或 PHY。策略允许时仍可使用明文广播。

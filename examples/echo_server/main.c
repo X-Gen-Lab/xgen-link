@@ -24,11 +24,10 @@ typedef struct {
  * \details         Return BUSY while an earlier echo remains pending. Accept
  *                  only after copying the borrowed payload.
  */
-static xgl_error_t echo_accept(xgl_handle_t handle, uint16_t source,
-                               uint8_t type, const uint8_t* data, size_t length,
+static xgl_error_t echo_accept(xgl_handle_t handle, const xgl_rx_info_t* info,
+                               const uint8_t* data, size_t length,
                                void* context) {
     (void)handle;
-    (void)type;
     echo_app_t* app = context;
     if (length > sizeof(app->pending)) {
         return XGL_ERR_INVALID_PARAM;
@@ -37,7 +36,7 @@ static xgl_error_t echo_accept(xgl_handle_t handle, uint16_t source,
         return XGL_ERR_BUSY;
     }
     memcpy(app->pending, data, length);
-    app->source = source;
+    app->source = info->source_id;
     app->length = length;
     app->received++;
     return XGL_OK;
@@ -47,21 +46,18 @@ static xgl_error_t echo_accept(xgl_handle_t handle, uint16_t source,
  * result. */
 int main(void) {
     static sim_node_t client, server;
-    static sim_channel_t to_client, to_server;
-    sim_port_t client_port = {&to_client, &to_server, false, 0};
-    sim_port_t server_port = {&to_server, &to_client, false, 0};
-    xgl_phy_ops_t client_phy = {sim_tx, sim_rx, &client_port};
-    xgl_phy_ops_t server_phy = {sim_tx, sim_rx, &server_port};
+    static sim_link_t link;
+    sim_connect(&link);
     echo_app_t client_app = {0};
     echo_app_t server_app = {.echo = true};
     sim_prepare(&client, 1U);
     sim_prepare(&server, 2U);
-    sim_route(&client, 0U, 2U, &client_phy);
-    sim_route(&server, 0U, 1U, &server_phy);
-    client.config.rx_accept_callback = echo_accept;
-    client.config.callback_user_data = &client_app;
-    server.config.rx_accept_callback = echo_accept;
-    server.config.callback_user_data = &server_app;
+    sim_route(&client, 0U, 2U, &link.phys[0]);
+    sim_route(&server, 0U, 1U, &link.phys[1]);
+    client.config.rx_callback = echo_accept;
+    client.config.rx_user_data = &client_app;
+    server.config.rx_callback = echo_accept;
+    server.config.rx_user_data = &server_app;
     if (sim_init(&client) != XGL_OK || sim_init(&server) != XGL_OK) {
         return 1;
     }

@@ -15,8 +15,11 @@
 #include "internal/xgl_protocol_io.h"
 #include "network/xgl_route.h"
 #include "security/xgl_security.h"
+#include "xgl/xgl_alloc.h"
 #include "xgl/xgl_config.h"
+#include "xgl/xgl_diagnostics.h"
 #include "xgl/xgl_error.h"
+#include "xgl/xgl_inplace.h"
 #include "xgl/xgl_types.h"
 
 #ifdef __cplusplus
@@ -116,18 +119,6 @@ xgl_error_t xgl_network_init(xgl_network_ctx_t* ctx,
  */
 xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet);
 
-/**
- * \brief           Route and synchronously submit caller-owned frame storage
- * \param[in,out]   ctx: Network context
- * \param[in]       handle: Instance passed to synchronous callbacks
- * \param[in,out]   request: Borrowed payload and exact frame headroom
- * \return          XGL_OK, or an argument, route, layout or submission error
- * \note            Reliable transmission is excluded from this entry point.
- */
-xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
-                                      xgl_handle_t handle,
-                                      const xgl_tx_data_zerocopy_t* request);
-
 /** \brief           Query one scoped frame without allocating or transmitting.
  */
 xgl_error_t
@@ -135,7 +126,12 @@ xgl_network_zerocopy_layout(xgl_network_ctx_t* ctx,
                             const xgl_tx_zerocopy_request_t* request,
                             xgl_tx_frame_layout_t* layout);
 
-/** \brief           Send caller storage with an explicit connection and epoch.
+/**
+ * \brief           Route and synchronously submit scoped caller-owned storage
+ * \param[in,out]   ctx: Network context
+ * \param[in]       handle: Instance passed to synchronous callbacks
+ * \param[in]       request: Borrowed payload, exact frame headroom and scope
+ * \return          XGL_OK, or an argument, route, layout or submission error
  */
 xgl_error_t
 xgl_network_send_zerocopy_scoped(xgl_network_ctx_t* ctx, xgl_handle_t handle,

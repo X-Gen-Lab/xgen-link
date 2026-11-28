@@ -8,17 +8,7 @@
  */
 
 #include <xgl/xgl.h>
-
-/*---------------------------------------------------------------------------*/
-/* Version Information                                                       */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Get the linked SDK version string
- */
-const char* xgl_version_string(void) {
-    return XGL_VERSION_STRING;
-}
+#include <xgl/xgl_diagnostics.h>
 
 /**
  * \brief           Get the linked SDK version as an integer

@@ -44,4 +44,9 @@ constexpr xgl_config_t xgl_test_config() {
 #endif
 }
 
+inline xgl_error_t xgl_test_measure_config(const xgl_config_t* config) {
+    xgl_memory_requirements_t requirements{};
+    return xgl_memory_requirements(config, &requirements);
+}
+
 #endif /* XGL_TEST_CONFIG_H */

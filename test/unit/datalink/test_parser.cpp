@@ -11,6 +11,7 @@
 #include <wire/xgl_frame.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_security.h>
 
 #include <gtest/gtest.h>
 #include <vector>

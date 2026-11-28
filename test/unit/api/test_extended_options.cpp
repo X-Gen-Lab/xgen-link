@@ -16,15 +16,18 @@
 #include <vector>
 #include <wire/xgl_frame.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_runtime.h>
 
 TEST(XglExtendedOptions, RejectsForeignOptionsBeforeAllocation) {
     xgl_config_t config;
     config = xgl_test_single_packet_config();
-    xgl_test_use_host_allocator(&config);
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     options.version++;
+    config.options = &options;
     xgl_handle_t handle = nullptr;
-    EXPECT_EQ(xgl_create_with_options(&config, &options, &handle),
+    EXPECT_EQ(xgl_init_allocated(&config, xgl_test_host_allocator(), &handle),
               XGL_ERR_INVALID_VERSION);
     EXPECT_EQ(handle, nullptr);
 }
@@ -78,19 +81,23 @@ class XglBoundedPollingTest : public ::testing::Test {
             }
             return XGL_OK;
         };
-        route = {2U, &phy, 128U, 1U, 1U};
+        route = {2U, &phy, 128U, 1U};
         config = xgl_test_single_packet_config();
         config.source_id = 1U;
         config.route_table = &route;
         config.route_table_len = 1U;
-        config.callback_user_data = this;
-        config.rx_callback = [](xgl_handle_t, uint16_t, uint8_t, const uint8_t*,
-                                size_t, void* user) {
+        config.rx_user_data = this;
+        config.rx_callback = [](xgl_handle_t, const xgl_rx_info_t* info,
+                                const uint8_t*, size_t length, void* user) {
+            EXPECT_EQ(info->source_id, 2U);
+            EXPECT_EQ(length, 1U);
             ++static_cast<XglBoundedPollingTest*>(user)->deliveries;
+            return XGL_OK;
         };
-        xgl_test_use_host_allocator(&config);
-        ASSERT_EQ(xgl_create_with_options(&config, &options, &handle), XGL_OK);
-        ASSERT_EQ(xgl_init(handle), XGL_OK);
+        config.options = &options;
+        ASSERT_EQ(
+            xgl_init_allocated(&config, xgl_test_host_allocator(), &handle),
+            XGL_OK);
     }
 
     void TearDown() override {
@@ -117,7 +124,7 @@ TEST_F(XglBoundedPollingTest, PausedParserDoesNotConsumeThePhyPollInterval) {
     EXPECT_EQ(deliveries, 1U);
     EXPECT_FALSE(result.pending);
     uint32_t delay = 0U;
-    ASSERT_TRUE(xgl_next_timeout_for_work(handle, 1000U, &budget, &delay));
+    ASSERT_TRUE(xgl_deadline_query(handle, 1000U, &budget, &delay));
     EXPECT_EQ(delay, 1000U);
     EXPECT_EQ(xgl_step_bounded(handle, 1999U, &budget, &limits, &result),
               XGL_OK);
@@ -153,8 +160,8 @@ TEST(XglExtendedOptions, DefaultOptionsPreserveMeasuredStorage) {
     xgl_memory_report_t legacy = {};
     xgl_memory_report_t extended = {};
     ASSERT_EQ(xgl_memory_report(&config, &legacy), XGL_OK);
-    ASSERT_EQ(xgl_memory_report_with_options(&config, &options, &extended),
-              XGL_OK);
+    config.options = &options;
+    ASSERT_EQ(xgl_memory_report(&config, &extended), XGL_OK);
     EXPECT_EQ(legacy.requirements.size, extended.requirements.size);
     EXPECT_EQ(legacy.requirements.alignment, extended.requirements.alignment);
 }
@@ -164,10 +171,10 @@ TEST(XglExtendedOptions, InvalidLifetimeDoesNotModifyReport) {
     config = xgl_test_single_packet_config();
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     options.tx_lifetime_ms = UINT32_C(0x80000000);
+    config.options = &options;
     xgl_memory_report_t report = {};
     report.requirements.size = 123U;
-    EXPECT_EQ(xgl_memory_report_with_options(&config, &options, &report),
-              XGL_ERR_INVALID_PARAM);
+    EXPECT_EQ(xgl_memory_report(&config, &report), XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(report.requirements.size, 123U);
 }
 
@@ -176,6 +183,7 @@ TEST(XglExtendedOptions, InvalidDescriptorAndCapabilityPreserveOutputs) {
     config = xgl_test_single_packet_config();
     const xgl_instance_options_t base = XGL_INSTANCE_OPTIONS_INIT;
     xgl_instance_options_t options = base;
+    config.options = &options;
     xgl_memory_report_t report = {};
     report.requirements.size = 123U;
     for (unsigned index = 0U; index < 3U; ++index) {
@@ -186,8 +194,7 @@ TEST(XglExtendedOptions, InvalidDescriptorAndCapabilityPreserveOutputs) {
             options.config_size++;
         if (index == 2U)
             options.version--;
-        EXPECT_EQ(xgl_memory_report_with_options(&config, &options, &report),
-                  XGL_ERR_INVALID_VERSION);
+        EXPECT_EQ(xgl_memory_report(&config, &report), XGL_ERR_INVALID_VERSION);
         EXPECT_EQ(report.requirements.size, 123U);
     }
     options = base;
@@ -197,37 +204,30 @@ TEST(XglExtendedOptions, InvalidDescriptorAndCapabilityPreserveOutputs) {
 #else
     const xgl_error_t unsupported_auth = XGL_ERR_UNSUPPORTED;
 #endif
-    EXPECT_EQ(xgl_memory_report_with_options(&config, &options, &report),
-              unsupported_auth);
+    EXPECT_EQ(xgl_memory_report(&config, &report), unsupported_auth);
     EXPECT_EQ(report.requirements.size, 123U);
-    EXPECT_EQ(xgl_memory_report_with_options(nullptr, &base, &report),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_memory_report_with_options(&config, nullptr, &report),
-              XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_memory_report_with_options(&config, &base, nullptr),
-              XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_memory_report(nullptr, &report), XGL_ERR_NULL_POINTER);
+    EXPECT_EQ(xgl_memory_report(&config, nullptr), XGL_ERR_NULL_POINTER);
 }
 
 TEST(XglExtendedOptions, StaticAndOwnedInitializationUseTheSameOptions) {
     xgl_config_t config;
     config = xgl_test_single_packet_config();
-    xgl_test_use_host_allocator(&config);
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     options.tx_lifetime_ms = 200U;
+    config.options = &options;
     xgl_memory_report_t report = {};
-    ASSERT_EQ(xgl_memory_report_with_options(&config, &options, &report),
-              XGL_OK);
+    ASSERT_EQ(xgl_memory_report(&config, &report), XGL_OK);
     std::vector<xgl_max_align_t> storage(
         (report.requirements.size + sizeof(xgl_max_align_t) - 1U) /
         sizeof(xgl_max_align_t));
     xgl_handle_t handle = nullptr;
-    EXPECT_EQ(xgl_init_static_with_options(&config, &options, storage.data(),
-                                           report.requirements.size - 1U,
-                                           &handle),
+    EXPECT_EQ(xgl_init_static(&config, storage.data(),
+                              report.requirements.size - 1U, &handle),
               XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(handle, nullptr);
-    ASSERT_EQ(xgl_init_static_with_options(&config, &options, storage.data(),
-                                           report.requirements.size, &handle),
+    ASSERT_EQ(xgl_init_static(&config, storage.data(), report.requirements.size,
+                              &handle),
               XGL_OK);
     xgl_resource_snapshot_t snapshot = {};
     ASSERT_EQ(xgl_resources_get(handle, &snapshot), XGL_OK);
@@ -249,9 +249,8 @@ TEST(XglExtendedOptions, StaticAndOwnedInitializationUseTheSameOptions) {
     EXPECT_EQ(xgl_resources_get(nullptr, &snapshot), XGL_ERR_NULL_POINTER);
     xgl_destroy(handle);
     handle = nullptr;
-    ASSERT_EQ(xgl_create_with_options(&config, &options, &handle), XGL_OK);
-    EXPECT_EQ(xgl_resources_get(handle, &snapshot), XGL_ERR_NOT_INITIALIZED);
-    ASSERT_EQ(xgl_init(handle), XGL_OK);
+    ASSERT_EQ(xgl_init_allocated(&config, xgl_test_host_allocator(), &handle),
+              XGL_OK);
     EXPECT_EQ(xgl_resources_get(handle, &snapshot), XGL_OK);
     xgl_destroy(handle);
 }
@@ -260,8 +259,8 @@ TEST(XglExtendedOptions, DisabledCapabilityIsExplicit) {
     xgl_config_t config;
     config = xgl_test_single_packet_config();
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
+    config.options = &options;
     xgl_memory_report_t report = {};
-    EXPECT_EQ(xgl_memory_report_with_options(&config, &options, &report),
-              XGL_ERR_UNSUPPORTED);
+    EXPECT_EQ(xgl_memory_report(&config, &report), XGL_ERR_UNSUPPORTED);
 }
 #endif

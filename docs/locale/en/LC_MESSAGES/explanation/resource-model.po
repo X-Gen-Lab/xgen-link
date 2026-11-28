@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 44a534b877d28a179170e74ec615523531247dc4c68fd6c8c6cb4908ca43b5eb\n"
+"X-XGL-Source-SHA256: a6b50e12679d24a0c64b97139fa716a8fa2f56b9619245d09d36b618187bce97\n"
 
 #: docs/zh/explanation/resource-model.md:8
 msgid "资源模型"
@@ -32,12 +32,12 @@ msgstr ""
 
 #: docs/zh/explanation/resource-model.md:16
 msgid ""
-"`xgl_init_static()` 准备并初始化调用者提供的对齐存储，不调用 `memory.allocator`。`xgl_create()` 通过配置的 `xgl_allocator_t` "
-"一次性申请整个 workspace，返回尚未初始化的 handle，随后须调用 `xgl_init()`。两条路径共用同一分区计划。"
+"`xgl_init_static()` 使用调用方提供的对齐存储。`<xgl/xgl_alloc.h>` 的 `xgl_init_allocated()` "
+"通过指定或编译选定的后端一次申请整个工作区。两条路径共用同一分区计划，成功时返回可立即使用的实例。"
 msgstr ""
-"`xgl_init_static()` prepares and initializes caller-owned aligned storage without calling "
-"`memory.allocator`. `xgl_create()` uses the configured `xgl_allocator_t` once for the entire workspace, "
-"then returns an uninitialized handle; call `xgl_init()` next. Both paths use the same partition plan."
+"`xgl_init_static()` uses aligned storage supplied by the caller. `xgl_init_allocated()` in "
+"`<xgl/xgl_alloc.h>` allocates the entire workspace once through the supplied or compiled backend. Both "
+"paths use the same partition plan and return a ready instance on success."
 
 #: docs/zh/explanation/resource-model.md:18
 msgid ""
@@ -49,13 +49,13 @@ msgstr ""
 
 #: docs/zh/explanation/resource-model.md:20
 msgid ""
-"`xgl_memory_report()` 无分配地解释同一份规划，分别报告管理区、初始化区、peer、窗口、可靠记录及载荷、帧 scratch 和乱序 RX 占用。类别字节数包含对齐，合计恰好等于 "
-"`report.requirements.size`。失败不改写输出。"
+"`<xgl/xgl_diagnostics.h>` 的 `xgl_memory_report()` 无分配地解释同一份规划，报告管理区、初始化区、peer、可靠记录及载荷、帧 scratch 和乱序 RX "
+"占用。类别字节数包含对齐，合计恰好等于 `report.requirements.size`。失败不改写输出。"
 msgstr ""
-"`xgl_memory_report()` describes the same plan without allocating. It reports management and "
-"initialization storage, peers, windows, reliable records and payloads, frame scratch and buffered out-"
-"of-order RX. Categories include alignment and total exactly `report.requirements.size`. Failure "
-"preserves the output."
+"`xgl_memory_report()` in `<xgl/xgl_diagnostics.h>` describes the same plan without allocating. It "
+"reports management and initialization storage, peer records, reliable records and payloads, frame "
+"scratch, and out-of-order RX storage. All categories include alignment padding and sum to exactly "
+"`report.requirements.size`. Failure leaves the output unchanged."
 
 #: docs/zh/explanation/resource-model.md:29
 msgid "独立资源池"
@@ -152,12 +152,12 @@ msgstr "No-Heap Builds"
 
 #: docs/zh/explanation/resource-model.md:50
 msgid ""
-"生产构建使用 `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` 禁止 libc 分配。采用静态初始化，或提供带上下文的显式分配器，只申请一次 workspace。启用 NULL "
-"fallback 时，也只在 create 边界解析。"
+"生产构建使用 `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` 禁止库从 libc 分配。使用静态初始化，或通过显式分配器申请一次工作区。启用回退的构建在 "
+"`xgl_init_allocated()` 的 allocator 参数为 `NULL` 时使用 libc。"
 msgstr ""
-"Select `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` for production without libc allocation. Use static "
-"initialization, or provide an explicit context allocator for the single workspace reservation. NULL "
-"fallback, when enabled, is resolved only at the create boundary."
+"Use `-DXGL_ALLOW_FALLBACK_MALLOC=OFF` to prevent the production library from allocating through libc. "
+"Use static initialization or allocate the workspace once through an explicit allocator. A build with "
+"fallback enabled uses libc when `xgl_init_allocated()` receives a `NULL` allocator."
 
 #: docs/zh/explanation/resource-model.md:52
 msgid "协议的无 heap 结论不涵盖应用驱动和认证 provider，应检查包含这些组件的最终固件链接结果。"

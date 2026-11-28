@@ -8,6 +8,7 @@
 #define MOCK_ALLOCATOR_H
 
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
 
 #include <cstdlib>
 #include <gmock/gmock.h>

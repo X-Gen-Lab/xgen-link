@@ -12,9 +12,11 @@
 #include <stdint.h>
 
 #include "datalink/xgl_parser.h"
+#include "internal/xgl_allocator.h"
 #include "internal/xgl_protocol_io.h"
 #include "wire/xgl_frame.h"
 #include "xgl/xgl_config.h"
+#include "xgl/xgl_diagnostics.h"
 #include "xgl/xgl_error.h"
 #include "xgl/xgl_types.h"
 #if XGL_FEATURE_AUTH

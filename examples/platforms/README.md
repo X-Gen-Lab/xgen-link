@@ -24,7 +24,8 @@ the requested buffer, updates the produced length, and never waits for a complet
 frame. ISRs may advance driver-owned rings and signal the owner loop/task.
 
 Use `xgl_send_at(handle, data, now_ms)`, `xgl_step(handle, now_ms, budget)`, and
-`xgl_next_timeout(handle, now_ms, &delay_ms)`. The caller supplies a monotonic
+`xgl_deadline_query(handle, now_ms, &budget, &delay_ms)` (from
+`<xgl/xgl_runtime.h>`). The caller supplies a monotonic
 32-bit millisecond clock with normal unsigned wrap. Schedule often enough that
 active timer intervals remain within the supported half-range. No global timer,
 OS mutex, or thread-safe callback reentry exists in the portable kernel.

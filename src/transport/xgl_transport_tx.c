@@ -7,7 +7,6 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
-#include "wire/xgl_frame.h"
 #include "wire/xgl_wire.h"
 #include "xgl/xgl_config.h"
 #include "xgl_transport_internal.h"
@@ -56,26 +55,6 @@ xgl_error_t transport_prepare_data_tx(xgl_transport_ctx_t* ctx,
                                   session_epoch));
 }
 
-/** \brief           Check the complete frame budget without changing state. */
-static xgl_error_t transport_check_frame_budget(const xgl_transport_ctx_t* ctx,
-                                                xgl_handle_t handle,
-                                                const xgl_tx_data_t* tx_data,
-                                                bool need_hello) {
-    if (ctx->lower_layer->check_data != NULL) {
-        return ctx->lower_layer->check_data(ctx->lower_layer->ctx, handle,
-                                            tx_data, need_hello);
-    }
-    const size_t extensions_len = xgl_wire_packet_extension_size(
-        tx_data->data_type, tx_data->session_epoch);
-    size_t payload_budget;
-    if (!xgl_frame_payload_budget(ctx->max_frame_size, extensions_len, 0U,
-                                  &payload_budget) ||
-        tx_data->data_len > payload_budget) {
-        return XGL_ERR_BUFFER_TOO_SMALL;
-    }
-    return XGL_OK;
-}
-
 static int32_t transport_send_timeout_ms(const xgl_transport_ctx_t* ctx,
                                          const xgl_transport_peer_state_t* peer,
                                          const xgl_tx_data_t* tx_data) {
@@ -104,9 +83,6 @@ static xgl_error_t transport_queue_reliable_tx(
         return XGL_OK;
     }
 
-    if (transport_tx_packet_count(ctx) >= ctx->max_tx_packets) {
-        return XGL_ERR_WINDOW_FULL;
-    }
     xgl_error_t err = xgl_reliable_add_packet_number(
         &peer->reliable_queue, tx_data->data, tx_data->data_len, ctx->local_id,
         tx_data->target_id, packet_number, tx_data->data_type,
@@ -243,10 +219,6 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (tx_data->compression_id != 0U) {
-        return XGL_ERR_UNSUPPORTED;
-    }
-
     if (tx_data->data_len == 0U || tx_data->timeout_ms > INT32_MAX ||
         (tx_data->reliable && tx_data->target_id == UINT16_MAX)) {
         return XGL_ERR_INVALID_PARAM;
@@ -268,16 +240,17 @@ xgl_error_t xgl_transport_send(xgl_transport_ctx_t* ctx, xgl_handle_t handle,
         tx_data->session_epoch);
     const bool need_hello =
         tx_data->reliable && (peer == NULL || !peer->hello_sent);
-    xgl_error_t err =
-        transport_check_frame_budget(ctx, handle, tx_data, need_hello);
-    if (err != XGL_OK) {
-        transport_count_send_error(ctx);
-        return err;
+    if (ctx->lower_layer->check_data != NULL) {
+        xgl_error_t error = ctx->lower_layer->check_data(
+            ctx->lower_layer->ctx, handle, tx_data, need_hello);
+        if (error != XGL_OK) {
+            transport_count_send_error(ctx);
+            return error;
+        }
     }
 
-    /* Validate the complete frame budget before reserving a scope or HELLO. */
     bool created = false;
-    err =
+    xgl_error_t err =
         transport_prepare_reliable_send(ctx, handle, tx_data, &peer, &created);
     if (err != XGL_OK) {
         transport_rollback_new_peer(ctx, handle, peer, created);

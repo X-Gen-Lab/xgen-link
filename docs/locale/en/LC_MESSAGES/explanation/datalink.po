@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 10b6d69b5646b2809d842019bfc3c76ae5d06fab580fda791ac4e34202c90dd0\n"
+"X-XGL-Source-SHA256: 5c83a1426342db5c433e5c66cc797431a5baea44cb2eb7f282f6ee52bf5f3b50\n"
 
 #: docs/zh/explanation/datalink.md:8
 msgid "数据链路"
@@ -123,14 +123,15 @@ msgstr "Limits and Scheduling"
 
 #: docs/zh/explanation/datalink.md:36
 msgid ""
-"编译期帧长上限和配置的链路 MTU 都约束完整序列化帧，包括扩展、标签和 CRC。`xgl_step` 接收显式时间与接收工作预算。`xgl_next_timeout` 汇总链路轮询、parser 和 "
-"transport 期限；零 RX 预算或链路尚未到轮询时间时，仍检查半帧过期。存在且为零的延迟表示工作已到期。驱动通过就绪通知或轮询发现新接收字节。"
+"编译期帧长上限和配置的链路 MTU 都约束完整序列化帧，包括扩展、标签和 CRC。`xgl_step` 接收显式时间与接收工作预算。`xgl_deadline_query()` 汇总链路轮询、parser 和"
+" transport 期限；零 RX 预算或链路尚未到轮询时间时，仍检查半帧过期。存在且为零的延迟表示工作已到期。驱动通过就绪通知或轮询发现新接收字节。"
 msgstr ""
-"The compiled frame-size bound and configured link MTU both apply to the full serialized frame, including"
-" extensions, tag and CRC. `xgl_step` receives explicit time and a receive-work budget. "
-"`xgl_next_timeout` combines link polling, parser and transport deadlines. Partial-frame expiry is "
-"maintained even with zero RX budget or before the next PHY poll. An active zero delay means work is due "
-"now. Drivers supply readiness notifications or polling for newly arrived bytes."
+"Both the compiled frame limit and the configured link MTU constrain the complete serialized frame, "
+"including extensions, the tag and CRC. Pass explicit time and an RX work budget to `xgl_step()`. "
+"`xgl_deadline_query()` combines link polling, parser and transport deadlines. A step still checks "
+"incomplete frames for expiry with a zero RX budget or before the link is due to poll. An available delay"
+" of zero means work is due. The driver uses readiness notifications or polling to discover new incoming "
+"bytes."
 
 #: docs/zh/explanation/datalink.md:38
 msgid ""

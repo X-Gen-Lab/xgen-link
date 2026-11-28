@@ -327,7 +327,7 @@ static xgl_error_t
 network_send_frame_to_lower(xgl_network_ctx_t* ctx, xgl_handle_t handle,
                             xgl_phy_ops_t* phy, xgl_frame_t* frame,
                             const xgl_frame_layout_t* layout,
-                            const xgl_tx_data_zerocopy_t* inplace) {
+                            const xgl_tx_zerocopy_request_t* inplace) {
     if (ctx->lower_layer == NULL || ctx->lower_layer->send == NULL) {
         network_count_tx_error(ctx);
         return XGL_ERR_INVALID_PARAM;
@@ -349,10 +349,12 @@ network_send_frame_to_lower(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     return err;
 }
 
-static xgl_error_t
-network_send_packet(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                    xgl_packet_t* packet, const xgl_tx_data_zerocopy_t* inplace,
-                    uint8_t* extensions, size_t extensions_capacity) {
+static xgl_error_t network_send_packet(xgl_network_ctx_t* ctx,
+                                       xgl_handle_t handle,
+                                       xgl_packet_t* packet,
+                                       const xgl_tx_zerocopy_request_t* inplace,
+                                       uint8_t* extensions,
+                                       size_t extensions_capacity) {
     if (ctx == NULL || packet == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -421,38 +423,30 @@ xgl_error_t xgl_network_send(xgl_network_ctx_t* ctx, xgl_packet_t* packet) {
 }
 
 /**
- * \brief           Validate zero-copy transmission data
+ * \brief           Validate the base frame and storage bounds for in-place TX
  */
-xgl_error_t
-xgl_network_validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
-    if (tx_data == NULL) {
+xgl_error_t xgl_network_validate_zerocopy_request(
+    const xgl_tx_zerocopy_request_t* request) {
+    if (request == NULL || request->buffer == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
 
-    if (tx_data->buffer == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-
-    if (tx_data->data_len == 0) {
+    if (request->data_len == 0U) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (tx_data->data_offset < XGL_FRAME_HEADER_SIZE) {
+    if (request->data_offset < XGL_FRAME_HEADER_SIZE) {
         return XGL_ERR_INVALID_PARAM;
     }
 
-    if (tx_data->data_offset > tx_data->buffer_size ||
-        tx_data->data_len > tx_data->buffer_size - tx_data->data_offset ||
+    if (request->data_offset > request->buffer_size ||
+        request->data_len > request->buffer_size - request->data_offset ||
         XGL_CRC16_SIZE >
-            tx_data->buffer_size - tx_data->data_offset - tx_data->data_len) {
+            request->buffer_size - request->data_offset - request->data_len) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
 
-    if (tx_data->priority > 7) {
-        return XGL_ERR_INVALID_PARAM;
-    }
-
-    if (tx_data->reliable) {
+    if (request->priority > 7U) {
         return XGL_ERR_INVALID_PARAM;
     }
 
@@ -463,23 +457,16 @@ xgl_network_validate_tx_data_zerocopy(const xgl_tx_data_zerocopy_t* tx_data) {
  * \brief           Apply shared routing and framing to caller-owned TX storage
  */
 xgl_error_t
-xgl_network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                                const xgl_tx_data_zerocopy_t* request,
-                                uint32_t connection_id, uint32_t session_epoch,
-                                bool* attempted) {
-    if (attempted != NULL) {
-        *attempted = false;
-    }
+xgl_network_send_zerocopy_scoped(xgl_network_ctx_t* ctx, xgl_handle_t handle,
+                                 const xgl_tx_zerocopy_request_t* request) {
     if (ctx == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    xgl_error_t error = xgl_network_validate_tx_data_zerocopy(request);
+    xgl_error_t error = xgl_network_validate_zerocopy_request(request);
     if (error != XGL_OK) {
         return error;
     }
-    if (attempted != NULL) {
-        *attempted = true;
-    }
+
     xgl_packet_data_t data = {
         .data = request->buffer + request->data_offset,
         .data_len = request->data_len,
@@ -487,8 +474,8 @@ xgl_network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     xgl_packet_t packet = {
         .source_id = ctx->local_id,
         .target_id = request->target_id,
-        .connection_id = connection_id,
-        .session_epoch = session_epoch,
+        .connection_id = request->connection_id,
+        .session_epoch = request->session_epoch,
         .data_type = request->data_type,
         .packet_type = XGL_PACKET_TYPE_DATA,
         .priority = request->priority,
@@ -497,23 +484,6 @@ xgl_network_send_zerocopy_scope(xgl_network_ctx_t* ctx, xgl_handle_t handle,
     uint8_t extensions[XGL_NETWORK_TX_GENERATED_EXT_CAPACITY];
     return network_send_packet(ctx, handle, &packet, request, extensions,
                                sizeof(extensions));
-}
-
-xgl_error_t xgl_network_send_zerocopy(xgl_network_ctx_t* ctx,
-                                      xgl_handle_t handle,
-                                      const xgl_tx_data_zerocopy_t* request) {
-    return xgl_network_send_zerocopy_scope(ctx, handle, request, 0U, 0U, NULL);
-}
-
-xgl_error_t
-xgl_network_send_zerocopy_scoped(xgl_network_ctx_t* ctx, xgl_handle_t handle,
-                                 const xgl_tx_zerocopy_request_t* request) {
-    if (request == NULL) {
-        return XGL_ERR_NULL_POINTER;
-    }
-    return xgl_network_send_zerocopy_scope(ctx, handle, &request->data,
-                                           request->connection_id,
-                                           request->session_epoch, NULL);
 }
 
 xgl_error_t
@@ -527,25 +497,24 @@ xgl_network_zerocopy_layout(xgl_network_ctx_t* ctx,
     if (ctx == NULL || request == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
-    const xgl_tx_data_zerocopy_t* data = &request->data;
-    if (data->data_len == 0U || data->priority > 7U || data->reliable ||
-        data->target_id == 0U) {
+    if (request->data_len == 0U || request->priority > 7U ||
+        request->target_id == 0U) {
         return XGL_ERR_INVALID_PARAM;
     }
-    if (data->data_len > UINT16_MAX) {
+    if (request->data_len > UINT16_MAX) {
         return XGL_ERR_BUFFER_TOO_SMALL;
     }
     const xgl_route_item_t* route =
-        xgl_route_table_lookup(ctx->route_table, data->target_id);
+        xgl_route_table_lookup(ctx->route_table, request->target_id);
     if (route == NULL) {
         return XGL_ERR_ROUTE_NOT_FOUND;
     }
-    size_t extensions_len =
-        xgl_wire_packet_extension_size(data->data_type, request->session_epoch);
+    size_t extensions_len = xgl_wire_packet_extension_size(
+        request->data_type, request->session_epoch);
     xgl_frame_layout_t measured;
     xgl_error_t error_layout = network_prepare_egress(
         ctx, route, request->connection_id, request->session_epoch, 0U,
-        data->data_len, extensions_len, false, &measured);
+        request->data_len, extensions_len, false, &measured);
     if (error_layout != XGL_OK) {
         return error_layout;
     }

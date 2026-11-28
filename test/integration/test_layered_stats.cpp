@@ -9,6 +9,7 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
@@ -24,12 +25,8 @@ class XglLayeredStatsTest : public ::testing::Test {
         config.source_id = 1;
 
         /* Create and initialize instance */
-        xgl_test_use_host_allocator(&config);
-        handle = xgl_create(&config);
+        handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr);
-
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK);
     }
 
     void TearDown() override {

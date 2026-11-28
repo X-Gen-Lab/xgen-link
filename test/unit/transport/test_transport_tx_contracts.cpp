@@ -14,6 +14,7 @@
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_alloc.h>
 
 #include <gtest/gtest.h>
 
@@ -86,15 +87,13 @@ class XglTransportTxContractTest : public ::testing::Test {
 
     void SetUp() override {
         phy = {Transmit, Receive, this};
-        route = {2U, &phy, 128U, 1000U, 0U};
+        route = {2U, &phy, 128U, 1000U};
         config = xgl_test_single_packet_config();
         config.features.peer_idle_timeout_ms = 0U;
-        config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;
-        instance = xgl_create(&config);
+        instance = xgl_test_init_allocated(&config);
         ASSERT_NE(instance, nullptr);
-        ASSERT_EQ(xgl_init(instance), XGL_OK);
     }
 
     void TearDown() override {
@@ -229,7 +228,7 @@ TEST_F(XglTransportTxContractTest, FailedSendPreservesAcknowledgedHistory) {
 TEST_F(XglTransportTxContractTest, ReliableBroadcastFailsBeforePeerOrPhyUse) {
     ASSERT_EQ(xgl_route_table_remove(&instance->route_table, 2U), XGL_OK);
     ASSERT_EQ(xgl_route_table_add(&instance->route_table, XGL_BROADCAST_ID,
-                                  &phy, 128U, 1000U, 0U),
+                                  &phy, 128U, 1000U),
               XGL_OK);
     EXPECT_EQ(Send(XGL_BROADCAST_ID), XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(Transport().peers, nullptr);

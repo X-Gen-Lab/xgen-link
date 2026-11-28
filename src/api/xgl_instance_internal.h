@@ -17,6 +17,7 @@
 #include <transport/xgl_transport.h>
 #include <transport/xgl_window.h>
 #include <xgl/xgl.h>
+#include <xgl/xgl_diagnostics.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,17 +61,14 @@ struct xgl_instance {
     /*-----------------------------------------------------------------------*/
     const xgl_config_t* config; /**< Instance configuration */
     bool initialized;           /**< Initialization flag */
-    bool caller_owned;          /**< Instance resides inside caller workspace */
     uint32_t parser_timeout_ms; /**< Latest step policy; zero disables expiry */
-#if XGL_FEATURE_ADVANCED_RUNTIME
-    const xgl_instance_options_t* options; /**< Immutable borrowed policy */
-#endif
 
     /*-----------------------------------------------------------------------*/
     /* Memory Management                                                     */
     /*-----------------------------------------------------------------------*/
     const xgl_allocator_t* allocator;
-    const xgl_allocator_t* storage_allocator;
+    const xgl_allocator_t*
+        storage_allocator; /**< NULL for caller-owned workspace */
     const xgl_protocol_memory_t* memory;
 
     /*-----------------------------------------------------------------------*/
@@ -107,16 +105,8 @@ xgl_error_t xgl_instance_init_links(xgl_handle_t handle);
 void xgl_instance_destroy_links(xgl_handle_t handle);
 size_t xgl_instance_count_links(const xgl_config_t* config);
 
-/**
- * \brief           Prepare caller storage without initializing protocol layers
- */
-xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
-                                  size_t storage_size,
-                                  const xgl_allocator_t* storage_allocator,
-                                  xgl_handle_t* handle);
-
-xgl_error_t xgl_options_validate(const xgl_config_t* config,
-                                 const xgl_instance_options_t* options);
+/** \brief           Validate instance policy and all workspace parameters. */
+xgl_error_t xgl_instance_validate_config(const xgl_config_t* config);
 
 #ifdef __cplusplus
 }

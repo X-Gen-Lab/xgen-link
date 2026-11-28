@@ -34,14 +34,16 @@ option(
 )
 option(XGL_BUILD_NOHEAP_SMOKE "Build strict no-heap profile smoke target" OFF)
 
-if(
-    CMAKE_CROSSCOMPILING
-    AND (XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE OR XGL_BUILD_SDK_CONSUMER_SMOKE)
-)
-    message(
-        FATAL_ERROR
-        "XGL_BUILD_TESTS, XGL_BUILD_NOHEAP_SMOKE and XGL_BUILD_SDK_CONSUMER_SMOKE require a separate native host build"
-    )
+set(xgl_host_checks_enabled FALSE)
+if(XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE OR XGL_BUILD_SDK_CONSUMER_SMOKE)
+    if(CMAKE_CROSSCOMPILING)
+        message(
+            FATAL_ERROR
+            "XGL_BUILD_TESTS, XGL_BUILD_NOHEAP_SMOKE and XGL_BUILD_SDK_CONSUMER_SMOKE require a separate native host build"
+        )
+    endif()
+    set(xgl_host_checks_enabled TRUE)
+    enable_testing()
 endif()
 
 include(cmake/XglProfiles.cmake)
@@ -52,7 +54,6 @@ target_include_directories(
     xgl
     PUBLIC "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-get_target_property(XGL_RESOURCE_CONFIG_ID xgl XGL_RESOURCE_CONFIG_ID)
 
 if(XGL_ENABLE_COVERAGE)
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CROSSCOMPILING)
@@ -68,9 +69,6 @@ endif()
 
 include(cmake/XglInstall.cmake)
 
-if(XGL_BUILD_TESTS OR XGL_BUILD_NOHEAP_SMOKE OR XGL_BUILD_SDK_CONSUMER_SMOKE)
-    enable_testing()
-endif()
 if(XGL_BUILD_TESTS)
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -33,8 +33,7 @@ xgl_error_t transport_drain_rx_buffered(xgl_transport_ctx_t* ctx,
 
 xgl_error_t transport_deliver_packet(xgl_transport_ctx_t* ctx,
                                      xgl_handle_t handle,
-                                     const xgl_packet_t* packet,
-                                     const uint8_t* data, size_t data_len);
+                                     const xgl_packet_t* packet);
 
 #ifdef __cplusplus
 }

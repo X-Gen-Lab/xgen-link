@@ -21,6 +21,8 @@ target_link_libraries(my_application PRIVATE xgl::xgl)
 
 应用也可用 `add_subdirectory()` 集成源码并链接同一目标。不同工具链、档位或资源配置使用各自的构建目录和安装前缀，库与生成头配套使用。[构建与消费](docs/zh/guides/build-and-consume.md)
 
+静态集成使用 `<xgl/xgl.h>` 完成工作区测量、初始化、收发、关闭和销毁。按需包含分配初始化、原地发送、运行调度、安全或诊断扩展头。[公开 API](docs/zh/reference/api.md)
+
 ## 选择档位
 
 | 档位 | 编译能力 |

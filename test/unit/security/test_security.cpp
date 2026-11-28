@@ -8,6 +8,7 @@
  */
 
 #include <security/xgl_security.h>
+#include <xgl/xgl_security.h>
 
 #include <gtest/gtest.h>
 

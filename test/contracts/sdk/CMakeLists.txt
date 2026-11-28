@@ -15,11 +15,19 @@ file(
     "${sdk_includes}/xgl/*"
 )
 list(SORT installed_headers)
-if(
-    NOT installed_headers
-        STREQUAL
-        "xgl.h;xgl_build_config.h;xgl_config.h;xgl_error.h;xgl_types.h"
+set(expected_headers
+    xgl.h
+    xgl_alloc.h
+    xgl_build_config.h
+    xgl_config.h
+    xgl_diagnostics.h
+    xgl_error.h
+    xgl_inplace.h
+    xgl_runtime.h
+    xgl_security.h
+    xgl_types.h
 )
+if(NOT installed_headers STREQUAL expected_headers)
     message(
         FATAL_ERROR
         "Unexpected installed SDK header set: ${installed_headers}"

@@ -33,8 +33,8 @@ class XglBoundedProfileTest : public ::testing::Test {
     std::array<xgl_max_align_t, 4096> storage_a{}, storage_b{};
     xgl_phy_ops_t phy_a{Transmit, Receive, &a};
     xgl_phy_ops_t phy_b{Transmit, Receive, &b};
-    xgl_route_item_t route_a{2U, &phy_a, 128U, 1000U, 0U};
-    xgl_route_item_t route_b{1U, &phy_b, 128U, 1000U, 0U};
+    xgl_route_item_t route_a{2U, &phy_a, 128U, 1000U};
+    xgl_route_item_t route_b{1U, &phy_b, 128U, 1000U};
     xgl_config_t config_a{}, config_b{};
     xgl_handle_t handle_a = nullptr;
     xgl_handle_t handle_b = nullptr;
@@ -62,21 +62,20 @@ class XglBoundedProfileTest : public ::testing::Test {
         return XGL_OK;
     }
 
-    static void Deliver(xgl_handle_t, uint16_t, uint8_t, const uint8_t* data,
-                        size_t len, void* context) {
+    static xgl_error_t Deliver(xgl_handle_t, const xgl_rx_info_t* /*info*/,
+                               const uint8_t* data, size_t len, void* context) {
         auto* endpoint = static_cast<Endpoint*>(context);
         endpoint->delivered.assign(data, data + len);
         ++endpoint->deliveries;
+        return XGL_OK;
     }
 
-    static xgl_error_t Accept(xgl_handle_t handle, uint16_t source,
-                              uint8_t type, const uint8_t* data, size_t len,
-                              void* context) {
+    static xgl_error_t Accept(xgl_handle_t handle, const xgl_rx_info_t* info,
+                              const uint8_t* data, size_t len, void* context) {
         if (static_cast<Endpoint*>(context)->reject_delivery) {
             return XGL_ERR_BUSY;
         }
-        Deliver(handle, source, type, data, len, context);
-        return XGL_OK;
+        return Deliver(handle, info, data, len, context);
     }
 
     void SetUp() override {
@@ -86,11 +85,11 @@ class XglBoundedProfileTest : public ::testing::Test {
         config_a.route_table = &route_a;
         config_a.route_table_len = 1U;
         config_a.rx_callback = Deliver;
-        config_a.callback_user_data = &a;
+        config_a.rx_user_data = &a;
         config_b = config_a;
         config_b.source_id = 2U;
         config_b.route_table = &route_b;
-        config_b.callback_user_data = &b;
+        config_b.rx_user_data = &b;
     }
 
     void Initialize() {
@@ -161,7 +160,7 @@ TEST_F(XglBoundedProfileTest, LostAckRetransmitsWithoutRedelivery) {
 }
 
 TEST_F(XglBoundedProfileTest, BusyReceiverRetainsSenderWindowUntilRetry) {
-    config_b.rx_accept_callback = Accept;
+    config_b.rx_callback = Accept;
     b.reject_delivery = true;
     Initialize();
     const uint8_t payload = 7U;
@@ -189,7 +188,7 @@ TEST_F(XglBoundedProfileTest, BusyReceiverRetainsSenderWindowUntilRetry) {
 
 TEST_F(XglBoundedProfileTest, RejectsUnsupportedAuthentication) {
     config_a.auth_required = true;
-    EXPECT_EQ(xgl_config_validate(&config_a), XGL_ERR_UNSUPPORTED);
+    EXPECT_EQ(xgl_test_measure_config(&config_a), XGL_ERR_UNSUPPORTED);
 }
 
 TEST_F(XglBoundedProfileTest, CapacityShortagePreservesCallerStorage) {

@@ -7,6 +7,7 @@
 #define TEST_SECURITY_HELPERS_H
 #include <security/xgl_security.h>
 #include <wire/xgl_frame.h>
+#include <xgl/xgl_security.h>
 
 /** \brief           Build a deterministic trusted test association. */
 static inline xgl_security_session_config_t

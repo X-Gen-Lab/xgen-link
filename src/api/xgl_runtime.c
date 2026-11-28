@@ -6,8 +6,8 @@
  * \date            2026-06-16
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
-#include <xgl/xgl.h>
 #include <xgl/xgl_config.h>
+#include <xgl/xgl_runtime.h>
 
 #include "xgl_instance_internal.h"
 
@@ -57,17 +57,29 @@ static inline void include_timeout(uint32_t candidate, uint32_t* next,
     }
 }
 
-/** \brief           Collect transport and link deadlines for the chosen policy.
+/** \brief           Collect deadlines without changing the latest step policy.
  */
-static bool instance_next_timeout(const struct xgl_instance* instance,
-                                  uint32_t now_ms, bool include_polling,
-                                  uint32_t receive_timeout_ms,
-                                  uint32_t* delay_ms) {
+bool xgl_deadline_query(xgl_handle_t handle, uint32_t now_ms,
+                        const xgl_work_budget_t* budget, uint32_t* delay_ms) {
+    if (handle == NULL || !handle->initialized || delay_ms == NULL) {
+        return false;
+    }
+
+    bool include_polling = true;
+    uint32_t receive_timeout_ms = handle->parser_timeout_ms;
+    if (budget != NULL) {
+        if (budget->receive_timeout_ms >= UINT32_C(0x80000000)) {
+            return false;
+        }
+        include_polling = budget->rx_bytes != 0U;
+        receive_timeout_ms = budget->receive_timeout_ms;
+    }
+
     uint32_t next = 0U;
-    bool found = xgl_transport_next_timeout(&instance->layers.transport_ctx,
+    bool found = xgl_transport_next_timeout(&handle->layers.transport_ctx,
                                             now_ms, &next);
-    for (size_t i = 0U; i < instance->link_count; ++i) {
-        const xgl_instance_link_t* link = &instance->links[i];
+    for (size_t i = 0U; i < handle->link_count; ++i) {
+        const xgl_instance_link_t* link = &handle->links[i];
         if (include_polling) {
             include_timeout(poll_timeout(link, now_ms), &next, &found);
         }
@@ -80,32 +92,6 @@ static bool instance_next_timeout(const struct xgl_instance* instance,
         *delay_ms = next;
     }
     return found;
-}
-
-/**
- * \brief           Include every link using the most recent step policy
- */
-bool xgl_next_timeout(xgl_handle_t handle, uint32_t now_ms,
-                      uint32_t* delay_ms) {
-    if (handle == NULL || !handle->initialized || delay_ms == NULL) {
-        return false;
-    }
-    return instance_next_timeout(handle, now_ms, true,
-                                 handle->parser_timeout_ms, delay_ms);
-}
-
-/**
- * \brief           Apply a proposed work policy only to the deadline query
- */
-bool xgl_next_timeout_for_work(xgl_handle_t handle, uint32_t now_ms,
-                               const xgl_work_budget_t* budget,
-                               uint32_t* delay_ms) {
-    if (handle == NULL || !handle->initialized || delay_ms == NULL ||
-        budget == NULL || budget->receive_timeout_ms >= UINT32_C(0x80000000)) {
-        return false;
-    }
-    return instance_next_timeout(handle, now_ms, budget->rx_bytes != 0U,
-                                 budget->receive_timeout_ms, delay_ms);
 }
 
 /**

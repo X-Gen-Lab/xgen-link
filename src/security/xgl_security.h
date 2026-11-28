@@ -4,8 +4,8 @@
  * \author          X-Gen Lab
  */
 
-#ifndef XGL_SECURITY_H
-#define XGL_SECURITY_H
+#ifndef XGL_SECURITY_INTERNAL_H
+#define XGL_SECURITY_INTERNAL_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -14,6 +14,7 @@
 #include "wire/xgl_wire.h"
 #include "xgl/xgl_config.h"
 #include "xgl/xgl_error.h"
+#include "xgl/xgl_security.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -245,4 +246,4 @@ xgl_error_t xgl_security_serialize_measured(uint8_t* buffer,
 }
 #endif
 
-#endif /* XGL_SECURITY_H */
+#endif /* XGL_SECURITY_INTERNAL_H */

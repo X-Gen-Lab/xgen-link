@@ -12,6 +12,7 @@
 #include <api/xgl_instance_internal.h>
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_wire.h>
+#include <xgl/xgl_diagnostics.h>
 
 #include <array>
 #include <gtest/gtest.h>
@@ -53,7 +54,7 @@ class XglTransportRuntimeTest : public ::testing::Test {
                                                          : XGL_OK;
     }
 
-    static xgl_error_t Accept(xgl_handle_t, uint16_t, uint8_t,
+    static xgl_error_t Accept(xgl_handle_t, const xgl_rx_info_t* /*info*/,
                               const uint8_t* data, size_t length, void* user) {
         auto* self = static_cast<XglTransportRuntimeTest*>(user);
         const xgl_error_t result =
@@ -87,7 +88,8 @@ class XglTransportRuntimeTest : public ::testing::Test {
         config.tx_retries = &retries;
         config.allocator = xgl_test_host_allocator();
         config.error_callback = Error;
-        config.rx_accept_callback = Accept;
+        config.rx_callback = Accept;
+        config.rx_user_data = this;
         config.callback_user_data = this;
         ASSERT_EQ(xgl_transport_init(&context, &config), XGL_OK);
     }
@@ -385,15 +387,14 @@ TEST(XglTransportPublicRuntimeTest, StepReturnsHardRetryAndExhaustionErrors) {
         route.read_freq_hz = 1000U;
         xgl_config_t config;
         config = xgl_test_single_packet_config();
-        config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;
         config.protocol.max_retry_count = 1U;
         config.error_callback = PublicRuntime::Error;
+        config.rx_user_data = &state;
         config.callback_user_data = &state;
-        xgl_handle_t handle = xgl_create(&config);
+        xgl_handle_t handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr);
-        ASSERT_EQ(xgl_init(handle), XGL_OK);
         const uint8_t payload = 42U;
         xgl_tx_data_t data = {};
         data.target_id = 2U;

@@ -8,7 +8,7 @@ source_language: zh_CN
 # 接收与运行时工作预算
 
 `XGL_ENABLE_ADVANCED_RUNTIME=ON` 启用可续跑的接收校验和
-`xgl_step_bounded()`。这是显式构建选项，所有 profile 默认均为 OFF。关闭时保留
+`<xgl/xgl_runtime.h>` 的 `xgl_step_bounded()`。这是显式构建选项，所有 profile 默认均为 OFF。关闭时保留
 原 parser 布局，有界入口返回 `XGL_ERR_UNSUPPORTED`。库和消费者必须使用一致的
 选项，以生成的构建配置为准。
 
@@ -124,7 +124,7 @@ void product_link_iteration(xgl_handle_t handle) {
         return;
     }
     uint32_t delay_ms;
-    bool timed = xgl_next_timeout_for_work(
+    bool timed = xgl_deadline_query(
         handle, product_monotonic_ms(), &budget, &delay_ms);
     product_wait_for_rx_capacity_or_timeout(timed, timed ? delay_ms : 0U);
 }

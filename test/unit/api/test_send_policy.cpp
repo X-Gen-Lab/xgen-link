@@ -9,6 +9,10 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
+#include <xgl/xgl_inplace.h>
+#include <xgl/xgl_runtime.h>
+#include <xgl/xgl_security.h>
 
 #include <gtest/gtest.h>
 #include <wire/xgl_wire.h>
@@ -34,9 +38,8 @@ class XglSendPolicyTest : public ::testing::Test {
         config.route_table_len = 1U;
         config.error_callback = Error;
         config.callback_user_data = this;
-        xgl_test_use_host_allocator(&config);
         phy = {Transmit, Receive, this};
-        route = {2U, &phy, 128U, 100U, 1U};
+        route = {2U, &phy, 128U, 100U};
         provider = {Sign, Verify, XGL_TEST_AUTH_TAG_SIZE, this};
         payload.fill(0x5AU);
     }
@@ -50,18 +53,19 @@ class XglSendPolicyTest : public ::testing::Test {
         route.max_frame_size = frame_size;
         config.auth_required = authenticated;
         config.auth_provider = authenticated ? &provider : nullptr;
-        ASSERT_EQ(xgl_config_validate(&config), XGL_OK);
+        ASSERT_EQ(xgl_test_measure_config(&config), XGL_OK);
 #if XGL_FEATURE_ADVANCED_RUNTIME
         if (options.tx_lifetime_ms != 0U) {
-            ASSERT_EQ(xgl_create_with_options(&config, &options, &handle),
-                      XGL_OK);
+            config.options = &options;
+            ASSERT_EQ(
+                xgl_init_allocated(&config, xgl_test_host_allocator(), &handle),
+                XGL_OK);
         } else
 #endif
         {
-            handle = xgl_create(&config);
+            handle = xgl_test_init_allocated(&config);
         }
         ASSERT_NE(handle, nullptr);
-        ASSERT_EQ(xgl_init(handle), XGL_OK);
         if (authenticated) {
             xgl_security_session_config_t session = {};
             session.remote_id = 2U;
@@ -85,13 +89,12 @@ class XglSendPolicyTest : public ::testing::Test {
 
     xgl_tx_zerocopy_request_t CallerFrame(size_t length) {
         xgl_tx_zerocopy_request_t request = {};
-        request.data.target_id = 2U;
-        request.data.data_len = length;
-        request.data.buffer = frame.data();
-        request.data.buffer_size = frame.size();
-        request.data.data_offset = XGL_FRAME_HEADER_SIZE;
-        std::memcpy(frame.data() + request.data.data_offset, payload.data(),
-                    length);
+        request.target_id = 2U;
+        request.data_len = length;
+        request.buffer = frame.data();
+        request.buffer_size = frame.size();
+        request.data_offset = XGL_FRAME_HEADER_SIZE;
+        std::memcpy(frame.data() + request.data_offset, payload.data(), length);
         return request;
     }
 
@@ -208,16 +211,6 @@ TEST_F(XglSendPolicyTest, OrdinaryRejectsSingleFrameAboveMtu) {
     EXPECT_EQ(tx_calls, 0U);
 }
 
-TEST_F(XglSendPolicyTest, LegacyZeroCopyRejectsSingleFrameAboveMtu) {
-    Initialize(false, XGL_TEST_MTU);
-    const auto request = CallerFrame(XGL_TEST_PLAIN_PAYLOAD_AT_MTU + 1U);
-    const auto before = frame;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &request.data, 0U),
-              XGL_ERR_BUFFER_TOO_SMALL);
-    EXPECT_EQ(tx_calls, 0U);
-    EXPECT_EQ(frame, before);
-}
-
 TEST_F(XglSendPolicyTest, ScopedZeroCopyRejectsSingleFrameAboveMtu) {
     Initialize(false, XGL_TEST_MTU);
     const auto request = CallerFrame(XGL_TEST_PLAIN_PAYLOAD_AT_MTU + 1U);
@@ -253,8 +246,8 @@ TEST_F(XglSendPolicyTest, AllSendPathsAcceptMtuBoundary) {
         ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
         EXPECT_EQ(layout.frame_size,
                   length + XGL_FRAME_HEADER_SIZE + XGL_CRC16_SIZE);
-        request.data.data_offset = layout.payload_offset;
-        ASSERT_EQ(xgl_send_zerocopy_at(handle, &request.data, 0U), XGL_OK);
+        request.data_offset = layout.payload_offset;
+        ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U), XGL_OK);
         ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 0U), XGL_OK);
     }
     EXPECT_EQ(data_calls, 6U);
@@ -267,18 +260,6 @@ TEST_F(XglSendPolicyTest, FailedScopeRejectsOrdinaryUnreliableData) {
     const auto before = Snapshot();
     auto tx = Ordinary(1U);
     EXPECT_EQ(xgl_send_at(handle, &tx, 11U), XGL_ERR_ACK_TIMEOUT);
-    EXPECT_EQ(tx_calls, submitted);
-    ExpectStatsUnchanged(before);
-}
-
-TEST_F(XglSendPolicyTest, FailedScopeRejectsLegacyZeroCopyData) {
-    Initialize();
-    FailDefaultScope();
-    const size_t submitted = tx_calls;
-    const auto before = Snapshot();
-    auto request = CallerFrame(1U);
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &request.data, 11U),
-              XGL_ERR_ACK_TIMEOUT);
     EXPECT_EQ(tx_calls, submitted);
     ExpectStatsUnchanged(before);
 }
@@ -308,7 +289,7 @@ TEST_F(XglSendPolicyTest, ScopedZeroCopyAppliesLifetimeAtWraparoundDeadline) {
     request.session_epoch = tx.session_epoch;
     xgl_tx_frame_layout_t layout = {};
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
-    request.data.data_offset = layout.payload_offset;
+    request.data_offset = layout.payload_offset;
     frame[layout.payload_offset] = payload[0];
     ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 4U), XGL_OK);
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
@@ -348,7 +329,7 @@ TEST_F(XglSendPolicyTest, FailedScopeDoesNotBlockAnotherConnectionOrEpoch) {
     request.session_epoch = 9U;
     xgl_tx_frame_layout_t layout = {};
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
-    request.data.data_offset = layout.payload_offset;
+    request.data_offset = layout.payload_offset;
     frame[layout.payload_offset] = payload[0];
     ASSERT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 11U), XGL_OK);
     EXPECT_EQ(data_connections.back(), 0U);
@@ -362,19 +343,15 @@ TEST_F(XglSendPolicyTest, ZeroCopyValidatesRequestsBeforeTerminalPolicy) {
     Initialize();
     FailDefaultScope();
     auto request = CallerFrame(1U);
-    request.data.buffer = nullptr;
-    EXPECT_EQ(xgl_send_zerocopy_at(handle, &request.data, 11U),
+    request.buffer = nullptr;
+    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 11U),
               XGL_ERR_NULL_POINTER);
-    request.data.buffer = frame.data();
-    request.data.priority = 8U;
+    request.buffer = frame.data();
+    request.priority = 8U;
     EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 11U),
               XGL_ERR_INVALID_PARAM);
     xgl_tx_frame_layout_t layout = {};
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
-              XGL_ERR_INVALID_PARAM);
-    request.data.priority = 0U;
-    request.data.reliable = true;
-    EXPECT_EQ(xgl_send_zerocopy_scoped_at(handle, &request, 11U),
               XGL_ERR_INVALID_PARAM);
 }
 
@@ -390,7 +367,7 @@ TEST_F(XglSendPolicyTest, AuthenticatedPolicyQueriesNeverSignOrSubmit) {
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     ASSERT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout), XGL_OK);
     EXPECT_EQ(layout.frame_size, XGL_TEST_MTU);
-    request.data.data_len = payload_at_mtu + 1U;
+    request.data_len = payload_at_mtu + 1U;
     EXPECT_EQ(xgl_send_zerocopy_layout(handle, &request, &layout),
               XGL_ERR_BUFFER_TOO_SMALL);
     EXPECT_EQ(layout.frame_size, 0U);

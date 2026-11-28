@@ -9,6 +9,7 @@
 
 #include "test_config.h"
 #include "test_host_allocator.h"
+#include <xgl/xgl_diagnostics.h>
 
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -39,8 +40,9 @@ xgl_error_t statistics_rx(uint8_t* data, size_t* size, void* context) {
     return XGL_OK;
 }
 
-xgl_error_t statistics_accept(xgl_handle_t, uint16_t source_id, uint8_t,
+xgl_error_t statistics_accept(xgl_handle_t, const xgl_rx_info_t* info,
                               const uint8_t* data, size_t size, void* context) {
+    const uint16_t source_id = info->source_id;
     if (source_id != 1U || data == nullptr || size != 1U) {
         return XGL_ERR_INVALID_PARAM;
     }
@@ -58,8 +60,8 @@ TEST(XglStatisticsBehavior,
     second.remote = &first;
     xgl_phy_ops_t first_phy = {statistics_tx, statistics_rx, &first};
     xgl_phy_ops_t second_phy = {statistics_tx, statistics_rx, &second};
-    xgl_route_item_t first_route = {2U, &first_phy, 128U, 1000U, 1U};
-    xgl_route_item_t second_route = {1U, &second_phy, 128U, 1000U, 1U};
+    xgl_route_item_t first_route = {2U, &first_phy, 128U, 1000U};
+    xgl_route_item_t second_route = {1U, &second_phy, 128U, 1000U};
     xgl_config_t sender_config, receiver_config;
     sender_config = xgl_test_two_packet_config();
     receiver_config = xgl_test_two_packet_config();
@@ -70,16 +72,12 @@ TEST(XglStatisticsBehavior,
     sender_config.route_table = &first_route;
     receiver_config.route_table = &second_route;
     sender_config.route_table_len = receiver_config.route_table_len = 1U;
-    receiver_config.rx_accept_callback = statistics_accept;
-    receiver_config.callback_user_data = &second;
-    xgl_test_use_host_allocator(&sender_config);
-    xgl_test_use_host_allocator(&receiver_config);
-    xgl_handle_t sender = xgl_create(&sender_config);
-    xgl_handle_t receiver = xgl_create(&receiver_config);
+    receiver_config.rx_callback = statistics_accept;
+    receiver_config.rx_user_data = &second;
+    xgl_handle_t sender = xgl_test_init_allocated(&sender_config);
+    xgl_handle_t receiver = xgl_test_init_allocated(&receiver_config);
     ASSERT_NE(sender, nullptr);
     ASSERT_NE(receiver, nullptr);
-    ASSERT_EQ(xgl_init(sender), XGL_OK);
-    ASSERT_EQ(xgl_init(receiver), XGL_OK);
 
     const uint8_t payload = 42U;
     xgl_tx_data_t tx{};
@@ -161,12 +159,8 @@ class XglStatsTest : public ::testing::Test {
         config.source_id = 1;
 
         /* Create and initialize instance */
-        xgl_test_use_host_allocator(&config);
-        handle = xgl_create(&config);
+        handle = xgl_test_init_allocated(&config);
         ASSERT_NE(handle, nullptr);
-
-        xgl_error_t err = xgl_init(handle);
-        ASSERT_EQ(err, XGL_OK);
     }
 
     void TearDown() override {
@@ -213,26 +207,6 @@ TEST_F(XglStatsTest, GetStatsWithNullStatsPointer) {
     xgl_error_t err = xgl_stats_get(handle, NULL);
 
     EXPECT_EQ(err, XGL_ERR_NULL_POINTER);
-}
-
-/**
- * \brief           Test getting statistics from uninitialized instance
- */
-TEST_F(XglStatsTest, GetStatsFromUninitializedInstance) {
-    xgl_config_t temp_config;
-    temp_config = xgl_test_config();
-    temp_config.source_id = 2;
-
-    xgl_test_use_host_allocator(&temp_config);
-    xgl_handle_t temp_handle = xgl_create(&temp_config);
-    ASSERT_NE(temp_handle, nullptr);
-
-    xgl_statistics_t stats;
-    xgl_error_t err = xgl_stats_get(temp_handle, &stats);
-
-    EXPECT_EQ(err, XGL_ERR_NOT_INITIALIZED);
-
-    xgl_destroy(temp_handle);
 }
 
 /**
@@ -291,25 +265,6 @@ TEST_F(XglStatsTest, ResetStatsWithNullHandle) {
 }
 
 /**
- * \brief           Test resetting statistics from uninitialized instance
- */
-TEST_F(XglStatsTest, ResetStatsFromUninitializedInstance) {
-    xgl_config_t temp_config;
-    temp_config = xgl_test_config();
-    temp_config.source_id = 2;
-
-    xgl_test_use_host_allocator(&temp_config);
-    xgl_handle_t temp_handle = xgl_create(&temp_config);
-    ASSERT_NE(temp_handle, nullptr);
-
-    xgl_error_t err = xgl_stats_reset(temp_handle);
-
-    EXPECT_EQ(err, XGL_ERR_NOT_INITIALIZED);
-
-    xgl_destroy(temp_handle);
-}
-
-/**
  * \brief           Test statistics remain zero after reset
  */
 TEST_F(XglStatsTest, StatsRemainZeroAfterReset) {
@@ -359,17 +314,13 @@ TEST_F(XglStatsTest, StatsIsolationBetweenInstances) {
     config2 = xgl_test_config();
     config2.source_id = 2;
 
-    xgl_test_use_host_allocator(&config2);
-    xgl_handle_t handle2 = xgl_create(&config2);
+    xgl_handle_t handle2 = xgl_test_init_allocated(&config2);
     ASSERT_NE(handle2, nullptr);
-
-    xgl_error_t err = xgl_init(handle2);
-    ASSERT_EQ(err, XGL_OK);
 
     /* Get statistics from both instances */
     xgl_statistics_t stats1, stats2;
 
-    err = xgl_stats_get(handle, &stats1);
+    xgl_error_t err = xgl_stats_get(handle, &stats1);
     ASSERT_EQ(err, XGL_OK);
 
     err = xgl_stats_get(handle2, &stats2);

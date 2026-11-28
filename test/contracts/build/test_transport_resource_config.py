@@ -258,7 +258,7 @@ class TransportResourceConfig(unittest.TestCase):
             '    config.features.max_peers = 1U; config.features.max_tx_packets = 1U;\n'
             '    if (xgl_memory_requirements(&config, &requirements) != XGL_OK) return 1;\n'
             '    config.protocol.window_size = 2U;\n'
-            '    if (xgl_config_validate(&config) != XGL_ERR_INVALID_PARAM) return 2;\n'
+            '    if (xgl_memory_requirements(&config, &requirements) != XGL_ERR_INVALID_PARAM) return 2;\n'
             '    return 0;\n}\n', encoding="utf-8")
         (source / "CMakeLists.txt").write_text(
             'cmake_minimum_required(VERSION 3.24)\nproject(resource_sdk_consumer C CXX)\n'

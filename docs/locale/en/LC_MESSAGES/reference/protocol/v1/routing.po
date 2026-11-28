@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 2f70169821313c65f38390a5e6c1db6e31d477a8a377afbedd8556145431ff26\n"
+"X-XGL-Source-SHA256: ea5d581cf8e6d5394a6410cbb1f9171b7de7cdb8e2d658c2611ac404452c2461\n"
 
 #: docs/zh/reference/protocol/v1/routing.md:8
 msgid "路由"
@@ -38,11 +38,10 @@ msgstr ""
 "SECURITY, tag and CRC overhead."
 
 #: docs/zh/reference/protocol/v1/routing.md:16
-msgid "`metric` 是保留的兼容字段，不参与出口选择，也不提供多路径择优。私有路由表仍支持更新已有目的和复用删除后的槽；查询返回的借用指针可能在删除、加载或清空后失效。"
+msgid "每个目的使用一条出口路由。私有路由表可更新已有目的或复用删除后的槽；查询返回的借用指针可能在删除、加载或清空后失效。"
 msgstr ""
-"`metric` is a reserved compatibility field; it does not select an egress or provide multipath ranking. "
-"The private table still supports updating existing destinations and reusing removed slots. Borrowed "
-"lookup pointers may become invalid after removal, loading or clearing."
+"Each destination uses one egress route. The private route table can update a destination or reuse a "
+"deleted slot. A borrowed lookup result may become invalid after deleting, loading or clearing routes."
 
 #: docs/zh/reference/protocol/v1/routing.md:18
 msgid "链路装配与生命周期"
@@ -60,15 +59,11 @@ msgstr ""
 "nonzero frequency has a minimum interval of 1 ms."
 
 #: docs/zh/reference/protocol/v1/routing.md:22
-msgid ""
-"路由表只负责目的出口，链路对象负责轮询和接收存储。兼容配置仍使用同一个公开结构，未增加第二份配置副本。私有路由增删不注册新 PHY、不重建接收缓存，也不改变已确定的轮询周期；公开 API "
-"不承诺运行时链路热更新。当前仍需通过路由配置注册 PHY，没有独立的仅接收链路配置入口。"
+msgid "路由表负责目的出口，链路对象负责 PHY 轮询和接收存储。PHY 通过静态路由配置注册。私有路由增删不注册新 PHY、不重建接收缓存，也不改变已确定的轮询周期。"
 msgstr ""
-"Routes select destination egress; link objects own polling and receive storage. The compatible public "
-"configuration still uses one structure without a second configuration copy. Private route mutations do "
-"not register a new PHY, rebuild RX caches or change established polling intervals. The public API does "
-"not promise runtime link replacement. PHY registration still comes from route configuration; there is no"
-" separate receive-only link configuration entry."
+"The route table selects destination egress. Link objects own PHY polling and receive storage. Static "
+"routes register the PHYs. Private route updates do not register new PHYs, rebuild RX caches or change "
+"the established polling periods."
 
 #: docs/zh/reference/protocol/v1/routing.md:24
 msgid ""
@@ -85,13 +80,11 @@ msgstr "Forwarding"
 
 #: docs/zh/reference/protocol/v1/routing.md:28
 msgid ""
-"Embedded 和 Full 支持转发。转发节点验证完整帧，要求目标路由，检查出口完整帧 MTU，并拒绝不足以再经过一跳的 TTL。然后取得有界 scratch，递减 TTL，重写帧头 CRC 与最终 "
-"CRC，再同步发送。"
+"Embedded 和 Full 支持转发。转发节点验证完整帧，要求目标路由，检查出口完整帧 MTU，并拒绝不足以再经过一跳的 TTL。随后递减 TTL、重写帧头 CRC 与最终 CRC 并同步发送。"
 msgstr ""
-"Embedded and Full support forwarding. A forwarder validates the complete frame, requires a destination "
-"route, checks the outgoing full-frame MTU and rejects TTL values that cannot survive another hop. It "
-"obtains bounded scratch, decrements TTL, rewrites the header CRC and final CRC, then synchronously "
-"transmits the frame."
+"Embedded and Full support forwarding. The relay validates the full frame, looks up a destination route, "
+"checks the complete frame against the egress MTU and rejects TTL values too low for another hop. It then"
+" decrements TTL, rewrites the header and final CRCs, and transmits synchronously."
 
 #: docs/zh/reference/protocol/v1/routing.md:30
 msgid "端到端认证标签与被认证载荷保持不变。AAD 规范化排除了 TTL 和帧头 CRC；转发不会安装本地信任，也不声称已验证目标标签。目标为本机的认证帧在 transport 投递前完成验签。"
@@ -102,24 +95,23 @@ msgstr ""
 
 #: docs/zh/reference/protocol/v1/routing.md:32
 msgid ""
-"正常 datalink → network 端点必须携带已验证的借用 view，不再接受 raw 回退。独立的私有 raw 接收函数保留完整解码和实例帧长检查。转发从 view 取得唯一的帧地址和长度，不修改"
-" parser 缓存；同步 serialized 提交复用同一份 scratch，不再申请第二份整帧。"
+"Datalink 将已验证帧的借用视图交给 Network。Parser 拥有可写的帧存储时，转发在该存储中临时更新 TTL 和 CRC，PHY "
+"返回后恢复原值。私有只读输入路径会先解码并检查实例帧长，再把待转发的帧复制到有界 scratch。"
 msgstr ""
-"The normal datalink-to-network endpoint requires a validated borrowed view and has no raw fallback. A "
-"separate private raw receive function retains complete decoding and the instance frame-size check. "
-"Forwarding obtains the sole frame address and length from the view without modifying parser storage. "
-"Synchronous serialized submission uses the same scratch allocation instead of reserving another complete"
-" frame."
+"Datalink passes a borrowed, validated frame view to Network. When the parser owns writable frame "
+"storage, the relay updates TTL and CRCs temporarily in place and restores their original values after "
+"the PHY returns. The private read-only path decodes and checks the instance frame size first, then "
+"copies the relay frame into bounded scratch."
 
 #: docs/zh/reference/protocol/v1/routing.md:34
 msgid ""
-"下层提交失败保留原始错误，例如 `XGL_ERR_BUSY`，并释放 scratch。没有中继排队或自动重试承诺；可靠性由端点 transport "
-"负责。返回值是本次操作的权威结果，错误回调仅报告指定事件，并不覆盖所有错误返回。"
+"下层提交失败保留原始错误，例如 `XGL_ERR_BUSY`。提交结束时恢复 parser 存储或归还有界 scratch。可靠重试由端点 transport "
+"负责。调用方检查返回值，并通过错误回调处理指定事件。"
 msgstr ""
-"Failed lower-layer submission preserves its original error, such as `XGL_ERR_BUSY`, and releases "
-"scratch. The relay does not promise queuing or automatic retry; endpoint transport owns reliability. The"
-" return value is authoritative for the operation. Error callbacks report selected events and do not "
-"cover every error return."
+"A lower-layer submission failure preserves its original error, such as `XGL_ERR_BUSY`. After submission,"
+" the relay restores parser storage or returns its scratch space. Endpoint transport owns reliable "
+"retransmission. The caller must check return codes and handle designated events through the error "
+"callback."
 
 #: docs/zh/reference/protocol/v1/routing.md:36
 msgid ""
