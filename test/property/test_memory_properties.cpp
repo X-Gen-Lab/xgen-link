@@ -435,16 +435,12 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
             << "Statistics inconsistent after memory pressure in iteration "
             << iteration;
 
-        /* Verify we attempted to send packets and some succeeded */
         EXPECT_EQ(send_attempts, 200)
             << "Did not attempt all sends in iteration " << iteration;
         EXPECT_GT(successful_sends, 0)
             << "No successful sends in iteration " << iteration;
-
-        /* The key property: system handled memory pressure without corruption
-         */
-        /* Whether we got resource errors or not, the system should remain
-         * functional */
+        EXPECT_GT(resource_errors, 0)
+            << "No resource exhaustion in iteration " << iteration;
 
         /* Clean up */
         xgl_destroy(handle);

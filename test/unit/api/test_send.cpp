@@ -298,9 +298,11 @@ TEST_F(XglSendTest, OrdinaryRejectsPayloadAboveRouteMtu) {
     EXPECT_EQ(xgl_send_at(handle, &tx_data, 0U), XGL_ERR_BUFFER_TOO_SMALL);
     tx_data.reliable = true;
     EXPECT_EQ(xgl_send_at(handle, &tx_data, 0U), XGL_ERR_BUFFER_TOO_SMALL);
+#if XGL_FEATURE_ADVANCED_RUNTIME
     xgl_resource_snapshot_t resources{};
     ASSERT_EQ(xgl_resources_get(handle, &resources), XGL_OK);
     EXPECT_EQ(resources.peer_count, 0U);
+#endif
     ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(mock_phy));
     tx_data.reliable = false;
     tx_data.data_len = capacity;
