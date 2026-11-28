@@ -39,47 +39,14 @@ extern "C" {
     (XGL_VERSION_INT >= ((major)*10000 + (minor)*100 + (patch)))
 
 /**
- * \brief           Reserve a workspace after checking consumer ABI constants
- * \param[in]       config: Immutable configuration borrowed until destruction
- * \param[in]       config_size: Size of the consumer's configuration structure
- * \param[in]       abi_version: Consumer configuration ABI version
- * \param[in]       build_config_id: Consumer compiled profile identifier
- * \return          Reserved handle, or NULL for invalid input/allocation
- * failure
- * \note            Call xgl_init() before using the reserved instance.
- */
-xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
-                                uint32_t abi_version, uint32_t build_config_id);
-
-/**
  * \brief           Reserve an instance and return the exact failure reason
  * \param[in]       config: Immutable configuration borrowed until destruction
- * \param[in]       config_size: Size of the consumer configuration structure
- * \param[in]       abi_version: Consumer configuration ABI version
- * \param[in]       build_config_id: Consumer compiled profile identifier
  * \param[out]      handle: Reserved instance; cleared on every failure
- * \return          XGL_OK or a configuration, ABI, backend or allocation error
+ * \return          XGL_OK or a configuration, backend or allocation error
  * \note            Successful reservation still requires xgl_init().
  */
-xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
-                                          size_t config_size,
-                                          uint32_t abi_version,
-                                          uint32_t build_config_id,
-                                          xgl_handle_t* handle);
-
-/**
- * \brief           Reserve an instance with consumer ABI checks and errors
- * \param[in]       config: Immutable configuration borrowed until destruction
- * \param[out]      handle: Reserved instance; cleared on every failure
- * \return          XGL_OK or a configuration, ABI, backend or allocation error
- * \note            Call xgl_init() before using the reserved instance.
- */
-static inline xgl_error_t xgl_create_with_error(const xgl_config_t* config,
-                                                xgl_handle_t* handle) {
-    return xgl_create_with_error_checked(config, sizeof(xgl_config_t),
-                                         XGL_CONFIG_ABI_VERSION,
-                                         XGL_BUILD_CONFIG_ID, handle);
-}
+xgl_error_t xgl_create_with_error(const xgl_config_t* config,
+                                  xgl_handle_t* handle);
 
 /**
  * \brief           Create a new protocol instance
@@ -94,11 +61,8 @@ static inline xgl_error_t xgl_create_with_error(const xgl_config_t* config,
  * \warning         Must call xgl_destroy() to free resources
  *
  * \par Example
+ * Given an initialized application-owned xgl_config_t named config:
  * \code{.c}
- * xgl_config_t config;
- * xgl_config_get_default(&config);
- * config.source_id = 1;
- *
  * xgl_handle_t handle = xgl_create(&config);
  * if (handle == NULL) {
  *     printf("Failed to create instance\n");
@@ -106,10 +70,7 @@ static inline xgl_error_t xgl_create_with_error(const xgl_config_t* config,
  * }
  * \endcode
  */
-static inline xgl_handle_t xgl_create(const xgl_config_t* config) {
-    return xgl_create_checked(config, sizeof(xgl_config_t),
-                              XGL_CONFIG_ABI_VERSION, XGL_BUILD_CONFIG_ID);
-}
+xgl_handle_t xgl_create(const xgl_config_t* config);
 
 /**
  * \brief           Storage requirements for a static protocol instance
@@ -140,63 +101,26 @@ typedef struct {
 } xgl_memory_report_t;
 
 /**
- * \brief           Query the exact static workspace layout after ABI validation
+ * \brief           Measure storage for the supplied configuration
  * \details         Accounts for every enabled protocol capacity and alignment.
  *                  No heap fallback or runtime expansion is performed.
  *                  Only size is the exact total; runtime_blocks multiplied by
  *                  runtime_block_size is not a workspace size.
  * \param[in]       config: Configuration supported by the static storage plan
- * \param[in]       config_size: Size of the caller's configuration structure
- * \param[in]       abi_version: Caller configuration ABI version
- * \param[in]       build_config_id: Caller compiled profile identifier
  * \param[out]      requirements: Required size, alignment, and runtime capacity
- * \return          XGL_OK, XGL_ERR_UNSUPPORTED, or configuration/ABI error
+ * \return          XGL_OK, XGL_ERR_UNSUPPORTED, or a configuration error
  */
-xgl_error_t
-xgl_memory_requirements_checked(const xgl_config_t* config, size_t config_size,
-                                uint32_t abi_version, uint32_t build_config_id,
-                                xgl_memory_requirements_t* requirements);
-
-/**
- * \brief           Query requirements using the consumer header's ABI constants
- * \param[in]       config: Configuration supported by the static storage plan
- * \param[out]      requirements: Required size, alignment, and runtime capacity
- * \return          XGL_OK, XGL_ERR_UNSUPPORTED, or configuration/ABI error
- */
-static inline xgl_error_t
-xgl_memory_requirements(const xgl_config_t* config,
-                        xgl_memory_requirements_t* requirements) {
-    return xgl_memory_requirements_checked(config, sizeof(xgl_config_t),
-                                           XGL_CONFIG_ABI_VERSION,
-                                           XGL_BUILD_CONFIG_ID, requirements);
-}
+xgl_error_t xgl_memory_requirements(const xgl_config_t* config,
+                                    xgl_memory_requirements_t* requirements);
 
 /**
  * \brief           Explain reserved storage without allocating or initializing
  * \param[in]       config: Configuration supported by the static storage plan
- * \param[in]       config_size: Size of the caller's configuration structure
- * \param[in]       abi_version: Caller configuration ABI version
- * \param[in]       build_config_id: Caller compiled profile identifier
  * \param[out]      report: Byte breakdown; unchanged on failure
- * \return          XGL_OK or a configuration, capacity or ABI error
+ * \return          XGL_OK or a configuration or capacity error
  */
-xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
-                                      size_t config_size, uint32_t abi_version,
-                                      uint32_t build_config_id,
-                                      xgl_memory_report_t* report);
-
-/**
- * \brief           Query reserved bytes using the consumer's ABI constants
- * \param[in]       config: Configuration supported by the static storage plan
- * \param[out]      report: Byte breakdown; unchanged on failure
- * \return          XGL_OK or a configuration, capacity or ABI error
- */
-static inline xgl_error_t xgl_memory_report(const xgl_config_t* config,
-                                            xgl_memory_report_t* report) {
-    return xgl_memory_report_checked(config, sizeof(xgl_config_t),
-                                     XGL_CONFIG_ABI_VERSION,
-                                     XGL_BUILD_CONFIG_ID, report);
-}
+xgl_error_t xgl_memory_report(const xgl_config_t* config,
+                              xgl_memory_report_t* report);
 
 /**
  * \brief           Initialize the protocol inside caller-owned storage
@@ -205,36 +129,13 @@ static inline xgl_error_t xgl_memory_report(const xgl_config_t* config,
  *                  The config, PHY descriptors and callback contexts must
  * remain valid and configuration arrays must not be mutated while in use.
  * \param[in]       config: Configuration supported by the static storage plan
- * \param[in]       config_size: Size of the caller's configuration structure
- * \param[in]       abi_version: Caller configuration ABI version
- * \param[in]       build_config_id: Caller compiled profile identifier
  * \param[in]       workspace: Aligned caller-owned storage
  * \param[in]       workspace_size: Available bytes from workspace
  * \param[out]      handle: Instance handle, or NULL on failure
  * \return          XGL_OK or validation/capacity error; failure clears handle
  */
-xgl_error_t xgl_init_static_checked(const xgl_config_t* config,
-                                    size_t config_size, uint32_t abi_version,
-                                    uint32_t build_config_id, void* workspace,
-                                    size_t workspace_size,
-                                    xgl_handle_t* handle);
-
-/**
- * \brief           Initialize with the consumer header's ABI constants
- * \param[in]       config: Configuration supported by the static storage plan
- * \param[in]       workspace: Aligned caller-owned storage
- * \param[in]       workspace_size: Available bytes from workspace
- * \param[out]      handle: Instance handle, or NULL on failure
- * \return          XGL_OK on success, error code otherwise
- */
-static inline xgl_error_t xgl_init_static(const xgl_config_t* config,
-                                          void* workspace,
-                                          size_t workspace_size,
-                                          xgl_handle_t* handle) {
-    return xgl_init_static_checked(config, sizeof(xgl_config_t),
-                                   XGL_CONFIG_ABI_VERSION, XGL_BUILD_CONFIG_ID,
-                                   workspace, workspace_size, handle);
-}
+xgl_error_t xgl_init_static(const xgl_config_t* config, void* workspace,
+                            size_t workspace_size, xgl_handle_t* handle);
 
 /**
  * \brief           Initialize the layers in a previously reserved workspace
@@ -262,84 +163,13 @@ const char* xgl_version_string(void);
  */
 uint32_t xgl_version_int(void);
 
-/** \cond ABI_SYMBOLS */
-/* Layout-dependent exports carry the SDK ABI in their symbol names. */
-void xgl_config_get_default_v5(xgl_config_t* config);
-void xgl_config_get_preset_boot_v5(xgl_config_t* config);
-void xgl_config_get_preset_tiny_v5(xgl_config_t* config);
-void xgl_config_get_preset_small_v5(xgl_config_t* config);
-void xgl_config_get_preset_medium_v5(xgl_config_t* config);
-void xgl_config_get_preset_large_v5(xgl_config_t* config);
-void xgl_config_get_preset_production_v5(xgl_config_t* config);
-xgl_error_t xgl_config_validate_v5(const xgl_config_t* config);
-
-/** \endcond */
-
-/**
- * \brief           Select defaults supported by the compiled profile
- * \param[out]      config: Configuration to overwrite; NULL is ignored
- */
-static inline void xgl_config_get_default(xgl_config_t* config) {
-    xgl_config_get_default_v5(config);
-}
-
-/**
- * \brief           Select one peer, one TX slot, and 128-byte frames
- * \param[out]      config: Configuration to overwrite; NULL is ignored
- */
-static inline void xgl_config_get_preset_boot(xgl_config_t* config) {
-    xgl_config_get_preset_boot_v5(config);
-}
-
-/**
- * \brief           Select the tiny bounded protocol configuration
- * \param[out]      config: Configuration to overwrite; NULL is ignored
- */
-static inline void xgl_config_get_preset_tiny(xgl_config_t* config) {
-    xgl_config_get_preset_tiny_v5(config);
-}
-
-/**
- * \brief           Select the small bounded protocol configuration
- * \param[out]      config: Configuration to overwrite; NULL is ignored
- */
-static inline void xgl_config_get_preset_small(xgl_config_t* config) {
-    xgl_config_get_preset_small_v5(config);
-}
-
-/**
- * \brief           Select the medium bounded protocol configuration
- * \param[out]      config: Configuration to overwrite; NULL is ignored
- */
-static inline void xgl_config_get_preset_medium(xgl_config_t* config) {
-    xgl_config_get_preset_medium_v5(config);
-}
-
-/**
- * \brief           Select the large bounded protocol configuration
- * \param[out]      config: Configuration to overwrite; NULL is ignored
- */
-static inline void xgl_config_get_preset_large(xgl_config_t* config) {
-    xgl_config_get_preset_large_v5(config);
-}
-
-/**
- * \brief           Select authenticated defaults; a provider must be supplied
- * \param[out]      config: Configuration to overwrite; NULL is ignored
- */
-static inline void xgl_config_get_preset_production(xgl_config_t* config) {
-    xgl_config_get_preset_production_v5(config);
-}
-
 /**
  * \brief           Validate configuration and the compiled capability ceiling
  * \param[in]       config: Configuration to validate without modifying it
  * \return          XGL_OK, NULL_POINTER, INVALID_PARAM, UNSUPPORTED, or
  *                  BUFFER_TOO_SMALL when RX storage is smaller than the MTU
  */
-static inline xgl_error_t xgl_config_validate(const xgl_config_t* config) {
-    return xgl_config_validate_v5(config);
-}
+xgl_error_t xgl_config_validate(const xgl_config_t* config);
 
 /**
  * \brief           Submit one DATA frame at the caller's monotonic time
@@ -565,22 +395,14 @@ xgl_error_t xgl_step_bounded(xgl_handle_t handle, uint32_t now_ms,
                              const xgl_execution_limits_t* limits,
                              xgl_execution_result_t* result);
 
-/** \cond ABI_SYMBOLS */
-xgl_error_t xgl_resources_get_v5(xgl_handle_t handle,
-                                 xgl_resource_snapshot_t* snapshot);
-
-/** \endcond */
-
 /**
  * \brief           Inspect currently owned resources without allocation
  * \param[in]       handle: Caller-serialized initialized instance
  * \param[out]      snapshot: Current resource counts, unchanged on error
  * \return          XGL_OK, argument error, or UNSUPPORTED if disabled
  */
-static inline xgl_error_t xgl_resources_get(xgl_handle_t handle,
-                                            xgl_resource_snapshot_t* snapshot) {
-    return xgl_resources_get_v5(handle, snapshot);
-}
+xgl_error_t xgl_resources_get(xgl_handle_t handle,
+                              xgl_resource_snapshot_t* snapshot);
 
 #ifdef __cplusplus
 }

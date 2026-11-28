@@ -23,7 +23,7 @@ reenter the instance. Host wall-clock timing uses `std::chrono::steady_clock`.
 
 - `bench_throughput` measures completed unreliable exchanges for three payload sizes.
 - `bench_latency` measures host CPU time through a reliable delivery and ACK processing.
-- `bench_memory` queries exact static workspace bytes per preset and separately
+- `bench_memory` queries exact static workspace bytes per workload and separately
   reports protocol memory-accounting fields. With statistics enabled,
   `memory_used` and `memory_peak` record the complete reserved workspace, including
   the initial reservation; resetting statistics preserves that reservation. They

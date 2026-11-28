@@ -7,7 +7,7 @@ source_language: zh_CN
 
 # 迁移既有集成
 
-将此前开发快照中的集成迁移到 SDK 0.0.1 时，使用新的构建目录和安装前缀。配置 ABI 为 `5`，线上协议为 Wire v1。按[构建与消费](build-and-consume.md)重新构建产品，配套使用同一档位和资源组合的库与生成头，继续链接 `xgl::xgl`。
+将此前开发快照中的集成迁移到 SDK 0.0.1 时，使用新的构建目录和安装前缀。线上协议为 Wire v1。应用直接初始化 `xgl_config_t`，具体字段见[配置指南](configuration.md)。按[构建与消费](build-and-consume.md)重新构建产品，配套使用同一档位和资源组合的库与生成头，继续链接 `xgl::xgl`。
 
 ## 线上协议与应用
 
@@ -18,9 +18,9 @@ source_language: zh_CN
 
 ## 配置与存储
 
-移除代码中的分片开关、整消息字节预算和重组槽配置，同时清理 CMake 的 `fragmentation` 组件请求，以及使用旧消息槽选项、重组超时、内存报告或资源快照字段的代码。`XGL_INSTANCE_OPTIONS_INIT` 初始化版本 2 的运行选项描述符，填写尺寸、版本和构建身份。带 scope 的回调、已安装 scope 的认证策略和可靠发送忙期选项继续可用。
+移除代码中的分片开关、整消息字节预算和重组槽配置，同时清理 CMake 的 `fragmentation` 组件请求，以及使用旧消息槽选项、重组超时、内存报告或资源快照字段的代码。`XGL_INSTANCE_OPTIONS_INIT` 填写运行选项描述符的版本 4、描述符尺寸和配置尺寸。带 scope 的回调、已安装 scope 的认证策略和可靠发送忙期选项继续可用。
 
-通过 `xgl_memory_requirements()` 或 `xgl_memory_report_with_options()` 重新测量实际所需存储及对齐。配置和回调上下文须活到销毁结束。动态创建继续使用公开的 `xgl_allocator_t`，分配器描述符和上下文也须活到销毁结束。Checked 入口校验配置大小、ABI 和构建身份。
+通过 `xgl_memory_requirements()` 或 `xgl_memory_report_with_options()` 重新测量实际所需存储及对齐。配置和回调上下文须活到销毁结束。动态创建继续使用公开的 `xgl_allocator_t`，分配器描述符和上下文也须活到销毁结束。使用同一安装前缀的头文件和静态库，重新编译全部消费者。
 
 定制编译帧长时，配置库的 `XGL_DATALINK_MAX_FRAME_SIZE`，然后重新安装生成头和库。发布检查见[互操作](../reference/protocol/v1/interoperability.md)与[验证](../development/validation.md)。
 

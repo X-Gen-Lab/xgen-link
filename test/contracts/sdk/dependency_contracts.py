@@ -128,15 +128,13 @@ class StandaloneContracts(unittest.TestCase):
              'set_target_properties(consumer PROPERTIES C_EXTENSIONS NO CXX_EXTENSIONS NO)\n'
              f'target_compile_features(consumer PRIVATE {"c_std_11" if language == "C" else "cxx_std_17"})\n'
              'target_link_libraries(consumer PRIVATE xgl::xgl)\n'
-             'if(FORCE_STALE_HEADER_ABI)\n'
-             '  target_compile_definitions(consumer PRIVATE XGL_CONFIG_ABI_VERSION=4)\nendif()\n'
              'if(DEFINED FORCE_FRAME_CEILING)\n'
              '  target_compile_definitions(consumer PRIVATE '
              'XGL_DATALINK_MAX_FRAME_SIZE=${FORCE_FRAME_CEILING})\nendif()\n'
-             'if(FORCE_STALE_TARGET_ABI)\n'
-             '  add_library(legacy_abi INTERFACE)\n'
-             '  set_property(TARGET legacy_abi PROPERTY INTERFACE_XGL_CONFIG_ABI_VERSION 4)\n'
-             '  target_link_libraries(consumer PRIVATE legacy_abi)\nendif()\n'
+             'if(FORCE_STALE_TARGET_RESOURCE_ID)\n'
+             '  add_library(foreign_resources INTERFACE)\n'
+             '  set_property(TARGET foreign_resources PROPERTY INTERFACE_XGL_RESOURCE_CONFIG_ID foreign)\n'
+             '  target_link_libraries(consumer PRIVATE foreign_resources)\nendif()\n'
              if include_consumer else ""),
             encoding="utf-8")
         return source
@@ -169,7 +167,6 @@ class StandaloneContracts(unittest.TestCase):
                                         f"-DXGL_DATALINK_MAX_FRAME_SIZE={value}", succeeds=False)
                 self.assertIn("XGL_DATALINK_MAX_FRAME_SIZE must be a decimal integer", result)
 
-        build_ids = set()
         resource_ids = set()
         for value in (2048, 512, 64):
             with self.subTest(ceiling=value):
@@ -181,15 +178,13 @@ class StandaloneContracts(unittest.TestCase):
                 self.run_command("cmake", "--install", binary, "--prefix", prefix)
                 header = (prefix / "include/xgl/xgl_build_config.h").read_text(encoding="utf-8")
                 self.assertIn(f"#define XGL_DATALINK_MAX_FRAME_SIZE {value}U\n", header)
-                for macro, values in (("XGL_BUILD_CONFIG_ID", build_ids),
-                                      ("XGL_RESOURCE_CONFIG_ID", resource_ids)):
-                    definition = next(line for line in header.splitlines()
-                                      if line.startswith(f"#define {macro} "))
-                    identity = int(definition.split()[-1].rstrip("U"))
-                    self.assertNotIn(identity, values)
-                    values.add(identity)
-                    if value == 2048:
-                        self.assertEqual(identity, 303 if macro == "XGL_BUILD_CONFIG_ID" else 8043)
+                definition = next(line for line in header.splitlines()
+                                  if line.startswith("#define XGL_RESOURCE_CONFIG_ID "))
+                identity = int(definition.split()[-1].rstrip("U"))
+                self.assertNotIn(identity, resource_ids)
+                resource_ids.add(identity)
+                if value == 2048:
+                    self.assertEqual(identity, 8043)
                 consumer = self.new_consumer(
                     f"ceiling-{value}-consumer", "C",
                     'find_package(xgl CONFIG REQUIRED PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
@@ -209,7 +204,7 @@ class StandaloneContracts(unittest.TestCase):
                     self.assertIn("XGL_DATALINK_MAX_FRAME_SIZE conflicts",
                                   self.build(conflict, succeeds=False))
 
-    def test_offline_source_and_relocated_sdk_reject_foreign_abi(self):
+    def test_offline_source_and_relocated_sdk_reject_foreign_resources(self):
         if ARGS.deny_network:
             self.run_command(sys.executable, "-c", """
 import errno
@@ -354,10 +349,7 @@ for family in (socket.AF_INET, socket.AF_INET6):
                         "sdk-" + suffix, language,
                         'find_package(xgl 0.0.1 EXACT CONFIG REQUIRED COMPONENTS reliable\n'
                         '    PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
-                        + VERIFY_PREFIX +
-                        "if(NOT xgl_CONFIG_ABI_VERSION EQUAL 5)\n"
-                        '  message(FATAL_ERROR "Unexpected SDK ABI")\n'
-                        "endif()")
+                        + VERIFY_PREFIX)
                     binary = self.work / ("sdk-build-" + suffix)
                     location = f"-DXGL_SDK_PREFIX={prefix.as_posix()}"
                     self.configure(consumer, binary, location)
@@ -366,12 +358,12 @@ for family in (socket.AF_INET, socket.AF_INET6):
                     if language == "C":
                         conflict = self.work / ("sdk-conflict-" + profile)
                         output = self.configure(consumer, conflict, location,
-                                                "-DFORCE_STALE_TARGET_ABI=ON", succeeds=False)
-                        self.assertIn("XGL_CONFIG_ABI_VERSION", output)
+                                                "-DFORCE_STALE_TARGET_RESOURCE_ID=ON", succeeds=False)
+                        self.assertIn("XGL_RESOURCE_CONFIG_ID", output)
                         stale = self.work / ("sdk-stale-" + profile)
-                        self.configure(consumer, stale, location, "-DFORCE_STALE_HEADER_ABI=ON")
+                        self.configure(consumer, stale, location, "-DFORCE_FRAME_CEILING=3")
                         output = self.build(stale, succeeds=False)
-                        self.assertIn("XGL_CONFIG_ABI_VERSION conflicts", output)
+                        self.assertIn("XGL_DATALINK_MAX_FRAME_SIZE conflicts", output)
 
         for name, selection, diagnostic in (
             ("legacy-sdk", "find_package(xgl 4 CONFIG REQUIRED", 'requested version "4"'),

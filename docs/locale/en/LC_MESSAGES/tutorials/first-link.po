@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: a496889f6bb90a61ebf00b52bfc26b9f114afaf845becb4001b062a007403582\n"
+"X-XGL-Source-SHA256: 7ff959e7652b9a5b43212585588d92d78f280741fa68daf15dc9421f6c161442\n"
 
 #: docs/zh/tutorials/first-link.md:8
 msgid "跑通首次收发"
@@ -35,11 +35,12 @@ msgid "存储与生命周期"
 msgstr "Storage and lifetime"
 
 #: docs/zh/tutorials/first-link.md:25
-msgid "示例从 Tiny preset 开始，将可靠窗口与 peer 容量各设为 1，使用 128 字节 MTU。为两端设置各自的本地节点、到对端的路由、PHY 和应用回调。配置及引用对象保留到销毁。"
+msgid "示例显式将可靠窗口与 peer 容量各设为 1，完整帧上限取构建上限与 128 字节中的较小值。为两端设置各自的本地节点、到对端的路由、PHY 和应用回调。配置及引用对象保留到销毁。"
 msgstr ""
-"The example starts with the Tiny preset and sets the reliable window and peer count to one with a "
-"128-byte MTU. Configure each node's ID, route to the other endpoint, PHY and application callback. Keep "
-"the configuration and referenced objects alive until destruction."
+"The example sets the reliable window and peer capacity to one. Its complete frame limit is the smaller"
+" of 128 bytes and the compiled ceiling. Each endpoint supplies its local node address, route to its "
+"peer, PHY and application callbacks. Keep the configurations and referenced objects alive until "
+"destruction."
 
 #: docs/zh/tutorials/first-link.md:27
 msgid ""

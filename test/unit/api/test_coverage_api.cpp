@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
@@ -47,7 +48,7 @@ xgl_auth_provider_t coverage_provider() {
 
 xgl_config_t coverage_config() {
     xgl_config_t config;
-    xgl_config_get_preset_tiny(&config);
+    config = xgl_test_two_packet_config();
     config.memory.allocator = xgl_test_host_allocator();
     return config;
 }
@@ -124,15 +125,7 @@ struct AllocationObserver {
 
 } /* namespace */
 
-TEST(XglCoverageApi,
-     ConfigPresetsAcceptNullAndRejectIncompleteResourceBudgets) {
-    xgl_config_get_default(nullptr);
-    xgl_config_get_preset_boot(nullptr);
-    xgl_config_get_preset_tiny(nullptr);
-    xgl_config_get_preset_small(nullptr);
-    xgl_config_get_preset_medium(nullptr);
-    xgl_config_get_preset_large(nullptr);
-    xgl_config_get_preset_production(nullptr);
+TEST(XglCoverageApi, RejectsIncompleteResourceBudgets) {
     auto config = coverage_config();
     config.source_id = XGL_BROADCAST_ID;
     EXPECT_EQ(xgl_config_validate(&config), XGL_ERR_INVALID_PARAM);
@@ -184,19 +177,6 @@ TEST(XglCoverageApi,
               XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(xgl_init_static(&config, storage.data(), required.size, nullptr),
               XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_init_static_checked(
-                  &config, sizeof(config) - 1, XGL_CONFIG_ABI_VERSION,
-                  XGL_BUILD_CONFIG_ID, storage.data(), required.size, &handle),
-              XGL_ERR_INVALID_VERSION);
-    EXPECT_EQ(xgl_init_static_checked(
-                  &config, sizeof(config), XGL_CONFIG_ABI_VERSION + 1,
-                  XGL_BUILD_CONFIG_ID, storage.data(), required.size, &handle),
-              XGL_ERR_INVALID_VERSION);
-    EXPECT_EQ(xgl_init_static_checked(&config, sizeof(config),
-                                      XGL_CONFIG_ABI_VERSION,
-                                      XGL_BUILD_CONFIG_ID + 1, storage.data(),
-                                      required.size, &handle),
-              XGL_ERR_INVALID_VERSION);
     ASSERT_EQ(xgl_init_static(&config, storage.data(), required.size, &handle),
               XGL_OK);
     ASSERT_NE(handle, nullptr);

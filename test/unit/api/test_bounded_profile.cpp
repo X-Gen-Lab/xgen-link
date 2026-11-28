@@ -7,6 +7,8 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
+
 #include <datalink/xgl_parser.h>
 #include <wire/xgl_frame.h>
 #include <xgl/xgl.h>
@@ -80,7 +82,7 @@ class XglBoundedProfileTest : public ::testing::Test {
     void SetUp() override {
         a.remote = &b;
         b.remote = &a;
-        xgl_config_get_preset_boot(&config_a);
+        config_a = xgl_test_single_packet_config();
         config_a.route_table = &route_a;
         config_a.route_table_len = 1U;
         config_a.rx_callback = Deliver;

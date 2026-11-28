@@ -356,9 +356,9 @@ typedef struct {
     bool enable_encryption; /**< Reserved; rejected until codec path is wired */
     size_t max_tx_packets;  /**< Total retained reliable packets */
     size_t max_rx_buffered_packets; /**< Total retained out-of-order packets */
-    uint32_t peer_idle_timeout_ms;  /**< Idle peer reclaim timeout; 0 = disabled
-                                       (default 60000) */
-    uint16_t max_peers;             /**< Peer/scope capacity; must be nonzero */
+    uint32_t
+        peer_idle_timeout_ms; /**< Idle peer reclaim timeout; 0 = disabled */
+    uint16_t max_peers;       /**< Peer/scope capacity; must be nonzero */
 } xgl_feature_config_t;
 
 /**
@@ -457,11 +457,9 @@ typedef void (*xgl_scope_event_fn)(xgl_handle_t handle, uint16_t remote_id,
  *                  reenter the instance.
  */
 typedef struct {
-    size_t size;              /**< Exact descriptor size */
-    uint32_t version;         /**< XGL_INSTANCE_OPTIONS_VERSION */
-    size_t config_size;       /**< Consumer xgl_config_t size */
-    uint32_t config_abi;      /**< Consumer configuration ABI */
-    uint32_t build_config_id; /**< Consumer compiled resource identity */
+    size_t size;        /**< Exact descriptor size */
+    uint32_t version;   /**< XGL_INSTANCE_OPTIONS_VERSION */
+    size_t config_size; /**< Consumer xgl_config_t size */
     uint32_t
         tx_lifetime_ms; /**< Reliable TX busy-period limit; 0 = unlimited */
     bool protect_installed_scopes;       /**< Require authenticated RX/TX for
@@ -473,14 +471,13 @@ typedef struct {
 } xgl_instance_options_t;
 
 /** \brief           Version of the optional instance policy descriptor. */
-#define XGL_INSTANCE_OPTIONS_VERSION 2U
+#define XGL_INSTANCE_OPTIONS_VERSION 4U
 
 /** \brief           Compatible C11/C++17 initializer for optional policy. */
 #define XGL_INSTANCE_OPTIONS_INIT                                              \
     {                                                                          \
         sizeof(xgl_instance_options_t), XGL_INSTANCE_OPTIONS_VERSION,          \
-            sizeof(xgl_config_t), XGL_CONFIG_ABI_VERSION, XGL_BUILD_CONFIG_ID, \
-            0U, false, NULL, NULL, NULL                                        \
+            sizeof(xgl_config_t), 0U, false, NULL, NULL, NULL                  \
     }
 
 /** \brief           Additional limits for one bounded step; zero stops that
@@ -630,163 +627,6 @@ typedef struct {
         payload_offset; /**< Header bytes including all selected extensions */
     size_t frame_size; /**< Header, payload, authentication tag and final CRC */
 } xgl_tx_frame_layout_t;
-
-/*---------------------------------------------------------------------------*/
-/* Configuration Presets                                                     */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Tiny configuration preset
- */
-#define XGL_CONFIG_PRESET_TINY                                                 \
-    {                                                                          \
-        /* name */ "tiny", /* source_id */ 1, /* memory */                     \
-            {                                                                  \
-                /* rx_buffer_size */ 160,                                      \
-                /* allocator */ NULL,                                          \
-            }, /* protocol */                                                  \
-            {                                                                  \
-                /* ack_timeout_ms */ 1000,                                     \
-                /* max_retry_count */ 3,                                       \
-                /* window_size */ 2,                                           \
-                /* max_frame_size */ 128,                                      \
-            }, /* features */                                                  \
-            {                                                                  \
-                /* enable_compression */ false,                                \
-                /* enable_encryption */ false,                                 \
-                /* max_tx_packets */ 2,                                        \
-                /* max_rx_buffered_packets */ 2,                               \
-                /* peer_idle_timeout_ms */ 60000,                              \
-                /* max_peers */ 1,                                             \
-            },                                                                 \
-            /* auth_required */ false, /* auth_provider */ NULL,               \
-            /* route_table */ NULL, /* route_table_len */ 0,                   \
-            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
-            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
-    }
-
-/**
- * \brief           Small configuration preset
- */
-#define XGL_CONFIG_PRESET_SMALL                                                \
-    {                                                                          \
-        /* name */ "small", /* source_id */ 1, /* memory */                    \
-            {                                                                  \
-                /* rx_buffer_size */ 288,                                      \
-                /* allocator */ NULL,                                          \
-            }, /* protocol */                                                  \
-            {                                                                  \
-                /* ack_timeout_ms */ 1000,                                     \
-                /* max_retry_count */ 5,                                       \
-                /* window_size */ 4,                                           \
-                /* max_frame_size */ 256,                                      \
-            }, /* features */                                                  \
-            {                                                                  \
-                /* enable_compression */ false,                                \
-                /* enable_encryption */ false,                                 \
-                /* max_tx_packets */ 4,                                        \
-                /* max_rx_buffered_packets */ 4,                               \
-                /* peer_idle_timeout_ms */ 60000,                              \
-                /* max_peers */ 2,                                             \
-            },                                                                 \
-            /* auth_required */ false, /* auth_provider */ NULL,               \
-            /* route_table */ NULL, /* route_table_len */ 0,                   \
-            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
-            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
-    }
-
-/**
- * \brief           Medium configuration preset
- */
-#define XGL_CONFIG_PRESET_MEDIUM                                               \
-    {                                                                          \
-        /* name */ "medium", /* source_id */ 1, /* memory */                   \
-            {                                                                  \
-                /* rx_buffer_size */ 544,                                      \
-                /* allocator */ NULL,                                          \
-            }, /* protocol */                                                  \
-            {                                                                  \
-                /* ack_timeout_ms */ 1000,                                     \
-                /* max_retry_count */ 5,                                       \
-                /* window_size */ 8,                                           \
-                /* max_frame_size */ 512,                                      \
-            }, /* features */                                                  \
-            {                                                                  \
-                /* enable_compression */ false,                                \
-                /* enable_encryption */ false,                                 \
-                /* max_tx_packets */ 16,                                       \
-                /* max_rx_buffered_packets */ 16,                              \
-                /* peer_idle_timeout_ms */ 60000,                              \
-                /* max_peers */ 8,                                             \
-            },                                                                 \
-            /* auth_required */ false, /* auth_provider */ NULL,               \
-            /* route_table */ NULL, /* route_table_len */ 0,                   \
-            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
-            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
-    }
-
-/**
- * \brief           Large configuration preset
- */
-#define XGL_CONFIG_PRESET_LARGE                                                \
-    {                                                                          \
-        /* name */ "large", /* source_id */ 1, /* memory */                    \
-            {                                                                  \
-                /* rx_buffer_size */ 1056,                                     \
-                /* allocator */ NULL,                                          \
-            }, /* protocol */                                                  \
-            {                                                                  \
-                /* ack_timeout_ms */ 1000,                                     \
-                /* max_retry_count */ 7,                                       \
-                /* window_size */ 16,                                          \
-                /* max_frame_size */ 1024,                                     \
-            }, /* features */                                                  \
-            {                                                                  \
-                /* enable_compression */ false,                                \
-                /* enable_encryption */ false,                                 \
-                /* max_tx_packets */ 64,                                       \
-                /* max_rx_buffered_packets */ 64,                              \
-                /* peer_idle_timeout_ms */ 60000,                              \
-                /* max_peers */ 16,                                            \
-            },                                                                 \
-            /* auth_required */ false, /* auth_provider */ NULL,               \
-            /* route_table */ NULL, /* route_table_len */ 0,                   \
-            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
-            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
-    }
-
-/**
- * \brief           Production configuration preset
- * \details         Production profile requires authentication by default.
- *                  The application must provide auth_provider before
- * validate/create.
- */
-#define XGL_CONFIG_PRESET_PRODUCTION                                           \
-    {                                                                          \
-        /* name */ "production", /* source_id */ 1, /* memory */               \
-            {                                                                  \
-                /* rx_buffer_size */ 1056,                                     \
-                /* allocator */ NULL,                                          \
-            }, /* protocol */                                                  \
-            {                                                                  \
-                /* ack_timeout_ms */ 1000,                                     \
-                /* max_retry_count */ 7,                                       \
-                /* window_size */ 16,                                          \
-                /* max_frame_size */ 1024,                                     \
-            }, /* features */                                                  \
-            {                                                                  \
-                /* enable_compression */ false,                                \
-                /* enable_encryption */ false,                                 \
-                /* max_tx_packets */ 64,                                       \
-                /* max_rx_buffered_packets */ 64,                              \
-                /* peer_idle_timeout_ms */ 60000,                              \
-                /* max_peers */ 16,                                            \
-            },                                                                 \
-            /* auth_required */ true, /* auth_provider */ NULL,                \
-            /* route_table */ NULL, /* route_table_len */ 0,                   \
-            /* rx_callback */ NULL, /* rx_accept_callback */ NULL,             \
-            /* error_callback */ NULL, /* callback_user_data */ NULL,          \
-    }
 
 #ifdef __cplusplus
 }

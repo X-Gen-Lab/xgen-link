@@ -9,7 +9,7 @@
 
 ### SDK 与集成
 
-- 发布版本标识为 `0.0.1`。运行时 `xgl_version_string()` 返回 `"0.0.1"`，`xgl_version_int()` 返回 `1`。本版使用配置 ABI `5`、高级选项描述符版本 `2`。
+- 发布版本标识为 `0.0.1`。运行时 `xgl_version_string()` 返回 `"0.0.1"`，`xgl_version_int()` 返回 `1`。应用直接初始化 `xgl_config_t`，通过 `xgl_config_validate()` 校验。创建、工作区测量和静态初始化直接链接同名函数。使用配套头文件重新编译应用及其依赖的对象文件。
 - C11 静态库支持源码接入和安装包消费，两种方式都链接 `xgl::xgl`。安装包导出配套的公开头、档位、能力和资源身份。[构建与消费](docs/zh/guides/build-and-consume.md)
 
 ### 开发与验证

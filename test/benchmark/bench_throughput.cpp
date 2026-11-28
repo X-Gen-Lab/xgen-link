@@ -7,6 +7,8 @@
  * \date            2026-07-10
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
+#include "test_config.h"
+
 #include <chrono>
 #include <cstdio>
 #include <vector>
@@ -18,7 +20,7 @@
  * logical clock
  */
 static bool run_throughput_benchmark(size_t payload_size, int iterations) {
-    xgl_config_t config = XGL_CONFIG_PRESET_TINY;
+    xgl_config_t config = xgl_test_two_packet_config();
     config.protocol.max_frame_size = 1200U;
     config.memory.rx_buffer_size = 1200U;
     config.protocol.window_size = 1U;

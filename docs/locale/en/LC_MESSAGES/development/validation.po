@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: bd77e59d019bf378c7b699fc8e375860fc618fc6224381e8211fa2eb4c02f706\n"
+"X-XGL-Source-SHA256: 0c56bb038776388113d83c66354b4c70e86f5ebc3fb82641e897171fef7e791d\n"
 
 #: docs/zh/development/validation.md:8
 msgid "验证"
@@ -115,8 +115,8 @@ msgid "`test/unit/api/test_footprint.cpp`、memory 性质测试"
 msgstr "`test/unit/api/test_footprint.cpp`, memory properties"
 
 #: docs/zh/development/validation.md:0
-msgid "公开安装包 C 消费者、ABI/profile 拒绝"
-msgstr "Public installed C consumer, ABI/profile rejection"
+msgid "公开安装包 C 消费者、资源标识冲突检查"
+msgstr "Installed C consumer and rejection of conflicting resource identities"
 
 #: docs/zh/development/validation.md:0
 msgid "SDK 消费者 CTest 及 instance 测试"
@@ -220,13 +220,13 @@ msgstr "Build and installation"
 #: docs/zh/development/validation.md:39
 msgid ""
 "在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库和源码子目录。独立安装消费实际编译、链接并运行公开 C11 和 C++17 程序，覆盖 "
-"ABI、profile、必需能力、资源身份和前缀冲突。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。"
+"profile、必需能力、资源身份和前缀冲突。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。"
 msgstr ""
-"Use a clean build with only the C11 toolchain to validate the default production library, Boot "
-"production library and source subdirectory. Compile, link and run isolated C11 and C++17 consumers "
-"against the installed SDK. Exercise rejected ABI, profile, required capability, resource identity and "
-"prefix combinations. Follow the [development workflow](workflow.md) for host tests. Keep missing test "
-"inventories, missing reports and failing exit statuses visible."
+"Use a clean directory with only a C11 toolchain to build the default production library, Boot library "
+"and source-subdirectory integration. Compile, link and run independent C11 and C++17 consumers against"
+" the installation. Exercise profile, required capabilities, resource identity and prefix conflicts. "
+"Run regular host tests using the [development workflow](workflow.md). Record missing test inventories,"
+" reports or exit codes explicitly."
 
 #: docs/zh/development/validation.md:41
 msgid "`ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。多配置构建逐配置保存结果。"

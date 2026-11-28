@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: d3913872f7b0ca98856003ede5d29cfb90042a84937b1803cbeec4d8ace1f7fa\n"
+"X-XGL-Source-SHA256: e18a851ed99e2a9ff5e1d46fc59366c382f60f48210ed3d13ed8cec2dddad2a1\n"
 
 #: docs/zh/explanation/implementation-map.md:8
 msgid "实现映射"
@@ -33,8 +33,8 @@ msgid "主要源码"
 msgstr "Main source"
 
 #: docs/zh/explanation/implementation-map.md:0
-msgid "ABI 校验、生命周期、公开 step"
-msgstr "ABI validation, lifecycle, public stepping"
+msgid "配置校验、生命周期、公开 step"
+msgstr "Configuration validation, lifecycle and public step functions"
 
 #: docs/zh/explanation/implementation-map.md:0
 msgid "`src/api/`"

@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 717ff6a27f1e9e65060514534068fdc484795d48b26bf2244f9057beedccf2b8\n"
+"X-XGL-Source-SHA256: 44a534b877d28a179170e74ec615523531247dc4c68fd6c8c6cb4908ca43b5eb\n"
 
 #: docs/zh/explanation/resource-model.md:8
 msgid "资源模型"
@@ -50,12 +50,12 @@ msgstr ""
 #: docs/zh/explanation/resource-model.md:20
 msgid ""
 "`xgl_memory_report()` 无分配地解释同一份规划，分别报告管理区、初始化区、peer、窗口、可靠记录及载荷、帧 scratch 和乱序 RX 占用。类别字节数包含对齐，合计恰好等于 "
-"`report.requirements.size`。失败不改写输出；内联入口检查消费者的配置 ABI 和编译能力身份。"
+"`report.requirements.size`。失败不改写输出。"
 msgstr ""
-"`xgl_memory_report()` explains the same plan without allocating: management, initialization, peers, "
-"windows, reliable records and payloads, frame scratch and buffered RX. Category bytes include alignment "
-"and sum exactly to `report.requirements.size`. Failure leaves the report unchanged. Its inline entry "
-"checks the consumer's configuration ABI and compiled profile identity."
+"`xgl_memory_report()` describes the same plan without allocating. It reports management and "
+"initialization storage, peers, windows, reliable records and payloads, frame scratch and buffered out-"
+"of-order RX. Categories include alignment and total exactly `report.requirements.size`. Failure "
+"preserves the output."
 
 #: docs/zh/explanation/resource-model.md:29
 msgid "独立资源池"

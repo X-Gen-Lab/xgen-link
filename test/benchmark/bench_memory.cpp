@@ -7,18 +7,19 @@
  * \date            2026-07-10
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
+#include "test_config.h"
+
 #include <cstdio>
 #include <vector>
 
 #include "benchmark_support.h"
 
 /**
- * \brief           Query exact static workspace and exercise the selected host
- * preset
- * \details         Copy the selected preset into persistent nodes. A
+ * \brief           Query exact static workspace and exercise a host workload
+ * \details         Copy the workload configuration into persistent nodes. A
  *                  successful run completes every delivery.
  */
-static bool run_memory_benchmark(const char* name, const xgl_config_t& config) {
+static bool run_memory_benchmark(const xgl_config_t& config) {
     BenchmarkPair pair;
     if (!pair.init(config)) {
         return false;
@@ -41,8 +42,11 @@ static bool run_memory_benchmark(const char* name, const xgl_config_t& config) {
         return false;
     }
     std::printf(
-        "%s,%zu,%zu,%zu,%zu,%llu\n", name, payload_size, required.size,
-        statistics.memory_used, statistics.memory_peak,
+        "%u,%u,%u,%zu,%zu,%zu,%zu,%llu\n",
+        static_cast<unsigned>(config.protocol.max_frame_size),
+        static_cast<unsigned>(config.protocol.window_size),
+        static_cast<unsigned>(config.features.max_peers), payload_size,
+        required.size, statistics.memory_used, statistics.memory_peak,
         static_cast<unsigned long long>(statistics.datalink.tx_packets));
     return true;
 }
@@ -50,16 +54,18 @@ static bool run_memory_benchmark(const char* name, const xgl_config_t& config) {
 /** \brief           Report protocol storage separately from MCU
  * Flash/stack/driver RAM. */
 int main() {
-    const xgl_config_t tiny = XGL_CONFIG_PRESET_TINY;
-    const xgl_config_t small = XGL_CONFIG_PRESET_SMALL;
-    const xgl_config_t medium = XGL_CONFIG_PRESET_MEDIUM;
-    const xgl_config_t large = XGL_CONFIG_PRESET_LARGE;
-    std::printf("preset,payload_bytes,static_workspace_bytes,reported_used,"
-                "reported_peak,tx_packets\n");
-    return run_memory_benchmark("tiny", tiny) &&
-                   run_memory_benchmark("small", small) &&
-                   run_memory_benchmark("medium", medium) &&
-                   run_memory_benchmark("large", large)
-               ? 0
-               : 1;
+    const xgl_config_t workloads[] = {
+        xgl_test_two_packet_config(),
+        xgl_test_config(256, 288, 4, 2, 4, 4, 5),
+        xgl_test_config(512, 544, 8, 8, 16, 16, 5),
+        xgl_test_config(1024, 1056, 16, 16, 64, 64, 7),
+    };
+    std::printf("frame_bytes,window,peers,payload_bytes,static_workspace_bytes,"
+                "reported_used,reported_peak,tx_packets\n");
+    for (const auto& workload : workloads) {
+        if (!run_memory_benchmark(workload)) {
+            return 1;
+        }
+    }
+    return 0;
 }

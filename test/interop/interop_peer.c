@@ -172,25 +172,30 @@ int main(int argc, char** argv) {
     state.remote = (uint16_t)(3U - state.local);
     xgl_phy_ops_t phy = {transmit, receive, &state};
     xgl_route_item_t route = {state.remote, &phy, 128U, 1000U, 0U};
-    xgl_config_t config;
-    if (strcmp(argv[2], "boot") == 0) {
-        xgl_config_get_preset_boot(&config);
-    } else if (strcmp(argv[2], "full") == 0 && XGL_FEATURE_AUTH &&
-               XGL_FEATURE_OUT_OF_ORDER) {
-        xgl_config_get_preset_small(&config);
-    } else {
+    const bool full = strcmp(argv[2], "full") == 0;
+    if (full ? !(XGL_FEATURE_AUTH && XGL_FEATURE_OUT_OF_ORDER)
+             : strcmp(argv[2], "boot") != 0) {
         return EXIT_FAILURE;
     }
-    config.source_id = state.local;
-    config.protocol.max_frame_size = 128U;
-    config.memory.rx_buffer_size = 128U;
+    xgl_config_t config = {
+        .source_id = state.local,
+        .memory = {.rx_buffer_size = 128U},
+        .protocol = {.ack_timeout_ms = 1000U,
+                     .max_retry_count = full ? 5U : 3U,
+                     .window_size = full ? 4U : 1U,
+                     .max_frame_size = 128U},
+        .features = {.max_peers = full ? 2U : 1U,
+                     .max_tx_packets = full ? 4U : 1U,
+                     .max_rx_buffered_packets = full ? 4U : 0U,
+                     .peer_idle_timeout_ms = 60000U},
+    };
     config.route_table = &route;
     config.route_table_len = 1U;
     config.rx_callback = deliver;
     config.callback_user_data = &state;
 #if XGL_FEATURE_AUTH
     xgl_auth_provider_t provider = {sign_frame, verify_frame, 4U, NULL};
-    config.auth_required = strcmp(argv[2], "full") == 0;
+    config.auth_required = full;
     config.auth_provider = config.auth_required ? &provider : NULL;
 #endif
 

@@ -122,9 +122,17 @@ int main(void) {
     xgl_phy_ops_t phy_b = {smoke_tx, smoke_rx, &b};
     xgl_route_item_t route_a = {2U, &phy_a, 128U, 1000U, 0U};
     xgl_route_item_t route_b = {1U, &phy_b, 128U, 1000U, 0U};
-    xgl_config_t config_a = XGL_CONFIG_PRESET_TINY;
-    config_a.protocol.window_size = 1U;
-    config_a.features.max_peers = 1U;
+    xgl_config_t config_a = {
+        .source_id = 1U,
+        .memory = {.rx_buffer_size = 160U},
+        .protocol = {.ack_timeout_ms = 1000U,
+                     .max_retry_count = 3U,
+                     .window_size = 1U,
+                     .max_frame_size = 128U},
+        .features = {.max_peers = 1U,
+                     .max_tx_packets = 2U,
+                     .max_rx_buffered_packets = 2U},
+    };
     config_a.route_table = &route_a;
     config_a.route_table_len = 1U;
     config_a.rx_accept_callback = smoke_accept;

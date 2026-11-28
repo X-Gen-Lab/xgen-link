@@ -4,7 +4,7 @@ set(XGL_TEST_SOURCES support/test_main.cpp)
 if(XGL_FEATURE_AUTH)
     list(
         APPEND XGL_TEST_SOURCES
-        unit/api/test_cpp17_presets.cpp
+        unit/api/test_cpp17_config.cpp
         unit/wire/test_coverage_wire.cpp
         unit/api/test_coverage_api.cpp
         integration/test_coverage_delivery.cpp

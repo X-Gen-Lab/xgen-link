@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <xgl/xgl.h>
@@ -78,7 +79,7 @@ TEST(XglInstanceProperties, InstanceIsolation) {
 
         /* Create configuration for instance 1 */
         xgl_config_t config1;
-        xgl_config_get_default(&config1);
+        config1 = xgl_test_config();
         config1.name = "instance1";
         config1.source_id = 1;
         config1.protocol.max_retry_count = 3 + (gen.random_uint8() % 5);
@@ -91,7 +92,7 @@ TEST(XglInstanceProperties, InstanceIsolation) {
 
         /* Create configuration for instance 2 with DIFFERENT values */
         xgl_config_t config2;
-        xgl_config_get_default(&config2);
+        config2 = xgl_test_config();
         config2.name = "instance2";
         config2.source_id = 10; /* Different source ID */
         config2.protocol.max_retry_count =

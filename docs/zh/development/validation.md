@@ -21,7 +21,7 @@ source_language: zh_CN
 | 静态认证丢 ACK 恢复、应用只交付一次 | `test/unit/api/test_send.cpp` |
 | 静态工作区、背压、回绕、存储复用 | `test/smoke/static_workspace_smoke.c` |
 | 一次后端预留、运行期不调用后端分配 | `test/unit/api/test_footprint.cpp`、memory 性质测试 |
-| 公开安装包 C 消费者、ABI/profile 拒绝 | SDK 消费者 CTest 及 instance 测试 |
+| 公开安装包 C 消费者、资源标识冲突检查 | SDK 消费者 CTest 及 instance 测试 |
 | 精确创建错误、纯预算期限查询与时间回绕 | `test/unit/api/test_api_contracts.cpp` |
 | 认证配置预检、基本 ACK 容量及较小转发路由 | `test/unit/api/test_config_consistency.cpp` |
 | 所有发送入口的单帧大小上限、终止 scope 拒绝及布局无副作用 | `test/unit/api/test_send_policy.cpp` |
@@ -36,7 +36,7 @@ source_language: zh_CN
 
 ## 构建和安装
 
-在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库和源码子目录。独立安装消费实际编译、链接并运行公开 C11 和 C++17 程序，覆盖 ABI、profile、必需能力、资源身份和前缀冲突。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。
+在只准备 C11 工具链的干净构建目录验证默认生产库、Boot 生产库和源码子目录。独立安装消费实际编译、链接并运行公开 C11 和 C++17 程序，覆盖 profile、必需能力、资源身份和前缀冲突。正常主机测试按 [开发工作流](workflow.md) 执行。缺少本次测试清单、运行报告或失败退出码时，保留真实状态。
 
 `ci` preset 选择 Full 档位，开启高级运行时和 GCC 覆盖率插桩。`run_ctest.py` 保存用例清单和 JUnit 报告，并拒绝跳过的测试。多配置构建逐配置保存结果。
 

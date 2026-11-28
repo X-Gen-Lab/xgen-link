@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: a9c8e81558227acd8ee587aa3460ffb8cb3bdce0577e564f30efb766aa508843\n"
+"X-XGL-Source-SHA256: a453b6cc3174ec05a2e9a15dcba02b6d7fe54615365bf731490a7184e8ca8c1a\n"
 
 #: docs/zh/explanation/architecture.md:8
 msgid "架构"
@@ -42,8 +42,8 @@ msgid "API"
 msgstr "API"
 
 #: docs/zh/explanation/architecture.md:0
-msgid "校验 ABI/profile/容量；构造实例；驱动执行"
-msgstr "Validate ABI/profile/capacities; construct instances; drive work"
+msgid "校验配置参数和容量；构造实例；驱动执行"
+msgstr "Check configuration parameters and capacities, construct instances and drive execution"
 
 #: docs/zh/explanation/architecture.md:0
 msgid "公开配置与显式时间戳"

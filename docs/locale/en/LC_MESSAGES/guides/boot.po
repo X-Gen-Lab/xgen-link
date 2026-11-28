@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 70c3217b58307d09d935999a5b46453760c53d610382a27a061d4a5b9476590a\n"
+"X-XGL-Source-SHA256: d19847699c52c95f6985560eacdc73b022eb0f20916da828f7ed3e16367917f8\n"
 
 #: docs/zh/guides/boot.md:8
 msgid "Boot 接入"
@@ -27,14 +27,14 @@ msgstr "Select resources"
 
 #: docs/zh/guides/boot.md:14
 msgid ""
-"用 [编译档位](../reference/profiles.md) 选择构建，再用 `xgl_config_get_preset_boot()` 设置运行配置。设置路由、节点、MTU、RX "
-"缓冲和时间预算，通过 `xgl_memory_requirements()` 获取真实大小和对齐。将存储配置为静态并以 `xgl_init_static()` 初始化。包载荷预算按真实头、TLV 和 CRC "
-"扣除后计算。"
+"用 [编译档位](../reference/profiles.md) 选择构建，再由应用填写 `xgl_config_t`。设置单包窗口、对端与发送槽容量、路由、节点、MTU、RX 缓冲和时间预算，通过 "
+"`xgl_memory_requirements()` 获取真实大小和对齐。将存储配置为静态并以 `xgl_init_static()` 初始化。包载荷预算按真实头、TLV 和 CRC 扣除后计算。"
 msgstr ""
-"Choose a [build profile](../reference/profiles.md) and use `xgl_config_get_preset_boot()` to set the "
-"runtime configuration. Set the route, nodes, MTU, RX buffer and time budget. Query target size and "
-"alignment through `xgl_memory_requirements()`, provide static storage and initialize with "
-"`xgl_init_static()`. Derive payload limits by subtracting the actual header, TLVs and CRC."
+"Select a [build profile](../reference/profiles.md) and initialize `xgl_config_t` in the application. "
+"Set a single-packet window, peer and TX slots, routes, node address, MTU, RX buffer and timing budget."
+" Call `xgl_memory_requirements()` for the size and alignment, then pass the static storage to "
+"`xgl_init_static()`. Deduct the actual header, TLVs and CRC from the frame limit to budget payload "
+"bytes."
 
 #: docs/zh/guides/boot.md:16
 msgid "测量目标固件并记录外部 PHY 所需的缓冲、时序及实际调用栈。运行窗口 1 与独立的编译窗口上限分别选择。资源证据参见[验证](../development/validation.md)。"

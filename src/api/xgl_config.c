@@ -15,8 +15,6 @@
 #include <wire/xgl_wire.h>
 #endif
 
-#include <string.h>
-
 /*---------------------------------------------------------------------------*/
 /* Configuration Limits                                                      */
 /*---------------------------------------------------------------------------*/
@@ -31,122 +29,6 @@
 #define XGL_MAX_WINDOW_SIZE    32    /**< Maximum window size */
 #define XGL_MIN_FRAME_SIZE     64    /**< Minimum frame size */
 #define XGL_MAX_ROUTE_MTU      2048  /**< Maximum physical route MTU */
-
-/*---------------------------------------------------------------------------*/
-/* Configuration API                                                         */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Get default configuration
- * \details         Uses the profile default with the compiled frame limit.
- */
-void xgl_config_get_default_v5(xgl_config_t* config) {
-    /* Validate parameter */
-    if (config == NULL) {
-        return;
-    }
-
-    /* Select defaults that are supported by the compiled profile. */
-#if XGL_BUILD_PROFILE_BOOT
-    xgl_config_get_preset_boot_v5(config);
-#else
-    xgl_config_t default_config = XGL_CONFIG_PRESET_MEDIUM;
-    if (default_config.protocol.window_size > XGL_BUILD_WINDOW_CAPACITY) {
-        default_config.protocol.window_size = XGL_BUILD_WINDOW_CAPACITY;
-    }
-
-    /* Copy to output */
-    memcpy(config, &default_config, sizeof(xgl_config_t));
-#endif
-    if (config->protocol.max_frame_size > XGL_DATALINK_MAX_FRAME_SIZE) {
-        config->protocol.max_frame_size = XGL_DATALINK_MAX_FRAME_SIZE;
-    }
-}
-
-/**
- * \brief           Configure the bounded single-peer boot transport
- */
-void xgl_config_get_preset_boot_v5(xgl_config_t* config) {
-    if (config == NULL) {
-        return;
-    }
-    xgl_config_t preset = XGL_CONFIG_PRESET_TINY;
-    preset.name = "boot";
-    preset.protocol.window_size = 1U;
-    preset.features.max_peers = 1U;
-    preset.features.max_tx_packets = 1U;
-    preset.features.max_rx_buffered_packets = 0U;
-    preset.memory.rx_buffer_size = 128U;
-    memcpy(config, &preset, sizeof(*config));
-}
-
-/**
- * \brief           Get tiny configuration preset
- * \details         Query exact workspace bytes with xgl_memory_report().
- */
-void xgl_config_get_preset_tiny_v5(xgl_config_t* config) {
-    if (config == NULL) {
-        return;
-    }
-
-    xgl_config_t preset = XGL_CONFIG_PRESET_TINY;
-    memcpy(config, &preset, sizeof(xgl_config_t));
-}
-
-/**
- * \brief           Get small configuration preset
- * \details         Query workspace bytes before selecting a device memory
- *                  budget.
- */
-void xgl_config_get_preset_small_v5(xgl_config_t* config) {
-    if (config == NULL) {
-        return;
-    }
-
-    xgl_config_t preset = XGL_CONFIG_PRESET_SMALL;
-    memcpy(config, &preset, sizeof(xgl_config_t));
-}
-
-/**
- * \brief           Get medium configuration preset
- * \details         Increased bounded packet and peer capacities.
- */
-void xgl_config_get_preset_medium_v5(xgl_config_t* config) {
-    if (config == NULL) {
-        return;
-    }
-
-    xgl_config_t preset = XGL_CONFIG_PRESET_MEDIUM;
-    memcpy(config, &preset, sizeof(xgl_config_t));
-}
-
-/**
- * \brief           Get large configuration preset
- * \details         Largest predefined bounded capacities; not a device-size
- *                  guarantee. Encryption is not implemented in the current
- * release.
- */
-void xgl_config_get_preset_large_v5(xgl_config_t* config) {
-    if (config == NULL) {
-        return;
-    }
-
-    xgl_config_t preset = XGL_CONFIG_PRESET_LARGE;
-    memcpy(config, &preset, sizeof(xgl_config_t));
-}
-
-/**
- * \brief           Get production configuration preset
- * \details         Production profile requires authentication provider wiring.
- */
-void xgl_config_get_preset_production_v5(xgl_config_t* config) {
-    if (config == NULL) {
-        return;
-    }
-
-    xgl_config_t preset = XGL_CONFIG_PRESET_PRODUCTION;
-    memcpy(config, &preset, sizeof(xgl_config_t));
-}
 
 /*---------------------------------------------------------------------------*/
 /* Configuration Validation                                                  */
@@ -195,7 +77,7 @@ static bool config_measure_required_auth_frame(size_t tag_len,
  *                  Returns specific error codes for different validation
  * failures
  */
-xgl_error_t xgl_config_validate_v5(const xgl_config_t* config) {
+xgl_error_t xgl_config_validate(const xgl_config_t* config) {
     /* Check for NULL pointer */
     if (config == NULL) {
         return XGL_ERR_NULL_POINTER;

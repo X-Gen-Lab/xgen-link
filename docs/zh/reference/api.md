@@ -9,13 +9,13 @@ source_language: zh_CN
 
 [生成的 C API 参考](c-api.md)。
 
-使用 `<xgl/xgl.h>`。安装头文件包含生成的 profile 和 ABI 常量；`internal/` 头文件不安装。
+使用 `<xgl/xgl.h>`。安装头文件包含生成的档位和资源标识；`internal/` 头文件不安装。
 
 ## 生命周期与所有权
 
 `xgl_memory_requirements()` 测量精确存储需求。`xgl_init_static()` 初始化对齐的调用者存储。`xgl_create()` 通过 `config.memory.allocator`（`xgl_allocator_t`）预留同一布局，随后需要调用 `xgl_init()`。Libc fallback 默认为 Full 开启、Embedded/Lite 关闭；Embedded/Lite 可在重新构建 SDK 时显式启用，Boot 禁止 fallback。调用者显式提供的 allocator 可以使用静态存储或堆，因此仅关闭协议 fallback 不等于产品整体无堆。`xgl_destroy()` 释放动态预留的 workspace，或结束对静态存储的使用。
 
-需要诊断创建失败时使用 `xgl_create_with_error(&config, &handle)`：返回配置、ABI、后端或分配错误；分配失败为 `XGL_ERR_NO_MEMORY`，失败时清空 handle。成功仍只预留 workspace，需要调用 `xgl_init()`。原 `xgl_create()` 的指针返回形式保持兼容，复用同一实现。跨编译边界可使用对应的 `_checked` 入口显式传入消费者配置大小、ABI 和构建身份。
+需要诊断创建失败时使用 `xgl_create_with_error(&config, &handle)`：返回配置、后端或分配错误；分配失败为 `XGL_ERR_NO_MEMORY`，失败时清空 handle。成功仍只预留 workspace，需要调用 `xgl_init()`。原 `xgl_create()` 的指针返回形式保持兼容，复用同一实现。应用直接调用创建、测量和静态初始化函数。
 
 `xgl_memory_report()` 返回同一份需求及按资源类别划分的字节明细，不分配、不修改实例。类别包含对齐填充，合计为精确 workspace 大小。接纳字节预算可能小于池的实际预留，见[资源模型](../explanation/resource-model.md)。
 

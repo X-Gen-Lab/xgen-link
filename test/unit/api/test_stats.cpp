@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <algorithm>
@@ -60,8 +61,8 @@ TEST(XglStatisticsBehavior,
     xgl_route_item_t first_route = {2U, &first_phy, 128U, 1000U, 1U};
     xgl_route_item_t second_route = {1U, &second_phy, 128U, 1000U, 1U};
     xgl_config_t sender_config, receiver_config;
-    xgl_config_get_preset_tiny(&sender_config);
-    xgl_config_get_preset_tiny(&receiver_config);
+    sender_config = xgl_test_two_packet_config();
+    receiver_config = xgl_test_two_packet_config();
     sender_config.protocol.window_size = 1U;
     receiver_config.protocol.window_size = 1U;
     sender_config.source_id = 1U;
@@ -156,8 +157,7 @@ TEST(XglStatisticsBehavior,
 class XglStatsTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        /* Get default configuration */
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = 1;
 
         /* Create and initialize instance */
@@ -220,7 +220,7 @@ TEST_F(XglStatsTest, GetStatsWithNullStatsPointer) {
  */
 TEST_F(XglStatsTest, GetStatsFromUninitializedInstance) {
     xgl_config_t temp_config;
-    xgl_config_get_default(&temp_config);
+    temp_config = xgl_test_config();
     temp_config.source_id = 2;
 
     xgl_test_use_host_allocator(&temp_config);
@@ -295,7 +295,7 @@ TEST_F(XglStatsTest, ResetStatsWithNullHandle) {
  */
 TEST_F(XglStatsTest, ResetStatsFromUninitializedInstance) {
     xgl_config_t temp_config;
-    xgl_config_get_default(&temp_config);
+    temp_config = xgl_test_config();
     temp_config.source_id = 2;
 
     xgl_test_use_host_allocator(&temp_config);
@@ -356,7 +356,7 @@ TEST_F(XglStatsTest, StatsRemainZeroAfterReset) {
 TEST_F(XglStatsTest, StatsIsolationBetweenInstances) {
     /* Create second instance */
     xgl_config_t config2;
-    xgl_config_get_default(&config2);
+    config2 = xgl_test_config();
     config2.source_id = 2;
 
     xgl_test_use_host_allocator(&config2);

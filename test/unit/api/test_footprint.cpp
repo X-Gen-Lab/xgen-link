@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <xgl/xgl.h>
@@ -67,7 +68,7 @@ TEST(XglFootprintTest, CreateReservesExactlyTheMeasuredWorkspaceOnce) {
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;
-    xgl_config_get_preset_tiny(&config);
+    config = xgl_test_two_packet_config();
     config.memory.allocator = &allocator;
     config.route_table = &route;
     config.route_table_len = 1U;
@@ -92,7 +93,7 @@ TEST(XglFootprintTest, SendsReuseReservedStorageWithoutBackendAllocations) {
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;
-    xgl_config_get_preset_tiny(&config);
+    config = xgl_test_two_packet_config();
     config.memory.allocator = &allocator;
     config.route_table = &route;
     config.route_table_len = 1U;
@@ -130,7 +131,7 @@ TEST(XglFootprintTest, SharedPhyReservesOnlyOneReceiveLink) {
                                  {3U, &phys[0], 128U, 50U, 1U},
                                  {4U, &phys[0], 128U, 25U, 1U}};
     xgl_config_t config;
-    xgl_config_get_preset_tiny(&config);
+    config = xgl_test_two_packet_config();
     config.route_table = routes;
     config.route_table_len = 3U;
     xgl_memory_requirements_t shared{};
@@ -164,7 +165,7 @@ TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
     xgl_phy_ops_t phy = {null_tx, null_rx, nullptr};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     config.route_table = &route;
     config.route_table_len = 1U;
     xgl_memory_report_t report{};
@@ -191,17 +192,13 @@ TEST(XglFootprintTest, MemoryReportExplainsEveryReservedByte) {
 
 TEST(XglFootprintTest, MemoryReportFailureDoesNotOverwriteOutput) {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     xgl_memory_report_t report;
     std::memset(&report, 0x5a, sizeof(report));
     xgl_memory_report_t original;
     std::memcpy(&original, &report, sizeof(report));
     EXPECT_EQ(xgl_memory_report(nullptr, &report), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(xgl_memory_report(&config, nullptr), XGL_ERR_NULL_POINTER);
-    EXPECT_EQ(xgl_memory_report_checked(&config, sizeof(config),
-                                        XGL_CONFIG_ABI_VERSION,
-                                        XGL_BUILD_CONFIG_ID + 1U, &report),
-              XGL_ERR_INVALID_VERSION);
     config.features.max_peers = 0U;
     EXPECT_EQ(xgl_memory_report(&config, &report), XGL_ERR_INVALID_PARAM);
     EXPECT_EQ(std::memcmp(&report, &original, sizeof(report)), 0);

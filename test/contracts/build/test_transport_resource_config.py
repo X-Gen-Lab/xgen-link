@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -70,6 +71,10 @@ class TransportResourceConfig(unittest.TestCase):
 
     def test_public_api_preserves_cases_across_default_and_compact_resources(self):
         baseline = None
+        inventory = ARGS.link_source / "test/cmake/baseline_tests.txt"
+        required = {name for name in inventory.read_text(encoding="utf-8").splitlines()
+                    if re.match(API_CASE_PATTERN, name)}
+        self.assertTrue(required)
         combinations = (("full", "AUTO", "ON"), ("full", "AUTO", "OFF"),
                         ("full", "1", "OFF"), ("embedded", "1", "OFF"))
         for profile, capacity, adaptive in combinations:
@@ -107,7 +112,7 @@ class TransportResourceConfig(unittest.TestCase):
                 (self.root / (name + "-discovery.json")).write_text(
                     json.dumps(listing, indent=2) + "\n", encoding="utf-8")
                 names = {case["name"] for case in listing["tests"]}
-                self.assertGreaterEqual(len(names), 48, "Public API cases must not disappear")
+                self.assertFalse(required - names, f"Missing public API cases: {sorted(required - names)}")
                 if baseline is None:
                     baseline = names
                 else:
@@ -157,14 +162,12 @@ class TransportResourceConfig(unittest.TestCase):
             executable = build / ("probe.exe" if (build / "probe.exe").is_file() else "probe")
             self.execute(executable)
 
-    def test_default_profiles_keep_private_window_and_legacy_identity(self):
-        for profile, config_id, buckets in (("boot", 301, 1), ("embedded", 302, 32),
-                                            ("full", 303, 32), ("embedded-lite", 304, 8)):
+    def test_default_profiles_keep_window_and_bucket_capacities(self):
+        for profile, buckets in (("boot", 1), ("embedded", 32), ("full", 32), ("embedded-lite", 8)):
             with self.subTest(profile=profile):
                 binary = self.configure("default-" + profile, profile)
                 self.probe("default-" + profile, binary,
                            '#include <xgl/xgl_build_config.h>\n'
-                           f'_Static_assert(XGL_BUILD_CONFIG_ID == {config_id}U, "profile identity");\n'
                            f'_Static_assert(XGL_RELIABLE_BUCKET_COUNT == {buckets}U, "bucket capacity");\n'
                            '_Static_assert(XGL_BUILD_WINDOW_CAPACITY == 128U, "private window contract");\n'
                            '_Static_assert(XGL_FEATURE_ADAPTIVE_RTO == 1, "adaptive default");\n'
@@ -214,7 +217,7 @@ class TransportResourceConfig(unittest.TestCase):
             binary = self.configure(f"identity-{index}", **options)
             config = self.header(binary).read_text(encoding="utf-8")
             line = next(item for item in config.splitlines()
-                        if item.startswith("#define XGL_BUILD_CONFIG_ID "))
+                        if item.startswith("#define XGL_RESOURCE_CONFIG_ID "))
             ids.append(line)
         self.assertEqual(len(set(ids)), len(ids), "Different SDK resources must have distinct identities")
 
@@ -227,7 +230,7 @@ class TransportResourceConfig(unittest.TestCase):
                    definitions="XGL_RELIABLE_BUCKET_COUNT=2 XGL_BUILD_WINDOW_CAPACITY=8 XGL_FEATURE_ADAPTIVE_RTO=0")
         for definition in ("XGL_RELIABLE_BUCKET_COUNT=32", "XGL_BUILD_WINDOW_CAPACITY=128",
                            "XGL_FEATURE_ADAPTIVE_RTO=1", "XGL_EXPECTED_RESOURCE_CONFIG_ID=0",
-                           "XGL_RESOURCE_CONFIG_ID=0", "XGL_BUILD_CONFIG_ID=303",
+                           "XGL_RESOURCE_CONFIG_ID=0",
                            "XGL_FEATURE_ADVANCED_RUNTIME=1"):
             with self.subTest(definition=definition):
                 self.probe("override-" + definition.split("=")[0], binary,
@@ -245,15 +248,14 @@ class TransportResourceConfig(unittest.TestCase):
                         source / "VerifySdkPrefix.cmake")
         (source / "main.c").write_text(
             '#include <xgl/xgl.h>\n'
-            '_Static_assert(XGL_BUILD_CONFIG_ID != 301U, "custom SDK identity");\n'
             '_Static_assert(XGL_RELIABLE_BUCKET_COUNT == 2U, "installed buckets");\n'
             '_Static_assert(XGL_BUILD_WINDOW_CAPACITY == 1U, "installed window");\n'
             '_Static_assert(XGL_FEATURE_ADAPTIVE_RTO == 0, "fixed timeout");\n'
             'int main(void) {\n'
-            '    xgl_config_t config;\n    xgl_memory_requirements_t requirements;\n'
-            '    xgl_config_get_preset_boot(&config);\n'
-            '    if (xgl_memory_requirements_checked(&config, sizeof(config),\n'
-            '        XGL_CONFIG_ABI_VERSION, 301U, &requirements) != XGL_ERR_INVALID_VERSION) return 3;\n'
+            '    xgl_config_t config = {0};\n    xgl_memory_requirements_t requirements;\n'
+            '    config.source_id = 1U; config.memory.rx_buffer_size = 128U;\n'
+            '    config.protocol = (xgl_protocol_config_t){1000U, 3U, 1U, 128U};\n'
+            '    config.features.max_peers = 1U; config.features.max_tx_packets = 1U;\n'
             '    if (xgl_memory_requirements(&config, &requirements) != XGL_OK) return 1;\n'
             '    config.protocol.window_size = 2U;\n'
             '    if (xgl_config_validate(&config) != XGL_ERR_INVALID_PARAM) return 2;\n'

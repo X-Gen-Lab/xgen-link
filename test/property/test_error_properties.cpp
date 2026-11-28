@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <xgl/xgl.h>
@@ -93,7 +94,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
         /* Test 2: Invalid parameter errors */
         {
             xgl_config_t config;
-            xgl_config_get_default(&config);
+            config = xgl_test_config();
             config.source_id = random_valid_source_id(gen);
 
             /* Invalid window size (0) */
@@ -117,7 +118,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
         /* Test 3: Not initialized error */
         {
             xgl_config_t config;
-            xgl_config_get_default(&config);
+            config = xgl_test_config();
             config.source_id = random_valid_source_id(gen);
 
             /* Create instance but don't initialize */
@@ -165,7 +166,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
             route.metric = 0;
 
             xgl_config_t config;
-            xgl_config_get_default(&config);
+            config = xgl_test_config();
             config.source_id = 1;
             config.protocol.max_frame_size = 256;
             config.memory.rx_buffer_size = config.protocol.max_frame_size;
@@ -201,7 +202,7 @@ TEST(XglErrorProperties, ErrorCodeSpecificity) {
         /* Test 5: Buffer too small error */
         {
             xgl_config_t config;
-            xgl_config_get_default(&config);
+            config = xgl_test_config();
             config.source_id = random_valid_source_id(gen);
             config.protocol.max_frame_size = 256;
             /* RX buffer too small (less than full max_frame_size) */
@@ -302,7 +303,7 @@ TEST(XglErrorProperties, ErrorCallbackInvocation) {
 
         /* Create configuration with error callback */
         xgl_config_t config;
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = 1;
         config.protocol.max_frame_size = 256;
         config.memory.rx_buffer_size = config.protocol.max_frame_size;
@@ -440,7 +441,7 @@ TEST(XglErrorProperties, ErrorStatistics) {
 
         /* Create configuration */
         xgl_config_t config;
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = 1;
         config.protocol.max_frame_size = 256;
         config.memory.rx_buffer_size = config.protocol.max_frame_size;

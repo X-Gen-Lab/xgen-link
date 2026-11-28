@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <xgl/xgl.h>
@@ -24,7 +25,7 @@
 class XglRuntimeContractTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = 1U;
         config.protocol.max_frame_size = 128U;
         config.memory.rx_buffer_size = 128U;
@@ -214,8 +215,7 @@ static_assert(
 class XglInstanceTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        /* Get default configuration */
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = 1;
     }
 
@@ -394,76 +394,17 @@ TEST_F(XglInstanceTest, DestroyWithoutInit) {
     xgl_destroy(handle);
 }
 
-/*---------------------------------------------------------------------------*/
-/* Configuration Preset Tests                                                */
-/*---------------------------------------------------------------------------*/
-
-/**
- * \brief           Test tiny configuration preset
- */
-TEST_F(XglInstanceTest, TinyConfigPreset) {
-    xgl_config_t tiny_config = XGL_CONFIG_PRESET_TINY;
-    tiny_config.source_id = 1;
-
-    xgl_test_use_host_allocator(&tiny_config);
-    xgl_handle_t handle = xgl_create(&tiny_config);
-    ASSERT_NE(handle, nullptr);
-
-    xgl_error_t err = xgl_init(handle);
-    EXPECT_EQ(err, XGL_OK);
-
-    xgl_destroy(handle);
-}
-
-/**
- * \brief           Test small configuration preset
- */
-TEST_F(XglInstanceTest, SmallConfigPreset) {
-    xgl_config_t small_config = XGL_CONFIG_PRESET_SMALL;
-    small_config.source_id = 1;
-
-    xgl_test_use_host_allocator(&small_config);
-    xgl_handle_t handle = xgl_create(&small_config);
-    ASSERT_NE(handle, nullptr);
-
-    xgl_error_t err = xgl_init(handle);
-    EXPECT_EQ(err, XGL_OK);
-
-    xgl_destroy(handle);
-}
-
-/**
- * \brief           Test medium configuration preset
- */
-TEST_F(XglInstanceTest, MediumConfigPreset) {
-    xgl_config_t medium_config = XGL_CONFIG_PRESET_MEDIUM;
-    medium_config.source_id = 1;
-
-    xgl_test_use_host_allocator(&medium_config);
-    xgl_handle_t handle = xgl_create(&medium_config);
-    ASSERT_NE(handle, nullptr);
-
-    xgl_error_t err = xgl_init(handle);
-    EXPECT_EQ(err, XGL_OK);
-
-    xgl_destroy(handle);
-}
-
-/**
- * \brief           Test large configuration preset
- */
-TEST_F(XglInstanceTest, LargeConfigPreset) {
-    xgl_config_t large_config = XGL_CONFIG_PRESET_LARGE;
-    large_config.source_id = 1;
-
-    xgl_test_use_host_allocator(&large_config);
-    xgl_handle_t handle = xgl_create(&large_config);
-    ASSERT_NE(handle, nullptr);
-
-    xgl_error_t err = xgl_init(handle);
-    EXPECT_EQ(err, XGL_OK);
-
-    xgl_destroy(handle);
+TEST_F(XglInstanceTest, InitializesApplicationCapacityBudgets) {
+    for (auto workload : {xgl_test_two_packet_config(),
+                          xgl_test_config(256, 288, 4, 2, 4, 4, 5),
+                          xgl_test_config(512, 544, 8, 8, 16, 16, 5),
+                          xgl_test_config(1024, 1056, 16, 16, 64, 64, 7)}) {
+        xgl_test_use_host_allocator(&workload);
+        xgl_handle_t instance = xgl_create(&workload);
+        ASSERT_NE(instance, nullptr);
+        EXPECT_EQ(xgl_init(instance), XGL_OK);
+        xgl_destroy(instance);
+    }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -662,29 +603,6 @@ TEST_F(XglInstanceTest, SharedPhyIsPolledOnceAndTimeZeroIsValid) {
 }
 
 /**
- * \brief           Reject mismatched consumer ABI before reading configuration
- */
-TEST_F(XglInstanceTest, RejectsConsumerAbiAndProfileMismatch) {
-    EXPECT_EQ(xgl_create_checked(nullptr, 1U, XGL_CONFIG_ABI_VERSION,
-                                 XGL_BUILD_CONFIG_ID),
-              nullptr);
-    EXPECT_EQ(xgl_create_checked(&config, sizeof(config),
-                                 XGL_CONFIG_ABI_VERSION,
-                                 XGL_BUILD_CONFIG_ID + 1U),
-              nullptr);
-    xgl_memory_requirements_t requirements{};
-    EXPECT_EQ(xgl_memory_requirements_checked(
-                  nullptr, sizeof(config), XGL_CONFIG_ABI_VERSION - 1U,
-                  XGL_BUILD_CONFIG_ID, &requirements),
-              XGL_ERR_INVALID_VERSION);
-    xgl_handle_t handle = nullptr;
-    EXPECT_EQ(xgl_init_static_checked(nullptr, 1U, XGL_CONFIG_ABI_VERSION,
-                                      XGL_BUILD_CONFIG_ID, nullptr, 0U,
-                                      &handle),
-              XGL_ERR_INVALID_VERSION);
-}
-
-/**
  * \brief           Reject impossible route counts before reading route storage
  */
 TEST_F(XglInstanceTest, RejectsOversizedRouteCount) {
@@ -698,7 +616,7 @@ TEST_F(XglInstanceTest, RejectsOversizedRouteCount) {
  * \brief           Reserve bounded receive buffering in static storage
  */
 TEST_F(XglInstanceTest, StaticWorkspaceSupportsReceiveWindow) {
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     xgl_memory_requirements_t requirements{};
     ASSERT_EQ(xgl_memory_requirements(&config, &requirements), XGL_OK);
     const size_t single_slot = requirements.size;

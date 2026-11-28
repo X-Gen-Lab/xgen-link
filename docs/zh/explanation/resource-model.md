@@ -17,7 +17,7 @@ source_language: zh_CN
 
 准备完成后，初始化、发送、接收处理及清理都只使用 workspace。`xgl_destroy()` 将动态存储一次性归还原 backend；静态存储仍归调用者所有。借用的配置和上下文必须活到销毁结束。
 
-`xgl_memory_report()` 无分配地解释同一份规划，分别报告管理区、初始化区、peer、窗口、可靠记录及载荷、帧 scratch 和乱序 RX 占用。类别字节数包含对齐，合计恰好等于 `report.requirements.size`。失败不改写输出；内联入口检查消费者的配置 ABI 和编译能力身份。
+`xgl_memory_report()` 无分配地解释同一份规划，分别报告管理区、初始化区、peer、窗口、可靠记录及载荷、帧 scratch 和乱序 RX 占用。类别字节数包含对齐，合计恰好等于 `report.requirements.size`。失败不改写输出。
 
 ```c
 xgl_memory_report_t report;

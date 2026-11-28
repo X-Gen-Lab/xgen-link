@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 4b0750550be866c1a97adba99eca71c16da983b7d10197d4652706dbe0158154\n"
+"X-XGL-Source-SHA256: 0080102ece9139bc842f05922771004d8c061ff287da65471648d7cfc610f0d2\n"
 
 #: docs/zh/guides/advanced-runtime.md:8
 msgid "扩展运行选项"
@@ -16,19 +16,20 @@ msgstr "Advanced Runtime Options"
 
 #: docs/zh/guides/advanced-runtime.md:10
 msgid ""
-"构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile 默认关闭；关闭时扩展入口返回"
-" `XGL_ERR_UNSUPPORTED`。选项改变私有布局与构建身份，库和消费者必须使用同一生成配置头。高级运行时选项描述符的版本为 `2`。"
+"构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile "
+"默认关闭；关闭时扩展入口返回 `XGL_ERR_UNSUPPORTED`。选项改变私有布局与编译资源组合，库和消费者必须使用同一生成配置头。高级运行时选项描述符的版本为 `4`。"
 msgstr ""
-"Build with `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`. Installed consumers can require `COMPONENTS "
-"advanced_runtime`. Every profile defaults to OFF, and disabled entries return `XGL_ERR_UNSUPPORTED`. "
-"This option changes private layout and build identity. Consumers must use the library's generated "
-"configuration header. The advanced runtime options descriptor has version `2`."
+"Set `-DXGL_ENABLE_ADVANCED_RUNTIME=ON` when building. Installed consumers can request `COMPONENTS "
+"advanced_runtime`. All profiles disable it by default. When disabled, extended entry points return "
+"`XGL_ERR_UNSUPPORTED`. The option changes the private layout and compiled resources. Use the same "
+"generated configuration header for the library and consumer. The advanced instance options descriptor "
+"is version `4`."
 
 #: docs/zh/guides/advanced-runtime.md:12
 msgid "创建与生命周期"
 msgstr "Creation and Lifetime"
 
-#: docs/zh/guides/advanced-runtime.md:24
+#: docs/zh/guides/advanced-runtime.md:29
 msgid ""
 "检查返回值后，提供 `report.requirements.size` 字节且满足其 alignment 的存储，调用 "
 "`xgl_init_static_with_options()`。产品可在构建阶段测量并提供固定数组，也可用显式 allocator 调用 `xgl_create_with_options()`，随后调用 "
@@ -39,16 +40,16 @@ msgstr ""
 "array, or use an explicit allocator with `xgl_create_with_options()` followed by `xgl_init()`. The "
 "static entry already initializes the instance."
 
-#: docs/zh/guides/advanced-runtime.md:26
+#: docs/zh/guides/advanced-runtime.md:31
 msgid ""
-"配置、options、路由、PHY、provider 与回调上下文都必须持续有效，直到销毁；不允许与 workspace 重叠。使用初始化宏填写尺寸、版本、配置 ABI 与构建身份，不硬编码。旧创建入口和旧 "
+"配置、options、路由、PHY、provider 与回调上下文都必须持续有效，直到销毁；不允许与 workspace 重叠。使用初始化宏填写描述符尺寸、版本和配置尺寸，不硬编码。旧创建入口和旧 "
 "`xgl_step()` 保持可用。"
 msgstr ""
-"Configuration, options, routes, PHY, provider and callback contexts remain valid until destruction; they"
-" must not overlap the workspace. Initialize descriptor size, version, configuration ABI and build "
-"identity using the macro. Existing creation entries and `xgl_step()` remain available."
+"Keep the configuration, options, routes, PHY, provider and callback contexts valid until destruction "
+"and separate from workspace storage. The initializer sets the descriptor size, version and "
+"configuration size. Existing creation calls and `xgl_step()` remain available."
 
-#: docs/zh/guides/advanced-runtime.md:28
+#: docs/zh/guides/advanced-runtime.md:33
 msgid "期限与观察"
 msgstr "Deadlines and Observation"
 
@@ -100,7 +101,7 @@ msgstr "`XGL_SCOPE_FAILED`"
 msgid "scope 已终止失败，错误码随事件提供"
 msgstr "Terminal scope failure, accompanied by its error"
 
-#: docs/zh/guides/advanced-runtime.md:38
+#: docs/zh/guides/advanced-runtime.md:43
 msgid ""
 "非零期限必须小于 `2^31` ms。TX 忙期在第一份可靠工作接纳时开始，持续到最后一个待 ACK 包确认；后续发送、BUSY、重试和部分 ACK 均不延长。到期会清理该 scope "
 "拥有的工作并报告超时。持续发送的业务应选择足够的忙期上限，或以显式事务边界停止接纳新工作。"
@@ -111,20 +112,20 @@ msgstr ""
 "producers must allow a sufficient busy-period limit or stop admission at explicit transaction "
 "boundaries."
 
-#: docs/zh/guides/advanced-runtime.md:40
+#: docs/zh/guides/advanced-runtime.md:45
 msgid "TX 忙期到期的 scope 在新 DATA 交付前终止，不能依靠接收阶段先于维护阶段来延长存活。"
 msgstr ""
 "A scope with an expired TX busy period terminates before new DATA delivery; receiving before maintenance"
 " cannot extend its lifetime."
 
-#: docs/zh/guides/advanced-runtime.md:42
+#: docs/zh/guides/advanced-runtime.md:47
 msgid "普通和原地实际发送均在提交前判定忙期。有效 ACK 完成语义校验后也先判定到期，再应用反馈。纯布局查询只准备缓冲区，实际发送重新判断期限。"
 msgstr ""
 "Ordinary and in-place sends check the busy period before submission. After semantic validation, a valid "
 "ACK checks expiry before applying feedback. The layout query prepares buffer space. The actual send "
 "checks the deadline again."
 
-#: docs/zh/guides/advanced-runtime.md:44
+#: docs/zh/guides/advanced-runtime.md:49
 msgid ""
 "发送排空是协议确认，不能作为远端电机执行、Flash 落盘或业务事务成功的证明。需要业务确认时应另加请求 ID 和业务响应。关闭 peer 是本地生命周期操作；同步通知、远端复位和重试策略由应用决定。"
 msgstr ""
@@ -132,7 +133,7 @@ msgstr ""
 "request ID and application response where business confirmation is required. Closing a peer is a local "
 "lifecycle operation; remote notification, reset and retry policy belong to the application."
 
-#: docs/zh/guides/advanced-runtime.md:46
+#: docs/zh/guides/advanced-runtime.md:51
 msgid ""
 "scoped 接收回调可返回 BUSY。若缓存中的乱序包已经由协议接纳，应用容量恢复后由 owner 再次调度交付。应用可主动唤醒 owner。所有回调同步执行，禁止重入同一实例或在回调中销毁实例。"
 msgstr ""
@@ -141,11 +142,11 @@ msgstr ""
 "detect changing application capacity. All callbacks are synchronous and must not reenter or destroy the "
 "instance."
 
-#: docs/zh/guides/advanced-runtime.md:48
+#: docs/zh/guides/advanced-runtime.md:53
 msgid "资源快照"
 msgstr "Resource Snapshots"
 
-#: docs/zh/guides/advanced-runtime.md:50
+#: docs/zh/guides/advanced-runtime.md:55
 msgid ""
 "`xgl_resources_get()` 返回当前 peer 和失败 peer 数量、待 ACK 包及其载荷字节数、乱序包及其载荷字节数。读取不分配内存，调用方须与实例修改串行化。遍历开销与配置容量有关。"
 msgstr ""
@@ -153,21 +154,20 @@ msgstr ""
 "bytes, and retained out-of-order RX packets and payload bytes. Reading performs no allocation, requires "
 "serialization and costs work proportional to configured capacities."
 
-#: docs/zh/guides/advanced-runtime.md:52
+#: docs/zh/guides/advanced-runtime.md:57
 msgid ""
-"快照描述当前占用，`xgl_memory_report_with_options()` 测量整个 workspace 的预留。统计中的 `memory_used` 按预留 workspace 解释。对 RX "
-"cache，可显式设 `rx_buffer_size = max_frame_size` 以节省存储。"
+"快照描述当前占用，`xgl_memory_report_with_options()` 测量整个 workspace 的预留。统计中的 `memory_used` 按预留 workspace 解释。对 "
+"RX cache，可显式设 `rx_buffer_size = max_frame_size` 以节省存储。"
 msgstr ""
 "Snapshots describe active content; `xgl_memory_report_with_options()` describes reserved workspace. "
-"Statistics `memory_used` still refers to reserved workspace. RX cache can explicitly use `rx_buffer_size"
-" = max_frame_size`; named presets preserve their historical margin, and the extra 32 B is not a protocol"
-" requirement."
+"Statistics `memory_used` counts reserved workspace. Set `rx_buffer_size = max_frame_size` to size "
+"the RX cache for one full frame."
 
-#: docs/zh/guides/advanced-runtime.md:54
+#: docs/zh/guides/advanced-runtime.md:59
 msgid "安全 scope 策略"
 msgstr "Security Scope Policy"
 
-#: docs/zh/guides/advanced-runtime.md:56
+#: docs/zh/guides/advanced-runtime.md:61
 msgid ""
 "有认证能力的 profile 可设 `protect_installed_scopes=true`。它要求合法 provider 和可容纳基本认证帧的协议 MTU。先为 exact `(remote_id, "
 "connection_id, epoch)` 安装可信安全会话，再发送数据；该 scope 的 HELLO、DATA、ACK、SACK、RESET、重传及零拷贝布局均采用认证策略。"
@@ -177,7 +177,7 @@ msgstr ""
 "exact `(remote_id, connection_id, epoch)` before sending. HELLO, DATA, ACK, SACK, RESET, retries and "
 "zero-copy layouts then share this authentication policy."
 
-#: docs/zh/guides/advanced-runtime.md:58
+#: docs/zh/guides/advanced-runtime.md:63
 msgid ""
 "关闭后的 scope 不回退为明文。其他未安装 scope 在全局 `auth_required=false` 时仍可使用明文；这不是自动协商或动态信任建立。全局 required "
 "继续强制所有本地收发认证。发送预检、原地布局与实际提交按目标的精确 scope 计算帧大小，仅为须认证的帧计入 SECURITY 和 tag。"
@@ -187,7 +187,7 @@ msgstr ""
 "required mode still protects all local traffic. Send preflight, in-place layout and submission size the "
 "frame for the exact target scope. Only frames that require authentication include SECURITY and the tag."
 
-#: docs/zh/guides/advanced-runtime.md:60
+#: docs/zh/guides/advanced-runtime.md:65
 msgid ""
 "安装不撤销之前已经接纳的数据；先前缓存的明文仍可在安装后交付。需要新的信任边界时，使用新 epoch/scope 并先安装后接收，显式处置旧 scope "
 "的数据。详见[安全生命周期](../reference/protocol/v1/security.md)。"
@@ -197,18 +197,18 @@ msgstr ""
 "and explicitly dispose of old-scope data. See the [security "
 "lifecycle](../reference/protocol/v1/security.md)."
 
-#: docs/zh/guides/advanced-runtime.md:62
+#: docs/zh/guides/advanced-runtime.md:67
 msgid "关闭安全会话保留 nonce 域记录；不能无限安装并关闭会话来回收槽。产品负责密钥轮换、epoch、重启新鲜性、真实密码实现及其验证。认证不等于 payload 加密。"
 msgstr ""
 "Closing a security session retains its nonce-domain record; repeated installation and closure cannot "
 "reclaim slots indefinitely. The product owns key rotation, epoch and reboot freshness, the real "
 "cryptographic provider and its validation. Authentication does not imply payload encryption."
 
-#: docs/zh/guides/advanced-runtime.md:64
+#: docs/zh/guides/advanced-runtime.md:69
 msgid "调度与验证"
 msgstr "Scheduling and Validation"
 
-#: docs/zh/guides/advanced-runtime.md:66
+#: docs/zh/guides/advanced-runtime.md:71
 msgid ""
 "执行预算、pending 和 DMA owner 示例见[有界接收与运行](../explanation/runtime.md)。预算限制工作次数，不能替代完整 WCET 测量。旧 step "
 "在扩展构建中使用无限候选和维护配额，不应在需要有界运行时混用。"
@@ -218,7 +218,7 @@ msgstr ""
 "candidate and maintenance quotas in an advanced build; do not mix entries where bounded execution is "
 "required."
 
-#: docs/zh/guides/advanced-runtime.md:68
+#: docs/zh/guides/advanced-runtime.md:73
 msgid "主机 GoogleTest 验证行为；每个 profile 的实际 ELF、栈、DMA cache 一致性、中断延时与产品内存预算需分别验收。测量时构建实际调用扩展 API 的产品固件。"
 msgstr ""
 "Host GoogleTest verifies behavior. Profile ELFs, stack, DMA cache coherency, interrupt latency and "

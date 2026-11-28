@@ -1,5 +1,3 @@
-# Configuration layout compatibility is independent of the SDK release number.
-set(XGL_CONFIG_ABI_VERSION 5)
 set(XGL_PROFILES boot embedded-lite embedded full)
 set(XGL_PROFILE "full" CACHE STRING "Compiled protocol profile")
 set_property(CACHE XGL_PROFILE PROPERTY STRINGS ${XGL_PROFILES})
@@ -26,7 +24,7 @@ if(XGL_PROFILE STREQUAL "boot")
     set(XGL_FEATURE_STATISTICS 0)
     set(XGL_DEFAULT_BUCKET_COUNT 1)
     set(XGL_DEFAULT_RX_CHUNK_SIZE 32)
-    set(XGL_PROFILE_CONFIG_ID 301)
+    set(XGL_RESOURCE_PROFILE_CODE 1)
 else()
     set(XGL_FEATURE_AUTH 1)
     set(XGL_FEATURE_ROUTE_INDEX 1)
@@ -40,13 +38,13 @@ else()
         set(XGL_FEATURE_FORWARDING 0)
         set(XGL_SECURITY_SESSION_CAPACITY 0)
         set(XGL_DEFAULT_BUCKET_COUNT 8)
-        set(XGL_PROFILE_CONFIG_ID 304)
+        set(XGL_RESOURCE_PROFILE_CODE 4)
     elseif(XGL_PROFILE STREQUAL "embedded")
         set(XGL_SECURITY_SESSION_CAPACITY 4)
-        set(XGL_PROFILE_CONFIG_ID 302)
+        set(XGL_RESOURCE_PROFILE_CODE 2)
     else()
         set(XGL_DEFAULT_FALLBACK_MALLOC 1)
-        set(XGL_PROFILE_CONFIG_ID 303)
+        set(XGL_RESOURCE_PROFILE_CODE 3)
     endif()
 endif()
 
@@ -178,11 +176,10 @@ function(xgl_finalize_build_config generated_dir)
     else()
         set(heap_code 0)
     endif()
-    math(EXPR profile_code "${XGL_PROFILE_CONFIG_ID} - 300")
     math(
         EXPR
         XGL_RESOURCE_CONFIG_ID
-        "${profile_code} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * (${heap_code} + 2 * ${XGL_FEATURE_ADVANCED_RUNTIME})))))"
+        "${XGL_RESOURCE_PROFILE_CODE} + 8 * (${bucket_code} + 8 * (${window_code} + 8 * (${XGL_FEATURE_ADAPTIVE_RTO} + 2 * (${chunk_code} + 4 * (${heap_code} + 2 * ${XGL_FEATURE_ADVANCED_RUNTIME})))))"
     )
     # Preserve the existing low 14 bits and all identities at the default ceiling.
     math(
@@ -191,25 +188,10 @@ function(xgl_finalize_build_config generated_dir)
         "${XGL_RESOURCE_CONFIG_ID} + 16384 * (${XGL_DEFAULT_MAX_FRAME_SIZE} - ${XGL_DATALINK_MAX_FRAME_SIZE})"
     )
 
-    set(XGL_BUILD_CONFIG_ID "${XGL_PROFILE_CONFIG_ID}")
-    if(
-        NOT (
-            XGL_RELIABLE_BUCKET_COUNT EQUAL XGL_DEFAULT_BUCKET_COUNT
-            AND XGL_BUILD_WINDOW_CAPACITY EQUAL XGL_DEFAULT_WINDOW_CAPACITY
-            AND XGL_FEATURE_ADAPTIVE_RTO EQUAL XGL_DEFAULT_ADAPTIVE_RTO
-            AND XGL_BUILD_RX_CHUNK_SIZE EQUAL XGL_DEFAULT_RX_CHUNK_SIZE
-            AND heap_code EQUAL XGL_DEFAULT_FALLBACK_MALLOC
-            AND XGL_FEATURE_ADVANCED_RUNTIME EQUAL XGL_DEFAULT_ADVANCED_RUNTIME
-            AND XGL_DATALINK_MAX_FRAME_SIZE EQUAL XGL_DEFAULT_MAX_FRAME_SIZE
-        )
-    )
-        math(EXPR XGL_BUILD_CONFIG_ID "65536 + ${XGL_RESOURCE_CONFIG_ID}")
-    endif()
     configure_file(
         "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/templates/xgl_build_config.h.in"
         "${generated_dir}/xgl/xgl_build_config.h"
         @ONLY
     )
     set(XGL_RESOURCE_CONFIG_ID "${XGL_RESOURCE_CONFIG_ID}" PARENT_SCOPE)
-    set(XGL_BUILD_CONFIG_ID "${XGL_BUILD_CONFIG_ID}" PARENT_SCOPE)
 endfunction()

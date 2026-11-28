@@ -55,7 +55,6 @@ function(xgl_add_library target fallback_malloc generated_dir)
         ${target}
         PUBLIC
             "XGL_EXPECTED_RESOURCE_CONFIG_ID=${XGL_RESOURCE_CONFIG_ID}U"
-            "XGL_EXPECTED_CONFIG_ABI_VERSION=${XGL_CONFIG_ABI_VERSION}U"
             "XGL_ALLOW_FALLBACK_MALLOC=$<BOOL:${XGL_ALLOW_FALLBACK_MALLOC}>"
     )
     target_include_directories(
@@ -70,9 +69,7 @@ function(xgl_add_library target fallback_malloc generated_dir)
         ${target}
         PROPERTIES
             XGL_PROFILE "${XGL_PROFILE}"
-            XGL_BUILD_CONFIG_ID "${XGL_BUILD_CONFIG_ID}"
             XGL_CAPABILITIES "${XGL_CAPABILITIES}"
-            XGL_CONFIG_ABI_VERSION "${XGL_CONFIG_ABI_VERSION}"
             XGL_RESOURCE_CONFIG_ID "${XGL_RESOURCE_CONFIG_ID}"
             XGL_DATALINK_MAX_FRAME_SIZE "${XGL_DATALINK_MAX_FRAME_SIZE}"
             XGL_RELIABLE_INDEX_BUCKETS "${XGL_RELIABLE_BUCKET_COUNT}"
@@ -80,16 +77,13 @@ function(xgl_add_library target fallback_malloc generated_dir)
             XGL_ENABLE_ADAPTIVE_RTO "${XGL_FEATURE_ADAPTIVE_RTO}"
             XGL_ENABLE_ADVANCED_RUNTIME "${XGL_FEATURE_ADVANCED_RUNTIME}"
             INTERFACE_XGL_RESOURCE_CONFIG_ID "${XGL_RESOURCE_CONFIG_ID}"
-            INTERFACE_XGL_CONFIG_ABI_VERSION "${XGL_CONFIG_ABI_VERSION}"
     )
     set_property(
         TARGET ${target}
         PROPERTY
             EXPORT_PROPERTIES
                 XGL_PROFILE
-                XGL_BUILD_CONFIG_ID
                 XGL_CAPABILITIES
-                XGL_CONFIG_ABI_VERSION
                 XGL_RESOURCE_CONFIG_ID
                 XGL_DATALINK_MAX_FRAME_SIZE
                 XGL_RELIABLE_INDEX_BUCKETS
@@ -99,9 +93,6 @@ function(xgl_add_library target fallback_malloc generated_dir)
     )
     set_property(
         TARGET ${target}
-        PROPERTY
-            COMPATIBLE_INTERFACE_STRING
-                XGL_RESOURCE_CONFIG_ID
-                XGL_CONFIG_ABI_VERSION
+        PROPERTY COMPATIBLE_INTERFACE_STRING XGL_RESOURCE_CONFIG_ID
     )
 endfunction()

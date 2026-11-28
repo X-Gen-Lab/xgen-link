@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <network/xgl_network.h>
@@ -129,8 +130,7 @@ class XglSendTest : public ::testing::Test {
         route.read_freq_hz = 100;
         route.metric = 100;
 
-        /* Get default configuration */
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = 1;
         config.route_table = &route;
         config.route_table_len = 1;
@@ -819,7 +819,7 @@ TEST(XglStaticAuthenticatedSendTest,
                                       8U, &a};
     xgl_auth_provider_t provider_b = {static_auth_sign, send_test_auth_verify,
                                       8U, &b};
-    xgl_config_t config_a = XGL_CONFIG_PRESET_TINY;
+    xgl_config_t config_a = xgl_test_two_packet_config();
     config_a.protocol.window_size = 1U;
     config_a.protocol.ack_timeout_ms = 100U;
     config_a.route_table = &route_a;

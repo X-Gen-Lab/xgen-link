@@ -58,12 +58,18 @@ static int smoke_instance(void) {
     xgl_allocator_t core = {&storage, smoke_alloc, smoke_free};
     xgl_phy_ops_t phy = {smoke_tx, smoke_rx, NULL};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 1U};
-    xgl_config_t config;
-    xgl_config_get_preset_tiny(&config);
-    config.source_id = 1U;
+    xgl_config_t config = {
+        .source_id = 1U,
+        .memory = {.rx_buffer_size = 160U},
+        .protocol = {.ack_timeout_ms = 1000U,
+                     .max_retry_count = 3U,
+                     .window_size = 1U,
+                     .max_frame_size = 128U},
+        .features = {.max_peers = 1U,
+                     .max_tx_packets = 2U,
+                     .max_rx_buffered_packets = 2U},
+    };
     config.memory.allocator = &core;
-    config.protocol.window_size = 1U;
-    config.features.max_peers = 1U;
     config.route_table = &route;
     config.route_table_len = 1U;
     xgl_handle_t handle = xgl_create(&config);

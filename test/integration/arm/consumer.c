@@ -94,8 +94,6 @@ static bool run_reference(void) {
     write_size("workspace_alignment=", requirements.alignment);
     write_size("workspace_reserved=", sizeof(s_workspace));
     write_size("resource_config_id=", XGL_RESOURCE_CONFIG_ID);
-    write_size("build_config_id=", XGL_BUILD_CONFIG_ID);
-    write_size("config_abi_version=", XGL_CONFIG_ABI_VERSION);
     write_size("adaptive_rto=", XGL_FEATURE_ADAPTIVE_RTO);
     write_size("window_capacity=", XGL_BUILD_WINDOW_CAPACITY);
 

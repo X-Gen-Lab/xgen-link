@@ -7,6 +7,8 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
+
 #include <xgl/xgl.h>
 
 #include "test_host_allocator.h"
@@ -30,7 +32,7 @@ class XglNetworkTxContractTest : public ::testing::Test {
             return XGL_OK;
         };
         phy.user_data = this;
-        xgl_config_get_preset_boot(&config);
+        config = xgl_test_single_packet_config();
         config.memory.allocator = xgl_test_host_allocator();
         route.target_id = 2U;
         route.phy = &phy;

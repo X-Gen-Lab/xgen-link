@@ -13,7 +13,7 @@ source_language: zh_CN
 
 | 契约 | 主要源码 |
 | --- | --- |
-| ABI 校验、生命周期、公开 step | `src/api/` |
+| 配置校验、生命周期、公开 step | `src/api/` |
 | 静态工作区规划与资源服务 | `src/api/xgl_workspace.c` |
 | 精确 peer 生命周期与 close | `src/transport/xgl_transport_peer.c` |
 | ACK 原子校验与应用 | `src/transport/xgl_transport_ack.c` |

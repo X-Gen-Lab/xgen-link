@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include "test_security_helpers.h"
 
@@ -186,7 +187,7 @@ class XglNetworkMultihopTest : public ::testing::Test {
         c.routes = {{1U, &c_phy.ops, 256U, 1000U, 1U}};
         uint16_t source = 1U;
         for (Node* node : {&a, &b, &c}) {
-            xgl_config_get_default(&node->config);
+            node->config = xgl_test_config();
             xgl_test_use_host_allocator(&node->config);
             node->config.source_id = source++;
             node->config.memory.rx_buffer_size = 256U;

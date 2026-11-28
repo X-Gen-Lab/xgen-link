@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <transport/xgl_transport_internal.h>
 #include <wire/xgl_crc16.h>
@@ -127,7 +128,7 @@ struct PublicReceiver {
         nullptr, &xgl_destroy};
 
     void Init(bool with_handler = true) {
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.memory.allocator = xgl_test_host_allocator();
         config.protocol.max_frame_size = 128U;
         config.memory.rx_buffer_size = 128U;

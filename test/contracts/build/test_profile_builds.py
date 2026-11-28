@@ -131,8 +131,8 @@ class ProfileBuilds(unittest.TestCase):
         self.execute("ctest", "--test-dir", binary, "--output-on-failure",
                      "--no-tests=error")
         config = (binary / "generated/xgl/xgl_build_config.h").read_text()
-        for definition in ("XGL_BUILD_CONFIG_ID 304U", "XGL_FEATURE_AUTH 0",
-                           "XGL_CONFIG_ABI_VERSION 5U", "XGL_FEATURE_FORWARDING 0",
+        for definition in ("XGL_FEATURE_AUTH 0",
+                           "XGL_FEATURE_FORWARDING 0",
                            "XGL_FEATURE_OUT_OF_ORDER 1"):
             self.assertIn("#define " + definition, config)
         self.assertNotIn("XGL_FEATURE_FRAGMENTATION", config)
@@ -152,7 +152,7 @@ class ProfileBuilds(unittest.TestCase):
             '    PATHS "${XGL_SDK_PREFIX}" NO_DEFAULT_PATH)\n'
             'include("${CMAKE_CURRENT_LIST_DIR}/VerifySdkPrefix.cmake")\n'
             'xgl_verify_sdk_prefix("${XGL_SDK_PREFIX}")\n'
-            'if(NOT xgl_PROFILE STREQUAL "embedded-lite" OR NOT xgl_BUILD_CONFIG_ID EQUAL 304)\n'
+            'if(NOT xgl_PROFILE STREQUAL "embedded-lite")\n'
             '  message(FATAL_ERROR "Installed profile identity does not match")\nendif()\n'
             'get_target_property(profile xgl::xgl XGL_PROFILE)\n'
             'if(NOT profile STREQUAL xgl_PROFILE)\n'

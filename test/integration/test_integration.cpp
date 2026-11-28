@@ -8,6 +8,7 @@
  * \note            Validates: Requirements 19.2
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <xgl/xgl.h>
@@ -38,15 +39,14 @@ using ::testing::Return;
 class XglIntegrationTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        /* Setup default configuration */
-        xgl_config_get_default(&config1_);
+        config1_ = xgl_test_config();
         config1_.source_id = 1;
         config1_.protocol.max_frame_size = 256;
         config1_.protocol.window_size = 4;
         config1_.protocol.max_retry_count = 3;
         config1_.protocol.ack_timeout_ms = 100;
 
-        xgl_config_get_default(&config2_);
+        config2_ = xgl_test_config();
         config2_.source_id = 2;
         config2_.protocol.max_frame_size = 256;
         config2_.protocol.window_size = 4;
@@ -149,7 +149,7 @@ TEST_F(XglIntegrationTest, ConfigurationValidation) {
     xgl_config_t config;
 
     /* Test valid configuration */
-    xgl_config_get_default(&config);
+    config = xgl_test_config();
     config.source_id = 1;
     EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
 
@@ -158,48 +158,10 @@ TEST_F(XglIntegrationTest, ConfigurationValidation) {
     EXPECT_NE(xgl_config_validate(&config), XGL_OK);
 
     /* Test invalid configuration - zero window size */
-    xgl_config_get_default(&config);
+    config = xgl_test_config();
     config.source_id = 1;
     config.protocol.window_size = 0;
     EXPECT_NE(xgl_config_validate(&config), XGL_OK);
-}
-
-/**
- * \brief           Test configuration presets
- * \note            Validates: Requirements 19.2, 10.3, 42.3
- */
-TEST_F(XglIntegrationTest, ConfigurationPresets) {
-    xgl_config_t config;
-
-    /* Test tiny preset */
-    xgl_config_get_preset_tiny(&config);
-    config.source_id = 1;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.features.max_tx_packets, 2U);
-    EXPECT_EQ(config.protocol.max_frame_size, 128);
-
-    /* Test small preset */
-    xgl_config_get_preset_small(&config);
-    config.source_id = 1;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.features.max_tx_packets, 4U);
-    EXPECT_EQ(config.protocol.max_frame_size, 256);
-
-    /* Test medium preset */
-    xgl_config_get_preset_medium(&config);
-    config.source_id = 1;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.features.max_tx_packets, 16U);
-    EXPECT_EQ(config.protocol.max_frame_size, 512);
-    EXPECT_FALSE(config.features.enable_compression);
-
-    /* Test large preset */
-    xgl_config_get_preset_large(&config);
-    config.source_id = 1;
-    EXPECT_EQ(xgl_config_validate(&config), XGL_OK);
-    EXPECT_EQ(config.features.max_tx_packets, 64U);
-    EXPECT_EQ(config.protocol.max_frame_size, 1024);
-    EXPECT_FALSE(config.features.enable_encryption);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -298,7 +260,7 @@ TEST_F(XglIntegrationTest, InitializationErrors) {
  */
 TEST_F(XglIntegrationTest, MemoryAllocationFailure) {
     xgl_config_t config;
-    xgl_config_get_default(&config);
+    config = xgl_test_config();
     config.features.max_tx_packets = SIZE_MAX;
     xgl_memory_requirements_t requirements{};
     EXPECT_EQ(xgl_memory_requirements(&config, &requirements),
@@ -660,7 +622,7 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
     config1_.route_table_len = 1;
 
     xgl_config_t config_b;
-    xgl_config_get_default(&config_b);
+    config_b = xgl_test_config();
     config_b.source_id = 2;
     config_b.protocol.max_frame_size = 256;
     config_b.protocol.window_size = 4;
@@ -670,7 +632,7 @@ TEST_F(XglIntegrationTest, MultiHopForwarding) {
     config_b.route_table_len = 2;
 
     xgl_config_t config_c;
-    xgl_config_get_default(&config_c);
+    config_c = xgl_test_config();
     config_c.source_id = 3;
     config_c.protocol.max_frame_size = 256;
     config_c.protocol.window_size = 4;

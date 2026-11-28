@@ -6,12 +6,6 @@
 #define XGL_VERSION_STRING "@PROJECT_VERSION@"
 #define XGL_BUILD_PROFILE "@XGL_PROFILE@"
 #define XGL_BUILD_PROFILE_BOOT @XGL_BUILD_PROFILE_BOOT@
-#if defined(XGL_BUILD_CONFIG_ID) && XGL_BUILD_CONFIG_ID != @XGL_BUILD_CONFIG_ID@U
-#error "XGL_BUILD_CONFIG_ID conflicts with the compiled protocol"
-#endif
-#ifndef XGL_BUILD_CONFIG_ID
-#define XGL_BUILD_CONFIG_ID @XGL_BUILD_CONFIG_ID@U
-#endif
 #if defined(XGL_RESOURCE_CONFIG_ID) && \
     XGL_RESOURCE_CONFIG_ID != @XGL_RESOURCE_CONFIG_ID@U
 #error "XGL_RESOURCE_CONFIG_ID conflicts with the compiled protocol"
@@ -34,16 +28,6 @@
 #define XGL_DATALINK_MAX_FRAME_SIZE @XGL_DATALINK_MAX_FRAME_SIZE@U
 #endif
 
-#if defined(XGL_CONFIG_ABI_VERSION) && XGL_CONFIG_ABI_VERSION != @XGL_CONFIG_ABI_VERSION@U
-#error "XGL_CONFIG_ABI_VERSION conflicts with the compiled protocol"
-#endif
-#ifndef XGL_CONFIG_ABI_VERSION
-#define XGL_CONFIG_ABI_VERSION @XGL_CONFIG_ABI_VERSION@U
-#endif
-#if defined(XGL_EXPECTED_CONFIG_ABI_VERSION) && \
-    XGL_EXPECTED_CONFIG_ABI_VERSION != XGL_CONFIG_ABI_VERSION
-#error "xgl headers and target have different configuration ABI versions"
-#endif
 #if defined(XGL_FEATURE_ADVANCED_RUNTIME) && \
     XGL_FEATURE_ADVANCED_RUNTIME != @XGL_FEATURE_ADVANCED_RUNTIME@
 #error "XGL_FEATURE_ADVANCED_RUNTIME conflicts with the compiled protocol"

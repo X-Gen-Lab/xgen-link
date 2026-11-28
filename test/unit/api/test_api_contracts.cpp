@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <gtest/gtest.h>
@@ -16,7 +17,7 @@
 class XglApiContractsTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        xgl_config_get_preset_boot(&config);
+        config = xgl_test_single_packet_config();
         config.source_id = 1U;
         config.route_table = &route;
         config.route_table_len = 1U;
@@ -63,27 +64,12 @@ class XglApiContractsTest : public ::testing::Test {
     bool partial = false;
 };
 
-TEST_F(XglApiContractsTest, CreationReturnsConfigurationAndAbiErrors) {
+TEST_F(XglApiContractsTest, CreationReportsInvalidConfiguration) {
     xgl_handle_t output = reinterpret_cast<xgl_handle_t>(&config);
     EXPECT_EQ(xgl_create_with_error(nullptr, &output), XGL_ERR_NULL_POINTER);
     EXPECT_EQ(output, nullptr);
     config.source_id = 0U;
     EXPECT_EQ(xgl_create_with_error(&config, &output), XGL_ERR_INVALID_PARAM);
-    EXPECT_EQ(output, nullptr);
-    EXPECT_EQ(xgl_create_with_error_checked(&config, sizeof(config) - 1U,
-                                            XGL_CONFIG_ABI_VERSION,
-                                            XGL_BUILD_CONFIG_ID, &output),
-              XGL_ERR_INVALID_VERSION);
-    EXPECT_EQ(output, nullptr);
-    EXPECT_EQ(xgl_create_with_error_checked(&config, sizeof(config),
-                                            XGL_CONFIG_ABI_VERSION + 1U,
-                                            XGL_BUILD_CONFIG_ID, &output),
-              XGL_ERR_INVALID_VERSION);
-    EXPECT_EQ(output, nullptr);
-    EXPECT_EQ(xgl_create_with_error_checked(&config, sizeof(config),
-                                            XGL_CONFIG_ABI_VERSION,
-                                            XGL_BUILD_CONFIG_ID + 1U, &output),
-              XGL_ERR_INVALID_VERSION);
     EXPECT_EQ(output, nullptr);
     EXPECT_EQ(xgl_create_with_error(&config, nullptr), XGL_ERR_NULL_POINTER);
 }

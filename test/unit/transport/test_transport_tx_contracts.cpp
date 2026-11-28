@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <api/xgl_instance_internal.h>
 #include <network/xgl_route.h>
@@ -86,7 +87,7 @@ class XglTransportTxContractTest : public ::testing::Test {
     void SetUp() override {
         phy = {Transmit, Receive, this};
         route = {2U, &phy, 128U, 1000U, 0U};
-        xgl_config_get_preset_boot(&config);
+        config = xgl_test_single_packet_config();
         config.features.peer_idle_timeout_ms = 0U;
         config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;

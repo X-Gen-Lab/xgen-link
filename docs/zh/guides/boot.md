@@ -11,7 +11,7 @@ Boot 编译档位保留静态 workspace、单 peer、最多一条路由和包窗
 
 ## 选择资源
 
-用 [编译档位](../reference/profiles.md) 选择构建，再用 `xgl_config_get_preset_boot()` 设置运行配置。设置路由、节点、MTU、RX 缓冲和时间预算，通过 `xgl_memory_requirements()` 获取真实大小和对齐。将存储配置为静态并以 `xgl_init_static()` 初始化。包载荷预算按真实头、TLV 和 CRC 扣除后计算。
+用 [编译档位](../reference/profiles.md) 选择构建，再由应用填写 `xgl_config_t`。设置单包窗口、对端与发送槽容量、路由、节点、MTU、RX 缓冲和时间预算，通过 `xgl_memory_requirements()` 获取真实大小和对齐。将存储配置为静态并以 `xgl_init_static()` 初始化。包载荷预算按真实头、TLV 和 CRC 扣除后计算。
 
 测量目标固件并记录外部 PHY 所需的缓冲、时序及实际调用栈。运行窗口 1 与独立的编译窗口上限分别选择。资源证据参见[验证](../development/validation.md)。
 

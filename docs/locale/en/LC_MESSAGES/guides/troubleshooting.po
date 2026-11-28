@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: ea13d69cc615f391eba2437ce55a2ca3e89ccf16a303f1e5cd41779151dd85e0\n"
+"X-XGL-Source-SHA256: f619cb7d9ddffa2403f319010a399bd32dc168ddfe9cc246f814be919474087f\n"
 
 #: docs/zh/guides/troubleshooting.md:8
 msgid "诊断和调试"
@@ -26,12 +26,12 @@ msgstr "Initialization"
 
 #: docs/zh/guides/troubleshooting.md:14
 msgid ""
-"检查生成头文件与库的 ABI 是否一致，节点/peer/TX 容量是否有效，路由回调是否齐全，RX 容量是否覆盖完整帧上限。Workspace 地址和大小必须满足 "
+"检查头文件与静态库是否来自同一 SDK 安装前缀，节点/peer/TX 容量是否有效，路由回调是否齐全，RX 容量是否覆盖完整帧上限。Workspace 地址和大小必须满足 "
 "`xgl_memory_requirements()`。"
 msgstr ""
-"Check the generated header/library ABI pair, nonzero node/peer/TX capacity, route callbacks, and RX "
-"capacity relative to the full frame limit. The workspace address and size must satisfy "
-"`xgl_memory_requirements()`."
+"Check that the headers and static library come from the same SDK installation prefix. Verify the node "
+"ID, peer and TX capacities, route callbacks and RX capacity for the complete frame limit. Workspace "
+"size and address must satisfy `xgl_memory_requirements()`."
 
 #: docs/zh/guides/troubleshooting.md:16
 msgid ""
@@ -107,8 +107,8 @@ msgid "`XGL_ERR_INVALID_VERSION`"
 msgstr "`XGL_ERR_INVALID_VERSION`"
 
 #: docs/zh/guides/troubleshooting.md:0
-msgid "消费者 ABI/build 标识或接收 wire 版本"
-msgstr "Consumer ABI/build identifier or received wire version"
+msgid "高级选项描述符的尺寸或版本、接收的 Wire 版本"
+msgstr "Extended options descriptor sizes or version, or received Wire version"
 
 #: docs/zh/guides/troubleshooting.md:0
 msgid "`XGL_ERR_ACK_TIMEOUT`"

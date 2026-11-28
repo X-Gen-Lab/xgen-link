@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <gtest/gtest.h>
@@ -19,8 +20,7 @@
 class XglLayeredStatsTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        /* Get default configuration */
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = 1;
 
         /* Create and initialize instance */

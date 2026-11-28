@@ -67,18 +67,18 @@ static xgl_error_t smoke_receive(uint8_t* data, size_t* length, void* context) {
     return XGL_OK;
 }
 
-/** \brief           Check optional APIs through the installed capability ID. */
+/** \brief           Check optional APIs with the installed SDK. */
 static int smoke_optional_runtime(const xgl_config_t* config,
                                   smoke_state_t* state) {
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     xgl_handle_t handle = NULL;
-    options.build_config_id ^= 1U;
+    options.version ^= 1U;
     if (xgl_create_with_options(config, &options, &handle) !=
             XGL_ERR_INVALID_VERSION ||
         handle != NULL || state->allocations != 2U) {
         return 12;
     }
-    options.build_config_id ^= 1U;
+    options.version ^= 1U;
     xgl_memory_report_t report = {0};
 #if XGL_FEATURE_ADVANCED_RUNTIME
     if (xgl_memory_report_with_options(config, &options, &report) != XGL_OK ||
@@ -140,30 +140,23 @@ int main(void) {
         .alloc = smoke_allocate, .free = smoke_release, .ctx = &state};
     xgl_phy_ops_t phy = {smoke_transmit, smoke_receive, &state};
     xgl_route_item_t route = {2U, &phy, 128U, 100U, 0U};
-    xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    xgl_config_t config = {
+        .source_id = 1U,
+        .memory = {.rx_buffer_size = 128U},
+        .protocol = {.ack_timeout_ms = 1000U,
+                     .max_retry_count = 3U,
+                     .window_size = 1U,
+                     .max_frame_size = 128U},
+        .features = {.max_peers = 1U, .max_tx_packets = 1U},
+    };
     config.memory.allocator = &allocator;
     config.route_table = &route;
     config.route_table_len = 1U;
 
     xgl_handle_t handle = NULL;
-    if (xgl_create_with_error_checked(
-            &config, sizeof(config) - 1U, XGL_CONFIG_ABI_VERSION,
-            XGL_BUILD_CONFIG_ID, &handle) != XGL_ERR_INVALID_VERSION ||
+    if (xgl_create_with_error(NULL, &handle) != XGL_ERR_NULL_POINTER ||
         handle != NULL || state.allocations != 0U) {
         return 1;
-    }
-    if (xgl_create_with_error_checked(
-            &config, sizeof(config), XGL_CONFIG_ABI_VERSION ^ 1U,
-            XGL_BUILD_CONFIG_ID, &handle) != XGL_ERR_INVALID_VERSION ||
-        handle != NULL || state.allocations != 0U) {
-        return 2;
-    }
-    if (xgl_create_with_error_checked(
-            &config, sizeof(config), XGL_CONFIG_ABI_VERSION,
-            XGL_BUILD_CONFIG_ID ^ 1U, &handle) != XGL_ERR_INVALID_VERSION ||
-        handle != NULL || state.allocations != 0U) {
-        return 3;
     }
 
     state.fail = true;

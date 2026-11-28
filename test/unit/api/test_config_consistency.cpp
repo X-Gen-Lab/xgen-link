@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <gtest/gtest.h>
 #include <xgl/xgl.h>
@@ -34,7 +35,7 @@ struct ScopedInstance {
 
 xgl_config_t bounded_config() {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     config.memory.allocator = xgl_test_host_allocator();
     return config;
 }

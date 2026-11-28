@@ -7,9 +7,19 @@ source_language: zh_CN
 
 # 配置
 
-先选择与编译 profile 匹配的预设，补充应用参数，再调用 `xgl_config_validate()` 和 `xgl_memory_requirements()`，最后准备存储。预设只是初始容量组合，不代表已测量的 MCU RAM 占用。
+应用在自己的代码中初始化 `xgl_config_t`。下面的 C11 示例为单对端、单个在途包分配容量。64 字节是完整帧上限，ACK 超时为 200 毫秒，最多重试三次。
 
-`xgl_config_get_default()` 在 Boot 档使用 Boot 预设；其余 profile 使用 Medium 模板，并将 `protocol.window_size` 限制为已编译的窗口容量。具名预设和 `XGL_CONFIG_PRESET_*` 宏保留各自的固定模板，不会自动缩小窗口或其他容量。例如，窗口容量为一的构建可以使用默认配置，但 Tiny 的窗口模板仍为二，需要显式调整后再校验。
+```c
+xgl_config_t config = {
+    .source_id = 1U,
+    .memory = {.rx_buffer_size = 64U},
+    .protocol = {.ack_timeout_ms = 200U, .max_retry_count = 3U,
+                 .window_size = 1U, .max_frame_size = 64U},
+    .features = {.max_tx_packets = 1U, .max_peers = 1U},
+};
+```
+
+通信前填写路由、PHY 和接收回调。用 `xgl_config_validate(&config)` 检查参数，再用 `xgl_memory_requirements()` 查询目标上的工作区字节数和对齐要求。
 
 ## 生命周期和身份
 
@@ -35,7 +45,7 @@ source_language: zh_CN
 
 实际帧必须同时满足协议上限和路由 MTU，包括 24 字节基础头、扩展、payload、启用认证时的 tag 和 2 字节 CRC。`memory.rx_buffer_size` 至少为 `protocol.max_frame_size`。
 
-生产 SDK 的 `XGL_DATALINK_MAX_FRAME_SIZE` 默认 2048 字节，可在构建库时通过同名 CMake 选项在 64–2048 字节之间选择。实例 MTU 必须处于 64 字节与所选上限之间。单条路由可以声明更大的物理 MTU，发送时两项限制同时生效。`xgl_config_get_default()` 会约束默认 MTU，使用具名 preset 时应检查并调整 `protocol.max_frame_size`。接收存储设为同一 MTU 可避免额外预留。涉及可靠通信时同时检查[反向反馈预算](../reference/protocol/v1/routing.md)。
+生产 SDK 的 `XGL_DATALINK_MAX_FRAME_SIZE` 默认 2048 字节，可在构建库时通过同名 CMake 选项在 64–2048 字节之间选择。实例 MTU 必须处于 64 字节与所选上限之间。单条路由可以声明更大的物理 MTU，发送时两项限制同时生效。接收存储设为同一 MTU 可避免额外预留。涉及可靠通信时同时检查[反向反馈预算](../reference/protocol/v1/routing.md)。
 
 ## 显式容量
 
@@ -66,17 +76,17 @@ workspace 为各类包预留固定大小的槽位。需要减少预留 RAM 时�
 
 只支持以下明确的能力组合，不提供任意 feature flag 的排列。实际启用项及容量仍由运行时配置决定，运行时配置不能恢复编译时已裁剪的能力。
 
-| Profile | 默认配置 ID | 认证/转发 | 乱序 | 统计/诊断文字 |
-| --- | ---: | --- | --- | --- |
-| `boot` | 301 | 无 | 无 | 无 |
-| `embedded-lite` | 304 | 无 | 有 | 有 |
-| `embedded` | 302 | 有 | 有 | 有 |
-| `full` | 303 | 有 | 有 | 有 |
+| Profile | 认证/转发 | 乱序 | 统计/诊断文字 |
+| --- | --- | --- | --- |
+| `boot` | 无 | 无 | 无 |
+| `embedded-lite` | 无 | 有 | 有 |
+| `embedded` | 有 | 有 | 有 |
+| `full` | 有 | 有 | 有 |
 
 Boot 允许一个 peer、最多一条路由、窗口一。Embedded Lite 默认使用 8 个可靠索引桶，不保留安全会话存储；适用于需要乱序缓存的直接通信端点。其他容量上限由生成的 `xgl_build_config.h` 给出。
 
-可靠索引桶数、私有窗口容量和自适应 RTO 可以通过受控编译选项选择，默认私有窗口仍为 128 槽，自适应 RTO 默认开启。运行时配置不能扩大已编译容量。上表 ID 仅适用于全部实际资源与 profile 默认值一致的构建；改变资源组合、PHY 读取块或 libc fallback 会获得不同的构建身份。选项、安装消费和冲突拒绝见[构建与测试](build-and-consume.md)。
+可靠索引桶数、私有窗口容量和自适应 RTO 可以通过受控编译选项选择，默认私有窗口仍为 128 槽，自适应 RTO 默认开启。运行时配置不能扩大已编译容量。选项、安装消费和冲突拒绝见[构建与测试](build-and-consume.md)。
 
-安装包导出 `xgl_PROFILE`、`xgl_BUILD_CONFIG_ID`、`xgl_RESOURCE_CONFIG_ID`、`xgl_CAPABILITIES` 和实际资源选项，目标 `xgl::xgl` 同时具有对应的 profile、构建与资源身份、能力属性。消费者可用 `find_package(xgl CONFIG REQUIRED COMPONENTS reliable out_of_order)` 要求能力；不支持的必需能力在配置阶段拒绝。可请求名称为 `wire`、`reliable`、`authentication`、`forwarding`、`out_of_order`、`statistics`、`diagnostics` 和 `advanced_runtime`。
+安装包导出 `xgl_PROFILE`、`xgl_RESOURCE_CONFIG_ID`、`xgl_CAPABILITIES` 和实际资源选项，目标 `xgl::xgl` 同时具有对应的 档位、资源标识和能力属性。消费者可用 `find_package(xgl CONFIG REQUIRED COMPONENTS reliable out_of_order)` 要求能力；不支持的必需能力在配置阶段拒绝。可请求名称为 `wire`、`reliable`、`authentication`、`forwarding`、`out_of_order`、`statistics`、`diagnostics` 和 `advanced_runtime`。
 
-压缩和 payload 加密仍是保留项，启用会被拒绝；两个 feature flag 保持 false，`compression_id` 保持零。通过 `xgl_memory_requirements()` 检查 workspace 算术溢出并查询依赖 ABI 的真实大小。库、CMake target 与消费者必须使用匹配的生成 profile 和资源头文件；公开 checked 入口使用生成的构建身份，不能硬编码默认 profile ID。
+压缩和 payload 加密仍是保留项，启用会被拒绝；两个 feature flag 保持 false，`compression_id` 保持零。通过 `xgl_memory_requirements()` 检查 workspace 算术溢出并查询依赖 ABI 的真实大小。库、CMake target 与消费者必须使用匹配的生成 profile 和资源头文件。

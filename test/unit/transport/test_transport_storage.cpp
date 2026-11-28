@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <transport/xgl_transport_rx_internal.h>
 #include <xgl/xgl.h>
@@ -19,7 +20,7 @@
 
 TEST(XglTransportStorageTest, WorkspaceDoesNotReserveWindowAllocations) {
     xgl_config_t config = {};
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     config.memory.allocator = xgl_test_host_allocator();
     xgl_memory_report_t report = {};
     ASSERT_EQ(xgl_memory_report(&config, &report), XGL_OK);

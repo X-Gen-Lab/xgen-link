@@ -22,7 +22,7 @@ cmake --build build/first-link --target echo_server
 
 ## 存储与生命周期
 
-示例从 Tiny preset 开始，将可靠窗口与 peer 容量各设为 1，使用 128 字节 MTU。为两端设置各自的本地节点、到对端的路由、PHY 和应用回调。配置及引用对象保留到销毁。
+示例显式将可靠窗口与 peer 容量各设为 1，完整帧上限取构建上限与 128 字节中的较小值。为两端设置各自的本地节点、到对端的路由、PHY 和应用回调。配置及引用对象保留到销毁。
 
 调用 `xgl_memory_requirements()`，检查精确大小和对齐，为 `xgl_init_static()` 提供足够容量。不同 profile 和容量需要不同空间。也可由 `xgl_create()` 通过选定后端预留相同布局，然后调用 `xgl_init()`。
 

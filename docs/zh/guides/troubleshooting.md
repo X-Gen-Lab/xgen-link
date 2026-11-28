@@ -11,7 +11,7 @@ source_language: zh_CN
 
 ## 初始化
 
-检查生成头文件与库的 ABI 是否一致，节点/peer/TX 容量是否有效，路由回调是否齐全，RX 容量是否覆盖完整帧上限。Workspace 地址和大小必须满足 `xgl_memory_requirements()`。
+检查头文件与静态库是否来自同一 SDK 安装前缀，节点/peer/TX 容量是否有效，路由回调是否齐全，RX 容量是否覆盖完整帧上限。Workspace 地址和大小必须满足 `xgl_memory_requirements()`。
 
 保证配置及引用对象持续有效。`xgl_create()` 只预留存储，还要调用 `xgl_init()`；`xgl_init_static()` 本身包含初始化。无 heap 的动态创建必须提供有效的显式上下文分配器。
 
@@ -25,7 +25,7 @@ source_language: zh_CN
 | `XGL_ERR_ROUTE_NOT_FOUND` | 目标与固定路由配置 |
 | `XGL_ERR_BUFFER_TOO_SMALL` | Workspace、RX cache、完整帧开销或消息上限 |
 | `XGL_ERR_UNSUPPORTED` | 编译 profile 与请求功能 |
-| `XGL_ERR_INVALID_VERSION` | 消费者 ABI/build 标识或接收 wire 版本 |
+| `XGL_ERR_INVALID_VERSION` | 高级选项描述符的尺寸或版本、接收的 Wire 版本 |
 | `XGL_ERR_ACK_TIMEOUT` | 链路丢失、step 未推进或可靠 scope 已失败 |
 
 确认 PHY RX 无数据时返回零字节，不越过缓冲容量，也不无限阻塞。完整序列化帧须满足两端限制。本地发送成功不是交付回执。

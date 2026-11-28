@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <api/xgl_instance_internal.h>
 #include <transport/xgl_transport_internal.h>
@@ -383,7 +384,7 @@ TEST(XglTransportPublicRuntimeTest, StepReturnsHardRetryAndExhaustionErrors) {
         route.max_frame_size = 128U;
         route.read_freq_hz = 1000U;
         xgl_config_t config;
-        xgl_config_get_preset_boot(&config);
+        config = xgl_test_single_packet_config();
         config.memory.allocator = xgl_test_host_allocator();
         config.route_table = &route;
         config.route_table_len = 1U;

@@ -30,16 +30,6 @@ typedef struct {
     xgl_memory_requirements_t requirements;
 } xgl_workspace_plan_t;
 
-/* Keep the checked entry points in agreement on the consumer's ABI identity. */
-/* NOLINTBEGIN(bugprone-easily-swappable-parameters) */
-static bool config_abi_matches(size_t config_size, uint32_t abi_version,
-                               uint32_t build_config_id) {
-    /* NOLINTEND(bugprone-easily-swappable-parameters) */
-    return config_size == sizeof(xgl_config_t) &&
-           abi_version == XGL_CONFIG_ABI_VERSION &&
-           build_config_id == XGL_BUILD_CONFIG_ID;
-}
-
 /**
  * \brief           Add protocol partition sizes without unsigned overflow
  */
@@ -204,15 +194,10 @@ static void bind_services(xgl_workspace_t* workspace) {
 }
 
 /**
- * \brief           Validate the caller ABI before calculating workspace sizes
+ * \brief           Calculate the exact static workspace requirements
  */
-xgl_error_t
-xgl_memory_requirements_checked(const xgl_config_t* config, size_t config_size,
-                                uint32_t abi_version, uint32_t build_config_id,
-                                xgl_memory_requirements_t* requirements) {
-    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
-        return XGL_ERR_INVALID_VERSION;
-    }
+xgl_error_t xgl_memory_requirements(const xgl_config_t* config,
+                                    xgl_memory_requirements_t* requirements) {
     if (requirements == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -240,8 +225,7 @@ xgl_error_t xgl_options_validate(const xgl_config_t* config,
     }
     if (options->size != sizeof(*options) ||
         options->version != XGL_INSTANCE_OPTIONS_VERSION ||
-        !config_abi_matches(options->config_size, options->config_abi,
-                            options->build_config_id)) {
+        options->config_size != sizeof(xgl_config_t)) {
         return XGL_ERR_INVALID_VERSION;
     }
 #if XGL_FEATURE_ADVANCED_RUNTIME
@@ -303,13 +287,8 @@ static void report_plan(const xgl_workspace_plan_t* plan,
 }
 
 /** \brief           Report the same validated layout used by initialization. */
-xgl_error_t xgl_memory_report_checked(const xgl_config_t* config,
-                                      size_t config_size, uint32_t abi_version,
-                                      uint32_t build_config_id,
-                                      xgl_memory_report_t* report) {
-    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
-        return XGL_ERR_INVALID_VERSION;
-    }
+xgl_error_t xgl_memory_report(const xgl_config_t* config,
+                              xgl_memory_report_t* report) {
     if (report == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
@@ -396,18 +375,12 @@ static xgl_error_t reserve_storage(const xgl_config_t* config,
 }
 
 /** \brief           Reserve one workspace through the selected backend. */
-xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
-                                          size_t config_size,
-                                          uint32_t abi_version,
-                                          uint32_t build_config_id,
-                                          xgl_handle_t* handle) {
+xgl_error_t xgl_create_with_error(const xgl_config_t* config,
+                                  xgl_handle_t* handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     *handle = NULL;
-    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
-        return XGL_ERR_INVALID_VERSION;
-    }
     xgl_workspace_plan_t plan;
     xgl_error_t error = make_plan(config, &plan);
     if (error != XGL_OK) {
@@ -417,12 +390,9 @@ xgl_error_t xgl_create_with_error_checked(const xgl_config_t* config,
 }
 
 /** \brief           Preserve the legacy pointer-only reservation result. */
-xgl_handle_t xgl_create_checked(const xgl_config_t* config, size_t config_size,
-                                uint32_t abi_version,
-                                uint32_t build_config_id) {
+xgl_handle_t xgl_create(const xgl_config_t* config) {
     xgl_handle_t handle;
-    (void)xgl_create_with_error_checked(config, config_size, abi_version,
-                                        build_config_id, &handle);
+    (void)xgl_create_with_error(config, &handle);
     return handle;
 }
 
@@ -455,17 +425,12 @@ xgl_error_t xgl_workspace_prepare(const xgl_config_t* config, void* storage,
 /**
  * \brief           Initialize the shared layout inside caller-owned storage
  */
-xgl_error_t xgl_init_static_checked(const xgl_config_t* config,
-                                    size_t config_size, uint32_t abi_version,
-                                    uint32_t build_config_id, void* storage,
-                                    size_t storage_size, xgl_handle_t* handle) {
+xgl_error_t xgl_init_static(const xgl_config_t* config, void* storage,
+                            size_t storage_size, xgl_handle_t* handle) {
     if (handle == NULL) {
         return XGL_ERR_NULL_POINTER;
     }
     *handle = NULL;
-    if (!config_abi_matches(config_size, abi_version, build_config_id)) {
-        return XGL_ERR_INVALID_VERSION;
-    }
     xgl_handle_t prepared;
     xgl_error_t error =
         xgl_workspace_prepare(config, storage, storage_size, NULL, &prepared);

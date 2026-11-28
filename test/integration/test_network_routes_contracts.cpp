@@ -7,6 +7,8 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
+
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -39,7 +41,7 @@ xgl_error_t route_rx(uint8_t*, size_t* len, void* user_data) {
 
 xgl_config_t route_config(xgl_route_item_t* routes, size_t count) {
     xgl_config_t config = {};
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     config.memory.allocator = xgl_test_host_allocator();
     config.route_table = routes;
     config.route_table_len = count;

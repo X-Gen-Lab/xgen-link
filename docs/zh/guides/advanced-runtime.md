@@ -7,13 +7,18 @@ source_language: zh_CN
 
 # 扩展运行选项
 
-构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile 默认关闭；关闭时扩展入口返回 `XGL_ERR_UNSUPPORTED`。选项改变私有布局与构建身份，库和消费者必须使用同一生成配置头。高级运行时选项描述符的版本为 `2`。
+构建时设置 `-DXGL_ENABLE_ADVANCED_RUNTIME=ON`，安装消费可要求 `COMPONENTS advanced_runtime`。所有 profile 默认关闭；关闭时扩展入口返回 `XGL_ERR_UNSUPPORTED`。选项改变私有布局与编译资源组合，库和消费者必须使用同一生成配置头。高级运行时选项描述符的版本为 `4`。
 
 ## 创建与生命周期
 
 ```c
-xgl_config_t config;
-xgl_config_get_preset_boot(&config);
+xgl_config_t config = {
+    .source_id = 1U,
+    .memory = {.rx_buffer_size = 64U},
+    .protocol = {.ack_timeout_ms = 200U, .max_retry_count = 3U,
+                 .window_size = 1U, .max_frame_size = 64U},
+    .features = {.max_tx_packets = 1U, .max_peers = 1U},
+};
 /* Populate routes, PHY callbacks and product identity before measurement. */
 xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
 options.tx_lifetime_ms = 1000U;
@@ -23,7 +28,7 @@ xgl_error_t error = xgl_memory_report_with_options(&config, &options, &report);
 
 检查返回值后，提供 `report.requirements.size` 字节且满足其 alignment 的存储，调用 `xgl_init_static_with_options()`。产品可在构建阶段测量并提供固定数组，也可用显式 allocator 调用 `xgl_create_with_options()`，随后调用 `xgl_init()`。静态入口已初始化，不要重复 init。
 
-配置、options、路由、PHY、provider 与回调上下文都必须持续有效，直到销毁；不允许与 workspace 重叠。使用初始化宏填写尺寸、版本、配置 ABI 与构建身份，不硬编码。旧创建入口和旧 `xgl_step()` 保持可用。
+配置、options、路由、PHY、provider 与回调上下文都必须持续有效，直到销毁；不允许与 workspace 重叠。使用初始化宏填写描述符尺寸、版本和配置尺寸，不硬编码。旧创建入口和旧 `xgl_step()` 保持可用。
 
 ## 期限与观察
 

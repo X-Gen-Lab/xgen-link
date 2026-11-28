@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <algorithm>
 #include <cstddef>
@@ -18,7 +19,7 @@
 
 TEST(XglExtendedOptions, RejectsForeignOptionsBeforeAllocation) {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     xgl_test_use_host_allocator(&config);
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     options.version++;
@@ -78,7 +79,7 @@ class XglBoundedPollingTest : public ::testing::Test {
             return XGL_OK;
         };
         route = {2U, &phy, 128U, 1U, 1U};
-        xgl_config_get_preset_boot(&config);
+        config = xgl_test_single_packet_config();
         config.source_id = 1U;
         config.route_table = &route;
         config.route_table_len = 1U;
@@ -147,7 +148,7 @@ TEST_F(XglBoundedPollingTest, DriverFailureStillConsumesThePhyPollInterval) {
 
 TEST(XglExtendedOptions, DefaultOptionsPreserveMeasuredStorage) {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     xgl_memory_report_t legacy = {};
     xgl_memory_report_t extended = {};
@@ -160,7 +161,7 @@ TEST(XglExtendedOptions, DefaultOptionsPreserveMeasuredStorage) {
 
 TEST(XglExtendedOptions, InvalidLifetimeDoesNotModifyReport) {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     options.tx_lifetime_ms = UINT32_C(0x80000000);
     xgl_memory_report_t report = {};
@@ -172,21 +173,19 @@ TEST(XglExtendedOptions, InvalidLifetimeDoesNotModifyReport) {
 
 TEST(XglExtendedOptions, InvalidDescriptorAndCapabilityPreserveOutputs) {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     const xgl_instance_options_t base = XGL_INSTANCE_OPTIONS_INIT;
     xgl_instance_options_t options = base;
     xgl_memory_report_t report = {};
     report.requirements.size = 123U;
-    for (unsigned index = 0U; index < 4U; ++index) {
+    for (unsigned index = 0U; index < 3U; ++index) {
         options = base;
         if (index == 0U)
             options.size++;
         if (index == 1U)
             options.config_size++;
         if (index == 2U)
-            options.config_abi++;
-        if (index == 3U)
-            options.build_config_id++;
+            options.version--;
         EXPECT_EQ(xgl_memory_report_with_options(&config, &options, &report),
                   XGL_ERR_INVALID_VERSION);
         EXPECT_EQ(report.requirements.size, 123U);
@@ -211,7 +210,7 @@ TEST(XglExtendedOptions, InvalidDescriptorAndCapabilityPreserveOutputs) {
 
 TEST(XglExtendedOptions, StaticAndOwnedInitializationUseTheSameOptions) {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     xgl_test_use_host_allocator(&config);
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     options.tx_lifetime_ms = 200U;
@@ -259,7 +258,7 @@ TEST(XglExtendedOptions, StaticAndOwnedInitializationUseTheSameOptions) {
 #else
 TEST(XglExtendedOptions, DisabledCapabilityIsExplicit) {
     xgl_config_t config;
-    xgl_config_get_preset_boot(&config);
+    config = xgl_test_single_packet_config();
     xgl_instance_options_t options = XGL_INSTANCE_OPTIONS_INIT;
     xgl_memory_report_t report = {};
     EXPECT_EQ(xgl_memory_report_with_options(&config, &options, &report),

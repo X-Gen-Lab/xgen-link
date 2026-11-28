@@ -8,7 +8,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-XGL-Reviewed: true\n"
-"X-XGL-Source-SHA256: 9e9ac0b5055a0d7df7d02843199d46c02234d013cd4868f03216e3a7f71e6334\n"
+"X-XGL-Source-SHA256: 9063a426d29bfd65cc3369c8e2d49445ee395890eab26da046433be5d4043c40\n"
 
 #: docs/zh/reference/api.md:8
 msgid "公开 API"
@@ -19,10 +19,10 @@ msgid "[生成的 C API 参考](c-api.md)。"
 msgstr "[Generated C API reference](c-api.md)."
 
 #: docs/zh/reference/api.md:12
-msgid "使用 `<xgl/xgl.h>`。安装头文件包含生成的 profile 和 ABI 常量；`internal/` 头文件不安装。"
+msgid "使用 `<xgl/xgl.h>`。安装头文件包含生成的档位和资源标识；`internal/` 头文件不安装。"
 msgstr ""
-"Use `<xgl/xgl.h>`. Installed headers include the generated profile and ABI constants; `internal/` "
-"headers are not installed."
+"Include `<xgl/xgl.h>`. The installed headers provide the generated profile and resource identifiers. "
+"The `internal/` headers are private."
 
 #: docs/zh/reference/api.md:14
 msgid "生命周期与所有权"
@@ -45,16 +45,14 @@ msgstr ""
 
 #: docs/zh/reference/api.md:18
 msgid ""
-"需要诊断创建失败时使用 `xgl_create_with_error(&config, &handle)`：返回配置、ABI、后端或分配错误；分配失败为 `XGL_ERR_NO_MEMORY`，失败时清空 "
-"handle。成功仍只预留 workspace，需要调用 `xgl_init()`。原 `xgl_create()` 的指针返回形式保持兼容，复用同一实现。跨编译边界可使用对应的 `_checked` "
-"入口显式传入消费者配置大小、ABI 和构建身份。"
+"需要诊断创建失败时使用 `xgl_create_with_error(&config, &handle)`：返回配置、后端或分配错误；分配失败为 `XGL_ERR_NO_MEMORY`，失败时清空 "
+"handle。成功仍只预留 workspace，需要调用 `xgl_init()`。原 `xgl_create()` 的指针返回形式保持兼容，复用同一实现。应用直接调用创建、测量和静态初始化函数。"
 msgstr ""
-"Use `xgl_create_with_error(&config, &handle)` to diagnose reservation failures: it returns "
-"configuration, ABI, backend or allocation errors. Allocation failure returns `XGL_ERR_NO_MEMORY`; every "
-"failure clears the handle. Success still only reserves storage and requires `xgl_init()`. The original "
-"pointer-returning `xgl_create()` remains compatible and uses the same implementation. The corresponding "
-"`_checked` entry accepts the consumer configuration size, ABI and build identity explicitly across "
-"compilation boundaries."
+"Use `xgl_create_with_error(&config, &handle)` to distinguish configuration, backend and allocation "
+"errors. Allocation failure returns `XGL_ERR_NO_MEMORY`. Every failure clears the handle. Success "
+"reserves the workspace. Call `xgl_init()` to initialize it. The pointer-returning `xgl_create()` uses "
+"the same implementation. Applications call the creation, measurement and static initialization "
+"functions directly."
 
 #: docs/zh/reference/api.md:20
 msgid ""

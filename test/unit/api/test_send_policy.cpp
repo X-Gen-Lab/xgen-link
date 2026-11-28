@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <gtest/gtest.h>
@@ -25,7 +26,7 @@ static constexpr size_t XGL_TEST_AUTH_TAG_SIZE = 4U;
 class XglSendPolicyTest : public ::testing::Test {
   protected:
     void SetUp() override {
-        xgl_config_get_preset_boot(&config);
+        config = xgl_test_single_packet_config();
         config.source_id = 1U;
         config.protocol.max_frame_size = 128U;
         config.memory.rx_buffer_size = 128U;

@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 
 #include <xgl/xgl.h>
@@ -97,7 +98,7 @@ TEST(XglMemoryProperties, StaticWindowResourcesAreRecycledWithoutBackend) {
     EXPECT_CALL(backend, free_impl(_)).Times(0);
 
     xgl_config_t config_a;
-    xgl_config_get_preset_tiny(&config_a);
+    config_a = xgl_test_two_packet_config();
     config_a.protocol.window_size = 2U;
     config_a.protocol.max_frame_size = 96U;
     config_a.memory.rx_buffer_size = 96U;
@@ -174,7 +175,7 @@ TEST(XglMemoryProperties, CustomAllocatorUsage) {
 
         /* Create configuration with custom allocator */
         xgl_config_t config;
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = random_valid_source_id(gen);
         config.memory.allocator = mock_alloc.get_allocator();
 
@@ -245,7 +246,7 @@ TEST(XglMemoryProperties, MemoryLeakPrevention) {
 
         /* Generate random configuration */
         xgl_config_t config;
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = random_valid_source_id(gen);
         config.protocol.max_retry_count = 1 + (gen.random_uint8() % 10);
         config.protocol.window_size = 1 + (gen.random_uint8() % 16);
@@ -329,7 +330,7 @@ TEST(XglMemoryProperties, AllocationFailureHandling) {
 
         /* Create configuration */
         xgl_config_t config;
-        xgl_config_get_default(&config);
+        config = xgl_test_config();
         config.source_id = random_valid_source_id(gen);
         config.memory.allocator = mock_alloc.get_allocator();
 
@@ -402,8 +403,7 @@ TEST(XglMemoryProperties, MemoryPoolExhaustion) {
 
         /* Create configuration with very small memory pool */
         xgl_config_t config;
-        xgl_config_get_preset_tiny(
-            &config); /* Use tiny preset for minimal pool */
+        config = xgl_test_two_packet_config();
         config.source_id = random_valid_source_id(gen);
         /* The route must remain remote for every replay seed. */
         route.target_id = config.source_id == 1U ? 2U : 1U;

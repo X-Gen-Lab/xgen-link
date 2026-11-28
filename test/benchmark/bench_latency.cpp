@@ -6,6 +6,8 @@
  * \date            2026-07-10
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
+#include "test_config.h"
+
 #include <chrono>
 #include <cstdio>
 
@@ -14,7 +16,7 @@
 /** \brief           Measure completed deliveries and ACK processing, with
  * failures visible. */
 int main() {
-    xgl_config_t config = XGL_CONFIG_PRESET_TINY;
+    xgl_config_t config = xgl_test_two_packet_config();
     config.protocol.window_size = 1U;
     BenchmarkPair pair;
     if (!pair.init(config)) {

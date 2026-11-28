@@ -99,15 +99,15 @@ static inline xgl_error_t sim_rx(uint8_t* data, size_t* length, void* context) {
  */
 static inline void sim_prepare(sim_node_t* node, uint16_t id) {
     memset(node, 0, sizeof(*node));
-    xgl_config_t tiny = XGL_CONFIG_PRESET_TINY;
-    node->config = tiny;
     node->config.source_id = id;
     node->config.protocol.max_frame_size = SIM_FRAME_SIZE;
     node->config.protocol.window_size = 1U;
     node->config.protocol.ack_timeout_ms = 100U;
-    if (node->config.memory.rx_buffer_size > XGL_DATALINK_MAX_FRAME_SIZE) {
-        node->config.memory.rx_buffer_size = XGL_DATALINK_MAX_FRAME_SIZE;
-    }
+    node->config.memory.rx_buffer_size = SIM_FRAME_SIZE;
+    node->config.protocol.max_retry_count = 3U;
+    node->config.features.max_tx_packets = 2U;
+    node->config.features.max_rx_buffered_packets = 2U;
+    node->config.features.peer_idle_timeout_ms = 60000U;
     node->config.features.max_peers = 1U;
     node->config.route_table = node->routes;
 }

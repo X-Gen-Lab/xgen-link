@@ -7,6 +7,7 @@
  * \copyright       Copyright (c) 2026 X-Gen Lab
  */
 
+#include "test_config.h"
 #include "test_host_allocator.h"
 #include <wire/xgl_wire.h>
 #include <xgl/xgl.h>
@@ -60,7 +61,7 @@ class XglTimeoutControlTest : public ::testing::Test {
         phy = {Transmit, Receive, this};
         route = {2U, &phy, 128U, 1000U, 0U};
         xgl_config_t config = {};
-        xgl_config_get_preset_boot(&config);
+        config = xgl_test_single_packet_config();
         config.protocol.ack_timeout_ms = 200U;
         config.features.peer_idle_timeout_ms = 0U;
         config.memory.allocator = xgl_test_host_allocator();

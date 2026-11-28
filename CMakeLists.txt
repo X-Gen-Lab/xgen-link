@@ -52,7 +52,6 @@ target_include_directories(
     xgl
     PUBLIC "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-get_target_property(XGL_BUILD_CONFIG_ID xgl XGL_BUILD_CONFIG_ID)
 get_target_property(XGL_RESOURCE_CONFIG_ID xgl XGL_RESOURCE_CONFIG_ID)
 
 if(XGL_ENABLE_COVERAGE)
